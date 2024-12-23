@@ -1,5 +1,7 @@
 // services/jamieAuth.ts
-import { RequestAuthMethod } from '@/lib/searxng';
+import { RequestAuthMethod } from '../lib/searxng';
+import { API_URL } from "../constants/constants.ts";
+
 
 interface RegistrationResult {
   success: boolean;
@@ -8,7 +10,7 @@ interface RegistrationResult {
 }
 
 class JamieAuthService {
-  private static readonly JAMIE_API_URL = process.env.NEXT_PUBLIC_API_URL;
+  private static readonly JAMIE_API_URL = API_URL;
   private static readonly TOKEN_KEY = 'auth_token';
 
   static getStoredToken(): string | null {

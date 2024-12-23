@@ -1,6 +1,8 @@
+import { API_URL } from "../constants/constants.ts";
+
 export const checkFreeTierEligibility = async (): Promise<boolean> => {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/check-free-eligibility`, {
+    const response = await fetch(`${API_URL}/api/check-free-eligibility`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { API_URL } from "../constants/constants.ts";
+
 
 type FeedbackFormProps = {
   mode: 'depth' | 'expert';
@@ -18,7 +20,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ mode }) => {
   
     try {
       // Update this URL to match your Express backend
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/feedback`, {
+      const response = await fetch(`${API_URL}/api/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

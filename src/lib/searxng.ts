@@ -1,3 +1,5 @@
+import { API_URL } from "../constants/constants.ts";
+
 export interface AuthConfig {
   type: RequestAuthMethod;
   credentials: {
@@ -31,7 +33,7 @@ export async function performSearch(query: string, auth: AuthConfig) {
     }
     // FREE tier doesn't need an auth header
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stream-search`, {
+    const response = await fetch(`${API_URL}/api/stream-search`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ query })

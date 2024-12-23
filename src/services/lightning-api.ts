@@ -1,5 +1,7 @@
 // services/lightning-api.ts
 import type { Invoice } from '../types/invoice.ts';
+import { API_URL } from "../constants/constants.ts";
+
 
 interface InvoicePoolResponse {
   invoices: Invoice[];
@@ -7,7 +9,7 @@ interface InvoicePoolResponse {
 
 export async function fetchInvoicePool(): Promise<Invoice[]> {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/invoice-pool`, {
+    const response = await fetch(`${API_URL}/invoice-pool`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
