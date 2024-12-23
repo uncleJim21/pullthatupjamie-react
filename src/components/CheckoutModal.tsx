@@ -103,7 +103,10 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
       case 1:
         return (
           <>
-          <Typography variant="caption" sx={{ color: 'white', marginTop: '1rem', display: 'block', textAlign: 'center' }}>
+            <Typography
+              variant="caption"
+              sx={{ color: 'grey', marginTop: '1rem', display: 'block', textAlign: 'center' }}
+            >
               *We are required to send this information to Square to store your card on file & guarantee uninterrupted access to Jamie. We do not otherwise store this information.
             </Typography>
             <AddressForm setParentFormData={setFormData} parentFormData={formData} />
@@ -129,66 +132,86 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
       <Paper
         sx={{
-          padding: '2rem',
+          padding: '1rem',
           maxWidth: '600px',
-          width: '100%',
+          width: '90%',
+          maxHeight: '90vh',
           borderRadius: '12px',
           backgroundColor: 'black',
           color: 'white',
           boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
+          overflowY: 'auto', // Enables vertical scrolling
         }}
       >
         <div className="flex justify-end">
-          <button className="text-white" onClick={onClose}>X</button>
+          <button className="text-white" onClick={onClose}>
+            X
+          </button>
         </div>
         <Typography variant="h5" align="center" sx={{ marginBottom: '1rem', color: 'white' }}>
           {activeStep === 0 ? 'Subscribe' : 'Checkout'}
         </Typography>
-        <Stepper 
-            activeStep={activeStep} 
-            sx={{
-                marginBottom: '1.5rem',
-                '& .MuiStepLabel-root .Mui-completed': {
-                color: 'white'
-                },
-                '& .MuiStepLabel-root .MuiStepIcon-root': {
-                color: 'white',
-                '& .MuiStepIcon-text': {
-                    fill: 'black'
-                }
-                },
-                '& .MuiStepLabel-label': {
-                color: 'white'
-                },
-                '& .MuiStepLabel-label.Mui-active': {
-                color: 'white !important'
-                },
-                '& .MuiStepConnector-line': {
-                borderColor: 'white'
-                }
-            }}
-            >
-            {steps.map((label) => (
-                <Step key={label}>
-                <StepLabel>{label}</StepLabel>
-                </Step>
-            ))}
+        <Stepper
+          activeStep={activeStep}
+          sx={{
+            marginBottom: '1.5rem',
+            '& .MuiStepLabel-root .Mui-completed': { color: 'white' },
+            '& .MuiStepLabel-root .MuiStepIcon-root': {
+              color: 'white',
+              '& .MuiStepIcon-text': { fill: 'black' },
+            },
+            '& .MuiStepLabel-label': { color: 'white' },
+            '& .MuiStepLabel-label.Mui-active': { color: 'white !important' },
+            '& .MuiStepConnector-line': { borderColor: 'white' },
+          }}
+        >
+          {steps.map((label) => (
+            <Step key={label}>
+              <StepLabel>{label}</StepLabel>
+            </Step>
+          ))}
         </Stepper>
 
-        {getStepContent(activeStep)}
+        <div>{getStepContent(activeStep)}</div>
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem' }}>
           {activeStep > 0 && (
-            <Button variant="outlined" onClick={handleBack} disabled={activeStep < 2} sx={{ color: 'white', borderColor: 'white', '&:hover': { borderColor: 'white' } }}>Back</Button>
+            <Button
+              variant="outlined"
+              onClick={handleBack}
+              disabled={activeStep < 2}
+              sx={{
+                color: 'white',
+                borderColor: 'white',
+                '&:hover': { borderColor: 'white' },
+              }}
+            >
+              Back
+            </Button>
           )}
           {activeStep < steps.length - 1 ? (
-            <Button variant="contained" onClick={handleNext} disabled={!formData.firstName} sx={{ backgroundColor: 'white', color: 'black', '&:hover': { backgroundColor: 'white' } }}>Next</Button>
+            <Button
+              variant="contained"
+              onClick={handleNext}
+              disabled={!formData.firstName}
+              sx={{
+                backgroundColor: 'white',
+                color: 'black',
+                '&:hover': { backgroundColor: 'white' },
+              }}
+            >
+              Next
+            </Button>
           ) : (
             <Button
               variant="contained"
               onClick={handlePayment}
               disabled={!consent || isPaymentProcessing}
-              sx={{ backgroundColor: 'white', color: 'black', '&:hover': { backgroundColor: 'white' } }}
+              sx={{
+                backgroundColor: 'white',
+                color: 'black',
+                '&:hover': { backgroundColor: 'white' },
+              }}
             >
               {isPaymentProcessing ? <BeatLoader color="#000" /> : 'Subscribe'}
             </Button>
@@ -196,7 +219,13 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
         </Box>
         {activeStep === 2 && (
           <FormControlLabel
-            control={<Checkbox checked={consent} onChange={(e) => setConsent(e.target.checked)} sx={{ color: 'white' }} />}
+            control={
+              <Checkbox
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                sx={{ color: 'white' }}
+              />
+            }
             label="I consent to saving my payment information."
             sx={{ marginTop: '1rem', color: 'white' }}
           />

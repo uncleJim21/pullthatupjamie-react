@@ -8,10 +8,11 @@ type AuthMode = 'signin' | 'signup';
 interface SignInModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSignInSuccess: () => void;
+  onSignUpSuccess: () => void;
 }
 
-export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuccess }) => {
+export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignInSuccess, onSignUpSuccess }) => {
   const [mode, setMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -65,7 +66,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
       setEmail("");
       setPassword("");
       setConfirmPassword("");
-      onSuccess();
+      mode === 'signin' ? onSignInSuccess() : onSignUpSuccess();
       onClose();
     } catch (err) {
       console.error('Auth error:', err);

@@ -149,7 +149,7 @@ export default function SearchInterface() {
   //Modals
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
-  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(true);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
 
 
@@ -661,11 +661,16 @@ export default function SearchInterface() {
       <SignInModal
         isOpen={isSignInModalOpen}
         onClose={() => setIsSignInModalOpen(false)}
-        onSuccess={() => {
+        onSignInSuccess={() => {
           setRequestAuthMethod(RequestAuthMethod.SQUARE); // or other appropriate method
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
           // Any additional success handling
+        }}
+        onSignUpSuccess={()=>{
+          setIsUserSignedIn(true);
+          setIsSignInModalOpen(false);
+          handleUpgrade();
         }}
       />
       <RegisterModal 
