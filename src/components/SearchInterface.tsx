@@ -208,14 +208,18 @@ export default function SearchInterface() {
     setRequestAuthMethod(RequestAuthMethod.FREE);
   };
 
-  const initializeLightning = async () => {
-    const success = await LightningService.initialize();
-    setIsLightningInitialized(success);
-    setRequestAuthMethod(RequestAuthMethod.LIGHTNING);
+  const refreshEmptyPool = () => {
     const existingPool = localStorage.getItem("invoice_pool");
     if(!existingPool || existingPool === '[]'){
       refreshPool();
     }
+  }
+
+  const initializeLightning = async () => {
+    const success = await LightningService.initialize();
+    setIsLightningInitialized(success);
+    setRequestAuthMethod(RequestAuthMethod.LIGHTNING);
+    refreshEmptyPool();
   };
 
   const payInvoice = async (bolt11: string) => {
@@ -554,9 +558,13 @@ export default function SearchInterface() {
   const updateAuthMethodAndRegisterModalStatus = async () => {
     if (localStorage.getItem('bc:config')) {
       setRequestAuthMethod(RequestAuthMethod.LIGHTNING);
+      setTimeout(refreshEmptyPool,1000);
       return;
     } else if (localStorage.getItem('squareId')) {
       setRequestAuthMethod(RequestAuthMethod.SQUARE);
+      const email = localStorage.getItem('squareId') as string;
+      const success = await registerSubscription(email);
+      console.log('Registration result:', success);
       return;
     } else {
       // Check Free Tier Eligibility
