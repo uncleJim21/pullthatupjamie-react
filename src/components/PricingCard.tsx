@@ -4,7 +4,7 @@ import './PricingCard.css'; // You'll need to create this CSS file
 
 const PricingCard = ({ plan, price, description, features }) => {
     return (
-      <div className="bg-[#25262b] rounded-lg p-8 w-[300px] text-center transition-all duration-300">
+      <div className="bg-[#25262b] rounded-lg p-8 w-[300px] text-center transition-all duration-300 shadow-[0_0_15px_rgba(255,255,255,1.0)]">
         <h2 className="text-2xl mb-2 text-white">{plan}</h2>
         <p className="text-gray-400 mb-4">{description}</p>
         <div className="text-4xl font-bold mb-4 text-white">
@@ -19,6 +19,9 @@ const PricingCard = ({ plan, price, description, features }) => {
             </li>
           ))}
         </ul>
+        <div className="bg-white rounded-lg">
+            <br></br>
+        </div>
       </div>
     );
   };

@@ -129,17 +129,17 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-      <div className="bg-black w-[90%] max-h-[90vh] overflow-auto">
-        <div className="flex flex-col lg:flex-row">
-          <div className="w-full lg:w-1/3 p-4">
-            <PricingCard 
-              plan="Jamie Plan"
+      <div className="bg-black w-[90%] max-h-[90vh] overflow-auto shadow-[0_0_15px_rgba(255,255,255,0.4)] rounded-lg">
+        <div className="flex flex-col lg:flex-row h-full">
+          <div className="w-full lg:w-1/3 p-4 flex items-center justify-center min-h-[400px]">
+          <PricingCard 
+              plan="Jamie Plan Selected"
               price={MONTHLY_PRICE_STRING.replace('$', '')}
               description="Productivity and Privacy at your fingertips with Jamie & other CASCDR apps."
               features={[
-                "Unlimited conversations",
-                "24/7 availability",
-                "Priority support"
+                "Unlimited usage",
+                "Access 20+ CASCDR Apps",
+                "Early previews of new features"
               ]}
             />
           </div>
