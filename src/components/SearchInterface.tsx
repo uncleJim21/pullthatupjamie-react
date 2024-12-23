@@ -15,6 +15,9 @@ import { Invoice } from '../types/invoice.ts';
 import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
 import {AccountButton} from './AccountButton.tsx'
+import {CheckoutModal} from './CheckoutModal.tsx'
+import { Check } from 'lucide-react';
+
 const DEBUG_MODE = false;
 
 export type SearchMode = 'quick' | 'depth' | 'expert';
@@ -75,6 +78,35 @@ const StreamingText: React.FC<StreamingTextProps> = ({ text, isLoading }) => {
   );
 };
 
+const SubscriptionSuccessPopup: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
+    <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+      <h2 className="text-white text-lg font-bold mb-4">
+        Your subscription was successful!
+      </h2>
+      <p className="text-gray-400 mb-4">
+        Enjoy unlimited access to Jamie and other{' '}
+        <a
+          href="https://cascdr.xyz"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-400 hover:text-blue-300 underline"
+        >
+          CASCDR apps
+        </a>
+        .
+      </p>
+      <button
+        onClick={onClose}
+        className="mt-4 px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+);
+
+
 interface ConversationItem {
   id: number;
   query: string;
@@ -113,8 +145,14 @@ export default function SearchInterface() {
   const [model, setModel] = useState<'gpt-3.5-turbo' | 'claude-3-sonnet'>('claude-3-sonnet');
   const [searchMode, setSearchMode] = useState<SearchMode>('quick');
   const [hasSearched, setHasSearched] = useState(false);
+
+  //Modals
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(true);
+  const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
+
+
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
   const [requestAuthMethod, setRequestAuthMethod] = useState<RequestAuthMethod>(RequestAuthMethod.FREE); //free, lightning or square
   const [conversation, setConversation] = useState<ConversationItem[]>([]);
@@ -136,8 +174,6 @@ export default function SearchInterface() {
   //Lightning related
   const [isLightningInitialized, setIsLightningInitialized] = useState(false);
   const paymentInProgressRef = useRef(false);
-  const lastPaidInvoiceRef = useRef<string | null>(null);  
-  const [paymentAttempted, setPaymentAttempted] = useState(false);
   const { 
     invoicePool, 
     isLoading: isLoadingInvoices, 
@@ -156,7 +192,14 @@ export default function SearchInterface() {
 
   const handleUpgrade = () => {
     console.log(`handleUpgrade`)
+    setIsCheckoutModalOpen(true);
   }
+
+  const handleUpgradeSuccess = () => {
+    setIsCheckoutModalOpen(false);
+    setIsUpgradeSuccessPopUpOpen(true); // Show the popup
+  };
+  
 
   const handleSignOut = () => {
     localStorage.removeItem('auth_token');
@@ -631,6 +674,12 @@ export default function SearchInterface() {
         onLightningSelect={handleLightningSelect} 
         onSubscribeSelect={handleSubscribeSelect} 
       />
+
+      <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => {setIsCheckoutModalOpen(false)}} onSuccess={handleUpgradeSuccess} />
+
+      {isUpgradeSuccessPopUpOpen && (
+        <SubscriptionSuccessPopup onClose={() => setIsUpgradeSuccessPopUpOpen(false)} />
+      )}
 
       {!isRegisterModalOpen && (
         <div className="absolute top-4 right-4 z-50 flex items-center gap-4">

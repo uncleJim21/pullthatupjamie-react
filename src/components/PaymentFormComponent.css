@@ -1,0 +1,45 @@
+/* PaymentFormComponent.css */
+.payment-form-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 50px;
+  margin-bottom: 50px;
+}
+
+#payment-form {
+  background: #f2f2f2; /* Light grey background */
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 480px; /* Reasonable width, adjust as needed */
+  box-sizing: border-box;
+  color:black;
+}
+
+#card-container {
+  margin: 20px 0; /* Space out elements within the form */
+}
+
+#card-button {
+  background-color: orangered;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%; /* Full width */
+  box-sizing: border-box;
+}
+
+#card-button:hover {
+  opacity: 0.9; /* Slight hover effect */
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.7); /* Adjust box shadow on hover */
+  transform: translateY(-2px); /* Move button slightly up on hover */
+}
+
+#payment-status-container {
+  text-align: center;
+  margin-bottom: 20px;
+}
