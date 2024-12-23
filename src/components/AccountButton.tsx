@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronUp, ChevronDown, User, LogIn, LogOut } from 'lucide-react';
 import BitcoinConnectButton from './BitcoinConnectButton.tsx'; // Regular import
 
@@ -16,7 +16,22 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
   isSignedIn,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [nickname, setNickname] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const email = localStorage.getItem('squareId') as string;
+    if (email) {
+      setNickname(email);
+    }
+  }, [isSignedIn]);
+
+  const truncateMiddle = (str: string, maxLength: number) => {
+    if (str.length <= maxLength) return str;
+    const start = str.slice(0, Math.floor(maxLength / 2));
+    const end = str.slice(-Math.floor(maxLength / 2));
+    return `${start}...${end}`;
+  };
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -26,7 +41,16 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
         className="flex items-center gap-2 px-4 py-2 bg-[#111111] text-white rounded-lg border border-gray-800 hover:border-gray-700 transition-all"
       >
         <User size={20} />
-        <span className="hidden sm:inline">Account</span>
+        <span
+          className="hidden sm:inline max-w-[200px] overflow-hidden text-ellipsis"
+          title={nickname || "Account"}
+        >
+          {isSignedIn
+            ? nickname
+              ? truncateMiddle(nickname, 20) // Adjust the max length as needed
+              : "Account"
+            : "Account"}
+        </span>
         {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
       </button>
 
@@ -69,5 +93,7 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
     </div>
   );
 };
+
+
 
 export default AccountButton;
