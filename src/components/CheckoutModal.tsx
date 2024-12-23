@@ -4,10 +4,12 @@ import { Stepper, Step, StepLabel, Button, Typography, Box, Paper, FormControlLa
 import PricingCard from './PricingCard.tsx';
 import AddressForm from './AddressForm.tsx';
 import PaymentFormComponent from './PaymentFormComponent.tsx';
-import cascdrAmber from '../../../media/images/cascdrAmberLogo.png';
-import squareLogo from '../../../media/images/misc/squareLogo.png';
 
-const steps = ['Sign In', 'Billing Address', 'Payment Details'];
+import {MONTHLY_PRICE_STRING} from '../constants/constants.ts'
+// import cascdrAmber from '../../../media/images/cascdrAmberLogo.png';
+// import squareLogo from '../../../media/images/misc/squareLogo.png';
+
+const steps = ['Sign In', 'Billing', 'Card'];
 const debug = false
 const paymentServerUrl = (debug === false) ? "https://cascdr-auth-backend-cw4nk.ondigitalocean.app" : "http://localhost:4000";
 
@@ -226,7 +228,7 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
                 sx={{ color: 'white' }}
               />
             }
-            label="I consent to saving my payment information."
+            label={`I consent to saving my payment information for a monthly subscription at ${MONTHLY_PRICE_STRING}`}
             sx={{ marginTop: '1rem', color: 'white' }}
           />
         )}
