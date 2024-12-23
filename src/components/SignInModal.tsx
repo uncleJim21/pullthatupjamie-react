@@ -28,7 +28,6 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
     e.preventDefault();
     setError('');
 
-    // Validation
     if (!validateEmail(email)) {
       setError('Please enter a valid email address');
       return;
@@ -48,15 +47,13 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
     setIsLoading(true);
 
     try {
-      const authResponse = mode === 'signin' 
+      const authResponse = mode === 'signin'
         ? await AuthService.signIn(email, password)
         : await AuthService.signUp(email, password);
-      
-      // Store credentials
+
       localStorage.setItem('auth_token', authResponse.token);
       localStorage.setItem('squareId', email);
-      
-      // Register with Jamie server if subscription valid
+
       if (authResponse.subscriptionValid) {
         const jamieRegistration = await JamieAuthService.registerSubscription(email);
         if (!jamieRegistration.success) {
@@ -64,6 +61,9 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
         }
       }
 
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
       onSuccess();
       onClose();
     } catch (err) {
@@ -79,9 +79,31 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      
+
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
-        <div className="bg-[#111111] border border-gray-800 rounded-lg p-8 shadow-xl">
+        <div className="bg-[#111111] border border-gray-800 rounded-lg p-8 shadow-xl relative">
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-gray-400 hover:text-white transition"
+            aria-label="Close"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="w-6 h-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+
           {/* Segment Control */}
           <div className="flex rounded-lg border border-gray-800 p-1 mb-6">
             <button
@@ -105,14 +127,17 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
               Sign Up
             </button>
           </div>
-          
+
           <h2 className="text-2xl font-bold mb-6 text-white">
             {mode === 'signin' ? 'Sign In' : 'Create Account'}
           </h2>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-400 mb-1">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-400 mb-1"
+              >
                 Email
               </label>
               <input
@@ -125,9 +150,12 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
                 required
               />
             </div>
-            
+
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-400 mb-1">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-400 mb-1"
+              >
                 Password
               </label>
               <input
@@ -143,7 +171,10 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
 
             {mode === 'signup' && (
               <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-400 mb-1">
+                <label
+                  htmlFor="confirmPassword"
+                  className="block text-sm font-medium text-gray-400 mb-1"
+                >
                   Confirm Password
                 </label>
                 <input
@@ -160,8 +191,8 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-center gap-2">
-                <svg 
-                  viewBox="0 0 24 24" 
+                <svg
+                  viewBox="0 0 24 24"
                   className="w-5 h-5 text-red-500"
                   fill="none"
                   stroke="currentColor"
@@ -187,8 +218,10 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
                   <div className="w-4 h-4 border-2 border-gray-600 border-t-gray-200 rounded-full animate-spin" />
                   {mode === 'signin' ? 'Signing In...' : 'Creating Account...'}
                 </div>
+              ) : mode === 'signin' ? (
+                'Sign In'
               ) : (
-                mode === 'signin' ? 'Sign In' : 'Create Account'
+                'Create Account'
               )}
             </button>
           </form>
