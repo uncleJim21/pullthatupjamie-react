@@ -212,6 +212,10 @@ export default function SearchInterface() {
     const success = await LightningService.initialize();
     setIsLightningInitialized(success);
     setRequestAuthMethod(RequestAuthMethod.LIGHTNING);
+    const existingPool = localStorage.getItem("invoice_pool");
+    if(!existingPool || existingPool === '[]'){
+      refreshPool();
+    }
   };
 
   const payInvoice = async (bolt11: string) => {
