@@ -56,6 +56,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
 
       if (authResponse.subscriptionValid) {
         const jamieRegistration = await JamieAuthService.registerSubscription(email);
+        localStorage.setItem('isSubscribed','true');
         if (!jamieRegistration.success) {
           console.error('Jamie registration failed:', jamieRegistration.message);
         }

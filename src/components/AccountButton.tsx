@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronUp, ChevronDown, User, LogIn, LogOut } from 'lucide-react';
+import { ChevronUp, ChevronDown, User, LogIn, LogOut,CircleFadingArrowUp } from 'lucide-react';
 import BitcoinConnectButton from './BitcoinConnectButton.tsx'; // Regular import
 
 interface AccountButtonProps {
   onConnect: () => void;
   onSignInClick: () => void;
+  onUpgradeClick: () => void;
   onSignOut: () => void;
   isSignedIn: boolean; // Prop passed from the parent component
 }
@@ -13,10 +14,12 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
   onConnect,
   onSignInClick,
   onSignOut,
+  onUpgradeClick,
   isSignedIn,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,6 +27,15 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
     if (email) {
       setNickname(email);
     }
+  }, [isSignedIn]);
+
+  useEffect(() => {
+    
+    async function checkUpgradePath(){
+      const isUpgraded = localStorage.getItem('isSubscribed') as string === 'true';
+      setShowUpgrade(!isUpgraded);
+    }
+    setTimeout(checkUpgradePath,2000);
   }, [isSignedIn]);
 
   const truncateMiddle = (str: string, maxLength: number) => {
@@ -62,6 +74,21 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
             <div className="p-2">
               <BitcoinConnectButton onConnect={onConnect} />
             </div>
+
+            {/* Upgrade Button */}
+            {showUpgrade && isSignedIn && (
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  onUpgradeClick();
+                }}
+                className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <CircleFadingArrowUp size={20} />
+                <span>Upgrade</span>
+              </button>
+            )}
+
 
             {/* Sign In/Out */}
             {isSignedIn ? (

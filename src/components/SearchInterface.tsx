@@ -154,10 +154,14 @@ export default function SearchInterface() {
     registrationError 
   } = useJamieAuth();
 
+  const handleUpgrade = () => {
+    console.log(`handleUpgrade`)
+  }
 
   const handleSignOut = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('squareId');
+    localStorage.removeItem('isSubscribed');
     setRequestAuthMethod(RequestAuthMethod.FREE);
   };
 
@@ -633,6 +637,7 @@ export default function SearchInterface() {
           <AccountButton 
             onConnect={() => initializeLightning()}
             onSignInClick={() => setIsSignInModalOpen(true)}
+            onUpgradeClick={handleUpgrade}
             onSignOut={handleSignOut}
             isSignedIn={isUserSignedIn}
           />
