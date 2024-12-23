@@ -2,28 +2,26 @@ import React from 'react';
 import PropTypes from 'prop-types'; // Import PropTypes
 import './PricingCard.css'; // You'll need to create this CSS file
 
-const PricingCard = ({ plan, price, description, features, buttonText, isHighlighted }) => {
-  return (
-    <div className={`pricing-card ${isHighlighted ? 'highlighted' : ''}`}>
-      <h2 className="plan-name">{plan}</h2>
-      <p className="plan-description">{description}</p>
-      <div className="price">
-        <span className="currency">$</span>
-        <span className="amount">{price}</span>
-        <span className="period">/mo</span>
+const PricingCard = ({ plan, price, description, features }) => {
+    return (
+      <div className="bg-[#25262b] rounded-lg p-8 w-[300px] text-center transition-all duration-300">
+        <h2 className="text-2xl mb-2 text-white">{plan}</h2>
+        <p className="text-gray-400 mb-4">{description}</p>
+        <div className="text-4xl font-bold mb-4 text-white">
+          <span className="text-base align-super">$</span>
+          <span>{price}</span>
+          <span className="text-base align-super">/mo</span>
+        </div>
+        <ul className="list-none p-0 mt-8 text-left">
+          {features.map((feature, index) => (
+            <li key={index} className="mb-2 text-white">
+              <span className="text-white mr-2">✓</span> {feature}
+            </li>
+          ))}
+        </ul>
       </div>
-      {/* Uncomment the button if needed */}
-      {/* <button className="cta-button">{buttonText}</button> */}
-      <ul className="feature-list">
-        {features.map((feature, index) => (
-          <li key={index} className="feature-item">
-            <span className="checkmark">✓</span> {feature}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-};
+    );
+  };
 
 // Define PropTypes to specify expected props and types
 PricingCard.propTypes = {
