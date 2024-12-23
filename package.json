@@ -3,19 +3,33 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@getalby/bitcoin-connect": "3.4.0",
+    "@getalby/bitcoin-connect-react": "3.4.0",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
-    "cra-template": "1.2.0",
+    "assert": "^2.1.0",
+    "autoprefixer": "^10.4.20",
+    "bolt11": "^1.4.1",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
+    "lucide-react": "^0.469.0",
+    "postcss": "^8.4.49",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^7.1.0",
     "react-scripts": "5.0.1",
+    "readable-stream": "^4.6.0",
+    "remark-gfm": "^4.0.0",
+    "stream-browserify": "^3.0.0",
+    "tailwindcss": "^3.4.17",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -35,5 +49,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@craco/craco": "^7.1.0",
+    "@typescript-eslint/parser": "^5.62.0"
   }
 }
