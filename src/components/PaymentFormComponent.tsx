@@ -14,7 +14,7 @@ function PaymentFormComponent({paymentProcessing, paymentFailed, setPaymentProce
 
     useEffect(() => {
         const loadSquareScript = () => {
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             const script = document.createElement('script');
             script.src = scriptUrl;
             script.async = true;
