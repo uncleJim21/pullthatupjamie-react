@@ -1,4 +1,5 @@
 import { requestProvider } from '@getalby/bitcoin-connect';
+import { printLog } from '../constants/constants.ts';
 
 interface WebLNProvider {
   sendPayment: (paymentRequest: string) => Promise<{ preimage: string }>;
@@ -9,9 +10,9 @@ class LightningService {
 
   static async initialize() {
     try {
-      console.log("Initializing Lightning provider...");
+      printLog("Initializing Lightning provider...");
       this.provider = await requestProvider();
-      console.log("Lightning provider initialized:", this.provider);
+      printLog(`Lightning provider initialized:${this.provider}`);
       return true;
     } catch (error) {
       console.error("Failed to initialize Lightning provider:", error);
@@ -28,9 +29,9 @@ class LightningService {
         }
       }
 
-      console.log("Attempting payment for invoice:", bolt11);
+      printLog(`Attempting payment for invoice:${bolt11}`);
       const result = await this.provider!.sendPayment(bolt11);
-      console.log("Payment successful! Preimage:", result.preimage);
+      printLog(`Payment successful! Preimage:${result.preimage}`);
       return result.preimage;
     } catch (error) {
       console.error("Payment failed:", error);

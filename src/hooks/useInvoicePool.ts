@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchInvoicePool } from '../services/lightning-api.ts';
 import type { Invoice } from '../types/invoice';
+import { printLog } from '../constants/constants.ts';
 import bolt11 from 'bolt11';
 
 function getInvoiceExpiry(pr: string): number {
@@ -47,7 +48,7 @@ export function useInvoicePool() {
 
   const refreshPool = useCallback(async () => {
     if (fetchInProgress.current) {
-      console.log('Fetch already in progress, skipping...');
+      printLog('Fetch already in progress, skipping...');
       return;
     }
   
@@ -59,7 +60,7 @@ export function useInvoicePool() {
         fetchInProgress.current = true;
         setIsLoading(true);
   
-        console.log('Fetching more invoices...');
+        printLog('Fetching more invoices...');
         const newInvoices = await fetchInvoicePool();
   
         setInvoicePool((current) => {

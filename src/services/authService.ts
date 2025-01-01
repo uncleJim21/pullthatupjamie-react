@@ -1,5 +1,4 @@
 // services/authService.ts
-
 interface SignInResponse {
     token: string;
     subscriptionValid: boolean;

@@ -1,5 +1,3 @@
-
-
 import { performSearch, AuthConfig, RequestAuthMethod } from '../lib/searxng.ts';
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -16,9 +14,7 @@ import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
 import {AccountButton} from './AccountButton.tsx'
 import {CheckoutModal} from './CheckoutModal.tsx'
-import { Check } from 'lucide-react';
-
-const DEBUG_MODE = false;
+import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 
 export type SearchMode = 'quick' | 'depth' | 'expert';
 let buffer = '';
@@ -191,7 +187,7 @@ export default function SearchInterface() {
   } = useJamieAuth();
 
   const handleUpgrade = () => {
-    console.log(`handleUpgrade`)
+    printLog(`handleUpgrade`)
     setIsCheckoutModalOpen(true);
   }
 
@@ -231,16 +227,16 @@ export default function SearchInterface() {
       throw new Error('Invalid invoice: missing bolt11');
     }
   
-    console.log('Starting payment with bolt11:', bolt11);
+    printLog(`Starting payment with bolt11:${bolt11}`);
   
     try {
-      console.log('Calling LightningService.payInvoice...');
+      printLog('Calling LightningService.payInvoice...');
       const preimage = await LightningService.payInvoice(bolt11);
-      console.log('Payment successful! Preimage:', preimage);
+      printLog(`Payment successful! Preimage:${preimage}`);
   
       // Find the invoice in the pool and mark it as paid
       const paidInvoice = invoicePool.find((inv) => inv.pr === bolt11);
-      console.log('Found paid invoice in pool:', paidInvoice);
+      printLog(`Found paid invoice in pool:${paidInvoice}`);
   
       if (paidInvoice && paidInvoice.paymentHash) {
         markInvoicePaid(paidInvoice.paymentHash, preimage);
@@ -261,7 +257,7 @@ export default function SearchInterface() {
       // Try the next unpaid invoice
       const nextInvoice = getNextUnpaidInvoice();
       if (nextInvoice?.pr) {
-        console.log('Retrying with next unpaid invoice...');
+        printLog('Retrying with next unpaid invoice...');
         return await payInvoice(nextInvoice.pr);
       } else {
         throw new Error('No unpaid invoices available after payment failure');
@@ -272,13 +268,13 @@ export default function SearchInterface() {
 
   const handleInvoicePayment = async (invoice: Invoice) => {
     if (paymentInProgressRef.current) {
-      console.log('Payment already in progress, skipping...');
+      printLog('Payment already in progress, skipping...');
       return null;
     }
   
     // Check if this invoice has already been paid
     if (invoice.paid) {
-      console.log('Invoice already paid, skipping...');
+      printLog('Invoice already paid, skipping...');
       return null;
     }
   
@@ -544,7 +540,7 @@ export default function SearchInterface() {
       );
     }
 
-    console.log(`post search check:${requestAuthMethod}`)
+    printLog(`post search check:${requestAuthMethod}`)
     if(requestAuthMethod === RequestAuthMethod.FREE){
       await updateAuthMethodAndRegisterModalStatus();
     }
@@ -564,7 +560,7 @@ export default function SearchInterface() {
       setRequestAuthMethod(RequestAuthMethod.SQUARE);
       const email = localStorage.getItem('squareId') as string;
       const success = await registerSubscription(email);
-      console.log('Registration result:', success);
+      printLog(`Registration result:${success}`);
       return;
     } else {
       // Check Free Tier Eligibility
@@ -598,20 +594,18 @@ export default function SearchInterface() {
 
   useEffect(() => {
     if(!isLightningInitialized && localStorage.getItem('bc:config')){
-      console.log('Initializing lightning from stored config...');
+      printLog('Initializing lightning from stored config...');
       initializeLightning();
     } else {
-      console.log('Not initializing lightning:', {
+      printLog(`Not initializing lightning:${{
         isLightningInitialized,
         hasConfig: !!localStorage.getItem('bc:config')
-      });
+      }}`);
     }
     return () => {
-      // Clean up any resources if needed
     };
   }, []);
 
-  // This should be the only payment-related effect
   useEffect(() => {
     const ensurePaidInvoice = async () => {
       if (!isLightningInitialized) return;
@@ -620,7 +614,7 @@ export default function SearchInterface() {
       const hasPaidInvoice = invoicePool.some(inv => inv.paid && !inv.usedAt);
       
       if (!hasPaidInvoice) {
-        console.log('No paid invoices found, preparing initial invoice...');
+        printLog('No paid invoices found, preparing initial invoice...');
         const nextInvoice = getNextUnpaidInvoice();
         if (nextInvoice?.pr && !nextInvoice.paid) {
           try {
@@ -647,7 +641,7 @@ export default function SearchInterface() {
       const hasPaidInvoice = invoicePool.some(inv => inv.paid && !inv.usedAt);
       
       if (!hasPaidInvoice) {
-        console.log('No paid invoices found, preparing initial invoice...');
+        printLog('No paid invoices found, preparing initial invoice...');
         const nextInvoice = getNextUnpaidInvoice();
         if (nextInvoice?.pr && !nextInvoice.paid) {
           try {
@@ -664,7 +658,7 @@ export default function SearchInterface() {
   
 
   useEffect(() => {
-    console.log(`model:${model}`)
+    printLog(`model:${model}`)
   }, [model]);
 
 
@@ -709,22 +703,6 @@ export default function SearchInterface() {
           />
         </div>
       )}
-      {/* {isLightningInitialized && (
-        <button
-          onClick={async () => {
-            const testInvoice = invoices[0]?.pr as string
-            try {
-              const preimage = await payInvoice(testInvoice);
-              console.log('Test payment successful! Preimage:', preimage);
-            } catch (error) {
-              console.error('Test payment failed:', error);
-            }
-          }}
-          className="px-4 py-2 bg-white text-black rounded hover:bg-gray-100"
-        >
-          Pay Test Invoice
-        </button>
-      )} */}
       { DEBUG_MODE &&
         (<button
         onClick={async () => {
@@ -734,7 +712,7 @@ export default function SearchInterface() {
             return;
           }
           const success = await registerSubscription(email);
-          console.log('Registration result:', success);
+          printLog(`Registration result:${success}`);
         }}
         className="px-4 py-2 bg-white text-black rounded hover:bg-gray-100"
       >
@@ -768,7 +746,6 @@ export default function SearchInterface() {
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               {[
                 { mode: 'quick', emoji: '⚡', label: 'Quick Mode' },
-                // { mode: 'depth', emoji: '🤿', label: 'Depth Mode' },
                 { mode: 'expert', emoji: '🔮', label: 'Expert Mode' }
               ].map(({ mode, emoji, label }) => (
                 <button

@@ -4,11 +4,10 @@ import { Stepper, Step, StepLabel, Button, Typography, Box, Paper, FormControlLa
 import PricingCard from './PricingCard.tsx';
 import AddressForm from './AddressForm.tsx';
 import PaymentFormComponent from './PaymentFormComponent.tsx';
-import { MONTHLY_PRICE_STRING } from '../constants/constants.ts';
+import { MONTHLY_PRICE_STRING, DEBUG_MODE, printLog } from '../constants/constants.ts';
 
 const steps = ['Sign In', 'Billing', 'Card'];
-const debug = false;
-const paymentServerUrl = debug === false ? "https://cascdr-auth-backend-cw4nk.ondigitalocean.app" : "http://localhost:4000";
+const paymentServerUrl = DEBUG_MODE === false ? "https://cascdr-auth-backend-cw4nk.ondigitalocean.app" : "http://localhost:4000";
 
 export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
   const [activeStep, setActiveStep] = useState(1);
@@ -42,12 +41,12 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
         setPaymentFailed(false);
         if(statusContainer){statusContainer.innerHTML = "Processing..."}
         if (result.status === 'OK' && result.token && userEmail) {
-            console.log("customer email:", userEmail)
-            console.log("card result:",result)
-            console.log(`Payment token is ${result.token}`);
+            printLog(`customer email: ${userEmail}`)
+            printLog(`card result: ${result}`)
+            printLog(`Payment token is ${result.token}`);
             const paymentToken = result.token;
-            console.log("payment token:", paymentToken);
-            console.log("formData:", formData);
+            printLog(`payment token: ${paymentToken}`);
+            printLog(`formData:${formData}`);
             const card = {
             "billing_address":{
                 "address_line_1":formData.address1,

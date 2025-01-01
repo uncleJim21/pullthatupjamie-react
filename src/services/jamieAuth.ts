@@ -1,5 +1,4 @@
 // services/jamieAuth.ts
-import { RequestAuthMethod } from '../lib/searxng';
 import { API_URL } from "../constants/constants.ts";
 
 
