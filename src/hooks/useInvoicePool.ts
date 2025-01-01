@@ -137,6 +137,11 @@ export function useInvoicePool() {
       )
     );
   }, []);
+
+  const clearPool = useCallback(() => {
+    localStorage.removeItem('invoice_pool');
+    setInvoicePool([]);
+  }, []);
   
 
   return {
@@ -149,5 +154,6 @@ export function useInvoicePool() {
     markInvoiceFailed,
     getNextUnpaidInvoice,
     getNextPaidInvoice,
+    clearPool
   };
 }
