@@ -41,6 +41,7 @@ export function useInvoicePool() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const fetchInProgress = useRef(false);
+  const cleanupIntervalMs = 30000;
 
   useEffect(() => {
     localStorage.setItem('invoice_pool', JSON.stringify(invoicePool));
@@ -159,7 +160,7 @@ export function useInvoicePool() {
   }, [invoicePool, refreshPool]);
 
   useEffect(() => {
-    const interval = setInterval(cleanupExpiredInvoices, 5000);
+    const interval = setInterval(cleanupExpiredInvoices, cleanupIntervalMs);
     return () => clearInterval(interval);
   }, [cleanupExpiredInvoices]);
   
