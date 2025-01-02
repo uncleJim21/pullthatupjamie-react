@@ -51,11 +51,12 @@ export function useInvoicePool() {
       printLog('Fetch already in progress, skipping...');
       return;
     }
-  
-    const paidCount = invoicePool.filter((inv) => inv.paid && !inv.usedAt).length;
-    const unpaidCount = invoicePool.filter((inv) => !inv.paid && !inv.failed).length;
-  
-    if (paidCount < 1 || unpaidCount < 1 || invoicePool.length < 3) {
+    const validInvoices = invoicePool.filter(
+      inv => !inv.usedAt && !inv.failed && !isInvoiceExpired(inv.pr)
+    );
+    if (validInvoices.length >= 3) {
+      return;
+    }
       try {
         fetchInProgress.current = true;
         setIsLoading(true);
@@ -88,7 +89,6 @@ export function useInvoicePool() {
         setIsLoading(false);
         fetchInProgress.current = false;
       }
-    }
   }, [invoicePool]);
   
 
@@ -142,6 +142,26 @@ export function useInvoicePool() {
     localStorage.removeItem('invoice_pool');
     setInvoicePool([]);
   }, []);
+
+  const cleanupExpiredInvoices = useCallback(async () => {
+    printLog('cleanupExpiredInvoices...')
+    if (!localStorage.getItem('bc:config')) return false;
+  
+    const expiredInvoices = invoicePool.filter(inv => isInvoiceExpired(inv.pr));
+    
+    if (expiredInvoices.length > 0) {
+      printLog(`Found ${expiredInvoices.length} expired invoices`);
+      setInvoicePool(current => current.filter(inv => !isInvoiceExpired(inv.pr)));
+      await refreshPool();
+      return true;
+    }
+    return false;
+  }, [invoicePool, refreshPool]);
+
+  useEffect(() => {
+    const interval = setInterval(cleanupExpiredInvoices, 5000);
+    return () => clearInterval(interval);
+  }, [cleanupExpiredInvoices]);
   
 
   return {
@@ -154,6 +174,7 @@ export function useInvoicePool() {
     markInvoiceFailed,
     getNextUnpaidInvoice,
     getNextPaidInvoice,
-    clearPool
+    clearPool,
+    cleanupExpiredInvoices
   };
 }

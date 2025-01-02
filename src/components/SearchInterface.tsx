@@ -160,6 +160,7 @@ export default function SearchInterface() {
     sources: []
   });
 
+  const cleanupIntervalRef = useRef<NodeJS.Timeout>();
   const searchInputRef = useRef<HTMLTextAreaElement | null>(null);
   const resultTextRef = useRef<string>('');
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -177,6 +178,7 @@ export default function SearchInterface() {
     markInvoiceUsed,
     markInvoiceFailed,
     getNextUnpaidInvoice ,
+    cleanupExpiredInvoices,
     refreshPool
   } = useInvoicePool();
 
@@ -578,6 +580,29 @@ export default function SearchInterface() {
   useEffect(() => {
     updateAuthMethodAndRegisterModalStatus();
   }, []);
+
+  useEffect(() => {
+    const checkInvoices = async () => {
+      const needsRefresh = await cleanupExpiredInvoices();
+      if (needsRefresh) {
+        const nextInvoice = getNextUnpaidInvoice();
+        if (nextInvoice?.pr && !nextInvoice.paid) {
+          await handleInvoicePayment(nextInvoice);
+        }
+      }
+    };
+  
+    if (!cleanupIntervalRef.current) {
+      cleanupIntervalRef.current = setInterval(checkInvoices, 5000);
+    }
+  
+    return () => {
+      if (cleanupIntervalRef.current) {
+        clearInterval(cleanupIntervalRef.current);
+        cleanupIntervalRef.current = undefined;
+      }
+    };
+  }, [cleanupExpiredInvoices, getNextUnpaidInvoice, handleInvoicePayment]);
   
   useEffect(() => {
     const checkSignedIn = () => {
