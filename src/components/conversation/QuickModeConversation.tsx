@@ -1,7 +1,7 @@
-// components/conversation/QuickModeConversation.tsx
 import React from 'react';
 import { SourceTile } from '../SourceTile.tsx';
 import { StreamingText } from '../StreamingText.tsx';
+import { BaseConversationLayout } from './BaseConversationLayout.tsx';
 import type { QuickModeItem } from '../../types/conversation';
 
 interface QuickModeConversationProps {
@@ -10,18 +10,13 @@ interface QuickModeConversationProps {
 
 export const QuickModeConversation: React.FC<QuickModeConversationProps> = ({ item }) => {
   return (
-    <div className="space-y-4">
-      <div className="font-medium text-white-400 max-w-[75%] break-words">
-        Query: {item.query}
-      </div>
-      <div style={{ "borderBottom": "1px solid #353535" }}></div>
-
+    <BaseConversationLayout query={item.query}>
       {item.data.sources.length > 0 && (
         <div className="relative">
           <div className="overflow-x-auto pb-4">
             <div className="flex space-x-4">
               {item.data.sources.map((source, idx) => (
-                <div key={idx} style={{ minWidth: '300px' }}>
+                <div key={idx} className="min-w-[300px]">
                   <SourceTile
                     title={source.title}
                     url={source.url}
@@ -42,6 +37,6 @@ export const QuickModeConversation: React.FC<QuickModeConversationProps> = ({ it
           isLoading={item.isStreaming}
         />
       </div>
-    </div>
+    </BaseConversationLayout>
   );
 };

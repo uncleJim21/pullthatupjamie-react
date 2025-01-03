@@ -14,7 +14,7 @@ interface PodcastSearchResultItemProps {
     start_time: number;
     end_time: number;
   };
-  artworkUrl?: string; // New field for episode artwork
+  episodeImage?: string; // New field for episode artwork
 }
 
 export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = ({
@@ -25,7 +25,7 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   date,
   similarity,
   timeContext,
-  artworkUrl = '/podcast-logo.png' // Default placeholder
+  episodeImage = '/podcast-logo.png' // Default placeholder
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
@@ -87,15 +87,15 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
       <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
         <div className="flex items-start">
           {/* Episode Artwork */}
-          {/* <div className="flex-shrink-0 mr-4">
-            <Image
-              src={artworkUrl}
+          <div className="flex-shrink-0 mr-4">
+            <img
+              src={episodeImage}
               alt={episode}
-              width={64}
-              height={64}
+              width={96}
+              height={96}
               className="rounded-md"
             />
-          </div> */}
+          </div>
 
           <div className="flex-grow">
             <div className="flex justify-between items-start">

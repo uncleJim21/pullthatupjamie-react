@@ -16,6 +16,7 @@ import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
 import {AccountButton} from './AccountButton.tsx'
 import {CheckoutModal} from './CheckoutModal.tsx'
+import { QuickModeItem } from '../types/conversation.ts';
 import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 
@@ -401,15 +402,15 @@ export default function SearchInterface() {
     
     setConversation(prev => [...prev, {
       id: conversationId,
-      type: 'quick' as const,  // Add the type property
-      query: query,
+      type: 'quick' as const,
+      query: queryToUse, // Note: changed from query to queryToUse
       timestamp: new Date(),
       isStreaming: true,
-      data: {               // Move result and sources into a data object
+      data: {
         result: '',
         sources: []
       }
-    }]);
+    } as QuickModeItem]);
   
     setSearchState(prev => ({
       ...prev,
@@ -468,6 +469,7 @@ export default function SearchInterface() {
             try {
               const parsed = JSON.parse(data);
               switch (parsed.type) {
+                // In the switch (parsed.type) case handling:
                 case 'search':
                   const sources = parsed.data.map((result: any) => ({
                     title: result.title,
@@ -475,22 +477,36 @@ export default function SearchInterface() {
                     snippet: result.content || result.snippet || ''
                   }));
                   setConversation(prev => 
-                    prev.map(item => 
-                      item.id === conversationId 
-                        ? { ...item, sources }
-                        : item
-                    )
+                    prev.map(item => {
+                      if (item.id === conversationId && item.type === 'quick') {
+                        return {
+                          ...item,
+                          data: {
+                            ...item.data,
+                            sources
+                          }
+                        } as QuickModeItem;
+                      }
+                      return item;
+                    })
                   );
                   break;
-  
+                
                 case 'inference':
                   resultTextRef.current += parsed.data;
                   setConversation(prev => 
-                    prev.map(item => 
-                      item.id === conversationId 
-                        ? { ...item, result: resultTextRef.current }
-                        : item
-                    )
+                    prev.map(item => {
+                      if (item.id === conversationId && item.type === 'quick') {
+                        return {
+                          ...item,
+                          data: {
+                            ...item.data,
+                            result: resultTextRef.current
+                          }
+                        } as QuickModeItem;
+                      }
+                      return item;
+                    })
                   );
                   break;
   
@@ -889,51 +905,6 @@ export default function SearchInterface() {
         
       </div>
 
-      {/* Conversation History */}
-      {searchMode === 'quick' && conversation.length > 0 && (
-        <div className="max-w-4xl mx-auto px-4 space-y-8 mb-24 pb-24">
-          {conversation.map((item) => (
-            <div key={item.id} className="space-y-4">
-              <div className="font-medium text-white-400 max-w-[75%] break-words">
-                Query: {item.query}
-              </div>
-              <div style={{"borderBottom":"1px solid #353535"}}></div>
-              {/* Sources for this specific query */}
-              {item.sources.length > 0 && (
-                <div className="relative">
-                  <div className="overflow-x-auto pb-4">
-                    <div className="flex space-x-4">
-                      {item.sources.map((source, idx) => (
-                        <div key={idx} style={{ minWidth: '300px' }}>
-                          <SourceTile
-                            title={source.title}
-                            url={source.url}
-                            index={idx + 1}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Only show left gradient if scrolled from start */}
-                  <div className="pointer-events-none absolute left-0 top-0 h-full w-5 bg-gradient-to-r from-black to-transparent opacity-0 transition-opacity duration-200" 
-                      id={`left-gradient-${item.id}`} />
-                  {/* Only show right gradient if there's more content to scroll */}
-                  <div className="pointer-events-none absolute right-0 top-0 h-full w-5 bg-gradient-to-l from-black to-transparent opacity-0 transition-opacity duration-200" 
-                      id={`right-gradient-${item.id}`} />
-                </div>
-              )}
-
-              {/* Answer with streaming effect */}
-              <div className="bg-[#111111] border border-gray-800 rounded-lg p-6">
-                <StreamingText 
-                  text={item.result} 
-                  isLoading={item.isStreaming}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Conversation History */}
       {conversation.length > 0 && (

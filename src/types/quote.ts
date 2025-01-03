@@ -5,7 +5,7 @@ export interface QuoteResult {
   creator: string;
   audioUrl: string;
   date: string;
-  artworkUrl?: string;
+  episodeImage?: string; // New field for episode artwork
   similarity: number;
   timeContext: {
     start_time: number;

@@ -1,7 +1,7 @@
-// components/conversation/PodcastSearchConversation.tsx
 import React from 'react';
 import type { PodcastSearchItem } from '../../types/conversation.ts';
 import { PodcastSearchResultItem } from '../podcast/PodcastSearchResultItem.tsx';
+import { BaseConversationLayout } from './BaseConversationLayout.tsx';
 
 interface PodcastSearchConversationProps {
   item: PodcastSearchItem;
@@ -9,12 +9,7 @@ interface PodcastSearchConversationProps {
 
 export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps> = ({ item }) => {
   return (
-    <div className="space-y-4">
-      <div className="font-medium text-white-400 max-w-[75%] break-words">
-        Query: {item.query}
-      </div>
-      <div style={{ "borderBottom": "1px solid #353535" }}></div>
-
+    <BaseConversationLayout query={item.query}>
       <div className="space-y-6">
         {item.data.quotes.map((quote, index) => (
           <PodcastSearchResultItem
@@ -23,6 +18,6 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
           />
         ))}
       </div>
-    </div>
+    </BaseConversationLayout>
   );
 };
