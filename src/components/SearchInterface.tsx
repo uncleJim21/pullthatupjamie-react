@@ -830,7 +830,7 @@ export default function SearchInterface() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleStreamingSearch();
+                  handleSearch(e);
                 }
               }}
             />
@@ -960,7 +960,7 @@ export default function SearchInterface() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleStreamingSearch();
+                  handleSearch(e);
                 }
               }}
             />
