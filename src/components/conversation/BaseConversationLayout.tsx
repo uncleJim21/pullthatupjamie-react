@@ -11,7 +11,7 @@ export const BaseConversationLayout: React.FC<BaseConversationLayoutProps> = ({
 }) => {
   return (
     <div className="space-y-4">
-      <div className="font-medium text-white-400 max-w-[75%] break-words">
+      <div className="font-medium text-white-400 max-w-[75%] break-words mt-6">
         Query: {query}
       </div>
       <div className="border-b border-[#353535]"></div>

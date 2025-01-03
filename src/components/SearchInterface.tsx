@@ -565,7 +565,8 @@ export default function SearchInterface() {
     console.log(`${searchMode === 'podcast-search'}`)
     e.preventDefault();
     if (searchMode === 'podcast-search') {
-      // try {
+      try {
+        setSearchState(prev => ({ ...prev, isLoading: true }));
         const quoteResults = await handleQuoteSearch(query);
         setConversation(prev => [...prev, {
           id: searchState.activeConversationId as number,
@@ -579,15 +580,15 @@ export default function SearchInterface() {
         }]);
         setSearchState(prev => ({ ...prev, isLoading: false }));
         return;
-      // } catch (error) {
-      //   console.error('Quote search error:', error);
-      //   setSearchState(prev => ({
-      //     ...prev,
-      //     error: error as Error,
-      //     isLoading: false
-      //   }));
-      //   return;
-      // }
+      } catch (error) {
+        console.error('Quote search error:', error);
+        setSearchState(prev => ({
+          ...prev,
+          error: error as Error,
+          isLoading: false
+        }));
+        return;
+      }
     }
     else{
       await handleStreamingSearch();
@@ -918,7 +919,7 @@ export default function SearchInterface() {
       )}
 
       {/* Floating Search Bar - Only show after first search */}
-      {hasSearched && searchMode === "quick" && !isRegisterModalOpen && !isSignInModalOpen && (
+      {hasSearched && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && (
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-3xl px-4 z-50">
           <form onSubmit={handleSearch} className="relative">
             <textarea
@@ -927,7 +928,7 @@ export default function SearchInterface() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="How Can I Help You Today?"
               className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 pl-4 pr-32 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-              disabled={searchMode !== "quick"}
+              // disabled={searchMode === "quick"}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
