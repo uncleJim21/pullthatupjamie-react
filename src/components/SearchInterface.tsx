@@ -1,4 +1,6 @@
 import { performSearch, AuthConfig, RequestAuthMethod } from '../lib/searxng.ts';
+import { handleQuoteSearch } from '../services/podcastService.ts';
+import { ConversationItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -16,7 +18,7 @@ import {AccountButton} from './AccountButton.tsx'
 import {CheckoutModal} from './CheckoutModal.tsx'
 import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 
-export type SearchMode = 'quick' | 'depth' | 'expert';
+export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
 let buffer = '';
 
 interface Source {
@@ -101,16 +103,6 @@ const SubscriptionSuccessPopup: React.FC<{ onClose: () => void }> = ({ onClose }
     </div>
   </div>
 );
-
-
-interface ConversationItem {
-  id: number;
-  query: string;
-  result: string;
-  sources: Source[];
-  timestamp: Date;
-  isStreaming: boolean;
-}
 
 interface SearchState {
   query: string;
@@ -408,11 +400,14 @@ export default function SearchInterface() {
     
     setConversation(prev => [...prev, {
       id: conversationId,
-      query: queryToUse,  
-      result: '',
-      sources: [],
+      type: 'quick' as const,  // Add the type property
+      query: query,
       timestamp: new Date(),
-      isStreaming: true
+      isStreaming: true,
+      data: {               // Move result and sources into a data object
+        result: '',
+        sources: []
+      }
     }]);
   
     setSearchState(prev => ({
@@ -549,8 +544,37 @@ export default function SearchInterface() {
   };
 
   const handleSearch = async (e: React.FormEvent) => {
+    console.log(`handleSearch:${searchMode}`)
+    console.log(`${searchMode === 'podcast-search'}`)
     e.preventDefault();
-    await handleStreamingSearch();
+    if (searchMode === 'podcast-search') {
+      // try {
+        const quoteResults = await handleQuoteSearch(query);
+        setConversation(prev => [...prev, {
+          id: searchState.activeConversationId as number,
+          type: 'podcast-search' as const,
+          query: query,
+          timestamp: new Date(),
+          isStreaming: false,
+          data: {
+            quotes: quoteResults.results
+          }
+        }]);
+        setSearchState(prev => ({ ...prev, isLoading: false }));
+        return;
+      // } catch (error) {
+      //   console.error('Quote search error:', error);
+      //   setSearchState(prev => ({
+      //     ...prev,
+      //     error: error as Error,
+      //     isLoading: false
+      //   }));
+      //   return;
+      // }
+    }
+    else{
+      await handleStreamingSearch();
+    }
   };
 
   const updateAuthMethodAndRegisterModalStatus = async () => {
@@ -771,7 +795,8 @@ export default function SearchInterface() {
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               {[
                 { mode: 'quick', emoji: '⚡', label: 'Quick Mode' },
-                { mode: 'expert', emoji: '🔮', label: 'Expert Mode' }
+                { mode: 'expert', emoji: '🔮', label: 'Expert Mode' },
+                { mode: 'podcast-search', emoji: '🎙️', label: 'Podcast Search' }
               ].map(({ mode, emoji, label }) => (
                 <button
                   key={mode}
@@ -792,7 +817,7 @@ export default function SearchInterface() {
 
         {/* Initial Search Form */}
         <div className="max-w-3xl mx-auto px-4">
-          {!hasSearched && searchMode === "quick" && (
+          {!hasSearched && (searchMode === "quick" || searchMode === 'podcast-search') && (
             <form onSubmit={handleSearch} className="relative">
             <textarea
               ref={searchInputRef}
@@ -800,7 +825,7 @@ export default function SearchInterface() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="How Can I Help You Today?"
               className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-              disabled={searchMode !== "quick"}
+              // disabled={searchMode !== "quick"}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
