@@ -16,6 +16,7 @@ import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
 import {AccountButton} from './AccountButton.tsx'
 import {CheckoutModal} from './CheckoutModal.tsx'
+import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 
 export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
@@ -931,6 +932,17 @@ export default function SearchInterface() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Conversation History */}
+      {conversation.length > 0 && (
+        <div className="max-w-4xl mx-auto px-4 space-y-8 mb-24 pb-24">
+          {conversation
+            .filter(item => item.type === searchMode)
+            .map((item) => (
+              <ConversationRenderer key={item.id} item={item} />
+            ))}
         </div>
       )}
 
