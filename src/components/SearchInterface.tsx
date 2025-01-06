@@ -230,6 +230,12 @@ export default function SearchInterface() {
     }
   
     printLog(`Starting payment with bolt11:${bolt11}`);
+
+    const existingInvoice = invoicePool.find((inv) => inv.pr === bolt11);
+    if (existingInvoice && existingInvoice.preimage) {
+      printLog(`Invoice already paid. Returning preimage: ${existingInvoice.preimage}`);
+      return existingInvoice.preimage;
+    }
   
     try {
       printLog('Calling LightningService.payInvoice...');
