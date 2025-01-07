@@ -19,6 +19,7 @@ import {CheckoutModal} from './CheckoutModal.tsx'
 import { QuickModeItem } from '../types/conversation.ts';
 import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import { DEBUG_MODE,printLog } from '../constants/constants.ts';
+import QuickTopicGrid from './QuickTopicGrid.tsx';
 
 export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
 let buffer = '';
@@ -560,25 +561,29 @@ export default function SearchInterface() {
     }
   };
 
+  const performQuoteSearch = async () => {
+    setSearchState(prev => ({ ...prev, isLoading: true }));
+    const quoteResults = await handleQuoteSearch(query);
+    setConversation(prev => [...prev, {
+      id: searchState.activeConversationId as number,
+      type: 'podcast-search' as const,
+      query: query,
+      timestamp: new Date(),
+      isStreaming: false,
+      data: {
+        quotes: quoteResults.results
+      }
+    }]);
+    setSearchState(prev => ({ ...prev, isLoading: false }));
+  }
+
   const handleSearch = async (e: React.FormEvent) => {
     console.log(`handleSearch:${searchMode}`)
     console.log(`${searchMode === 'podcast-search'}`)
     e.preventDefault();
     if (searchMode === 'podcast-search') {
       try {
-        setSearchState(prev => ({ ...prev, isLoading: true }));
-        const quoteResults = await handleQuoteSearch(query);
-        setConversation(prev => [...prev, {
-          id: searchState.activeConversationId as number,
-          type: 'podcast-search' as const,
-          query: query,
-          timestamp: new Date(),
-          isStreaming: false,
-          data: {
-            quotes: quoteResults.results
-          }
-        }]);
-        setSearchState(prev => ({ ...prev, isLoading: false }));
+        performQuoteSearch();
         return;
       } catch (error) {
         console.error('Quote search error:', error);
@@ -915,6 +920,47 @@ export default function SearchInterface() {
             .map((item) => (
               <ConversationRenderer key={item.id} item={item} />
             ))}
+        </div>
+      )}
+
+      {searchMode === 'podcast-search' && conversation.length === 0 && (
+        <div className="mt-12 mb-16">
+          <QuickTopicGrid 
+            onTopicSelect={(topicQuery) => {
+              setQuery(topicQuery);
+              // Instead of relying on the state update, use the topicQuery directly
+              try {
+                setSearchState(prev => ({ ...prev, isLoading: true }));
+                handleQuoteSearch(topicQuery).then(quoteResults => {
+                  setConversation(prev => [...prev, {
+                    id: nextConversationId.current++,
+                    type: 'podcast-search' as const,
+                    query: topicQuery,
+                    timestamp: new Date(),
+                    isStreaming: false,
+                    data: {
+                      quotes: quoteResults.results
+                    }
+                  }]);
+                  setSearchState(prev => ({ ...prev, isLoading: false }));
+                }).catch(error => {
+                  console.error('Quote search error:', error);
+                  setSearchState(prev => ({
+                    ...prev,
+                    error: error as Error,
+                    isLoading: false
+                  }));
+                });
+              } catch (error) {
+                console.error('Quote search error:', error);
+                setSearchState(prev => ({
+                  ...prev,
+                  error: error as Error,
+                  isLoading: false
+                }));
+              }
+            }}
+          />
         </div>
       )}
 
