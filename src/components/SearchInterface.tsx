@@ -864,7 +864,7 @@ export default function SearchInterface() {
                 disabled={searchState.isLoading}
               >
                 {searchState.isLoading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
                 ) : (
                   <svg
                     className="w-5 h-5 text-black"

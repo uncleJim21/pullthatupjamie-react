@@ -13,7 +13,9 @@ export const getTimestampedUrl = (audioUrl: string, startTime: number): string =
   // Remove any existing timestamp fragments
   const baseUrl = audioUrl.split('#')[0];
 
+  const finalSeconds = Math.max(seconds - 3,0)
+
   // Handle different podcast platform URLs
     // For all other URLs, use Media Fragments RFC standard format #t={seconds}
-    return `${baseUrl}#t=${seconds}`;
+    return `${baseUrl}#t=${finalSeconds}`;
 };
