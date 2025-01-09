@@ -20,6 +20,7 @@ import { QuickModeItem } from '../types/conversation.ts';
 import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
+import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 
 export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
 let buffer = '';
@@ -136,6 +137,7 @@ export default function SearchInterface() {
   const [model, setModel] = useState<'gpt-3.5-turbo' | 'claude-3-sonnet'>('claude-3-sonnet');
   const [searchMode, setSearchMode] = useState<SearchMode>('quick');
   const [hasSearched, setHasSearched] = useState(false);
+  const [gridFadeOut, setGridFadeOut] = useState(false);
 
   //Modals
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -583,6 +585,8 @@ export default function SearchInterface() {
     e.preventDefault();
     if (searchMode === 'podcast-search') {
       try {
+        setGridFadeOut(true);
+        setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
         performQuoteSearch();
         return;
       } catch (error) {
@@ -926,11 +930,12 @@ export default function SearchInterface() {
       {searchMode === 'podcast-search' && conversation.length === 0 && (
         <div className="mt-12 mb-16">
           <QuickTopicGrid 
+            triggerFadeOut={gridFadeOut}
             onTopicSelect={(topicQuery) => {
               setQuery(topicQuery);
               // Instead of relying on the state update, use the topicQuery directly
               try {
-                setSearchState(prev => ({ ...prev, isLoading: true }));
+                setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
                 handleQuoteSearch(topicQuery).then(quoteResults => {
                   setConversation(prev => [...prev, {
                     id: nextConversationId.current++,
@@ -962,6 +967,10 @@ export default function SearchInterface() {
             }}
           />
         </div>
+      )}
+
+      {searchMode === 'podcast-search' && searchState.isLoading && (
+        <PodcastLoadingPlaceholder />
       )}
 
       {/* Floating Search Bar - Only show after first search */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface QuickTopicCardProps {
   icon: React.ReactNode;
@@ -33,11 +33,21 @@ const QuickTopicCard: React.FC<QuickTopicCardProps> = ({
 
 interface QuickTopicGridProps {
   onTopicSelect: (query: string) => void;
+  triggerFadeOut?: boolean; // New prop to trigger fade out from parent
 }
 
-const QuickTopicGrid: React.FC<QuickTopicGridProps> = ({ onTopicSelect }) => {
+const QuickTopicGrid: React.FC<QuickTopicGridProps> = ({ onTopicSelect , triggerFadeOut=false}) => {
   const [fadeOut, setFadeOut] = useState(false);
   const [isGridVisible, setIsGridVisible] = useState(true);
+
+  useEffect(() => {
+    if (triggerFadeOut) {
+      setFadeOut(true);
+      setTimeout(() => {
+        setIsGridVisible(false);
+      }, 500);
+    }
+  }, [triggerFadeOut]);
 
   const topics = [
     { 

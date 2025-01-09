@@ -9,7 +9,7 @@ export const handleQuoteSearch = async (queryToUse: string) => {
       },
       body: JSON.stringify({ 
         query: queryToUse,
-        limit: 5
+        limit: 20
       })
     });
 
