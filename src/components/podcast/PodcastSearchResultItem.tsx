@@ -15,6 +15,7 @@ interface PodcastSearchResultItemProps {
     end_time: number;
   };
   episodeImage?: string; // New field for episode artwork
+  listenLink?: string;
 }
 
 export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = ({
@@ -25,7 +26,8 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   date,
   similarity,
   timeContext,
-  episodeImage = '/podcast-logo.png' // Default placeholder
+  episodeImage = '/podcast-logo.png', // Default placeholder
+  listenLink
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
@@ -82,6 +84,16 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
     }
   };
 
+  const handleListen = () => {
+    if (listenLink) {
+      window.open(listenLink, '_blank');
+    } else {
+      console.error('Listen link is not available');
+    }
+  };
+  
+
+
   return (
     <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
       <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
@@ -105,17 +117,22 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
                   {creator} • {new Date(date).toLocaleDateString()}
                 </p>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-col space-y-2">
                 <button
                   onClick={handleShare}
                   className="inline-flex items-center px-3 py-1 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                 >
                   <Share2 className="h-4 w-4 mr-1" />
-                  Share
+                  <p>{!showCopied ? "Share" : "Copied!"}</p>
                 </button>
-                {showCopied && (
-                  <span className="text-sm text-green-400">Copied!</span>
-                )}
+                <button
+                  onClick={handleListen}
+                  disabled={listenLink === ""}
+                  className={`inline-flex items-center px-3 py-1 rounded-md text-sm ${listenLink !== "" ? "text-gray-300 hover:bg-gray-800 transition-colors": "text-gray-600"}`}
+                >
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  <p>Listen</p>
+                </button>
               </div>
             </div>
 
