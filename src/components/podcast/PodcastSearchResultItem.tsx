@@ -147,7 +147,8 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
               <div className="flex items-center space-x-3">
                 <button
                   onClick={handlePlayPause}
-                  className="p-2 rounded-full bg-white text-black hover:bg-gray-200 transition-colors"
+                  className={`p-2 rounded-full text-black transition-colors ${(audioUrl === "URL unavailable") ? "bg-gray-700" : "hover:bg-gray-200 bg-white"}`}
+                  disabled={audioUrl === "URL unavailable"}
                 >
                   {isPlaying ? <Pause size={16} /> : <Play size={16} />}
                 </button>

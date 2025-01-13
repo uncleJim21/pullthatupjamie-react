@@ -822,8 +822,8 @@ export default function SearchInterface() {
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               {[
                 { mode: 'quick', emoji: '⚡', label: 'Quick Mode' },
-                { mode: 'expert', emoji: '🔮', label: 'Expert Mode' },
-                { mode: 'podcast-search', emoji: '🎙️', label: 'Podcast Search' }
+                { mode: 'podcast-search', emoji: '🎙️', label: 'Podcast Search' },
+                { mode: 'expert', emoji: '🔮', label: 'Expert Mode' }
               ].map(({ mode, emoji, label }) => (
                 <button
                   key={mode}
