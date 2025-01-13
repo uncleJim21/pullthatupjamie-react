@@ -31,8 +31,9 @@
 
 ## 🧩 **Key Components**  
 - 🌐 **[SearxNG](https://github.com/searxng/searxng):** A powerful metasearch engine that aggregates top results from mainstream search engines.  
-- 🤖 **LLMs (e.g., ChatGPT & Claude):** Analyze search results to provide executive summaries with precision and clarity.  
+- 🤖 **LLMs (e.g., ChatGPT & Claude):** Analyze search results to provide executive summaries with precision and clarity.
+- **Back End Code**: https://github.com/uncleJim21/pullthatupjamie-backend
 
 ---
 
-🎉 Start searching smarter, faster, and more securely with **Pull That Up Jamie**! 🚀
+🎉 Start searching smarter, faster, and more securely with **Pull That Up Jamie**! 🚀 
