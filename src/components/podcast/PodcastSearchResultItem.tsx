@@ -1,7 +1,6 @@
-// components/podcast/PodcastSearchResultItem.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { ExternalLink, Share2, Play, Pause } from 'lucide-react';
-import { formatTime,getTimestampedUrl } from '../../utils/time.ts';
+import { formatTime, getTimestampedUrl } from '../../utils/time.ts';
 
 interface PodcastSearchResultItemProps {
   quote: string;
@@ -35,10 +34,11 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   id,
   isPlaying,
   onPlayPause,
-  onEnded
+  onEnded,
 }) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false); // Image loading state
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
 
@@ -70,10 +70,10 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
 
   const handleTimeUpdate = () => {
     if (!audioRef.current) return;
-    
+
     const currentAudioTime = audioRef.current.currentTime;
     setCurrentTime(currentAudioTime);
-    
+
     if (currentAudioTime >= timeContext.end_time) {
       audioRef.current.pause();
       setCurrentTime(timeContext.start_time);
@@ -86,7 +86,7 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
     if (progressRef.current && audioRef.current) {
       const rect = progressRef.current.getBoundingClientRect();
       const clickPosition = (e.clientX - rect.left) / rect.width;
-      const newTime = timeContext.start_time + (duration * clickPosition);
+      const newTime = timeContext.start_time + duration * clickPosition;
       audioRef.current.currentTime = newTime;
       setCurrentTime(newTime);
     }
@@ -115,22 +115,27 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
         <div className="flex flex-col sm:flex-row">
           {/* Episode Artwork */}
           <div className="flex-shrink-0 mb-4 sm:mb-0 sm:mr-4">
+            {!imageLoaded && (
+              <div className="w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 bg-gray-800 animate-pulse" />
+            )}
             <img
               src={episodeImage}
               alt={episode}
-              className="w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700"
+              className={`w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 ${
+                imageLoaded ? 'block' : 'hidden'
+              }`}
+              onLoad={() => setImageLoaded(true)} // Set image loaded state
+              onError={() => setImageLoaded(false)} // Handle image loading failure
             />
           </div>
 
-          <div className="flex-grow min-w-0"> {/* Added min-w-0 to enable text truncation */}
+          <div className="flex-grow min-w-0">
             <div className="flex flex-col sm:flex-row justify-between">
-              <div className="min-w-0 mb-2 sm:mb-0"> {/* Added min-w-0 container */}
+              <div className="min-w-0 mb-2 sm:mb-0">
                 <h3 className="text-lg font-medium text-white line-clamp-4">
                   {episode}
                 </h3>
-                <p className="text-sm text-gray-400">
-                  {creator}
-                </p>
+                <p className="text-sm text-gray-400">{creator}</p>
               </div>
               <div className="flex sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4">
                 <button
@@ -138,13 +143,15 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
                   className="inline-flex items-center px-3 py-1 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                 >
                   <Share2 className="h-4 w-4 mr-1" />
-                  <p>{!showCopied ? "Share" : "Copied!"}</p>
+                  <p>{!showCopied ? 'Share' : 'Copied!'}</p>
                 </button>
                 <button
                   onClick={handleListen}
                   disabled={!listenLink}
                   className={`inline-flex items-center px-3 py-1 rounded-md text-sm ${
-                    listenLink ? "text-gray-300 hover:bg-gray-800 transition-colors" : "text-gray-600"
+                    listenLink
+                      ? 'text-gray-300 hover:bg-gray-800 transition-colors'
+                      : 'text-gray-600'
                   }`}
                 >
                   <ExternalLink className="h-4 w-4 mr-1" />
@@ -171,18 +178,20 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
                 <button
                   onClick={handlePlayPause}
                   className={`p-2 rounded-full text-black transition-colors ${
-                    audioUrl === "URL unavailable" ? "bg-gray-700" : "hover:bg-gray-200 bg-white"
+                    audioUrl === 'URL unavailable'
+                      ? 'bg-gray-700'
+                      : 'hover:bg-gray-200 bg-white'
                   }`}
-                  disabled={audioUrl === "URL unavailable"}
+                  disabled={audioUrl === 'URL unavailable'}
                 >
                   {isPlaying ? <Pause size={16} /> : <Play size={16} />}
                 </button>
-                <div 
+                <div
                   ref={progressRef}
                   className="flex-grow h-1 bg-gray-700 rounded cursor-pointer"
                   onClick={handleProgressClick}
                 >
-                  <div 
+                  <div
                     className="h-full bg-white rounded transition-all"
                     style={{ width: `${progress}%` }}
                   />
