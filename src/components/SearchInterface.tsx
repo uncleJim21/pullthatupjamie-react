@@ -924,7 +924,7 @@ export default function SearchInterface() {
 
 
       {/* Conversation History */}
-      {conversation.length > 0 && (searchMode !== 'expert') && (
+      {conversation.length > 0 && (searchMode !== 'expert') && (!searchState.isLoading) && (
         <div className="max-w-4xl mx-auto px-4 space-y-8 mb-24 pb-24">
           {conversation
             .filter(item => item.type === searchMode)
