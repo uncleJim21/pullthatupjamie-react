@@ -1,5 +1,5 @@
 // components/podcast/PodcastSearchResultItem.tsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ExternalLink, Share2, Play, Pause } from 'lucide-react';
 import { formatTime,getTimestampedUrl } from '../../utils/time.ts';
 
@@ -14,8 +14,12 @@ interface PodcastSearchResultItemProps {
     start_time: number;
     end_time: number;
   };
-  episodeImage?: string; // New field for episode artwork
+  episodeImage?: string;
   listenLink?: string;
+  id: string; // Add this to uniquely identify each item
+  isPlaying: boolean;
+  onPlayPause: (id: string) => void;
+  onEnded: (id: string) => void;
 }
 
 export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = ({
@@ -26,10 +30,13 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   date,
   similarity,
   timeContext,
-  episodeImage = '/podcast-logo.png', // Default placeholder
-  listenLink
+  episodeImage = '/podcast-logo.png',
+  listenLink,
+  id,
+  isPlaying,
+  onPlayPause,
+  onEnded
 }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -38,26 +45,44 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   const duration = timeContext.end_time - timeContext.start_time;
   const progress = ((currentTime - timeContext.start_time) / duration) * 100;
 
-  const handlePlayPause = () => {
+  useEffect(() => {
+    // When isPlaying changes to false, pause the audio
+    if (!isPlaying && audioRef.current) {
+      audioRef.current.pause();
+    }
+  }, [isPlaying]);
+
+  const handlePlayPause = async () => {
     if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.currentTime = timeContext.start_time;
-        audioRef.current.play();
+      try {
+        if (!isPlaying) {
+          // First notify parent to handle pausing other audio
+          onPlayPause(id);
+          // Then play this audio
+          audioRef.current.currentTime = timeContext.start_time;
+          await audioRef.current.play();
+        } else {
+          audioRef.current.pause();
+          onPlayPause(id);
+        }
+      } catch (error) {
+        console.error('Playback error:', error);
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
   const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-      if (audioRef.current.currentTime >= timeContext.end_time) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-        setCurrentTime(timeContext.start_time);
-      }
+    if (!audioRef.current) return;
+    
+    const currentAudioTime = audioRef.current.currentTime;
+    setCurrentTime(currentAudioTime);
+    
+    // If we hit the end time
+    if (currentAudioTime >= timeContext.end_time) {
+      audioRef.current.pause();
+      setCurrentTime(timeContext.start_time);
+      audioRef.current.currentTime = timeContext.start_time;
+      onEnded(id); // Use new handler instead of onPlayPause
     }
   };
 
@@ -114,7 +139,8 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
               <div>
                 <h3 className="text-lg font-medium text-white">{episode}</h3>
                 <p className="text-sm text-gray-400">
-                  {creator} • {new Date(date).toLocaleDateString()}
+                  {/* {creator} • {new Date(date).toLocaleDateString()} */}
+                  {creator}
                 </p>
               </div>
               <div className="flex flex-col space-y-2">
@@ -138,12 +164,18 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
 
             {/* Mini Player */}
             <div className="mt-4">
-              <audio
-                ref={audioRef}
-                src={audioUrl}
-                onTimeUpdate={handleTimeUpdate}
-                onEnded={() => setIsPlaying(false)}
-              />
+            <audio
+              ref={audioRef}
+              src={audioUrl}
+              onTimeUpdate={handleTimeUpdate}
+              onEnded={() => {
+                if (audioRef.current) {
+                  audioRef.current.currentTime = timeContext.start_time;
+                  setCurrentTime(timeContext.start_time);
+                }
+                onEnded(id);
+              }}
+            />
               <div className="flex items-center space-x-3">
                 <button
                   onClick={handlePlayPause}
