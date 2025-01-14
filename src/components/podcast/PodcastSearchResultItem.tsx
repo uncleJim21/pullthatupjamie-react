@@ -16,7 +16,7 @@ interface PodcastSearchResultItemProps {
   };
   episodeImage?: string;
   listenLink?: string;
-  id: string; // Add this to uniquely identify each item
+  id: string;
   isPlaying: boolean;
   onPlayPause: (id: string) => void;
   onEnded: (id: string) => void;
@@ -46,7 +46,6 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   const progress = ((currentTime - timeContext.start_time) / duration) * 100;
 
   useEffect(() => {
-    // When isPlaying changes to false, pause the audio
     if (!isPlaying && audioRef.current) {
       audioRef.current.pause();
     }
@@ -56,9 +55,7 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
     if (audioRef.current) {
       try {
         if (!isPlaying) {
-          // First notify parent to handle pausing other audio
           onPlayPause(id);
-          // Then play this audio
           audioRef.current.currentTime = timeContext.start_time;
           await audioRef.current.play();
         } else {
@@ -77,12 +74,11 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
     const currentAudioTime = audioRef.current.currentTime;
     setCurrentTime(currentAudioTime);
     
-    // If we hit the end time
     if (currentAudioTime >= timeContext.end_time) {
       audioRef.current.pause();
       setCurrentTime(timeContext.start_time);
       audioRef.current.currentTime = timeContext.start_time;
-      onEnded(id); // Use new handler instead of onPlayPause
+      onEnded(id);
     }
   };
 
@@ -97,9 +93,7 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   };
 
   const handleShare = async () => {
-    const timestamp = Math.floor(timeContext.start_time);
-    const shareUrl = getTimestampedUrl(audioUrl,timeContext.start_time);
-    
+    const shareUrl = getTimestampedUrl(audioUrl, timeContext.start_time);
     try {
       await navigator.clipboard.writeText(shareUrl);
       setShowCopied(true);
@@ -112,38 +106,33 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   const handleListen = () => {
     if (listenLink) {
       window.open(listenLink, '_blank');
-    } else {
-      console.error('Listen link is not available');
     }
   };
-  
-
 
   return (
     <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
       <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
-        <div className="flex items-start">
+        <div className="flex flex-col sm:flex-row">
           {/* Episode Artwork */}
-          <div className="flex-shrink-0 mr-4">
+          <div className="flex-shrink-0 mb-4 sm:mb-0 sm:mr-4">
             <img
               src={episodeImage}
               alt={episode}
-              width={96}
-              height={96}
-              className="rounded-md"
+              className="w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700"
             />
           </div>
 
-          <div className="flex-grow">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-lg font-medium text-white">{episode}</h3>
+          <div className="flex-grow min-w-0"> {/* Added min-w-0 to enable text truncation */}
+            <div className="flex flex-col sm:flex-row justify-between">
+              <div className="min-w-0 mb-2 sm:mb-0"> {/* Added min-w-0 container */}
+                <h3 className="text-lg font-medium text-white line-clamp-4">
+                  {episode}
+                </h3>
                 <p className="text-sm text-gray-400">
-                  {/* {creator} • {new Date(date).toLocaleDateString()} */}
                   {creator}
                 </p>
               </div>
-              <div className="flex flex-col space-y-2">
+              <div className="flex sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4">
                 <button
                   onClick={handleShare}
                   className="inline-flex items-center px-3 py-1 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
@@ -153,8 +142,10 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
                 </button>
                 <button
                   onClick={handleListen}
-                  disabled={listenLink === ""}
-                  className={`inline-flex items-center px-3 py-1 rounded-md text-sm ${listenLink !== "" ? "text-gray-300 hover:bg-gray-800 transition-colors": "text-gray-600"}`}
+                  disabled={!listenLink}
+                  className={`inline-flex items-center px-3 py-1 rounded-md text-sm ${
+                    listenLink ? "text-gray-300 hover:bg-gray-800 transition-colors" : "text-gray-600"
+                  }`}
                 >
                   <ExternalLink className="h-4 w-4 mr-1" />
                   <p>Listen</p>
@@ -163,23 +154,25 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
             </div>
 
             {/* Mini Player */}
-            <div className="mt-4">
-            <audio
-              ref={audioRef}
-              src={audioUrl}
-              onTimeUpdate={handleTimeUpdate}
-              onEnded={() => {
-                if (audioRef.current) {
-                  audioRef.current.currentTime = timeContext.start_time;
-                  setCurrentTime(timeContext.start_time);
-                }
-                onEnded(id);
-              }}
-            />
+            <div className="mt-4 pl-0">
+              <audio
+                ref={audioRef}
+                src={audioUrl}
+                onTimeUpdate={handleTimeUpdate}
+                onEnded={() => {
+                  if (audioRef.current) {
+                    audioRef.current.currentTime = timeContext.start_time;
+                    setCurrentTime(timeContext.start_time);
+                  }
+                  onEnded(id);
+                }}
+              />
               <div className="flex items-center space-x-3">
                 <button
                   onClick={handlePlayPause}
-                  className={`p-2 rounded-full text-black transition-colors ${(audioUrl === "URL unavailable") ? "bg-gray-700" : "hover:bg-gray-200 bg-white"}`}
+                  className={`p-2 rounded-full text-black transition-colors ${
+                    audioUrl === "URL unavailable" ? "bg-gray-700" : "hover:bg-gray-200 bg-white"
+                  }`}
                   disabled={audioUrl === "URL unavailable"}
                 >
                   {isPlaying ? <Pause size={16} /> : <Play size={16} />}
@@ -194,7 +187,7 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-400 whitespace-nowrap">
                   {formatTime(currentTime)} / {formatTime(timeContext.end_time)}
                 </span>
               </div>

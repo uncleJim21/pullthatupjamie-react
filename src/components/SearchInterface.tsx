@@ -21,6 +21,7 @@ import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
+import { Analytics } from "@vercel/analytics/react"
 
 export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
 let buffer = '';
