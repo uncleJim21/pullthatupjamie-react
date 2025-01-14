@@ -3,7 +3,7 @@ import { Podcast } from 'lucide-react';
 
 export default function PodcastLoadingState() {
   return (
-    <div className="flex flex-col items-center justify-center w-full py-16">
+    <div className="flex flex-col items-center justify-center w-full py-8">
       <h2 className="text-gray-500 text-xl mb-8 text-center">
         Searching Through
         <br />

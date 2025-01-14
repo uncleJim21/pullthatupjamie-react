@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Share2, Play, Pause } from 'lucide-react';
+import { ExternalLink, Share2, Play, Pause, Loader } from 'lucide-react';
 import { formatTime, getTimestampedUrl } from '../../utils/time.ts';
 
 interface PodcastSearchResultItemProps {
@@ -38,6 +38,7 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
 }) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false); // Image loading state
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -55,15 +56,18 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
     if (audioRef.current) {
       try {
         if (!isPlaying) {
+          setIsBuffering(true);
           onPlayPause(id);
           audioRef.current.currentTime = timeContext.start_time;
           await audioRef.current.play();
+          setIsBuffering(false);
         } else {
           audioRef.current.pause();
           onPlayPause(id);
         }
       } catch (error) {
         console.error('Playback error:', error);
+        setIsBuffering(false);
       }
     }
   };
@@ -184,7 +188,13 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
                   }`}
                   disabled={audioUrl === 'URL unavailable'}
                 >
-                  {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                  {isBuffering ? (
+                    <Loader className="animate-spin" size={16} />
+                  ) : isPlaying ? (
+                    <Pause size={16} />
+                  ) : (
+                    <Play size={16} />
+                  )}
                 </button>
                 <div
                   ref={progressRef}
