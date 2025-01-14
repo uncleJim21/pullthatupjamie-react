@@ -52,18 +52,24 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
     }
   }, [isPlaying]);
 
+  useEffect(() => {
+    if (!isPlaying && audioRef.current) {
+      audioRef.current.pause();
+    }
+  }, [isPlaying]);
+
   const handlePlayPause = async () => {
     if (audioRef.current) {
       try {
         if (!isPlaying) {
           setIsBuffering(true);
-          onPlayPause(id);
+          onPlayPause(id); // Notify parent component to handle playback state
           audioRef.current.currentTime = timeContext.start_time;
           await audioRef.current.play();
           setIsBuffering(false);
         } else {
           audioRef.current.pause();
-          onPlayPause(id);
+          onPlayPause(id); // Notify parent component to handle pause state
         }
       } catch (error) {
         console.error('Playback error:', error);
@@ -73,18 +79,19 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   };
 
   const handleTimeUpdate = () => {
-    if (!audioRef.current) return;
+    if (audioRef.current) {
+      const currentAudioTime = audioRef.current.currentTime;
+      setCurrentTime(currentAudioTime);
 
-    const currentAudioTime = audioRef.current.currentTime;
-    setCurrentTime(currentAudioTime);
-
-    if (currentAudioTime >= timeContext.end_time) {
-      audioRef.current.pause();
-      setCurrentTime(timeContext.start_time);
-      audioRef.current.currentTime = timeContext.start_time;
-      onEnded(id);
+      if (currentAudioTime >= timeContext.end_time) {
+        audioRef.current.pause();
+        setCurrentTime(timeContext.start_time);
+        audioRef.current.currentTime = timeContext.start_time;
+        onEnded(id);
+      }
     }
   };
+
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (progressRef.current && audioRef.current) {
