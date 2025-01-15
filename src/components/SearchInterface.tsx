@@ -924,19 +924,26 @@ export default function SearchInterface() {
 
 
       {/* Conversation History */}
-      {conversation.length > 0 && (searchMode !== 'expert') && (!searchState.isLoading) && (
-        <div className="max-w-4xl mx-auto px-4 space-y-8 mb-24 pb-24">
-          {conversation
-            .filter(item => item.type === searchMode)
-            .map((item) => (
-              <ConversationRenderer key={item.id} item={item} />
-            ))}
-        </div>
-      )}
+      {conversation.length > 0 && (searchMode !== 'expert') && (
+      <div
+        className={`max-w-4xl mx-auto px-4 space-y-8 ${
+          searchMode === 'podcast-search' && conversation.length > 0
+            ? 'mb-1 pb-1'
+            : 'mb-24 pb-24'
+        }`}
+      >
+        {conversation
+          .filter(item => item.type === searchMode)
+          .map((item) => (
+            <ConversationRenderer key={item.id} item={item} />
+          ))}
+      </div>
+    )}
 
-      {searchMode === 'podcast-search' && conversation.length === 0 && (
-        <div className="mt-12 mb-16">
+      {searchMode === 'podcast-search' && (
+        <div className={`mt-12 ${hasSearched ? 'mb-52' : 'mb-36'}`}>
           <QuickTopicGrid 
+            className=""
             triggerFadeOut={gridFadeOut}
             onTopicSelect={(topicQuery) => {
               setQuery(topicQuery);
