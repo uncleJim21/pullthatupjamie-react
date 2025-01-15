@@ -20,6 +20,7 @@ import { QuickModeItem } from '../types/conversation.ts';
 import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
+import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import { Analytics } from "@vercel/analytics/react"
 
@@ -583,6 +584,7 @@ export default function SearchInterface() {
         quotes: quoteResults.results
       }
     }]);
+    setQuery("");
     setSearchState(prev => ({ ...prev, isLoading: false }));
   }
 
@@ -980,6 +982,7 @@ export default function SearchInterface() {
               }
             }}
           />
+          {!hasSearched && <AvailableSourcesSection hasSearched={hasSearched} />}
         </div>
       )}
 
