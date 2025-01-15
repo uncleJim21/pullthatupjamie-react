@@ -91,7 +91,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
                       }}
                     />
                     {selectedSources.has(index) && (
-                      <div className={`absolute bottom-1 right-1 bg-white rounded-full p-0.5`}>
+                      <div className={`absolute bottom-1 right-1 bg-white rounded-full p-0.5 border border-black`}>
                         <Check className="w-4 h-4 text-black" />
                       </div>
                     )}

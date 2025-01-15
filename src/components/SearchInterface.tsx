@@ -22,7 +22,7 @@ import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
 import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
-import { Analytics } from "@vercel/analytics/react"
+// import { Analytics } from "@vercel/analytics/react"
 
 export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
 let buffer = '';
@@ -32,55 +32,6 @@ interface Source {
   url: string;
   snippet?: string;
 }
-
-interface StreamingTextProps {
-  text: string;
-  isLoading: boolean;
-}
-
-const StreamingText: React.FC<StreamingTextProps> = ({ text, isLoading }) => {
-  return (
-    <div className="prose prose-invert max-w-none relative">
-      <ReactMarkdown 
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: ({ node, ...props }) => (
-            <a
-              {...props}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300"
-            />
-          ),
-          strong: ({ node, ...props }) => (
-            <strong {...props} className="text-white" />
-          ),
-          ul: ({ node, ...props }) => (
-            <ul {...props} className="list-disc pl-4 my-4" />
-          ),
-          ol: ({ node, ...props }) => (
-            <ol {...props} className="list-decimal pl-4 my-4" />
-          ),
-          li: ({ node, children, ...props }) => (
-            <li {...props} className="my-2">
-              {React.Children.map(children, child => {
-                if (React.isValidElement(child) && child.type === 'p') {
-                  return child.props.children;
-                }
-                return child;
-              })}
-            </li>
-          )
-        }}
-      >
-        {text}
-      </ReactMarkdown>
-      {isLoading && (
-        <span className="inline-block w-2 h-4 ml-1 bg-white animate-pulse" />
-      )}
-    </div>
-  );
-};
 
 const SubscriptionSuccessPopup: React.FC<{ onClose: () => void }> = ({ onClose }) => (
   <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
