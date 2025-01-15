@@ -29,7 +29,7 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
 
   return (
     <BaseConversationLayout query={item.query}>
-      <div className="space-y-6">
+      <div className="space-y-6 pb-48">
         {item.data.quotes.map((quote, index) => (
           <PodcastSearchResultItem
             key={index}

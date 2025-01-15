@@ -138,8 +138,18 @@ export default function SearchInterface() {
   const [query, setQuery] = useState('');
   const [model, setModel] = useState<'gpt-3.5-turbo' | 'claude-3-sonnet'>('claude-3-sonnet');
   const [searchMode, setSearchMode] = useState<SearchMode>('quick');
-  const [hasSearched, setHasSearched] = useState(false);
+  const [selectedSources, setSelectedSources] = useState<Set<number>>(new Set());
   const [gridFadeOut, setGridFadeOut] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<Record<SearchMode, boolean>>({
+    'quick': false,
+    'depth': false,
+    'expert': false,
+    'podcast-search': false
+  });
+  const hasSearchedInMode = (mode: SearchMode): boolean => {
+    if (!searchHistory[mode]) return false;
+    return searchHistory[mode];
+  };
 
   //Modals
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -433,7 +443,7 @@ export default function SearchInterface() {
     }));
   
     resultTextRef.current = '';
-    setHasSearched(true);
+    setSearchHistory(prev => ({...prev, [searchMode]: true}));
   
     try {
       const response = await performSearch(queryToUse, auth);
@@ -573,6 +583,7 @@ export default function SearchInterface() {
 
   const performQuoteSearch = async () => {
     setSearchState(prev => ({ ...prev, isLoading: true }));
+    setSearchHistory(prev => ({...prev, [searchMode]: true}));
     const quoteResults = await handleQuoteSearch(query);
     setConversation(prev => [...prev, {
       id: searchState.activeConversationId as number,
@@ -589,8 +600,6 @@ export default function SearchInterface() {
   }
 
   const handleSearch = async (e: React.FormEvent) => {
-    console.log(`handleSearch:${searchMode}`)
-    console.log(`${searchMode === 'podcast-search'}`)
     e.preventDefault();
     if (searchMode === 'podcast-search') {
       try {
@@ -805,20 +814,20 @@ export default function SearchInterface() {
       </button>)
       }
       <br></br>
-      <div className={`${hasSearched ? 'mb-8' : ''} ml-4 mr-4`}>
+      <div className={`${hasSearchedInMode(searchMode) ? 'mb-8' : ''} ml-4 mr-4`}>
         {/* Header with Logo */}
-        <div className={`flex justify-center items-center py-8 ${!hasSearched && 'mt-8'}`}>
+        <div className={`flex justify-center items-center py-8 ${!hasSearchedInMode(searchMode) && 'mt-8'}`}>
           <div className="flex items-center gap-4">
             <img
               src="/jamie-logo.png"
               alt="Jamie Logo"
               width={128}
               height={128}
-              className={`${hasSearched ? 'w-16 h-16' : ''} w-128 h-128`}
+              className={`${hasSearchedInMode(searchMode) ? 'w-16 h-16' : ''} w-128 h-128`}
             />
             <div>
               <h1 className="text-3xl font-bold">Pull That Up Jamie!</h1>
-              <p className={`text-gray-400 text-md text-shadow-light-white ${hasSearched ? 'hidden' : ''}`}>
+              <p className={`text-gray-400 text-md text-shadow-light-white ${hasSearchedInMode(searchMode) ? 'hidden' : ''}`}>
                 Instantly pull up anything with private web search + AI.
               </p>
             </div>
@@ -826,7 +835,7 @@ export default function SearchInterface() {
         </div>
 
         {/* Search Modes - Now shown when hasSearched is true */}
-        {(hasSearched || searchMode !== "quick") && (
+        {(hasSearchedInMode(searchMode) || searchMode !== "quick") && (
           <div className="flex justify-center mb-6">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               {[
@@ -851,9 +860,17 @@ export default function SearchInterface() {
           </div>
         )}
 
+        {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && 
+          <AvailableSourcesSection 
+            hasSearched={hasSearchedInMode(searchMode)} 
+            selectedSources={selectedSources} 
+            setSelectedSources={setSelectedSources} 
+            /> 
+          }
+
         {/* Initial Search Form */}
         <div className="max-w-3xl mx-auto px-4">
-          {!hasSearched && (searchMode === "quick" || searchMode === 'podcast-search') && (
+          {!hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && (
             <form onSubmit={handleSearch} className="relative">
             <textarea
               ref={searchInputRef}
@@ -903,7 +920,7 @@ export default function SearchInterface() {
           </form>
           )}
           {/* Suggested Queries */}
-          {!hasSearched && searchMode === "quick" && (
+          {!hasSearchedInMode(searchMode) && searchMode === "quick" && (
             <div className="mt-24 mb-8">
               <h3 className="text-gray-400 text-sm font-medium mb-4">Suggested</h3>
               <div className="space-y-4">
@@ -942,8 +959,8 @@ export default function SearchInterface() {
       </div>
     )}
 
-      {searchMode === 'podcast-search' && (
-        <div className={`mt-12 ${hasSearched ? 'mb-52' : 'mb-36'}`}>
+      {searchMode === 'podcast-search' && !hasSearchedInMode(searchMode) && (
+        <div className={`mt-12 ${hasSearchedInMode(searchMode) ? 'mb-52' : 'mb-36'}`}>
           <QuickTopicGrid 
             className=""
             triggerFadeOut={gridFadeOut}
@@ -952,6 +969,7 @@ export default function SearchInterface() {
               // Instead of relying on the state update, use the topicQuery directly
               try {
                 setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
+                setSearchHistory(prev => ({...prev, [searchMode]: true}));
                 handleQuoteSearch(topicQuery).then(quoteResults => {
                   setConversation(prev => [...prev, {
                     id: nextConversationId.current++,
@@ -963,6 +981,7 @@ export default function SearchInterface() {
                       quotes: quoteResults.results
                     }
                   }]);
+                  setQuery("")
                   setSearchState(prev => ({ ...prev, isLoading: false }));
                 }).catch(error => {
                   console.error('Quote search error:', error);
@@ -982,7 +1001,12 @@ export default function SearchInterface() {
               }
             }}
           />
-          {!hasSearched && <AvailableSourcesSection hasSearched={hasSearched} />}
+          {
+            <AvailableSourcesSection 
+              hasSearched={hasSearchedInMode(searchMode)} 
+              selectedSources={selectedSources} 
+              setSelectedSources={setSelectedSources} 
+          />}
         </div>
       )}
 
@@ -991,7 +1015,7 @@ export default function SearchInterface() {
       )}
 
       {/* Floating Search Bar - Only show after first search */}
-      {hasSearched && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && (
+      {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && (
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-3xl px-4 z-50">
           <form onSubmit={handleSearch} className="relative">
             <textarea

@@ -12,10 +12,9 @@ interface AvailableSourcesProps {
   hasSearched: boolean;
 }
 
-const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, hasSearched }) => {
+const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, hasSearched,selectedSources, setSelectedSources  }) => {
   const [sources, setSources] = useState<PodcastSource[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [selectedSources, setSelectedSources] = useState<Set<number>>(new Set());
   const [isExpanded, setIsExpanded] = useState(!hasSearched);
 
   useEffect(() => {
@@ -60,9 +59,9 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
   }
 
   return (
-    <div className={`${className} ${hasSearched ? 'mt-2' : 'mt-8'} max-w-3xl mx-auto pl-4 pr-4`}>
+    <div className="mx-auto max-w-4xl mt-4 pt-4 px-6">
       <button 
-        className="text-white text-2xl font-medium mb-4 flex items-center gap-2 hover:text-gray-300 transition-colors"
+        className="text-white text-xl font-medium mb-4 flex items-center gap-2 hover:text-gray-300 transition-colors"
         onClick={toggleExpanded}
       >
         <span className={`transform transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`}>
@@ -73,15 +72,15 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
       
       {isExpanded && (
         <div className="relative border border-gray-800 pt-4 pb-4 rounded-lg">
-          <div className="overflow-x-auto pb-4 mask-fade-edges">
-            <div className="flex space-x-4 pl-4 mr-4">
+          <div className="overflow-x-auto">
+            <div className="flex space-x-4 px-4">
               {sources.map((source, index) => (
                 <div
                   key={index}
-                  className="flex-shrink-0 w-24 group cursor-pointer"
+                  className="flex-shrink-0 w-28 sm:w-12 lg:w-48 group cursor-pointer"
                   onClick={() => toggleSource(index)}
                 >
-                  <div className={`relative aspect-square rounded-lg overflow-hidden border transition-colors ${selectedSources.has(index) ? 'border-gray-300' : 'border-gray-600'}`}>
+                  <div className={`relative aspect-square rounded-lg overflow-hidden border group-hover:border-2 transition-colors ${selectedSources.has(index) ? 'border-gray-300' : 'border-gray-600'}`}>
                     <img
                       src={source.feedImage}
                       alt={source.title}
@@ -97,7 +96,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
                       </div>
                     )}
                   </div>
-                  <p className="mt-2 text-sm text-gray-400 text-center truncate group-hover:text-white transition-colors">
+                  <p className="my-4 text-lg text-gray-100 text-center truncate transition-colors">
                     {source.title}
                   </p>
                 </div>
