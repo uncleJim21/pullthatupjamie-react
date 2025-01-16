@@ -7,3 +7,20 @@ export const printLog = (log:string) =>{
     console.log(log)
   }
 }
+
+export interface AuthConfig {
+  type: RequestAuthMethod;
+  credentials: {
+    username?: string;
+    password?: string;
+    preimage?: string;
+    paymentHash?: string;
+  };
+}
+
+export enum RequestAuthMethod {
+  LIGHTNING = 'lightning',
+  SQUARE = 'square',
+  FREE = 'free',
+  FREE_EXPENDED = 'free-expended'//means they're in limbo and have to choose
+}

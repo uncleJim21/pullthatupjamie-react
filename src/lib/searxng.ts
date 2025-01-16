@@ -1,21 +1,4 @@
-import { API_URL } from "../constants/constants.ts";
-
-export interface AuthConfig {
-  type: RequestAuthMethod;
-  credentials: {
-    username?: string;
-    password?: string;
-    preimage?: string;
-    paymentHash?: string;
-  };
-}
-
-export enum RequestAuthMethod {
-  LIGHTNING = 'lightning',
-  SQUARE = 'square',
-  FREE = 'free',
-  FREE_EXPENDED = 'free-expended'//means they're in limbo and have to choose
-}
+import { API_URL, AuthConfig, RequestAuthMethod } from "../constants/constants.ts";
 
 export async function performSearch(query: string, auth: AuthConfig) {
   try {

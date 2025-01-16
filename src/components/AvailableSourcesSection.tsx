@@ -66,7 +66,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
   return (
     <div className="mx-auto max-w-4xl mt-4 pt-4 px-6">
       <button 
-        className="text-white text-xl font-medium mb-4 flex items-center gap-2 hover:text-gray-300 transition-colors"
+        className="text-white text-xl font-medium mb-4 flex items-center gap-2 border-white-800 rounded-lg hover:border-gray-700 transition-colors"
         onClick={toggleExpanded}
       >
         <span className={`transform transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`}>

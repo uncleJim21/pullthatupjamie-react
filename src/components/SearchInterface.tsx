@@ -1,4 +1,5 @@
-import { performSearch, AuthConfig, RequestAuthMethod } from '../lib/searxng.ts';
+import { performSearch } from '../lib/searxng.ts';
+import { RequestAuthMethod, AuthConfig } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef } from 'react';
@@ -289,14 +290,7 @@ export default function SearchInterface() {
     setIsSignInModalOpen(true);
   }
 
-  const handleStreamingSearch = async (overrideQuery?: string) => {
-    const queryToUse = overrideQuery || query;
-    if (!queryToUse.trim()) return;
-    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
-      setIsRegisterModalOpen(true);
-      return;
-    }
-
+  const getAuth = async () => {
     let auth: AuthConfig;
     if (isLightningInitialized && requestAuthMethod === RequestAuthMethod.LIGHTNING) {
       // Look for a paid but unused invoice
@@ -363,6 +357,20 @@ export default function SearchInterface() {
     else{
       auth = { type: RequestAuthMethod.FREE, credentials:{} };
     }
+
+    return auth as AuthConfig;
+  }
+
+  const handleStreamingSearch = async (overrideQuery?: string) => {
+    const queryToUse = overrideQuery || query;
+    if (!queryToUse.trim()) return;
+    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+      setIsRegisterModalOpen(true);
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
+
+    const auth = await getAuth() as AuthConfig;
   
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -537,8 +545,15 @@ export default function SearchInterface() {
     setSearchHistory(prev => ({...prev, [searchMode]: true}));
     const selectedFeedIds = Array.from(selectedSources) as string[]
     printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
+
+    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+      setIsRegisterModalOpen(true);
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
     
-    const quoteResults = await handleQuoteSearch(query, selectedFeedIds);
+    const auth = await getAuth() as AuthConfig;
+    const quoteResults = await handleQuoteSearch(query, auth,selectedFeedIds);
     setConversation(prev => [...prev, {
       id: searchState.activeConversationId as number,
       type: 'podcast-search' as const,
@@ -918,13 +933,19 @@ export default function SearchInterface() {
           <QuickTopicGrid 
             className=""
             triggerFadeOut={gridFadeOut}
-            onTopicSelect={(topicQuery) => {
+            onTopicSelect={async (topicQuery) => {
               setQuery(topicQuery);
               // Instead of relying on the state update, use the topicQuery directly
               try {
+                const auth = await getAuth() as AuthConfig;
+                if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+                  setIsRegisterModalOpen(true);
+                  setSearchState(prev => ({ ...prev, isLoading: false }));
+                  return;
+                }
                 setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
                 setSearchHistory(prev => ({...prev, [searchMode]: true}));
-                handleQuoteSearch(topicQuery).then(quoteResults => {
+                handleQuoteSearch(topicQuery,auth).then(quoteResults => {
                   setConversation(prev => [...prev, {
                     id: nextConversationId.current++,
                     type: 'podcast-search' as const,
