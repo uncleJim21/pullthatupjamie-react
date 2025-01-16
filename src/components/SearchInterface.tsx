@@ -550,7 +550,7 @@ export default function SearchInterface() {
       return;
     }
     printLog(`Request auth method:${requestAuthMethod}`)
-    const quoteResults = await handleQuoteSearch(query, auth,setIsSignInModalOpen,selectedFeedIds);
+    const quoteResults = await handleQuoteSearch(query, auth, selectedFeedIds);
     setConversation(prev => [...prev, {
       id: searchState.activeConversationId as number,
       type: 'podcast-search' as const,
