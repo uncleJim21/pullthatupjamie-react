@@ -1,8 +1,8 @@
-import { performSearch, AuthConfig, RequestAuthMethod } from '../lib/searxng.ts';
+import { performSearch } from '../lib/searxng.ts';
+import { RequestAuthMethod, AuthConfig } from '../constants/constants.ts';
+import { handleQuoteSearch } from '../services/podcastService.ts';
+import { ConversationItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { SourceTile } from './SourceTile.tsx';
 import { ModelSettingsBar } from './ModelSettingsBar.tsx';
 import { DepthModeCard, ExpertModeCard } from './ModeCards.tsx';
 import { RegisterModal } from './RegisterModal.tsx';
@@ -14,9 +14,15 @@ import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
 import {AccountButton} from './AccountButton.tsx'
 import {CheckoutModal} from './CheckoutModal.tsx'
+import { QuickModeItem } from '../types/conversation.ts';
+import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import { DEBUG_MODE,printLog } from '../constants/constants.ts';
+import QuickTopicGrid from './QuickTopicGrid.tsx';
+import AvailableSourcesSection from './AvailableSourcesSection.tsx';
+import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
+// import { Analytics } from "@vercel/analytics/react"
 
-export type SearchMode = 'quick' | 'depth' | 'expert';
+export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
 let buffer = '';
 
 interface Source {
@@ -24,55 +30,6 @@ interface Source {
   url: string;
   snippet?: string;
 }
-
-interface StreamingTextProps {
-  text: string;
-  isLoading: boolean;
-}
-
-const StreamingText: React.FC<StreamingTextProps> = ({ text, isLoading }) => {
-  return (
-    <div className="prose prose-invert max-w-none relative">
-      <ReactMarkdown 
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: ({ node, ...props }) => (
-            <a
-              {...props}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300"
-            />
-          ),
-          strong: ({ node, ...props }) => (
-            <strong {...props} className="text-white" />
-          ),
-          ul: ({ node, ...props }) => (
-            <ul {...props} className="list-disc pl-4 my-4" />
-          ),
-          ol: ({ node, ...props }) => (
-            <ol {...props} className="list-decimal pl-4 my-4" />
-          ),
-          li: ({ node, children, ...props }) => (
-            <li {...props} className="my-2">
-              {React.Children.map(children, child => {
-                if (React.isValidElement(child) && child.type === 'p') {
-                  return child.props.children;
-                }
-                return child;
-              })}
-            </li>
-          )
-        }}
-      >
-        {text}
-      </ReactMarkdown>
-      {isLoading && (
-        <span className="inline-block w-2 h-4 ml-1 bg-white animate-pulse" />
-      )}
-    </div>
-  );
-};
 
 const SubscriptionSuccessPopup: React.FC<{ onClose: () => void }> = ({ onClose }) => (
   <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
@@ -102,16 +59,6 @@ const SubscriptionSuccessPopup: React.FC<{ onClose: () => void }> = ({ onClose }
   </div>
 );
 
-
-interface ConversationItem {
-  id: number;
-  query: string;
-  result: string;
-  sources: Source[];
-  timestamp: Date;
-  isStreaming: boolean;
-}
-
 interface SearchState {
   query: string;
   result: string;
@@ -140,7 +87,18 @@ export default function SearchInterface() {
   const [query, setQuery] = useState('');
   const [model, setModel] = useState<'gpt-3.5-turbo' | 'claude-3-sonnet'>('claude-3-sonnet');
   const [searchMode, setSearchMode] = useState<SearchMode>('quick');
-  const [hasSearched, setHasSearched] = useState(false);
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  const [gridFadeOut, setGridFadeOut] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<Record<SearchMode, boolean>>({
+    'quick': false,
+    'depth': false,
+    'expert': false,
+    'podcast-search': false
+  });
+  const hasSearchedInMode = (mode: SearchMode): boolean => {
+    if (!searchHistory[mode]) return false;
+    return searchHistory[mode];
+  };
 
   //Modals
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -329,14 +287,7 @@ export default function SearchInterface() {
     setIsSignInModalOpen(true);
   }
 
-  const handleStreamingSearch = async (overrideQuery?: string) => {
-    const queryToUse = overrideQuery || query;
-    if (!queryToUse.trim()) return;
-    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
-      setIsRegisterModalOpen(true);
-      return;
-    }
-
+  const getAuth = async () => {
     let auth: AuthConfig;
     if (isLightningInitialized && requestAuthMethod === RequestAuthMethod.LIGHTNING) {
       // Look for a paid but unused invoice
@@ -403,6 +354,20 @@ export default function SearchInterface() {
     else{
       auth = { type: RequestAuthMethod.FREE, credentials:{} };
     }
+
+    return auth as AuthConfig;
+  }
+
+  const handleStreamingSearch = async (overrideQuery?: string) => {
+    const queryToUse = overrideQuery || query;
+    if (!queryToUse.trim()) return;
+    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+      setIsRegisterModalOpen(true);
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
+
+    const auth = await getAuth() as AuthConfig;
   
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -414,12 +379,15 @@ export default function SearchInterface() {
     
     setConversation(prev => [...prev, {
       id: conversationId,
-      query: queryToUse,  
-      result: '',
-      sources: [],
+      type: 'quick' as const,
+      query: queryToUse, // Note: changed from query to queryToUse
       timestamp: new Date(),
-      isStreaming: true
-    }]);
+      isStreaming: true,
+      data: {
+        result: '',
+        sources: []
+      }
+    } as QuickModeItem]);
   
     setSearchState(prev => ({
       ...prev,
@@ -431,7 +399,7 @@ export default function SearchInterface() {
     }));
   
     resultTextRef.current = '';
-    setHasSearched(true);
+    setSearchHistory(prev => ({...prev, [searchMode]: true}));
   
     try {
       const response = await performSearch(queryToUse, auth);
@@ -478,6 +446,7 @@ export default function SearchInterface() {
             try {
               const parsed = JSON.parse(data);
               switch (parsed.type) {
+                // In the switch (parsed.type) case handling:
                 case 'search':
                   const sources = parsed.data.map((result: any) => ({
                     title: result.title,
@@ -485,22 +454,36 @@ export default function SearchInterface() {
                     snippet: result.content || result.snippet || ''
                   }));
                   setConversation(prev => 
-                    prev.map(item => 
-                      item.id === conversationId 
-                        ? { ...item, sources }
-                        : item
-                    )
+                    prev.map(item => {
+                      if (item.id === conversationId && item.type === 'quick') {
+                        return {
+                          ...item,
+                          data: {
+                            ...item.data,
+                            sources
+                          }
+                        } as QuickModeItem;
+                      }
+                      return item;
+                    })
                   );
                   break;
-  
+                
                 case 'inference':
                   resultTextRef.current += parsed.data;
                   setConversation(prev => 
-                    prev.map(item => 
-                      item.id === conversationId 
-                        ? { ...item, result: resultTextRef.current }
-                        : item
-                    )
+                    prev.map(item => {
+                      if (item.id === conversationId && item.type === 'quick') {
+                        return {
+                          ...item,
+                          data: {
+                            ...item.data,
+                            result: resultTextRef.current
+                          }
+                        } as QuickModeItem;
+                      }
+                      return item;
+                    })
                   );
                   break;
   
@@ -554,9 +537,55 @@ export default function SearchInterface() {
     }
   };
 
+  const performQuoteSearch = async () => {
+    setSearchState(prev => ({ ...prev, isLoading: true }));
+    setSearchHistory(prev => ({...prev, [searchMode]: true}));
+    const selectedFeedIds = Array.from(selectedSources) as string[]
+    printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
+
+    const auth = await getAuth() as AuthConfig;
+    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+      setIsRegisterModalOpen(true);
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
+    printLog(`Request auth method:${requestAuthMethod}`)
+    const quoteResults = await handleQuoteSearch(query, auth, selectedFeedIds);
+    setConversation(prev => [...prev, {
+      id: searchState.activeConversationId as number,
+      type: 'podcast-search' as const,
+      query: query,
+      timestamp: new Date(),
+      isStreaming: false,
+      data: {
+        quotes: quoteResults.results
+      }
+    }]);
+    setQuery("");
+    setSearchState(prev => ({ ...prev, isLoading: false }));
+  }
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    await handleStreamingSearch();
+    if (searchMode === 'podcast-search') {
+      try {
+        setGridFadeOut(true);
+        setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
+        performQuoteSearch();
+        return;
+      } catch (error) {
+        console.error('Quote search error:', error);
+        setSearchState(prev => ({
+          ...prev,
+          error: error as Error,
+          isLoading: false
+        }));
+        return;
+      }
+    }
+    else{
+      await handleStreamingSearch();
+    }
   };
 
   const updateAuthMethodAndRegisterModalStatus = async () => {
@@ -751,20 +780,20 @@ export default function SearchInterface() {
       </button>)
       }
       <br></br>
-      <div className={`${hasSearched ? 'mb-8' : ''} ml-4 mr-4`}>
+      <div className={`${hasSearchedInMode(searchMode) ? 'mb-8' : ''} ml-4 mr-4`}>
         {/* Header with Logo */}
-        <div className={`flex justify-center items-center py-8 ${!hasSearched && 'mt-8'}`}>
+        <div className={`flex justify-center items-center py-8 ${!hasSearchedInMode(searchMode) && 'mt-8'}`}>
           <div className="flex items-center gap-4">
             <img
               src="/jamie-logo.png"
               alt="Jamie Logo"
               width={128}
               height={128}
-              className={`${hasSearched ? 'w-16 h-16' : ''} w-128 h-128`}
+              className={`${hasSearchedInMode(searchMode) ? 'w-16 h-16' : ''} w-128 h-128`}
             />
             <div>
               <h1 className="text-3xl font-bold">Pull That Up Jamie!</h1>
-              <p className={`text-gray-400 text-md text-shadow-light-white ${hasSearched ? 'hidden' : ''}`}>
+              <p className={`text-gray-400 text-md text-shadow-light-white ${hasSearchedInMode(searchMode) ? 'hidden' : ''}`}>
                 Instantly pull up anything with private web search + AI.
               </p>
             </div>
@@ -772,11 +801,12 @@ export default function SearchInterface() {
         </div>
 
         {/* Search Modes - Now shown when hasSearched is true */}
-        {(hasSearched || searchMode !== "quick") && (
+        {(hasSearchedInMode(searchMode) || searchMode !== "quick") && (
           <div className="flex justify-center mb-6">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               {[
                 { mode: 'quick', emoji: '⚡', label: 'Quick Mode' },
+                { mode: 'podcast-search', emoji: '🎙️', label: 'Podcast Search (Beta)' },
                 { mode: 'expert', emoji: '🔮', label: 'Expert Mode' }
               ].map(({ mode, emoji, label }) => (
                 <button
@@ -796,9 +826,17 @@ export default function SearchInterface() {
           </div>
         )}
 
+        {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && 
+          <AvailableSourcesSection 
+            hasSearched={hasSearchedInMode(searchMode)} 
+            selectedSources={selectedSources} 
+            setSelectedSources={setSelectedSources} 
+            /> 
+          }
+
         {/* Initial Search Form */}
         <div className="max-w-3xl mx-auto px-4">
-          {!hasSearched && searchMode === "quick" && (
+          {!hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && (
             <form onSubmit={handleSearch} className="relative">
             <textarea
               ref={searchInputRef}
@@ -806,11 +844,11 @@ export default function SearchInterface() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="How Can I Help You Today?"
               className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-              disabled={searchMode !== "quick"}
+              // disabled={searchMode !== "quick"}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleStreamingSearch();
+                  handleSearch(e);
                 }
               }}
             />
@@ -827,7 +865,7 @@ export default function SearchInterface() {
                 disabled={searchState.isLoading}
               >
                 {searchState.isLoading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
                 ) : (
                   <svg
                     className="w-5 h-5 text-black"
@@ -848,7 +886,7 @@ export default function SearchInterface() {
           </form>
           )}
           {/* Suggested Queries */}
-          {!hasSearched && searchMode === "quick" && (
+          {!hasSearchedInMode(searchMode) && searchMode === "quick" && (
             <div className="mt-24 mb-8">
               <h3 className="text-gray-400 text-sm font-medium mb-4">Suggested</h3>
               <div className="space-y-4">
@@ -869,54 +907,91 @@ export default function SearchInterface() {
         
       </div>
 
-      {/* Conversation History */}
-      {searchMode === 'quick' && conversation.length > 0 && (
-        <div className="max-w-4xl mx-auto px-4 space-y-8 mb-24 pb-24">
-          {conversation.map((item) => (
-            <div key={item.id} className="space-y-4">
-              <div className="font-medium text-white-400 max-w-[75%] break-words">
-                Query: {item.query}
-              </div>
-              <div style={{"borderBottom":"1px solid #353535"}}></div>
-              {/* Sources for this specific query */}
-              {item.sources.length > 0 && (
-                <div className="relative">
-                  <div className="overflow-x-auto pb-4">
-                    <div className="flex space-x-4">
-                      {item.sources.map((source, idx) => (
-                        <div key={idx} style={{ minWidth: '300px' }}>
-                          <SourceTile
-                            title={source.title}
-                            url={source.url}
-                            index={idx + 1}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Only show left gradient if scrolled from start */}
-                  <div className="pointer-events-none absolute left-0 top-0 h-full w-5 bg-gradient-to-r from-black to-transparent opacity-0 transition-opacity duration-200" 
-                      id={`left-gradient-${item.id}`} />
-                  {/* Only show right gradient if there's more content to scroll */}
-                  <div className="pointer-events-none absolute right-0 top-0 h-full w-5 bg-gradient-to-l from-black to-transparent opacity-0 transition-opacity duration-200" 
-                      id={`right-gradient-${item.id}`} />
-                </div>
-              )}
 
-              {/* Answer with streaming effect */}
-              <div className="bg-[#111111] border border-gray-800 rounded-lg p-6">
-                <StreamingText 
-                  text={item.result} 
-                  isLoading={item.isStreaming}
-                />
-              </div>
-            </div>
+      {/* Conversation History */}
+      {conversation.length > 0 && (searchMode !== 'expert') && (
+      <div
+        className={`max-w-4xl mx-auto px-4 space-y-8 ${
+          searchMode === 'podcast-search' && conversation.length > 0
+            ? 'mb-1 pb-1'
+            : 'mb-24 pb-24'
+        }`}
+      >
+        {conversation
+          .filter(item => item.type === searchMode)
+          .map((item) => (
+            <ConversationRenderer key={item.id} item={item} />
           ))}
+      </div>
+    )}
+
+      {searchMode === 'podcast-search' && !hasSearchedInMode(searchMode) && (
+        <div className={`mt-12 ${hasSearchedInMode(searchMode) ? 'mb-52' : 'mb-36'}`}>
+          <QuickTopicGrid 
+            className=""
+            triggerFadeOut={gridFadeOut}
+            onTopicSelect={async (topicQuery) => {
+              setQuery(topicQuery);
+              // Instead of relying on the state update, use the topicQuery directly
+              try {
+                const auth = await getAuth() as AuthConfig;
+                if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+                  setIsRegisterModalOpen(true);
+                  setSearchState(prev => ({ ...prev, isLoading: false }));
+                  return;
+                }
+                setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
+                setSearchHistory(prev => ({...prev, [searchMode]: true}));
+                handleQuoteSearch(topicQuery,auth).then(quoteResults => {
+                  if(quoteResults === false){
+                    setIsRegisterModalOpen();
+                    return;
+                  }
+                  setConversation(prev => [...prev, {
+                    id: nextConversationId.current++,
+                    type: 'podcast-search' as const,
+                    query: topicQuery,
+                    timestamp: new Date(),
+                    isStreaming: false,
+                    data: {
+                      quotes: quoteResults.results
+                    }
+                  }]);
+                  setQuery("")
+                  setSearchState(prev => ({ ...prev, isLoading: false }));
+                }).catch(error => {
+                  console.error('Quote search error:', error);
+                  setSearchState(prev => ({
+                    ...prev,
+                    error: error as Error,
+                    isLoading: false
+                  }));
+                });
+              } catch (error) {
+                console.error('Quote search error:', error);
+                setSearchState(prev => ({
+                  ...prev,
+                  error: error as Error,
+                  isLoading: false
+                }));
+              }
+            }}
+          />
+          {
+            <AvailableSourcesSection 
+              hasSearched={hasSearchedInMode(searchMode)} 
+              selectedSources={selectedSources} 
+              setSelectedSources={setSelectedSources} 
+          />}
         </div>
       )}
 
+      {searchMode === 'podcast-search' && searchState.isLoading && (
+        <PodcastLoadingPlaceholder />
+      )}
+
       {/* Floating Search Bar - Only show after first search */}
-      {hasSearched && searchMode === "quick" && !isRegisterModalOpen && !isSignInModalOpen && (
+      {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && (
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-3xl px-4 z-50">
           <form onSubmit={handleSearch} className="relative">
             <textarea
@@ -925,11 +1000,11 @@ export default function SearchInterface() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="How Can I Help You Today?"
               className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 pl-4 pr-32 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-              disabled={searchMode !== "quick"}
+              // disabled={searchMode === "quick"}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleStreamingSearch();
+                  handleSearch(e);
                 }
               }}
             />

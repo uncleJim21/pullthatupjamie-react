@@ -28,7 +28,7 @@ const DataSourceCarousel = ({ sources }: { sources: Array<{ imageUrl: string, ti
   };
 
   return (
-    <div className="border border-gray-500 rounded-lg p-4 mb-8 ml-16 mr-16">
+    <div className="border border-gray-500 rounded-lg p-4 mb-8 mx-2 md:mx-16">
       <div className="flex items-center justify-between">
         <button 
           onClick={handlePrevious}
