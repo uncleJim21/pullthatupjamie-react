@@ -120,13 +120,13 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
 
           <div className="flex justify-center mt-4 space-x-2">
             <button
-              className="px-4 py-2 text-black bg-white border border-gray-800 rounded hover:bg-gray-200"
+              className="font-bold px-4 py-2 text-black bg-white border border-gray-800 rounded hover:bg-gray-200"
               onClick={selectAll}
             >
               Select All
             </button>
             <button
-              className="px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800"
+              className="font-bold px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800"
               onClick={deselectAll}
             >
               Deselect All
