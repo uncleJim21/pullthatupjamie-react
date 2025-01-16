@@ -1,4 +1,5 @@
-# Pull That Up Jamie  
+# 🎉 Pull That Up Jamie  
+
 ### 🚀 Instantly Pull Up Anything with Your AI Search Assistant!  
 #### 🔍 Research Like a BOSS & 💡 Experience Productivity Without Sacrificing Privacy  
 
@@ -19,8 +20,13 @@
 
 ---
 
-## ⚡ Quick Mode  
-🔍 **Access results from the top search engines** instantly.  
+## ⚡ Modes  
+
+### 🔍 **Quick Mode**  
+Access results from the top search engines instantly.  
+
+### 🎧 **Podcast Search (Beta)**  
+Explore over **100,000 podcast clips** with **lightning-fast vector search** to find insights, commentary, and stories across curated podcast feeds.  
 
 ---
 
@@ -31,9 +37,14 @@
 
 ## 🧩 **Key Components**  
 - 🌐 **[SearxNG](https://github.com/searxng/searxng):** A powerful metasearch engine that aggregates top results from mainstream search engines.  
-- 🤖 **LLMs (e.g., ChatGPT & Claude):** Analyze search results to provide executive summaries with precision and clarity.
-- **Back End Code**: https://github.com/uncleJim21/pullthatupjamie-backend
+- ⚡ **Lightning-Fast Vector Search:** Advanced AI-powered search for podcast clips and contextual queries.  
+- 🤖 **LLMs (e.g., ChatGPT & Claude):** Analyze search results to provide executive summaries with precision and clarity.  
+- **Back End Code**: https://github.com/uncleJim21/pullthatupjamie-backend  
 
 ---
 
-🎉 Start searching smarter, faster, and more securely with **Pull That Up Jamie**! 🚀 
+🎉 Start searching smarter, faster, and more securely with **Pull That Up Jamie**! 🚀  
+
+---
+
+🔗 [Visit Our Website](https://pullthatupjamie.ai)  
