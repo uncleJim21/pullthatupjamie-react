@@ -3,9 +3,6 @@ import { RequestAuthMethod, AuthConfig } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { SourceTile } from './SourceTile.tsx';
 import { ModelSettingsBar } from './ModelSettingsBar.tsx';
 import { DepthModeCard, ExpertModeCard } from './ModeCards.tsx';
 import { RegisterModal } from './RegisterModal.tsx';
@@ -546,14 +543,14 @@ export default function SearchInterface() {
     const selectedFeedIds = Array.from(selectedSources) as string[]
     printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
 
+    const auth = await getAuth() as AuthConfig;
     if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
       setIsRegisterModalOpen(true);
       setSearchState(prev => ({ ...prev, isLoading: false }));
       return;
     }
-    
-    const auth = await getAuth() as AuthConfig;
-    const quoteResults = await handleQuoteSearch(query, auth,selectedFeedIds);
+    printLog(`Request auth method:${requestAuthMethod}`)
+    const quoteResults = await handleQuoteSearch(query, auth,setIsSignInModalOpen,selectedFeedIds);
     setConversation(prev => [...prev, {
       id: searchState.activeConversationId as number,
       type: 'podcast-search' as const,
@@ -946,6 +943,10 @@ export default function SearchInterface() {
                 setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
                 setSearchHistory(prev => ({...prev, [searchMode]: true}));
                 handleQuoteSearch(topicQuery,auth).then(quoteResults => {
+                  if(quoteResults === false){
+                    setIsRegisterModalOpen();
+                    return;
+                  }
                   setConversation(prev => [...prev, {
                     id: nextConversationId.current++,
                     type: 'podcast-search' as const,
