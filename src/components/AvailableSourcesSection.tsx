@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
+import { API_URL, printLog } from '../constants/constants.ts';
 
 interface PodcastSource {
-  feedImage: string;
-  title: string;
-  description: string;
-}
+    feedImage: string;
+    title: string;
+    description: string;
+    feedId: string;  
+  }
 
 interface AvailableSourcesProps {
   className?: string;
@@ -20,28 +22,31 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
   useEffect(() => {
     const fetchSources = async () => {
       try {
-        const response = await fetch('http://localhost:3131/api/get-available-feeds');
+        const response = await fetch(`${API_URL}/api/get-available-feeds`);
         const data = await response.json();
         setSources(data.results);
-        const allIndices = new Set(Array.from({ length: data.results.length }, (_, i) => i));
-        setSelectedSources(allIndices);
+        // Create a Set of all feedIds from the results
+        const allFeedIds = new Set(data.results.map(source => (source.feedId)));
+        printLog(`All Feed IDs:${JSON.stringify(allFeedIds,null,2)}`); // Debug log
+        setSelectedSources(allFeedIds);
       } catch (err) {
         setError('Failed to load podcast sources');
         console.error('Error fetching podcast sources:', err);
       }
     };
-
+  
     fetchSources();
-  }, []);
+  }, [setSelectedSources]);
 
-  const toggleSource = (index: number) => {
+  const toggleSource = (feedId: string) => {
     setSelectedSources(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(index)) {
-        newSet.delete(index);
+      if (newSet.has(feedId)) {
+        newSet.delete(feedId);
       } else {
-        newSet.add(index);
+        newSet.add(feedId);
       }
+      printLog(`newSet:${JSON.stringify(Array.from(newSet))}`)
       return newSet;
     });
   };
@@ -76,11 +81,11 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
             <div className="flex space-x-4 px-4">
               {sources.map((source, index) => (
                 <div
-                  key={index}
-                  className="flex-shrink-0 w-28 sm:w-12 lg:w-48 group cursor-pointer"
-                  onClick={() => toggleSource(index)}
+                key={index}
+                className="flex-shrink-0 w-24 lg:w-36 group cursor-pointer"
+                onClick={() => toggleSource(source.feedId)}
                 >
-                  <div className={`relative aspect-square rounded-lg overflow-hidden border group-hover:border-2 transition-colors ${selectedSources.has(index) ? 'border-gray-300' : 'border-gray-600'}`}>
+                    <div className={`relative aspect-square rounded-lg overflow-hidden border group-hover:border-2 transition-colors ${selectedSources.has(source.feedId) ? 'border-gray-300' : 'border-gray-600'}`}>
                     <img
                       src={source.feedImage}
                       alt={source.title}
@@ -90,7 +95,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
                         target.src = '/podcast-placeholder.png';
                       }}
                     />
-                    {selectedSources.has(index) && (
+                    {selectedSources.has(source.feedId) && (
                       <div className={`absolute bottom-1 right-1 bg-white rounded-full p-0.5 border border-black`}>
                         <Check className="w-4 h-4 text-black" />
                       </div>

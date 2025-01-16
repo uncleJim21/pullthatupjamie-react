@@ -89,7 +89,7 @@ export default function SearchInterface() {
   const [query, setQuery] = useState('');
   const [model, setModel] = useState<'gpt-3.5-turbo' | 'claude-3-sonnet'>('claude-3-sonnet');
   const [searchMode, setSearchMode] = useState<SearchMode>('quick');
-  const [selectedSources, setSelectedSources] = useState<Set<number>>(new Set());
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [gridFadeOut, setGridFadeOut] = useState(false);
   const [searchHistory, setSearchHistory] = useState<Record<SearchMode, boolean>>({
     'quick': false,
@@ -535,7 +535,10 @@ export default function SearchInterface() {
   const performQuoteSearch = async () => {
     setSearchState(prev => ({ ...prev, isLoading: true }));
     setSearchHistory(prev => ({...prev, [searchMode]: true}));
-    const quoteResults = await handleQuoteSearch(query);
+    const selectedFeedIds = Array.from(selectedSources) as string[]
+    printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
+    
+    const quoteResults = await handleQuoteSearch(query, selectedFeedIds);
     setConversation(prev => [...prev, {
       id: searchState.activeConversationId as number,
       type: 'podcast-search' as const,
