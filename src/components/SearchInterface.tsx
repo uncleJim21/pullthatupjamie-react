@@ -1,4 +1,5 @@
 import { performSearch } from '../lib/searxng.ts';
+import { useSearchParams } from 'react-router-dom'; 
 import { RequestAuthMethod, AuthConfig } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem } from '../types/conversation.ts';
@@ -87,6 +88,15 @@ export default function SearchInterface() {
   const [query, setQuery] = useState('');
   const [model, setModel] = useState<'gpt-3.5-turbo' | 'claude-3-sonnet'>('claude-3-sonnet');
   const [searchMode, setSearchMode] = useState<SearchMode>('quick');
+  const [searchParams] = useSearchParams(); 
+  useEffect(() => {
+    // Parse the searchMode parameter from the URL
+    const mode = searchParams.get('searchMode') as SearchMode;
+    if (mode && ['quick', 'depth', 'expert', 'podcast-search'].includes(mode)) {
+      setSearchMode(mode);
+    }
+  }, [searchParams]);
+
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [gridFadeOut, setGridFadeOut] = useState(false);
   const [searchHistory, setSearchHistory] = useState<Record<SearchMode, boolean>>({
