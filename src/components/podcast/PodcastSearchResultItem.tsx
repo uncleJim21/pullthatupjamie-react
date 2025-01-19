@@ -8,7 +8,10 @@ interface PodcastSearchResultItemProps {
   creator: string;
   audioUrl: string;
   date: string;
-  similarity: number;
+  similarity: {
+      combined: number;
+      vector: number;
+  }
   timeContext: {
     start_time: number;
     end_time: number;
@@ -227,7 +230,14 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
           {quote}
         </div>
         <div className="flex justify-between items-center text-xs text-gray-500">
-          <span>Similarity: {(similarity * 100).toFixed(1)}%</span>
+            <span>
+                Similarity: {(similarity.combined).toFixed(3)}
+                {similarity.vector !== similarity.combined && (
+                    <span className="ml-2 text-gray-600">
+                        (Vector: {(similarity.vector).toFixed(3)})
+                    </span>
+                )}
+            </span>
           <span>
             {formatTime(timeContext.start_time)} - {formatTime(timeContext.end_time)}
           </span>
