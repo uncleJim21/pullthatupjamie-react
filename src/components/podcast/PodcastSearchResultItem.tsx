@@ -52,9 +52,12 @@ export const PodcastSearchResultItem = ({
   const progressRef = useRef(null as HTMLDivElement | null);
 
   const duration = timeContext.end_time - timeContext.start_time;
-  const progress = isContinuingBeyondClip 
-  ? 100  // Always show full progress when continuing beyond clip
+  const progress = isContinuingBeyondClip
+  ? 100 // Show full progress when continuing beyond clip
+  : currentTime < timeContext.start_time
+  ? 0 // Show 0% if playback is before the clip start time
   : Math.min(((currentTime - timeContext.start_time) / duration) * 100, 100);
+
 
   useEffect(() => {
     if (!isPlaying && audioRef.current) {
@@ -95,18 +98,11 @@ export const PodcastSearchResultItem = ({
       const clickPosition = (e.clientX - rect.left) / rect.width;
       const newTime = timeContext.start_time + duration * clickPosition;
   
-      if (newTime < timeContext.start_time) {
-        audioRef.current.currentTime = timeContext.start_time;
-        setCurrentTime(timeContext.start_time);
-      } else if (newTime > timeContext.end_time) {
-        audioRef.current.currentTime = timeContext.end_time;
-        setCurrentTime(timeContext.end_time);
-      } else {
-        audioRef.current.currentTime = newTime;
-        setCurrentTime(newTime);
-      }
+      audioRef.current.currentTime = Math.max(newTime, 0); // Allow seeking to any time, even before start_time
+      setCurrentTime(audioRef.current.currentTime);
     }
   };
+  
 
   const handleShare = async () => {
     try {
@@ -164,20 +160,16 @@ export const PodcastSearchResultItem = ({
       const currentAudioTime = audioRef.current.currentTime;
       setCurrentTime(currentAudioTime);
   
-      if (currentAudioTime < timeContext.start_time) {
-        // Ensure progress bar reads 0 if playback is rewinded before the clip
-        setCurrentTime(timeContext.start_time);
-        audioRef.current.currentTime = timeContext.start_time;
-      }
-  
+      // Handle clip end logic
       if (currentAudioTime >= timeContext.end_time && !hasEnded && !isContinuingBeyondClip) {
-        // Pause playback when clip segment ends and show rewind/continue options
         setHasEnded(true);
         audioRef.current.pause();
         onEnded(id);
       }
     }
   };
+  
+  
 
   return (
     <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
@@ -258,10 +250,11 @@ export const PodcastSearchResultItem = ({
                     </button>
                     <button
                       onClick={handleContinuePlaying}
-                      className="p-2 rounded-full text-black transition-colors hover:bg-gray-200 bg-white"
+                      className="flex items-center px-4 py-2 rounded-md bg-white text-black transition-colors hover:bg-gray-200"
                       title="Continue playing beyond clip"
                     >
-                      <Play size={16} />
+                      Continue
+                      <SkipForward className="ml-2 h-4 w-4" />
                     </button>
                   </>
                 ) : (
@@ -302,6 +295,7 @@ export const PodcastSearchResultItem = ({
                   </>
                 )}
               </div>
+
               {/* Progress Bar */}
               <div
                 ref={progressRef}
@@ -324,7 +318,6 @@ export const PodcastSearchResultItem = ({
                   : formatTime(timeContext.end_time)}
               </span>
             </div>
-
             </div>
           </div>
         </div>
