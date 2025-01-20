@@ -94,8 +94,17 @@ export const PodcastSearchResultItem = ({
       const rect = progressRef.current.getBoundingClientRect();
       const clickPosition = (e.clientX - rect.left) / rect.width;
       const newTime = timeContext.start_time + duration * clickPosition;
-      audioRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
+  
+      if (newTime < timeContext.start_time) {
+        audioRef.current.currentTime = timeContext.start_time;
+        setCurrentTime(timeContext.start_time);
+      } else if (newTime > timeContext.end_time) {
+        audioRef.current.currentTime = timeContext.end_time;
+        setCurrentTime(timeContext.end_time);
+      } else {
+        audioRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
+      }
     }
   };
 
@@ -140,7 +149,7 @@ export const PodcastSearchResultItem = ({
   const handleContinuePlaying = async () => {
     if (audioRef.current) {
       setHasEnded(false);
-      setIsContinuingBeyondClip(true);
+      setIsContinuingBeyondClip(true); // Allow playback beyond the clip segment
       try {
         await audioRef.current.play();
         onPlayPause(id);
@@ -150,13 +159,19 @@ export const PodcastSearchResultItem = ({
     }
   };
   
-  {/* Update your handleTimeUpdate function: */}
   const handleTimeUpdate = () => {
     if (audioRef.current) {
       const currentAudioTime = audioRef.current.currentTime;
       setCurrentTime(currentAudioTime);
   
+      if (currentAudioTime < timeContext.start_time) {
+        // Ensure progress bar reads 0 if playback is rewinded before the clip
+        setCurrentTime(timeContext.start_time);
+        audioRef.current.currentTime = timeContext.start_time;
+      }
+  
       if (currentAudioTime >= timeContext.end_time && !hasEnded && !isContinuingBeyondClip) {
+        // Pause playback when clip segment ends and show rewind/continue options
         setHasEnded(true);
         audioRef.current.pause();
         onEnded(id);
@@ -229,75 +244,87 @@ export const PodcastSearchResultItem = ({
                   onEnded(id);
                 }}
               />
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2">
-                  {hasEnded ? (
-                    <>
-                      <button
-                        onClick={handleRestart}
-                        className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
-                        title="Restart from clip beginning"
-                      >
-                        <RotateCcw size={16} />
-                      </button>
-                      <button
-                        onClick={handleContinuePlaying}
-                        className="p-2 rounded-full text-black transition-colors hover:bg-gray-200 bg-white"
-                      >
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
+                {hasEnded && !isContinuingBeyondClip ? (
+                  // Rewind and Continue buttons at clip end
+                  <>
+                    <button
+                      onClick={handleRestart}
+                      className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
+                      title="Restart from clip beginning"
+                    >
+                      <RotateCcw size={16} />
+                    </button>
+                    <button
+                      onClick={handleContinuePlaying}
+                      className="p-2 rounded-full text-black transition-colors hover:bg-gray-200 bg-white"
+                      title="Continue playing beyond clip"
+                    >
+                      <Play size={16} />
+                    </button>
+                  </>
+                ) : (
+                  // Regular playback controls
+                  <>
+                    <button
+                      onClick={() => handleSkip(-15)}
+                      className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
+                      title="Back 15 seconds"
+                    >
+                      <SkipBack size={16} />
+                    </button>
+                    <button
+                      onClick={handlePlayPause}
+                      className={`p-2 rounded-full text-black transition-colors ${
+                        audioUrl === 'URL unavailable'
+                          ? 'bg-gray-700'
+                          : 'hover:bg-gray-200 bg-white'
+                      }`}
+                      disabled={audioUrl === 'URL unavailable'}
+                      title={isPlaying ? "Pause" : "Play"}
+                    >
+                      {isBuffering ? (
+                        <Loader className="animate-spin" size={16} />
+                      ) : isPlaying ? (
+                        <Pause size={16} />
+                      ) : (
                         <Play size={16} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => handleSkip(-15)}
-                        className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
-                        title="Back 15 seconds"
-                      >
-                        <SkipBack size={16} />
-                      </button>
-                      <button
-                        onClick={handlePlayPause}
-                        className={`p-2 rounded-full text-black transition-colors ${
-                          audioUrl === 'URL unavailable'
-                            ? 'bg-gray-700'
-                            : 'hover:bg-gray-200 bg-white'
-                        }`}
-                        disabled={audioUrl === 'URL unavailable'}
-                      >
-                        {isBuffering ? (
-                          <Loader className="animate-spin" size={16} />
-                        ) : isPlaying ? (
-                          <Pause size={16} />
-                        ) : (
-                          <Play size={16} />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleSkip(15)}
-                        className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
-                        title="Forward 15 seconds"
-                      >
-                        <SkipForward size={16} />
-                      </button>
-                    </>
-                  )}
-                </div>
-                
-                <div
-                  ref={progressRef}
-                  className="flex-grow h-1 bg-gray-700 rounded cursor-pointer"
-                  onClick={handleProgressClick}
-                >
-                  <div
-                    className="h-full bg-white rounded transition-all"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <span className="text-xs text-gray-400 whitespace-nowrap">
-                  {formatTime(currentTime)} / {formatTime(timeContext.end_time)}
-                </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleSkip(15)}
+                      className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
+                      title="Forward 15 seconds"
+                    >
+                      <SkipForward size={16} />
+                    </button>
+                  </>
+                )}
               </div>
+              {/* Progress Bar */}
+              <div
+                ref={progressRef}
+                className="flex-grow h-1 bg-gray-700 rounded cursor-pointer"
+                onClick={handleProgressClick}
+              >
+                <div
+                  className={`h-full ${
+                    isContinuingBeyondClip ? 'bg-green-500' : 'bg-white'
+                  } rounded transition-all`}
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              {/* Timestamps */}
+              <span className="text-xs text-gray-400 whitespace-nowrap">
+                {formatTime(currentTime)} /{' '}
+                {isContinuingBeyondClip
+                  ? formatTime(audioRef.current?.duration || timeContext.end_time)
+                  : formatTime(timeContext.end_time)}
+              </span>
+            </div>
+
             </div>
           </div>
         </div>
