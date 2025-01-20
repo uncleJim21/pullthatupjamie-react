@@ -1,4 +1,5 @@
 import { performSearch } from '../lib/searxng.ts';
+import { fetchClipById } from '../services/clipService.ts';
 import { useSearchParams } from 'react-router-dom'; 
 import { RequestAuthMethod, AuthConfig } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
@@ -84,11 +85,17 @@ const SUGGESTED_QUERIES = [
   }
 ];
 
-export default function SearchInterface() {
+interface SearchInterfaceProps {
+  isSharePage?: boolean;
+}
+
+export default function SearchInterface({ isSharePage = false }: SearchInterfaceProps) {  
   const [query, setQuery] = useState('');
   const [model, setModel] = useState<'gpt-3.5-turbo' | 'claude-3-sonnet'>('claude-3-sonnet');
-  const [searchMode, setSearchMode] = useState<SearchMode>('quick');
+  const [searchMode, setSearchMode] = useState<SearchMode>(isSharePage ? 'podcast-search' : 'quick');
   const [searchParams] = useSearchParams(); 
+  const clipId = searchParams.get('clip');
+
   useEffect(() => {
     // Parse the searchMode parameter from the URL
     const mode = searchParams.get('searchMode') as SearchMode;
@@ -103,7 +110,7 @@ export default function SearchInterface() {
     'quick': false,
     'depth': false,
     'expert': false,
-    'podcast-search': false
+    'podcast-search': isSharePage // Mark as true for share pages
   });
   const hasSearchedInMode = (mode: SearchMode): boolean => {
     if (!searchHistory[mode]) return false;
@@ -123,7 +130,7 @@ export default function SearchInterface() {
   const [searchState, setSearchState] = useState<SearchState>({
     query: '',
     result: '',
-    isLoading: false,
+    isLoading: isSharePage && !!clipId, // Start with loading true for share pages
     error: null,
     sources: []
   });
@@ -627,6 +634,43 @@ export default function SearchInterface() {
   }, []);
 
   useEffect(() => {
+    const loadSharedClip = async () => {
+      if (isSharePage && clipId) {
+        try {
+          const clip = await fetchClipById(clipId);
+          
+          setConversation([{
+            id: nextConversationId.current++,
+            type: 'podcast-search' as const,
+            query: '', 
+            timestamp: new Date(),
+            isStreaming: false,
+            data: {
+              quotes: [clip]
+            }
+          }]);
+        } catch (error) {
+          console.error('Error loading shared clip:', error);
+          setSearchState(prev => ({
+            ...prev,
+            error: error as Error,
+            isLoading: false
+          }));
+        } finally {
+          setSearchState(prev => ({ 
+            ...prev, 
+            isLoading: false 
+          }));
+        }
+      }
+    };
+
+    if (isSharePage && clipId) {
+      loadSharedClip();
+    }
+  }, [isSharePage, clipId]);
+
+  useEffect(() => {
     const checkInvoices = async () => {
       const needsRefresh = await cleanupExpiredInvoices();
       if (needsRefresh) {
@@ -852,7 +896,7 @@ export default function SearchInterface() {
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="How Can I Help You Today?"
+              placeholder={searchMode === 'podcast-search' ? `Search Thousands of Podcast Clips` : `How Can I Help You Today?`}
               className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
               // disabled={searchMode !== "quick"}
               onKeyDown={(e) => {
@@ -1008,7 +1052,7 @@ export default function SearchInterface() {
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="How Can I Help You Today?"
+              placeholder={searchMode === 'podcast-search' ? `Search Thousands of Podcast Clips` : `How Can I Help You Today?`}
               className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 pl-4 pr-32 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
               // disabled={searchMode === "quick"}
               onKeyDown={(e) => {

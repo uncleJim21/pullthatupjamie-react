@@ -22,6 +22,7 @@ interface PodcastSearchResultItemProps {
   isPlaying: boolean;
   onPlayPause: (id: string) => void;
   onEnded: (id: string) => void;
+  shareUrl:string;
 }
 
 export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = ({
@@ -38,6 +39,7 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   isPlaying,
   onPlayPause,
   onEnded,
+  shareUrl
 }) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
@@ -107,7 +109,6 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   };
 
   const handleShare = async () => {
-    const shareUrl = getTimestampedUrl(audioUrl, timeContext.start_time);
     try {
       await navigator.clipboard.writeText(shareUrl);
       setShowCopied(true);
