@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Share2, Play, Pause, Loader } from 'lucide-react';
+import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, SkipBack, SkipForward } from 'lucide-react';
 import { formatTime, getTimestampedUrl } from '../../utils/time.ts';
 
 interface PodcastSearchResultItemProps {
@@ -25,7 +25,7 @@ interface PodcastSearchResultItemProps {
   shareUrl:string;
 }
 
-export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = ({
+export const PodcastSearchResultItem = ({
   quote,
   episode,
   creator,
@@ -40,16 +40,21 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   onPlayPause,
   onEnded,
   shareUrl
-}) => {
+}: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false); // Image loading state
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const progressRef = useRef<HTMLDivElement>(null);
+  const [hasEnded, setHasEnded] = useState(false);
+  const [isContinuingBeyondClip, setIsContinuingBeyondClip] = useState(false);
+
+  const audioRef = useRef(null as HTMLAudioElement | null);
+  const progressRef = useRef(null as HTMLDivElement | null);
 
   const duration = timeContext.end_time - timeContext.start_time;
-  const progress = ((currentTime - timeContext.start_time) / duration) * 100;
+  const progress = isContinuingBeyondClip 
+  ? 100  // Always show full progress when continuing beyond clip
+  : Math.min(((currentTime - timeContext.start_time) / duration) * 100, 100);
 
   useEffect(() => {
     if (!isPlaying && audioRef.current) {
@@ -83,22 +88,8 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
     }
   };
 
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      const currentAudioTime = audioRef.current.currentTime;
-      setCurrentTime(currentAudioTime);
 
-      if (currentAudioTime >= timeContext.end_time) {
-        audioRef.current.pause();
-        setCurrentTime(timeContext.start_time);
-        audioRef.current.currentTime = timeContext.start_time;
-        onEnded(id);
-      }
-    }
-  };
-
-
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleProgressClick = (e: { clientX: number }) => {
     if (progressRef.current && audioRef.current) {
       const rect = progressRef.current.getBoundingClientRect();
       const clickPosition = (e.clientX - rect.left) / rect.width;
@@ -121,6 +112,55 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
   const handleListen = () => {
     if (listenLink) {
       window.open(listenLink, '_blank');
+    }
+  };
+
+  const handleSkip = (seconds: number) => {
+    if (audioRef.current) {
+      const newTime = audioRef.current.currentTime + seconds;
+      audioRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+    }
+  };
+
+  const handleRestart = async () => {
+    if (audioRef.current) {
+      setHasEnded(false);
+      try {
+        audioRef.current.currentTime = timeContext.start_time;
+        setCurrentTime(timeContext.start_time);
+        await audioRef.current.play();
+        onPlayPause(id);
+      } catch (error) {
+        console.error('Playback error:', error);
+      }
+    }
+  };
+  
+  const handleContinuePlaying = async () => {
+    if (audioRef.current) {
+      setHasEnded(false);
+      setIsContinuingBeyondClip(true);
+      try {
+        await audioRef.current.play();
+        onPlayPause(id);
+      } catch (error) {
+        console.error('Playback error:', error);
+      }
+    }
+  };
+  
+  {/* Update your handleTimeUpdate function: */}
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      const currentAudioTime = audioRef.current.currentTime;
+      setCurrentTime(currentAudioTime);
+  
+      if (currentAudioTime >= timeContext.end_time && !hasEnded && !isContinuingBeyondClip) {
+        setHasEnded(true);
+        audioRef.current.pause();
+        onEnded(id);
+      }
     }
   };
 
@@ -190,23 +230,60 @@ export const PodcastSearchResultItem: React.FC<PodcastSearchResultItemProps> = (
                 }}
               />
               <div className="flex items-center space-x-3">
-                <button
-                  onClick={handlePlayPause}
-                  className={`p-2 rounded-full text-black transition-colors ${
-                    audioUrl === 'URL unavailable'
-                      ? 'bg-gray-700'
-                      : 'hover:bg-gray-200 bg-white'
-                  }`}
-                  disabled={audioUrl === 'URL unavailable'}
-                >
-                  {isBuffering ? (
-                    <Loader className="animate-spin" size={16} />
-                  ) : isPlaying ? (
-                    <Pause size={16} />
+                <div className="flex items-center space-x-2">
+                  {hasEnded ? (
+                    <>
+                      <button
+                        onClick={handleRestart}
+                        className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
+                        title="Restart from clip beginning"
+                      >
+                        <RotateCcw size={16} />
+                      </button>
+                      <button
+                        onClick={handleContinuePlaying}
+                        className="p-2 rounded-full text-black transition-colors hover:bg-gray-200 bg-white"
+                      >
+                        <Play size={16} />
+                      </button>
+                    </>
                   ) : (
-                    <Play size={16} />
+                    <>
+                      <button
+                        onClick={() => handleSkip(-15)}
+                        className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
+                        title="Back 15 seconds"
+                      >
+                        <SkipBack size={16} />
+                      </button>
+                      <button
+                        onClick={handlePlayPause}
+                        className={`p-2 rounded-full text-black transition-colors ${
+                          audioUrl === 'URL unavailable'
+                            ? 'bg-gray-700'
+                            : 'hover:bg-gray-200 bg-white'
+                        }`}
+                        disabled={audioUrl === 'URL unavailable'}
+                      >
+                        {isBuffering ? (
+                          <Loader className="animate-spin" size={16} />
+                        ) : isPlaying ? (
+                          <Pause size={16} />
+                        ) : (
+                          <Play size={16} />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleSkip(15)}
+                        className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
+                        title="Forward 15 seconds"
+                      >
+                        <SkipForward size={16} />
+                      </button>
+                    </>
                   )}
-                </button>
+                </div>
+                
                 <div
                   ref={progressRef}
                   className="flex-grow h-1 bg-gray-700 rounded cursor-pointer"
