@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { RequestAuthMethod, AuthConfig } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem } from '../types/conversation.ts';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef} from 'react';
 import { ModelSettingsBar } from './ModelSettingsBar.tsx';
 import { DepthModeCard, ExpertModeCard } from './ModeCards.tsx';
 import { RegisterModal } from './RegisterModal.tsx';
@@ -25,6 +25,7 @@ import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 // import { Analytics } from "@vercel/analytics/react"
 
 export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
+type ModelType = 'gpt-3.5-turbo' | 'claude-3-sonnet';
 let buffer = '';
 
 interface Source {
@@ -33,7 +34,24 @@ interface Source {
   snippet?: string;
 }
 
-const SubscriptionSuccessPopup: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+interface SearchState {
+  query: string;
+  result: string;
+  isLoading: boolean;
+  error: Error | null;
+  sources: Source[];
+  activeConversationId?: number;
+}
+
+interface SearchInterfaceProps {
+  isSharePage?: boolean;
+}
+
+interface SubscriptionSuccessPopupProps {
+  onClose: () => void;
+}
+
+const SubscriptionSuccessPopup = ({ onClose }: SubscriptionSuccessPopupProps) => (
   <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
     <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
       <h2 className="text-white text-lg font-bold mb-4">
@@ -61,14 +79,7 @@ const SubscriptionSuccessPopup: React.FC<{ onClose: () => void }> = ({ onClose }
   </div>
 );
 
-interface SearchState {
-  query: string;
-  result: string;
-  isLoading: boolean;
-  error: Error | null;
-  sources: Source[];
-  activeConversationId?: number;
-}
+
 
 const SUGGESTED_QUERIES = [
   {
@@ -85,14 +96,14 @@ const SUGGESTED_QUERIES = [
   }
 ];
 
-interface SearchInterfaceProps {
-  isSharePage?: boolean;
-}
+
 
 export default function SearchInterface({ isSharePage = false }: SearchInterfaceProps) {  
   const [query, setQuery] = useState('');
-  const [model, setModel] = useState<'gpt-3.5-turbo' | 'claude-3-sonnet'>('claude-3-sonnet');
-  const [searchMode, setSearchMode] = useState<SearchMode>(isSharePage ? 'podcast-search' : 'quick');
+  const [model, setModel] = useState('claude-3-sonnet' as ModelType);
+  const [searchMode, setSearchMode] = useState(
+    isSharePage ? 'podcast-search' as SearchMode : 'quick' as SearchMode
+  );
   const [searchParams] = useSearchParams(); 
   const clipId = searchParams.get('clip');
 
@@ -104,13 +115,13 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     }
   }, [searchParams]);
 
-  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  const [selectedSources, setSelectedSources] = useState(new Set());
   const [gridFadeOut, setGridFadeOut] = useState(false);
-  const [searchHistory, setSearchHistory] = useState<Record<SearchMode, boolean>>({
+  const [searchHistory, setSearchHistory] = useState({
     'quick': false,
     'depth': false,
     'expert': false,
-    'podcast-search': isSharePage // Mark as true for share pages
+    'podcast-search': isSharePage
   });
   const hasSearchedInMode = (mode: SearchMode): boolean => {
     if (!searchHistory[mode]) return false;
@@ -125,20 +136,21 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
 
 
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
-  const [requestAuthMethod, setRequestAuthMethod] = useState<RequestAuthMethod>(RequestAuthMethod.FREE); //free, lightning or square
-  const [conversation, setConversation] = useState<ConversationItem[]>([]);
-  const [searchState, setSearchState] = useState<SearchState>({
+  const [requestAuthMethod, setRequestAuthMethod] = useState(RequestAuthMethod.FREE);//free, lightning or square
+  const [conversation, setConversation] = useState([] as ConversationItem[]);
+
+  const [searchState, setSearchState] = useState({
     query: '',
     result: '',
-    isLoading: isSharePage && !!clipId, // Start with loading true for share pages
+    isLoading: isSharePage && !!clipId,
     error: null,
     sources: []
   });
 
-  const cleanupIntervalRef = useRef<NodeJS.Timeout>();
-  const searchInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const resultTextRef = useRef<string>('');
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const searchInputRef = useRef(null);
+  const cleanupIntervalRef = useRef();
+  const resultTextRef = useRef('');
+  const eventSourceRef = useRef(null);
   const nextConversationId = useRef(0);
   const searchSettingsBarStyle = "bg-[#000000] border-gray-800 border shadow-white-glow rounded-lg mt-2 pt-2 pb-2 max-w-3xl pr-1 mx-auto px-4 flex items-start relative"
   const searchButtonStyle = "ml-auto mt-1 mr-1 pl-3 pr-3 bg-white rounded-lg pt-1 pb-1 border-gray-800 hover:border-gray-700"
@@ -582,7 +594,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     setSearchState(prev => ({ ...prev, isLoading: false }));
   }
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = async (e: { preventDefault: () => void; target: HTMLFormElement }) => {
     e.preventDefault();
     if (searchMode === 'podcast-search') {
       try {
