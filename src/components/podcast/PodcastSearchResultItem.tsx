@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward } from 'lucide-react';
-import { formatTime, getTimestampedUrl } from '../../utils/time.ts';
+import { formatTime } from '../../utils/time.ts';
 
 interface PodcastSearchResultItemProps {
   quote: string;
