@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, SkipBack, SkipForward } from 'lucide-react';
+import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward } from 'lucide-react';
 import { formatTime, getTimestampedUrl } from '../../utils/time.ts';
 
 interface PodcastSearchResultItemProps {
@@ -172,70 +172,70 @@ export const PodcastSearchResultItem = ({
   
 
   return (
-    <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
-      <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
-        <div className="flex flex-col sm:flex-row">
-          {/* Episode Artwork */}
-          <div className="flex-shrink-0 mb-4 sm:mb-0 sm:mr-4">
-            {!imageLoaded && (
-              <div className="w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 bg-gray-800 animate-pulse" />
-            )}
-            <img
-              src={episodeImage}
-              alt={episode}
-              className={`w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 ${
-                imageLoaded ? 'block' : 'hidden'
-              }`}
-              onLoad={() => setImageLoaded(true)} // Set image loaded state
-              onError={() => setImageLoaded(false)} // Handle image loading failure
-            />
+  <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
+    <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
+      <div className="flex flex-col sm:flex-row">
+        {/* Episode Artwork */}
+        <div className="flex-shrink-0 mb-4 sm:mb-0 sm:mr-4">
+          {!imageLoaded && (
+            <div className="w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 bg-gray-800 animate-pulse" />
+          )}
+          <img
+            src={episodeImage}
+            alt={episode}
+            className={`w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 ${
+              imageLoaded ? 'block' : 'hidden'
+            }`}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageLoaded(false)}
+          />
+        </div>
+
+        <div className="flex-grow min-w-0">
+          <div className="flex flex-col sm:flex-row justify-between">
+            <div className="min-w-0 mb-2 sm:mb-0">
+              <h3 className="text-lg font-medium text-white line-clamp-4">
+                {episode}
+              </h3>
+              <p className="text-sm text-gray-400">{creator}</p>
+            </div>
+            <div className="flex sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4">
+              <button
+                onClick={handleShare}
+                className="inline-flex items-center px-3 py-1 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+              >
+                <Share2 className="h-4 w-4 mr-1" />
+                <p>{!showCopied ? 'Share' : 'Copied!'}</p>
+              </button>
+              <button
+                onClick={handleListen}
+                disabled={!listenLink}
+                className={`inline-flex items-center px-3 py-1 rounded-md text-sm ${
+                  listenLink
+                    ? 'text-gray-300 hover:bg-gray-800 transition-colors'
+                    : 'text-gray-600'
+                }`}
+              >
+                <ExternalLink className="h-4 w-4 mr-1" />
+                <p>Listen</p>
+              </button>
+            </div>
           </div>
 
-          <div className="flex-grow min-w-0">
-            <div className="flex flex-col sm:flex-row justify-between">
-              <div className="min-w-0 mb-2 sm:mb-0">
-                <h3 className="text-lg font-medium text-white line-clamp-4">
-                  {episode}
-                </h3>
-                <p className="text-sm text-gray-400">{creator}</p>
-              </div>
-              <div className="flex sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4">
-                <button
-                  onClick={handleShare}
-                  className="inline-flex items-center px-3 py-1 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
-                >
-                  <Share2 className="h-4 w-4 mr-1" />
-                  <p>{!showCopied ? 'Share' : 'Copied!'}</p>
-                </button>
-                <button
-                  onClick={handleListen}
-                  disabled={!listenLink}
-                  className={`inline-flex items-center px-3 py-1 rounded-md text-sm ${
-                    listenLink
-                      ? 'text-gray-300 hover:bg-gray-800 transition-colors'
-                      : 'text-gray-600'
-                  }`}
-                >
-                  <ExternalLink className="h-4 w-4 mr-1" />
-                  <p>Listen</p>
-                </button>
-              </div>
-            </div>
-
-            {/* Mini Player */}
-            <div className="mt-4 pl-0">
-              <audio
-                ref={audioRef}
-                src={audioUrl}
-                onTimeUpdate={handleTimeUpdate}
-                onEnded={() => {
-                  if (audioRef.current) {
-                    audioRef.current.currentTime = timeContext.start_time;
-                    setCurrentTime(timeContext.start_time);
-                  }
-                  onEnded(id);
-                }}
-              />
+          {/* Mini Player */}
+          <div className="mt-4 pl-0">
+            <audio
+              ref={audioRef}
+              src={audioUrl}
+              onTimeUpdate={handleTimeUpdate}
+              onEnded={() => {
+                if (audioRef.current) {
+                  audioRef.current.currentTime = timeContext.start_time;
+                  setCurrentTime(timeContext.start_time);
+                }
+                onEnded(id);
+              }}
+            />
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
                 {hasEnded && !isContinuingBeyondClip ? (
@@ -261,11 +261,11 @@ export const PodcastSearchResultItem = ({
                   // Regular playback controls
                   <>
                     <button
-                      onClick={() => handleSkip(-15)}
+                      onClick={() => handleSkip(-5)}
                       className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
-                      title="Back 15 seconds"
+                      title="Back 5 seconds"
                     >
-                      <SkipBack size={16} />
+                      <RotateCcw size={16} />
                     </button>
                     <button
                       onClick={handlePlayPause}
@@ -275,7 +275,7 @@ export const PodcastSearchResultItem = ({
                           : 'hover:bg-gray-200 bg-white'
                       }`}
                       disabled={audioUrl === 'URL unavailable'}
-                      title={isPlaying ? "Pause" : "Play"}
+                      title={isPlaying ? 'Pause' : 'Play'}
                     >
                       {isBuffering ? (
                         <Loader className="animate-spin" size={16} />
@@ -286,11 +286,11 @@ export const PodcastSearchResultItem = ({
                       )}
                     </button>
                     <button
-                      onClick={() => handleSkip(15)}
+                      onClick={() => handleSkip(5)}
                       className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
-                      title="Forward 15 seconds"
+                      title="Forward 5 seconds"
                     >
-                      <SkipForward size={16} />
+                      <RotateCw size={16} />
                     </button>
                   </>
                 )}
@@ -299,48 +299,54 @@ export const PodcastSearchResultItem = ({
               {/* Progress Bar */}
               <div
                 ref={progressRef}
-                className="flex-grow h-1 bg-gray-700 rounded cursor-pointer"
+                className="flex-grow h-1 bg-gray-700 rounded cursor-pointer relative"
                 onClick={handleProgressClick}
               >
+                {/* Progress Indicator */}
                 <div
-                  className={`h-full ${
-                    isContinuingBeyondClip ? 'bg-green-500' : 'bg-white'
-                  } rounded transition-all`}
+                  className="h-full bg-white rounded transition-all"
                   style={{ width: `${progress}%` }}
                 />
+                {/* Demarcation Point for Clip Continuation */}
+                {isContinuingBeyondClip && (
+                  <div
+                    className="absolute right-0 top-0 h-full w-1 bg-gray-300"
+                    title="Clip Continued"
+                  />
+                )}
               </div>
 
-              {/* Timestamps */}
-              <span className="text-xs text-gray-400 whitespace-nowrap">
-                {formatTime(currentTime)} /{' '}
-                {isContinuingBeyondClip
-                  ? formatTime(audioRef.current?.duration || timeContext.end_time)
-                  : formatTime(timeContext.end_time)}
-              </span>
-            </div>
+              {/* Clip Continued Label */}
+              {isContinuingBeyondClip && (
+                <span className="text-xs text-gray-400 whitespace-nowrap">
+                  (Clip Continued)
+                </span>
+              )}
             </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <div className="p-4 space-y-2">
-        <div className="text-sm text-gray-300 bg-[#0A0A0A] p-3 rounded-md">
-          {quote}
-        </div>
-        <div className="flex justify-between items-center text-xs text-gray-500">
-            <span>
-                Similarity: {(similarity.combined).toFixed(3)}
-                {similarity.vector !== similarity.combined && (
-                    <span className="ml-2 text-gray-600">
-                        (Vector: {(similarity.vector).toFixed(3)})
-                    </span>
-                )}
+    <div className="p-4 space-y-2">
+      <div className="text-sm text-gray-300 bg-[#0A0A0A] p-3 rounded-md">
+        {quote}
+      </div>
+      <div className="flex justify-between items-center text-xs text-gray-500">
+        <span>
+          Similarity: {(similarity.combined).toFixed(3)}
+          {similarity.vector !== similarity.combined && (
+            <span className="ml-2 text-gray-600">
+              (Vector: {(similarity.vector).toFixed(3)})
             </span>
-          <span>
-            {formatTime(timeContext.start_time)} - {formatTime(timeContext.end_time)}
-          </span>
-        </div>
+          )}
+        </span>
+        <span>
+          {formatTime(timeContext.start_time)} - {formatTime(timeContext.end_time)}
+        </span>
       </div>
     </div>
-  );
+  </div>
+);
+
 };
