@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import SearchInterface from './components/SearchInterface.tsx';
+import { inject } from "@vercel/analytics"
+
 
 const App = () => (
   <BrowserRouter>
@@ -15,3 +17,4 @@ const App = () => (
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
+inject();

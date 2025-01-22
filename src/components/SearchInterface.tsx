@@ -22,7 +22,6 @@ import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
 import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
-// import { Analytics } from "@vercel/analytics/react"
 
 export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
 type ModelType = 'gpt-3.5-turbo' | 'claude-3-sonnet';
