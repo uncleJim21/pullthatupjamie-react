@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors } from 'lucide-react';
 import { formatTime } from '../../utils/time.ts';
-import { makeClip } from '../../services/clipService.ts';
+import { makeClip,checkClipStatus } from '../../services/clipService.ts';
+import { ClipProgress } from '../../types/clips.ts';
 import { printLog } from '../../constants/constants.ts';
 
 interface PodcastSearchResultItemProps {
@@ -26,6 +27,8 @@ interface PodcastSearchResultItemProps {
   onEnded: (id: string) => void;
   shareUrl:string;
   shareLink:string;
+  onClipStart: (progress: ClipProgress) => void;
+  onClipProgress: (progress: ClipProgress) => void;
 }
 
 export const PodcastSearchResultItem = ({
@@ -43,7 +46,9 @@ export const PodcastSearchResultItem = ({
   onPlayPause,
   onEnded,
   shareUrl,
-  shareLink
+  shareLink,
+  onClipStart,
+  onClipProgress
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
@@ -108,14 +113,34 @@ export const PodcastSearchResultItem = ({
   };
   
   const handleClip = async () => {
-    try{
-      const {status, lookupHash, pollUrl} = await makeClip(shareLink);
-      printLog(`pollUrl:${pollUrl}`)
+    try {
+      // Start with progress notification
+      onClipProgress({
+        isProcessing: true,
+        creator,
+        episode,
+        timestamps: [timeContext.start_time, timeContext.end_time],
+        clipId: shareLink,
+        episodeImage,
+      });
+  
+      const { status, lookupHash, pollUrl } = await makeClip(shareLink);
+      
+      // Update progress with polling URL
+      onClipProgress({
+        isProcessing: true,
+        creator,
+        episode,
+        timestamps: [timeContext.start_time, timeContext.end_time],
+        clipId: lookupHash,
+        episodeImage,
+        pollUrl
+      });
+      
+    } catch (error) {
+      console.error('Failed to create clip:', error);
     }
-    catch{
-      printLog(`makeClip failed.`)
-    }
-  }
+  };
 
   const handleShare = async () => {
     try {

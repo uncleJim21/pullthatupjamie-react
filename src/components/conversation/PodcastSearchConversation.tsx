@@ -3,13 +3,20 @@ import React, { useState, useRef } from 'react';
 import type { PodcastSearchItem } from '../../types/conversation';
 import { PodcastSearchResultItem } from '../podcast/PodcastSearchResultItem.tsx';
 import { BaseConversationLayout } from './BaseConversationLayout.tsx';
+import { ClipProgress } from '../../types/clips.ts';
 
 interface PodcastSearchConversationProps {
   item: PodcastSearchItem;
+  clipProgress?: ClipProgress | null;
+  onClipProgress: (progress: ClipProgress) => void;
 }
 
 // PodcastSearchConversation.tsx
-export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps> = ({ item }) => {
+export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps> = ({ 
+  item, 
+  clipProgress,
+  onClipProgress 
+}) => {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
 
   const handlePlayPause = (id: string) => {
@@ -38,6 +45,7 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
             isPlaying={currentlyPlayingId === `${item.id}-${index}`}
             onPlayPause={handlePlayPause}
             onEnded={handleEnded}
+            onClipProgress={onClipProgress}
           />
         ))}
       </div>

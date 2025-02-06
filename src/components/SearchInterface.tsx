@@ -1,5 +1,5 @@
 import { performSearch } from '../lib/searxng.ts';
-import { fetchClipById } from '../services/clipService.ts';
+import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams } from 'react-router-dom'; 
 import { RequestAuthMethod, AuthConfig } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
@@ -12,6 +12,7 @@ import {SignInModal} from './SignInModal.tsx'
 import LightningService from '../services/lightning.ts'
 import { useInvoicePool } from '../hooks/useInvoicePool.ts';
 import { Invoice } from '../types/invoice.ts';
+import {ClipProgress, ClipStatus, ClipRequest} from '../types/clips.ts'
 import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
 import {AccountButton} from './AccountButton.tsx'
@@ -23,6 +24,7 @@ import QuickTopicGrid from './QuickTopicGrid.tsx';
 import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
+
 
 export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
 type ModelType = 'gpt-3.5-turbo' | 'claude-3-sonnet';
@@ -41,6 +43,7 @@ interface SearchState {
   error: Error | null;
   sources: Source[];
   activeConversationId?: number;
+  clipProgress?: ClipProgress | null;
 }
 
 interface SearchInterfaceProps {
@@ -106,6 +109,9 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   );
   const [searchParams] = useSearchParams(); 
   const clipId = searchParams.get('clip');
+  const [clipProgress, setClipProgress] = useState<ClipProgress | null>(null);
+  const pollInterval = useRef<NodeJS.Timeout | null>(null);
+
 
   useEffect(() => {
     // Parse the searchMode parameter from the URL
@@ -138,6 +144,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
   const [requestAuthMethod, setRequestAuthMethod] = useState(RequestAuthMethod.FREE);//free, lightning or square
   const [conversation, setConversation] = useState([] as ConversationItem[]);
+  
 
   const [searchState, setSearchState] = useState({
     query: '',
@@ -315,6 +322,46 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     setIsRegisterModalOpen(false);
     setIsSignInModalOpen(true);
   }
+
+  const handleClipProgress = (progress: ClipProgress) => {
+    setClipProgress(progress);
+    
+    if (progress.pollUrl) {
+      // Clear any existing polling
+      if (pollInterval.current) {
+        clearInterval(pollInterval.current);
+      }
+      
+      // Start new polling
+      pollInterval.current = setInterval(async () => {
+        try {
+          const status = await checkClipStatus(progress.pollUrl!);
+          
+          if (status.status === "completed" && status.url) {
+            setClipProgress(prev => prev && {
+              ...prev,
+              isProcessing: false,
+              cdnLink: status.url
+            });
+            
+            // Clear polling on completion
+            if (pollInterval.current) {
+              clearInterval(pollInterval.current);
+            }
+          }
+        } catch (error) {
+          console.error('Error polling clip status:', error);
+        }
+      }, 7500);
+  
+      // Cleanup after 5 minutes
+      setTimeout(() => {
+        if (pollInterval.current) {
+          clearInterval(pollInterval.current);
+        }
+      }, 5 * 60 * 1000);
+    }
+  };
 
   const getAuth = async () => {
     let auth: AuthConfig;
@@ -643,6 +690,14 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
 
   useEffect(() => {
     updateAuthMethodAndRegisterModalStatus();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pollInterval.current) {
+        clearInterval(pollInterval.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -986,7 +1041,11 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
         {conversation
           .filter(item => item.type === searchMode)
           .map((item) => (
-            <ConversationRenderer key={item.id} item={item} />
+            <ConversationRenderer 
+              item={item} 
+              clipProgress={clipProgress}
+              onClipProgress={handleClipProgress}
+            />
           ))}
       </div>
     )}
@@ -1056,14 +1115,14 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
         <PodcastLoadingPlaceholder />
       )}
 
-      {true && (
+      {clipProgress && (
         <ClipTrackerModal
-          creator="Robin Seyr"
-          episode="Why Bitcoiners Will Always Win (BTC is transforming everything...)"
-          timestamps={[40, 75]}
-          cdnLink={"https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/clips/6708272/f06c5ef3-3a22-48c4-af9a-1d77cee01296/a80701876f797146aa4aafae237fd55cc545c58b4b73ae4906e5a357a8ad87d8-clip.mp4"} // Pass this if available
-          clipId="your-clip-id"
-          episodeImage="https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_episode/39673442/39673442-1738228698376-f17efb3bf38b3.jpg"
+          creator={clipProgress.creator}
+          episode={clipProgress.episode}
+          timestamps={clipProgress.timestamps}
+          cdnLink={clipProgress.cdnLink}
+          clipId={clipProgress.clipId}
+          episodeImage={clipProgress.episodeImage}
         />
       )}
 

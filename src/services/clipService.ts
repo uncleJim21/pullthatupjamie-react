@@ -52,3 +52,20 @@ export async function makeClip(clipId:string){
     throw error;
   }
 }
+
+
+export async function checkClipStatus(endpointString:string){
+  try {
+    const response = await fetch(`${API_URL}${endpointString}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Clip fetch error:', error);
+    throw error;
+  }
+}
