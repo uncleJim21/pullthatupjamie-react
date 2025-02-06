@@ -57,7 +57,7 @@ export default function ClipTrackerModal({
             `}
           >
           <div className="flex items-start space-x-4">
-            <div className="w-24 h-24 rounded-lg bg-zinc-800 flex-shrink-0 overflow-hidden">
+            <div className="ml-2 mb-2 mt-2 w-24 h-24 rounded-lg bg-zinc-800 flex-shrink-0 border border-gray-800 overflow-hidden">
               <img 
                 src={`${episodeImage}`} 
                 alt={creator}
@@ -65,7 +65,7 @@ export default function ClipTrackerModal({
               />
             </div>
             
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 mt-2">
               <h3 className="text-lg font-semibold text-white truncate">
                 {creator}
               </h3>
@@ -79,11 +79,11 @@ export default function ClipTrackerModal({
 
             <div className="flex-shrink-0">
               {cdnLink ? (
-                <div className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4 mt-4">
                   <Check className="w-5 h-5 text-green-500" />
                 </div>
               ) : (
-                <div className="w-8 h-8 rounded-full  flex items-center justify-center pt-10 mr-4">
+                <div className="w-8 h-8 rounded-full  flex items-center justify-center pt-10 mr-4 mt-4">
                   <Loader2 className="w-12 h-12 text-white-500 animate-spin" />
                 </div>
               )}
