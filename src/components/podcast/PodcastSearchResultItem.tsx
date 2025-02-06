@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward } from 'lucide-react';
+import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors } from 'lucide-react';
 import { formatTime } from '../../utils/time.ts';
+import { makeClip } from '../../services/clipService.ts';
+import { printLog } from '../../constants/constants.ts';
 
 interface PodcastSearchResultItemProps {
   quote: string;
@@ -23,6 +25,7 @@ interface PodcastSearchResultItemProps {
   onPlayPause: (id: string) => void;
   onEnded: (id: string) => void;
   shareUrl:string;
+  shareLink:string;
 }
 
 export const PodcastSearchResultItem = ({
@@ -39,7 +42,8 @@ export const PodcastSearchResultItem = ({
   isPlaying,
   onPlayPause,
   onEnded,
-  shareUrl
+  shareUrl,
+  shareLink
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
@@ -103,6 +107,11 @@ export const PodcastSearchResultItem = ({
     }
   };
   
+  const handleClip = async () => {
+    printLog(`shareLink:${shareLink}`)
+    printLog(`shareUrl:${shareUrl}`)
+    await makeClip(shareLink)
+  }
 
   const handleShare = async () => {
     try {
@@ -218,6 +227,13 @@ export const PodcastSearchResultItem = ({
               >
                 <ExternalLink className="h-4 w-4 mr-1" />
                 <p>Listen</p>
+              </button>
+              <button
+                onClick={handleClip}
+                className="inline-flex items-center px-3 py-1 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+              >
+                <Scissors className="h-4 w-4 mr-1" />
+                <p>{'Clip'}</p>
               </button>
             </div>
           </div>

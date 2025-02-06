@@ -15,3 +15,40 @@ export async function fetchClipById(clipId: string) {
     throw error;
   }
 }
+
+export async function makeClip(clipId:string){
+  try{
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    // // Only add Authorization header for LIGHTNING and SQUARE auth
+    // if (auth.type === RequestAuthMethod.LIGHTNING) {
+    //   const { preimage, paymentHash } = auth.credentials;
+    //   headers.Authorization = `${preimage}:${paymentHash}`;
+    // } else if (auth.type === RequestAuthMethod.SQUARE) {
+    //   const { username } = auth.credentials;
+    //   headers.Authorization = `Basic ${btoa(`${username}:`)}`;
+    // }
+    // FREE tier doesn't need an auth header
+
+    const response = await fetch(`${API_URL}/api/make-clip`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ 
+        clipId: clipId
+      })
+    });
+  
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+  
+    const data = await response.json();
+    return data;
+  }
+  catch(error){
+    console.error('quote search error:', error);
+    throw error;
+  }
+}
