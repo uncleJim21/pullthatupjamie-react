@@ -108,9 +108,13 @@ export const PodcastSearchResultItem = ({
   };
   
   const handleClip = async () => {
-    printLog(`shareLink:${shareLink}`)
-    printLog(`shareUrl:${shareUrl}`)
-    await makeClip(shareLink)
+    try{
+      const {status, lookupHash, pollUrl} = await makeClip(shareLink);
+      printLog(`pollUrl:${pollUrl}`)
+    }
+    catch{
+      printLog(`makeClip failed.`)
+    }
   }
 
   const handleShare = async () => {

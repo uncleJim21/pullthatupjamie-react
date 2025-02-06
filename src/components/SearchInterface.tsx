@@ -22,6 +22,7 @@ import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
 import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
+import ClipTrackerModal from './ClipTrackerModal.tsx';
 
 export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
 type ModelType = 'gpt-3.5-turbo' | 'claude-3-sonnet';
@@ -1055,9 +1056,20 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
         <PodcastLoadingPlaceholder />
       )}
 
+      {true && (
+        <ClipTrackerModal
+          creator="Robin Seyr"
+          episode="Why Bitcoiners Will Always Win (BTC is transforming everything...)"
+          timestamps={[40, 75]}
+          cdnLink={"https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/clips/6708272/f06c5ef3-3a22-48c4-af9a-1d77cee01296/a80701876f797146aa4aafae237fd55cc545c58b4b73ae4906e5a357a8ad87d8-clip.mp4"} // Pass this if available
+          clipId="your-clip-id"
+          episodeImage="https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_episode/39673442/39673442-1738228698376-f17efb3bf38b3.jpg"
+        />
+      )}
+
       {/* Floating Search Bar - Only show after first search */}
       {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && (
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-3xl px-4 z-50">
+        <div className="fixed bottom-12 left-1/2 transform -translate-x-1/2 w-full max-w-3xl px-4 z-50">
           <form onSubmit={handleSearch} className="relative">
             <textarea
               ref={searchInputRef}
