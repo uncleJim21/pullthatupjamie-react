@@ -33,8 +33,8 @@ export default function ClipTrackerModal({
     return (
       <div className={`
         fixed z-50 transition-all duration-300 ease-in-out
-        md:right-4 md:bottom-24 md:w-[25rem]
-        w-full px-4 md:px-0
+        xl:right-4 xl:bottom-24 xl:w-[22.5rem] xl:px-0 xl:left-auto xl:transform-none
+        left-1/2 -translate-x-1/2 mx-auto w-full max-w-[40rem] px-4
         ${isCollapsed ? 'bottom-[12.0rem]' : 'bottom-[13.0rem]'}
       `}>
         <div className="bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow">

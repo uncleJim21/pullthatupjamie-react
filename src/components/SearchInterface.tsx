@@ -1069,7 +1069,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
 
       {/* Floating Search Bar - Only show after first search */}
       {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && (
-        <div className="fixed bottom-12 left-1/2 transform -translate-x-1/2 w-full max-w-3xl px-4 z-50">
+        <div className="fixed bottom-12 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 z-50">
           <form onSubmit={handleSearch} className="relative">
             <textarea
               ref={searchInputRef}
