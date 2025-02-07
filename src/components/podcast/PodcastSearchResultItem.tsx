@@ -47,7 +47,6 @@ export const PodcastSearchResultItem = ({
   onEnded,
   shareUrl,
   shareLink,
-  onClipStart,
   onClipProgress
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
