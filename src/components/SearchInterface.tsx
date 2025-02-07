@@ -151,6 +151,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
+  const [isClipTrackerCollapsed, setIsClipTrackerCollapsed] = useState(false);
 
 
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
@@ -337,6 +338,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
 
   const handleClipProgress = (progress: ClipProgress) => {
     setClipProgress(progress);
+    setIsClipTrackerCollapsed(false);
     
     // Only start polling if we have a pollUrl and clip is still processing
     if (progress.pollUrl && progress.isProcessing) {
@@ -1150,6 +1152,8 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
           cdnLink={clipProgress.cdnLink}
           clipId={clipProgress.clipId}
           episodeImage={clipProgress.episodeImage}
+          isCollapsed={isClipTrackerCollapsed}
+          onCollapsedChange={setIsClipTrackerCollapsed}
         />
       )}
 

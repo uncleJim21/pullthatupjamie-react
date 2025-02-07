@@ -7,7 +7,9 @@ interface ClipTrackerModalProps {
   timestamps: number[];
   cdnLink?: string;
   clipId: string;
-  episodeImage:string;
+  episodeImage: string;
+  isCollapsed: boolean;
+  onCollapsedChange: (collapsed: boolean) => void;
 }
 
 export default function ClipTrackerModal({
@@ -16,9 +18,10 @@ export default function ClipTrackerModal({
   episodeImage,
   timestamps,
   cdnLink,
-  clipId
+  clipId,
+  isCollapsed,
+  onCollapsedChange
 }: ClipTrackerModalProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -39,7 +42,7 @@ export default function ClipTrackerModal({
       `}>
         <div className="bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow">
           <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={() => onCollapsedChange(!isCollapsed)}
             className="w-full h-8 flex items-center justify-center hover:bg-gray-800/30 transition-colors"
           >
             {isCollapsed ? (
