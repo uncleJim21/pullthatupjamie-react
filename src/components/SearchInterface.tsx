@@ -54,6 +54,18 @@ interface SubscriptionSuccessPopupProps {
   onClose: () => void;
 }
 
+interface BackoffConfig {
+  initialDelay: number;  // Starting delay in ms
+  maxDelay: number;     // Maximum delay in ms
+  factor: number;       // Multiplication factor for each step
+}
+
+const defaultBackoff: BackoffConfig = {
+  initialDelay: 2000,   // Start with 2 seconds
+  maxDelay: 30000,      // Max out at 30 seconds
+  factor: 1.5           // Increase by 50% each time
+};
+
 const SubscriptionSuccessPopup = ({ onClose }: SubscriptionSuccessPopupProps) => (
   <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
     <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
@@ -326,14 +338,18 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const handleClipProgress = (progress: ClipProgress) => {
     setClipProgress(progress);
     
-    if (progress.pollUrl) {
+    // Only start polling if we have a pollUrl and clip is still processing
+    if (progress.pollUrl && progress.isProcessing) {
       // Clear any existing polling
       if (pollInterval.current) {
-        clearInterval(pollInterval.current);
+        clearTimeout(pollInterval.current);
+        pollInterval.current = null;
       }
       
-      // Start new polling
-      pollInterval.current = setInterval(async () => {
+      let currentDelay = defaultBackoff.initialDelay;
+      let timeoutId: NodeJS.Timeout;
+  
+      const poll = async () => {
         try {
           const status = await checkClipStatus(progress.pollUrl!);
           
@@ -343,21 +359,32 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
               isProcessing: false,
               cdnLink: status.url
             });
-            
-            // Clear polling on completion
-            if (pollInterval.current) {
-              clearInterval(pollInterval.current);
-            }
+            return; // Stop polling
           }
+          
+          // Increase delay for next poll, but don't exceed max
+          currentDelay = Math.min(
+            currentDelay * defaultBackoff.factor,
+            defaultBackoff.maxDelay
+          );
+          
+          // Schedule next poll
+          timeoutId = setTimeout(poll, currentDelay);
         } catch (error) {
           console.error('Error polling clip status:', error);
+          timeoutId = setTimeout(poll, currentDelay);
         }
-      }, 7500);
+      };
+  
+      // Start polling
+      timeoutId = setTimeout(poll, currentDelay);
+      pollInterval.current = timeoutId;
   
       // Cleanup after 5 minutes
       setTimeout(() => {
         if (pollInterval.current) {
-          clearInterval(pollInterval.current);
+          clearTimeout(pollInterval.current);
+          pollInterval.current = null;
         }
       }, 5 * 60 * 1000);
     }

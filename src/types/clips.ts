@@ -5,6 +5,14 @@ export interface ClipRequest {
   pollUrl: string;
 }
 
+export interface ClipRequestResponse {
+    status: "processing" | "completed";
+    lookupHash: string;
+    pollUrl?: string;  // Only present if status is "processing"
+    url?: string;      // Only present if status is "completed"
+}
+  
+
 export interface ClipStatus {
   status: string;
   queuePosition?: string;

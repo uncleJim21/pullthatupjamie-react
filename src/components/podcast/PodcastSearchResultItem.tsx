@@ -124,19 +124,31 @@ export const PodcastSearchResultItem = ({
         episodeImage,
       });
   
-      const { status, lookupHash, pollUrl } = await makeClip(shareLink);
+      const response = await makeClip(shareLink);
       
-      // Update progress with polling URL
-      onClipProgress({
-        isProcessing: true,
-        creator,
-        episode,
-        timestamps: [timeContext.start_time, timeContext.end_time],
-        clipId: lookupHash,
-        episodeImage,
-        pollUrl
-      });
-      
+      if (response.status === "completed" && response.url) {
+        // Clip is immediately available
+        onClipProgress({
+          isProcessing: false,
+          creator,
+          episode,
+          timestamps: [timeContext.start_time, timeContext.end_time],
+          clipId: response.lookupHash,
+          episodeImage,
+          cdnLink: response.url
+        });
+      } else {
+        // Need to poll for completion
+        onClipProgress({
+          isProcessing: true,
+          creator,
+          episode,
+          timestamps: [timeContext.start_time, timeContext.end_time],
+          clipId: response.lookupHash,
+          episodeImage,
+          pollUrl: response.pollUrl
+        });
+      }
     } catch (error) {
       console.error('Failed to create clip:', error);
     }

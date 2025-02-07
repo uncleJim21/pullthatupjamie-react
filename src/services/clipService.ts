@@ -1,4 +1,5 @@
 import { API_URL } from "../constants/constants.ts";
+import { ClipRequestResponse } from "../types/clips.ts";
 
 export async function fetchClipById(clipId: string) {
   try {
@@ -16,21 +17,11 @@ export async function fetchClipById(clipId: string) {
   }
 }
 
-export async function makeClip(clipId:string){
-  try{
+export async function makeClip(clipId: string): Promise<ClipRequestResponse> {
+  try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
-
-    // // Only add Authorization header for LIGHTNING and SQUARE auth
-    // if (auth.type === RequestAuthMethod.LIGHTNING) {
-    //   const { preimage, paymentHash } = auth.credentials;
-    //   headers.Authorization = `${preimage}:${paymentHash}`;
-    // } else if (auth.type === RequestAuthMethod.SQUARE) {
-    //   const { username } = auth.credentials;
-    //   headers.Authorization = `Basic ${btoa(`${username}:`)}`;
-    // }
-    // FREE tier doesn't need an auth header
 
     const response = await fetch(`${API_URL}/api/make-clip`, {
       method: 'POST',
@@ -46,8 +37,7 @@ export async function makeClip(clipId:string){
   
     const data = await response.json();
     return data;
-  }
-  catch(error){
+  } catch (error) {
     console.error('quote search error:', error);
     throw error;
   }
