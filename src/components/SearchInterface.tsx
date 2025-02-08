@@ -1154,6 +1154,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
           episodeImage={clipProgress.episodeImage}
           isCollapsed={isClipTrackerCollapsed}
           onCollapsedChange={setIsClipTrackerCollapsed}
+          lookupHash={clipProgress.pollUrl}
         />
       )}
 

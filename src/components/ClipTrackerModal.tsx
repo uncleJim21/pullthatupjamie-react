@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, Loader2, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors } from 'lucide-react';
 interface ClipHistoryItem {
   creator: string;
   episode: string;
@@ -9,6 +9,7 @@ interface ClipHistoryItem {
   episodeImage: string;
   timestamp: number;
   id: string;
+  lookupHash:string;
 }
 
 interface ClipTrackerModalProps {
@@ -20,6 +21,7 @@ interface ClipTrackerModalProps {
   episodeImage: string;
   isCollapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
+  lookupHash?: string;
 }
 
 export default function ClipTrackerModal({
@@ -30,7 +32,8 @@ export default function ClipTrackerModal({
   cdnLink,
   clipId,
   isCollapsed,
-  onCollapsedChange
+  onCollapsedChange,
+  lookupHash
 }: ClipTrackerModalProps) {
   const [clipHistory, setClipHistory] = useState<ClipHistoryItem[]>([]);
   const [isHistoryShown, setIsHistoryShown] = useState(false);
@@ -56,12 +59,13 @@ export default function ClipTrackerModal({
 
   // Update history when new clip arrives or existing clip updates
   useEffect(() => {
-    if (!clipId) return;
-  
+    // Only proceed if we have both clipId and lookupHash
+    if (!clipId || !lookupHash) return;
+
     setClipHistory(prev => {
-      // First remove any existing item with same clipId
-      const filtered = prev.filter(item => item.clipId !== clipId);
-      
+      // Find existing item by lookupHash
+      const existingIndex = prev.findIndex(item => item.lookupHash === lookupHash);
+
       // Create new history item
       const updatedItem: ClipHistoryItem = {
         creator,
@@ -71,13 +75,21 @@ export default function ClipTrackerModal({
         clipId,
         episodeImage,
         timestamp: Date.now(),
-        id: Math.random().toString(36).substr(2, 9),
+        id: existingIndex >= 0 ? prev[existingIndex].id : Math.random().toString(36).substr(2, 9),
+        lookupHash  // Now this is guaranteed to exist
       };
-  
-      // Add new/updated item at the beginning
-      return [updatedItem, ...filtered];
+
+      // If item exists, update it and move to top
+      if (existingIndex >= 0) {
+        const newHistory = [...prev];
+        newHistory.splice(existingIndex, 1);
+        return [updatedItem, ...newHistory];
+      }
+
+      // If it's a new item, add it to the start
+      return [updatedItem, ...prev];
     });
-  }, [clipId, cdnLink, creator, episode, timestamps, episodeImage]);
+  }, [clipId, cdnLink, creator, episode, timestamps, episodeImage, lookupHash]);
 
   return (
     <div className={`fixed z-50 transition-all duration-300 ease-in-out
@@ -87,16 +99,22 @@ export default function ClipTrackerModal({
     >
       {/* Current Clip */}
       <div className="bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow">
-        <button
-          onClick={() => onCollapsedChange(!isCollapsed)}
-          className="w-full h-8 flex items-center justify-center hover:bg-gray-800/30 transition-colors"
-        >
-          {isCollapsed ? (
+      <button
+        onClick={() => onCollapsedChange(!isCollapsed)}
+        className="w-full h-12 flex items-center justify-center hover:bg-gray-800/30 transition-colors"
+      >
+        {isCollapsed ? (
+          <div className="flex flex-col items-center gap-1">
             <ChevronUp className="w-5 h-5 text-gray-400" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-gray-400" />
-          )}
-        </button>
+            <div className="flex items-center gap-1 text-gray-200 text-sm">
+              <Scissors className="h-4 w-4" />
+              <span>Clips</span>
+            </div>
+          </div>
+        ) : (
+          <ChevronDown className="w-5 h-5 text-gray-400" />
+        )}
+      </button>
   
         <div className={`transition-all duration-300 ease-in-out overflow-hidden
           ${isCollapsed ? 'max-h-0' : 'max-h-[500px]'}`}
@@ -167,7 +185,7 @@ export default function ClipTrackerModal({
       )}
   
       {/* History Items */}
-      {isHistoryShown && (
+      {isHistoryShown && !isCollapsed && (
         <div className="mt-2 space-y-2 max-h-[300px] overflow-y-auto">
           {clipHistory.map(item => (
             <div
