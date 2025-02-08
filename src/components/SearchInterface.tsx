@@ -1096,7 +1096,9 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
                 }
                 setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
                 setSearchHistory(prev => ({...prev, [searchMode]: true}));
-                handleQuoteSearch(topicQuery,auth).then(quoteResults => {
+                const selectedFeedIds = Array.from(selectedSources) as string[]
+                printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
+                handleQuoteSearch(topicQuery,auth,selectedFeedIds).then(quoteResults => {
                   if(quoteResults === false){
                     setIsRegisterModalOpen();
                     return;
