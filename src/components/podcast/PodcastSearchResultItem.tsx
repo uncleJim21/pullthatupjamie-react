@@ -265,7 +265,7 @@ export const PodcastSearchResultItem = ({
           />)
         }
       {isClipModalOpen && (
-        <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
+        <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-[9999]">
           <div className="bg-[#111111] rounded-lg p-6 text-center w-[90%] max-w-sm border border-gray-800 relative mb-36">
             {/* Close Button */}
             <button
