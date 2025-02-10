@@ -37,6 +37,7 @@ export default function ClipTrackerModal({
 }: ClipTrackerModalProps) {
   const [clipHistory, setClipHistory] = useState<ClipHistoryItem[]>([]);
   const [isHistoryShown, setIsHistoryShown] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -50,6 +51,13 @@ export default function ClipTrackerModal({
     if (savedHistory) {
       setClipHistory(JSON.parse(savedHistory));
     }
+  }, []);
+
+  useEffect(() => {
+    const checkScreenSize = () => setIsMobile(window.innerWidth <= 768);
+    checkScreenSize(); // Run on mount
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
   // Save history to localStorage when it changes
@@ -106,7 +114,7 @@ export default function ClipTrackerModal({
         {isCollapsed ? (
           <div className="flex flex-col items-center gap-1">
             <ChevronUp className="w-5 h-5 text-gray-400" />
-            <div className="flex items-center gap-1 text-gray-200 text-sm">
+            <div className="flex items-center gap-1 text-gray-200 text-sm mb-1">
               <Scissors className="h-4 w-4" />
               <span>Clips</span>
             </div>
@@ -119,61 +127,52 @@ export default function ClipTrackerModal({
         <div className={`transition-all duration-300 ease-in-out overflow-hidden
           ${isCollapsed ? 'max-h-0' : 'max-h-[500px]'}`}
         >
-          {/* Current clip content */}
-          <div className="flex items-start space-x-4">
-            <div className="ml-2 mb-2 mt-2 w-24 h-24 rounded-lg bg-zinc-800 flex-shrink-0 border border-gray-800 overflow-hidden">
-              <img 
-                src={episodeImage} 
-                alt={creator}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            
-            <div className="flex-1 min-w-0 mt-2">
-              <h3 className="text-lg font-semibold text-white truncate">
-                {creator}
-              </h3>
-              <p className="text-sm text-gray-400 mt-1 line-clamp-2">
-                {episode}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Timestamps: {timestamps.map(t => formatTime(t)).join(' - ')}
-              </p>
-            </div>
-  
-            <div className="flex-shrink-0">
-              {cdnLink ? (
-                <div 
-                  onClick={() => cdnLink && window.open(cdnLink, '_blank')}
-                  className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4 mt-4 cursor-pointer hover:opacity-80"
-                >
-                  <Check className="w-5 h-5 text-green-500" />
+          {/* Current Clip Section (Hidden on Mobile) */}
+            {!isMobile && (
+              <div className="bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow">
+
+                <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isCollapsed ? 'max-h-0' : 'max-h-[500px]'}`}>
+                  <div className="flex items-start space-x-4">
+                    <div className="ml-2 mb-2 mt-2 w-24 h-24 rounded-lg bg-zinc-800 flex-shrink-0 border border-gray-800 overflow-hidden">
+                      <img src={episodeImage} alt={creator} className="w-full h-full object-cover" />
+                    </div>
+
+                    <div className="flex-1 min-w-0 mt-2">
+                      <h3 className="text-lg font-semibold text-white truncate">{creator}</h3>
+                      <p className="text-sm text-gray-400 mt-1 line-clamp-2">{episode}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Timestamps: {timestamps.map((t) => formatTime(t)).join(' - ')}
+                      </p>
+                    </div>
+
+                    <div className="flex-shrink-0">
+                      {cdnLink ? (
+                        <div onClick={() => cdnLink && window.open(cdnLink, '_blank')} className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4 mt-4 cursor-pointer hover:opacity-80">
+                          <Check className="w-5 h-5 text-green-500" />
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4 mt-4">
+                          <Loader2 className="w-12 h-12 text-white-500 animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {cdnLink && (
+                    <div className="mt-4">
+                      <a href={cdnLink} target="_blank" rel="noopener noreferrer" className="block w-full text-center bg-[#111111] hover:bg-[#1A1A1A] text-white font-medium py-2 px-4 rounded-lg transition-colors border border-gray-800 hover:border-gray-700">
+                        View Clip
+                      </a>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4 mt-4">
-                  <Loader2 className="w-12 h-12 text-white-500 animate-spin" />
-                </div>
-              )}
+              </div>
+            )}
             </div>
-          </div>
-  
-          {cdnLink && (
-            <div className="mt-4">
-              <a
-                href={cdnLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full text-center bg-[#111111] hover:bg-[#1A1A1A] text-white font-medium py-2 px-4 rounded-lg transition-colors border border-gray-800 hover:border-gray-700"
-              >
-                View Clip
-              </a>
-            </div>
-          )}
-        </div>
       </div>
   
       {/* History Toggle */}
-      {clipHistory.length > 0 && !isCollapsed && (
+      {clipHistory.length > 0 && !isCollapsed && !isMobile && (
         <button
           onClick={() => setIsHistoryShown(!isHistoryShown)}
           className="w-full mt-2 px-4 py-2 bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg 
@@ -185,7 +184,7 @@ export default function ClipTrackerModal({
       )}
   
       {/* History Items */}
-      {isHistoryShown && !isCollapsed && (
+      {(isHistoryShown || (isMobile)) && !isCollapsed && (
         <div className="mt-2 space-y-2 max-h-[300px] overflow-y-auto">
           {clipHistory.map(item => (
             <div
