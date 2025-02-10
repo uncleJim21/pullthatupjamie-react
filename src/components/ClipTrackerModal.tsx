@@ -185,7 +185,7 @@ export default function ClipTrackerModal({
   
       {/* History Items */}
       {(isHistoryShown || (isMobile)) && !isCollapsed && (
-        <div className="mt-2 space-y-2 max-h-[300px] overflow-y-auto">
+        <div className="mt-2 space-y-2 max-h-[300px] overflow-y-auto bg-black">
           {clipHistory.map(item => (
             <div
               key={item.id}
