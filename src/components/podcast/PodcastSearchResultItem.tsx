@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link } from 'lucide-react';
+import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2 } from 'lucide-react';
 import { formatTime } from '../../utils/time.ts';
 import { makeClip,checkClipStatus } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
@@ -55,6 +55,8 @@ export const PodcastSearchResultItem = ({
   const [imageLoaded, setImageLoaded] = useState(false); // Image loading state
   const [hasEnded, setHasEnded] = useState(false);
   const [isContinuingBeyondClip, setIsContinuingBeyondClip] = useState(false);
+  const [isClipModalOpen, setIsClipModalOpen] = useState(false);
+
 
   const audioRef = useRef(null as HTMLAudioElement | null);
   const progressRef = useRef(null as HTMLDivElement | null);
@@ -111,9 +113,14 @@ export const PodcastSearchResultItem = ({
     }
   };
   
-  const handleClip = async () => {
+  const handleClip = () => {
+    setIsClipModalOpen(true);
+  };
+  
+  const handleClipConfirm = async () => {
+    setIsClipModalOpen(false); // Close the modal
+  
     try {
-      // Start with progress notification
       onClipProgress({
         isProcessing: true,
         creator,
@@ -124,9 +131,8 @@ export const PodcastSearchResultItem = ({
       });
   
       const response = await makeClip(shareLink);
-      
+  
       if (response.status === "completed" && response.url) {
-        // Clip is immediately available
         onClipProgress({
           isProcessing: false,
           creator,
@@ -134,10 +140,9 @@ export const PodcastSearchResultItem = ({
           timestamps: [timeContext.start_time, timeContext.end_time],
           clipId: response.lookupHash,
           episodeImage,
-          cdnLink: response.url
+          cdnLink: response.url,
         });
       } else {
-        // Need to poll for completion
         onClipProgress({
           isProcessing: true,
           creator,
@@ -145,12 +150,16 @@ export const PodcastSearchResultItem = ({
           timestamps: [timeContext.start_time, timeContext.end_time],
           clipId: response.lookupHash,
           episodeImage,
-          pollUrl: response.pollUrl
+          pollUrl: response.pollUrl,
         });
       }
     } catch (error) {
-      console.error('Failed to create clip:', error);
+      console.error("Failed to create clip:", error);
     }
+  };
+  
+  const handleClipCancel = () => {
+    setIsClipModalOpen(false); // Close the modal
   };
 
   const handleShare = async () => {
@@ -220,8 +229,42 @@ export const PodcastSearchResultItem = ({
   
   
   return (
-    <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
+    <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden z-100">
       <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
+      {isClipModalOpen && (
+        <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-[#111111] rounded-lg p-6 text-center w-[90%] max-w-sm border border-gray-800 relative mb-36">
+            {/* Close Button */}
+            <button
+              onClick={handleClipCancel}
+              className="absolute top-2 right-2 text-white text-3xl"
+              aria-label="Close"
+            >
+              &times;
+            </button>
+
+            {/* Modal Content */}
+            <div className="flex flex-col items-center space-y-6">
+              {/* Edit Timestamps Button */}
+              <button
+                onClick={handleClipCancel} // Replace with the logic for editing timestamps
+                className="flex items-center justify-center px-6 py-3 bg-[#1A1A1A] text-white border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors w-full mt-8 z-100"
+              >
+                <Edit2 className="w-5 h-5 mr-2" />
+                Edit Timestamps
+              </button>
+              {/* Clip This Button */}
+              <button
+                onClick={handleClipConfirm}
+                className="flex items-center font-bold justify-center px-6 py-3 bg-white text-black rounded-lg hover:bg-gray-400 transition-colors w-full mt-8"
+              >
+                <Scissors className="w-5 h-5 mr-2" />
+                Clip This
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
         <div className="flex flex-col sm:flex-row">
           {/* Episode Artwork */}
           <div className="flex-shrink-0 mb-4 sm:mb-0 sm:mr-4">
