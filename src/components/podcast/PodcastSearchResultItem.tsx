@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors } from 'lucide-react';
+import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link } from 'lucide-react';
 import { formatTime } from '../../utils/time.ts';
 import { makeClip,checkClipStatus } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
@@ -221,188 +221,192 @@ export const PodcastSearchResultItem = ({
   
 
   return (
-  <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
-    <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
-      <div className="flex flex-col sm:flex-row">
-        {/* Episode Artwork */}
-        <div className="flex-shrink-0 mb-4 sm:mb-0 sm:mr-4">
-          {!imageLoaded && (
-            <div className="w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 bg-gray-800 animate-pulse" />
-          )}
-          <img
-            src={episodeImage}
-            alt={episode}
-            className={`w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 ${
-              imageLoaded ? 'block' : 'hidden'
-            }`}
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageLoaded(false)}
-          />
-        </div>
-
-        <div className="flex-grow min-w-0">
-          <div className="flex flex-col sm:flex-row justify-between">
-            <div className="min-w-0 mb-2 sm:mb-0">
-              <h3 className="text-lg font-medium text-white line-clamp-4">
-                {episode}
-              </h3>
-              <p className="text-sm text-gray-400">{creator}</p>
-            </div>
-            <div className="flex sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2 sm:ml-4">
-              <button
-                onClick={handleShare}
-                className="inline-flex items-center px-3 py-1 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
-              >
-                <Share2 className="h-4 w-4 mr-1" />
-                <p>{!showCopied ? 'Share' : 'Copied!'}</p>
-              </button>
-              <button
-                onClick={handleListen}
-                disabled={!listenLink}
-                className={`inline-flex items-center px-3 py-1 rounded-md text-sm ${
-                  listenLink
-                    ? 'text-gray-300 hover:bg-gray-800 transition-colors'
-                    : 'text-gray-600'
-                }`}
-              >
-                <ExternalLink className="h-4 w-4 mr-1" />
-                <p>Listen</p>
-              </button>
-              <button
-                onClick={handleClip}
-                className="inline-flex items-center px-3 py-1 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
-              >
-                <Scissors className="h-4 w-4 mr-1" />
-                <p>{'Clip'}</p>
-              </button>
-            </div>
-          </div>
-
-          {/* Mini Player */}
-          <div className="mt-4 pl-0">
-            <audio
-              ref={audioRef}
-              src={audioUrl}
-              onTimeUpdate={handleTimeUpdate}
-              onEnded={() => {
-                if (audioRef.current) {
-                  audioRef.current.currentTime = timeContext.start_time;
-                  setCurrentTime(timeContext.start_time);
-                }
-                onEnded(id);
-              }}
+    <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
+      <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
+        <div className="flex flex-col sm:flex-row">
+          {/* Episode Artwork */}
+          <div className="flex-shrink-0 mb-4 sm:mb-0 sm:mr-4">
+            {!imageLoaded && (
+              <div className="w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 bg-gray-800 animate-pulse" />
+            )}
+            <img
+              src={episodeImage}
+              alt={episode}
+              className={`w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 ${
+                imageLoaded ? 'block' : 'hidden'
+              }`}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageLoaded(false)}
             />
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2">
-                {hasEnded && !isContinuingBeyondClip ? (
-                  // Rewind and Continue buttons at clip end
-                  <>
-                    <button
-                      onClick={handleRestart}
-                      className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
-                      title="Restart from clip beginning"
-                    >
-                      <RotateCcw size={16} />
-                    </button>
-                    <button
-                      onClick={handleContinuePlaying}
-                      className="flex items-center px-4 py-2 rounded-md bg-white text-black transition-colors hover:bg-gray-200"
-                      title="Continue playing beyond clip"
-                    >
-                      Continue
-                      <SkipForward className="ml-2 h-4 w-4" />
-                    </button>
-                  </>
-                ) : (
-                  // Regular playback controls
-                  <>
-                    <button
-                      onClick={() => handleSkip(-5)}
-                      className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
-                      title="Back 5 seconds"
-                    >
-                      <RotateCcw size={16} />
-                    </button>
-                    <button
-                      onClick={handlePlayPause}
-                      className={`p-2 rounded-full text-black transition-colors ${
-                        audioUrl === 'URL unavailable'
-                          ? 'bg-gray-700'
-                          : 'hover:bg-gray-200 bg-white'
-                      }`}
-                      disabled={audioUrl === 'URL unavailable'}
-                      title={isPlaying ? 'Pause' : 'Play'}
-                    >
-                      {isBuffering ? (
-                        <Loader className="animate-spin" size={16} />
-                      ) : isPlaying ? (
-                        <Pause size={16} />
-                      ) : (
-                        <Play size={16} />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleSkip(5)}
-                      className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
-                      title="Forward 5 seconds"
-                    >
-                      <RotateCw size={16} />
-                    </button>
-                  </>
-                )}
+          </div>
+  
+          <div className="flex-grow min-w-0">
+            <div className="flex justify-between items-start">
+              {/* Episode text */}
+              <div className="flex-grow pr-[4px] max-w-md">
+                <h3 className="text-lg font-medium text-white line-clamp-3">
+                  {episode}
+                </h3>
+                <p className="text-sm text-gray-400">{creator}</p>
               </div>
-
-              {/* Progress Bar */}
-              <div
-                ref={progressRef}
-                className="flex-grow h-1 bg-gray-700 rounded cursor-pointer relative"
-                onClick={handleProgressClick}
-              >
-                {/* Progress Indicator */}
+  
+              {/* Action Buttons */}
+              <div className="w-[200px] grid grid-cols-2 gap-2">
+                <button
+                  className="flex items-center px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                  onClick={handleShare}
+                >
+                  <Link className="h-4 w-4 mr-2" />
+                  <span>{showCopied ? 'Copied!' : 'Link'}</span>
+                </button>
+                <button
+                  className={`flex items-center px-2 py-2 rounded-md text-sm ${
+                    listenLink
+                      ? 'text-gray-300 hover:bg-gray-800 transition-colors'
+                      : 'text-gray-600'
+                  }`}
+                  onClick={handleListen}
+                  disabled={!listenLink}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  <span>Listen</span>
+                </button>
+                <button
+                  className="flex items-center px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors col-span-2"
+                  onClick={handleClip}
+                >
+                  <Scissors className="h-4 w-4 mr-2" />
+                  <span>Clip</span>
+                </button>
+              </div>
+            </div>
+  
+            {/* Mini Player */}
+            <div className="mt-4 pl-0">
+              <audio
+                ref={audioRef}
+                src={audioUrl}
+                onTimeUpdate={handleTimeUpdate}
+                onEnded={() => {
+                  if (audioRef.current) {
+                    audioRef.current.currentTime = timeContext.start_time;
+                    setCurrentTime(timeContext.start_time);
+                  }
+                  onEnded(id);
+                }}
+              />
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  {hasEnded && !isContinuingBeyondClip ? (
+                    // Rewind and Continue buttons at clip end
+                    <>
+                      <button
+                        onClick={handleRestart}
+                        className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
+                        title="Restart from clip beginning"
+                      >
+                        <RotateCcw size={16} />
+                      </button>
+                      <button
+                        onClick={handleContinuePlaying}
+                        className="flex items-center px-4 py-2 rounded-md bg-white text-black transition-colors hover:bg-gray-200"
+                        title="Continue playing beyond clip"
+                      >
+                        Continue
+                        <SkipForward className="ml-2 h-4 w-4" />
+                      </button>
+                    </>
+                  ) : (
+                    // Regular playback controls
+                    <>
+                      <button
+                        onClick={() => handleSkip(-5)}
+                        className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
+                        title="Back 5 seconds"
+                      >
+                        <RotateCcw size={16} />
+                      </button>
+                      <button
+                        onClick={handlePlayPause}
+                        className={`p-2 rounded-full text-black transition-colors ${
+                          audioUrl === 'URL unavailable'
+                            ? 'bg-gray-700'
+                            : 'hover:bg-gray-200 bg-white'
+                        }`}
+                        disabled={audioUrl === 'URL unavailable'}
+                        title={isPlaying ? 'Pause' : 'Play'}
+                      >
+                        {isBuffering ? (
+                          <Loader className="animate-spin" size={16} />
+                        ) : isPlaying ? (
+                          <Pause size={16} />
+                        ) : (
+                          <Play size={16} />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleSkip(5)}
+                        className="p-2 rounded-full text-white transition-colors hover:bg-gray-700"
+                        title="Forward 5 seconds"
+                      >
+                        <RotateCw size={16} />
+                      </button>
+                    </>
+                  )}
+                </div>
+  
+                {/* Progress Bar */}
                 <div
-                  className="h-full bg-white rounded transition-all"
-                  style={{ width: `${progress}%` }}
-                />
-                {/* Demarcation Point for Clip Continuation */}
-                {isContinuingBeyondClip && (
+                  ref={progressRef}
+                  className="flex-grow h-1 bg-gray-700 rounded cursor-pointer relative"
+                  onClick={handleProgressClick}
+                >
+                  {/* Progress Indicator */}
                   <div
-                    className="absolute right-0 top-0 h-full w-1 bg-gray-300"
-                    title="Clip Continued"
+                    className="h-full bg-white rounded transition-all"
+                    style={{ width: `${progress}%` }}
                   />
+                  {/* Demarcation Point for Clip Continuation */}
+                  {isContinuingBeyondClip && (
+                    <div
+                      className="absolute right-0 top-0 h-full w-1 bg-gray-300"
+                      title="Clip Continued"
+                    />
+                  )}
+                </div>
+  
+                {/* Clip Continued Label */}
+                {isContinuingBeyondClip && (
+                  <span className="text-xs text-gray-400 whitespace-nowrap">
+                    (Clip Continued)
+                  </span>
                 )}
               </div>
-
-              {/* Clip Continued Label */}
-              {isContinuingBeyondClip && (
-                <span className="text-xs text-gray-400 whitespace-nowrap">
-                  (Clip Continued)
-                </span>
-              )}
             </div>
           </div>
         </div>
       </div>
-    </div>
-
-    <div className="p-4 space-y-2">
-      <div className="text-sm text-gray-300 bg-[#0A0A0A] p-3 rounded-md">
-        {quote}
+  
+      <div className="p-4 space-y-2">
+        <div className="text-sm text-gray-300 bg-[#0A0A0A] p-3 rounded-md">
+          {quote}
+        </div>
+        <div className="flex justify-between items-center text-xs text-gray-500">
+          <span>
+            Similarity: {(similarity.combined).toFixed(3)}
+            {similarity.vector !== similarity.combined && (
+              <span className="ml-2 text-gray-600">
+                (Vector: {(similarity.vector).toFixed(3)})
+              </span>
+            )}
+          </span>
+          <span>
+            {formatTime(timeContext.start_time)} - {formatTime(timeContext.end_time)}
+          </span>
+        </div>
       </div>
-      <div className="flex justify-between items-center text-xs text-gray-500">
-        <span>
-          Similarity: {(similarity.combined).toFixed(3)}
-          {similarity.vector !== similarity.combined && (
-            <span className="ml-2 text-gray-600">
-              (Vector: {(similarity.vector).toFixed(3)})
-            </span>
-          )}
-        </span>
-        <span>
-          {formatTime(timeContext.start_time)} - {formatTime(timeContext.end_time)}
-        </span>
-      </div>
     </div>
-  </div>
-);
+  );
+  
 
 };

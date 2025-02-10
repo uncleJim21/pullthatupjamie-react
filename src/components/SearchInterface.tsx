@@ -62,8 +62,8 @@ interface BackoffConfig {
 
 const defaultBackoff: BackoffConfig = {
   initialDelay: 2000,   // Start with 2 seconds
-  maxDelay: 30000,      // Max out at 30 seconds
-  factor: 1.5           // Increase by 50% each time
+  maxDelay: 8000,      // Max out at 30 seconds
+  factor: 1.1           // Increase by 50% each time
 };
 
 const SubscriptionSuccessPopup = ({ onClose }: SubscriptionSuccessPopupProps) => (
