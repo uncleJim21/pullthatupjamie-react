@@ -219,7 +219,6 @@ export const PodcastSearchResultItem = ({
   };
   
   
-
   return (
     <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
       <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
@@ -241,26 +240,24 @@ export const PodcastSearchResultItem = ({
           </div>
   
           <div className="flex-grow min-w-0">
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col sm:flex-row sm:justify-between">
               {/* Episode text */}
-              <div className="flex-grow pr-[4px] max-w-md">
-                <h3 className="text-lg font-medium text-white line-clamp-3">
-                  {episode}
-                </h3>
+              <div className="flex-grow pr-0 sm:pr-4">
+                <h3 className="text-lg font-medium text-white line-clamp-3 max-w-md">{episode}</h3>
                 <p className="text-sm text-gray-400">{creator}</p>
               </div>
   
               {/* Action Buttons */}
-              <div className="w-[200px] grid grid-cols-2 gap-2">
+              <div className="mt-4 sm:mt-0 sm:w-[200px] grid grid-cols-3 gap-2 sm:grid-cols-2">
                 <button
-                  className="flex items-center px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                  className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                   onClick={handleShare}
                 >
                   <Link className="h-4 w-4 mr-2" />
                   <span>{showCopied ? 'Copied!' : 'Link'}</span>
                 </button>
                 <button
-                  className={`flex items-center px-2 py-2 rounded-md text-sm ${
+                  className={`flex items-center justify-start px-2 py-2 rounded-md text-sm ${
                     listenLink
                       ? 'text-gray-300 hover:bg-gray-800 transition-colors'
                       : 'text-gray-600'
@@ -272,7 +269,7 @@ export const PodcastSearchResultItem = ({
                   <span>Listen</span>
                 </button>
                 <button
-                  className="flex items-center px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors col-span-2"
+                  className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors col-span-3 sm:col-span-1"
                   onClick={handleClip}
                 >
                   <Scissors className="h-4 w-4 mr-2" />
@@ -408,5 +405,5 @@ export const PodcastSearchResultItem = ({
     </div>
   );
   
-
+  
 };
