@@ -3,6 +3,8 @@ import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBac
 import { formatTime } from '../../utils/time.ts';
 import { makeClip,checkClipStatus } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
+import EditTimestampsModal from "./EditTimestampsModal.tsx";
+
 import { printLog } from '../../constants/constants.ts';
 
 interface PodcastSearchResultItemProps {
@@ -56,6 +58,8 @@ export const PodcastSearchResultItem = ({
   const [hasEnded, setHasEnded] = useState(false);
   const [isContinuingBeyondClip, setIsContinuingBeyondClip] = useState(false);
   const [isClipModalOpen, setIsClipModalOpen] = useState(false);
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
 
   const audioRef = useRef(null as HTMLAudioElement | null);
@@ -117,20 +121,24 @@ export const PodcastSearchResultItem = ({
     setIsClipModalOpen(true);
   };
   
-  const handleClipConfirm = async () => {
+  const handleClipConfirm = async (
+    start?:number|null,
+    end?:number|null
+  ) => {
     setIsClipModalOpen(false); // Close the modal
-  
+    const startTime = start ?? timeContext.start_time;
+    const endTime = end ?? timeContext.end_time;
     try {
       onClipProgress({
         isProcessing: true,
         creator,
         episode,
-        timestamps: [timeContext.start_time, timeContext.end_time],
+        timestamps: [startTime, endTime],
         clipId: shareLink,
         episodeImage,
       });
   
-      const response = await makeClip(shareLink);
+      const response = await makeClip(shareLink,startTime,endTime);
   
       if (response.status === "completed" && response.url) {
         onClipProgress({
@@ -160,6 +168,16 @@ export const PodcastSearchResultItem = ({
   
   const handleClipCancel = () => {
     setIsClipModalOpen(false); // Close the modal
+  };
+
+  const handleEditTimestamps = () => {
+    setIsClipModalOpen(false);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateTimestamps = (newStart: number, newEnd: number) => {
+    setIsEditModalOpen(false);
+    handleClipConfirm(newStart,newEnd);
   };
 
   const handleShare = async () => {
@@ -231,6 +249,21 @@ export const PodcastSearchResultItem = ({
   return (
     <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden z-100">
       <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
+
+        {
+         isEditModalOpen &&( <EditTimestampsModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            audioUrl={audioUrl}
+            episodeTitle={episode}
+            episodeDate={date}
+            creator={creator}
+            episodeImage={episodeImage}
+            initialStartTime={timeContext.start_time}
+            initialEndTime={timeContext.end_time}
+            onConfirm={handleUpdateTimestamps}
+          />)
+        }
       {isClipModalOpen && (
         <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
           <div className="bg-[#111111] rounded-lg p-6 text-center w-[90%] max-w-sm border border-gray-800 relative mb-36">
@@ -247,7 +280,7 @@ export const PodcastSearchResultItem = ({
             <div className="flex flex-col items-center space-y-6">
               {/* Edit Timestamps Button */}
               <button
-                onClick={handleClipCancel} // Replace with the logic for editing timestamps
+                onClick={handleEditTimestamps} // Replace with the logic for editing timestamps
                 className="flex items-center justify-center px-6 py-3 bg-[#1A1A1A] text-white border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors w-full mt-8 z-100"
               >
                 <Edit2 className="w-5 h-5 mr-2" />
@@ -255,7 +288,7 @@ export const PodcastSearchResultItem = ({
               </button>
               {/* Clip This Button */}
               <button
-                onClick={handleClipConfirm}
+                onClick={() => handleClipConfirm(null,null)}
                 className="flex items-center font-bold justify-center px-6 py-3 bg-white text-black rounded-lg hover:bg-gray-400 transition-colors w-full mt-8"
               >
                 <Scissors className="w-5 h-5 mr-2" />
