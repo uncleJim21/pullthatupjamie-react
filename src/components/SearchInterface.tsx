@@ -649,7 +649,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
 
     const auth = await getAuth() as AuthConfig;
-    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED && false){
+    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
       setIsRegisterModalOpen(true);
       setSearchState(prev => ({ ...prev, isLoading: false }));
       return;
