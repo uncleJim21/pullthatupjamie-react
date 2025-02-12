@@ -40,6 +40,7 @@ export default function ClipTrackerModal({
   const [isMobile, setIsMobile] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [lookupHash, setLookupHash] = useState<string | null>(null);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -48,6 +49,7 @@ export default function ClipTrackerModal({
   };
 
   const getRenderClipUrl = (lookupHash?: string | null) => {
+    console.log(`getRenderClipUrl lookupHash:${lookupHash}`)
     if (!lookupHash) return;
     const extractLookupHash = (url) => {
       return url.split('/').pop();
@@ -65,11 +67,13 @@ export default function ClipTrackerModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleShare = () => {
+  const handleShare = (lookupHash?: string | null ) => {
+    console.log(`handleShare lookupHash:${lookupHash}`)
+    setLookupHash(lookupHash);
     setShowShareModal(true);
   };
 
-  const shareToTwitter = (lookupHash?: string|null) => {
+  const shareToTwitter = (lookupHash?: string | null) => {
     const url = getRenderClipUrl(lookupHash);
     if (!url) return;
     const tweetText = encodeURIComponent(`Check out this clip:\n${url}\n\nMade with PullThatUpJamie.ai`);
@@ -139,6 +143,7 @@ export default function ClipTrackerModal({
   }
 
   const ShareModal = () => {
+    if(!showShareModal) { return}
     return (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
           <div className="bg-black border border-gray-800 rounded-lg p-6 w-80 text-center relative">
@@ -149,13 +154,13 @@ export default function ClipTrackerModal({
 
             <div className="flex justify-center mt-4 gap-4">
               <button
-                onClick={() => copyToClipboard(clipProgress?.lookupHash)}
+                onClick={() => copyToClipboard(lookupHash)}
                 className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
               >
                 {copied ? <Check className="w-6 h-6 text-green-500" /> : <Link className="w-6 h-6 text-white" />}
               </button>
               <button
-                onClick={() => shareToTwitter(clipProgress?.lookupHash)}
+                onClick={() => shareToTwitter(lookupHash)}
                 className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
               >
                 <Twitter className="w-6 h-6 text-blue-400" />
@@ -228,7 +233,7 @@ export default function ClipTrackerModal({
                           <Play className="w-4 h-4 text-green-500" />
                         </div>
                         <div
-                          onClick={()=> handleShare(clipProgress?.lookupHash)}
+                          onClick={() => handleShare(clipProgress.lookupHash)}
                           className="w-8 h-8 mt-5 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
                         >
                           <Share className="w-4 h-4 text-white" />
@@ -270,6 +275,7 @@ export default function ClipTrackerModal({
       {/* History Items */}
       {(isHistoryShown || (isMobile)) && !isCollapsed && (
         <div className="mt-2 space-y-2 max-h-[12rem] overflow-y-auto bg-black">
+          <ShareModal />
           {clipHistory.map(item => (
             <div
               key={item.id}
@@ -301,7 +307,7 @@ export default function ClipTrackerModal({
                     <Play className="w-3 h-3 text-green-500" />
                   </div>
                   <div
-                    onClick={() => handleShare(item.lookupHash)}
+                    onClick={() => (handleShare(item.lookupHash))}
                     className="w-6 h-6 mt-3 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
                   >
                     <Share className="w-3 h-3 text-white" />
@@ -315,10 +321,6 @@ export default function ClipTrackerModal({
             </div>
           ))}
         </div>
-      )}
-
-      {showShareModal && (
-       <ShareModal />
       )}
     </div>
   );
