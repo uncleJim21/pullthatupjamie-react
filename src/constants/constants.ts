@@ -1,5 +1,5 @@
 export const DEBUG_MODE = false;
-export const API_URL = DEBUG_MODE ? "http://localhost:4131" : "https://clownfish-app-gm3gv.ondigitalocean.app";
+export const API_URL = DEBUG_MODE ? "http://localhost:4132" : "https://pullthatupjamie-nsh57.ondigitalocean.app";
 export const MONTHLY_PRICE_STRING = "$9.99"
 
 export const printLog = (log:string) =>{
