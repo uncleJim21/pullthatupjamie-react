@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {Play, Share, Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors } from 'lucide-react';
+import { Play, Share, Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors, Link, Twitter, X } from 'lucide-react';
 import { API_URL } from '../constants/constants.ts';
 
 interface ClipHistoryItem {
@@ -38,6 +38,8 @@ export default function ClipTrackerModal({
   const [clipHistory, setClipHistory] = useState<ClipHistoryItem[]>([]);
   const [isHistoryShown, setIsHistoryShown] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -45,7 +47,7 @@ export default function ClipTrackerModal({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleShare = (lookupHash?: string|null) => {
+  const getRenderClipUrl = (lookupHash?: string | null) => {
     if (!lookupHash) return;
     const extractLookupHash = (url) => {
       return url.split('/').pop();
@@ -53,7 +55,24 @@ export default function ClipTrackerModal({
     const finalHash = extractLookupHash(lookupHash);
   
     const renderClipUrl = `${API_URL}/api/render-clip/${finalHash}`;
-    const tweetText = encodeURIComponent(`Check out this clip:\n${renderClipUrl}\n\nMade with PullThatUpJamie.ai`);
+    return renderClipUrl;
+  }
+  const copyToClipboard = (lookupHash?: string | null) => {
+    const url = getRenderClipUrl(lookupHash);
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShare = () => {
+    setShowShareModal(true);
+  };
+
+  const shareToTwitter = (lookupHash?: string|null) => {
+    const url = getRenderClipUrl(lookupHash);
+    if (!url) return;
+    const tweetText = encodeURIComponent(`Check out this clip:\n${url}\n\nMade with PullThatUpJamie.ai`);
     const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
   
     window.open(twitterUrl, '_blank');
@@ -117,6 +136,35 @@ export default function ClipTrackerModal({
     }
 
     return isCollapsed ? 'bottom-[11.6rem]' : 'bottom-[12.6rem]'
+  }
+
+  const ShareModal = () => {
+    return (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
+          <div className="bg-black border border-gray-800 rounded-lg p-6 w-80 text-center relative">
+            <button onClick={() => setShowShareModal(false)} className="absolute top-2 right-2 text-gray-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-lg font-semibold text-white">Share This Clip</h2>
+
+            <div className="flex justify-center mt-4 gap-4">
+              <button
+                onClick={() => copyToClipboard(clipProgress?.lookupHash)}
+                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
+              >
+                {copied ? <Check className="w-6 h-6 text-green-500" /> : <Link className="w-6 h-6 text-white" />}
+              </button>
+              <button
+                onClick={() => shareToTwitter(clipProgress?.lookupHash)}
+                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
+              >
+                <Twitter className="w-6 h-6 text-blue-400" />
+              </button>
+            </div>
+            {copied && <p className="text-sm text-green-400 mt-2">Copied to clipboard!</p>}
+          </div>
+        </div>
+    )
   }
 
   return (
@@ -267,6 +315,10 @@ export default function ClipTrackerModal({
             </div>
           ))}
         </div>
+      )}
+
+      {showShareModal && (
+       <ShareModal />
       )}
     </div>
   );
