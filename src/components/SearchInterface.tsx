@@ -151,7 +151,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
-  const [isClipTrackerCollapsed, setIsClipTrackerCollapsed] = useState(false);
+  const [isClipTrackerCollapsed, setIsClipTrackerCollapsed] = useState(true);
 
 
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);

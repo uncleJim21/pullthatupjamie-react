@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2 } from 'lucide-react';
 import { formatTime } from '../../utils/time.ts';
-import { makeClip,checkClipStatus } from '../../services/clipService.ts';
+import { makeClip } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
 import EditTimestampsModal from "./EditTimestampsModal.tsx";
 
