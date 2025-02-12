@@ -337,60 +337,60 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   }
 
   const handleClipProgress = (progress: ClipProgress) => {
-    setClipProgress(progress);
-    setIsClipTrackerCollapsed(false);
-    
-    // Only start polling if we have a pollUrl and clip is still processing
-    if (progress.pollUrl && progress.isProcessing) {
-      // Clear any existing polling
-      if (pollInterval.current) {
-        clearTimeout(pollInterval.current);
-        pollInterval.current = null;
-      }
-      
-      let currentDelay = defaultBackoff.initialDelay;
-      let timeoutId: NodeJS.Timeout;
-  
-      const poll = async () => {
-        try {
-          const status = await checkClipStatus(progress.pollUrl!);
-          
-          if (status.status === "completed" && status.url) {
-            setClipProgress(prev => prev && {
-              ...prev,
-              isProcessing: false,
-              cdnLink: status.url
-            });
-            return; // Stop polling
-          }
-          
-          // Increase delay for next poll, but don't exceed max
-          currentDelay = Math.min(
-            currentDelay * defaultBackoff.factor,
-            defaultBackoff.maxDelay
-          );
-          
-          // Schedule next poll
-          timeoutId = setTimeout(poll, currentDelay);
-        } catch (error) {
-          console.error('Error polling clip status:', error);
-          timeoutId = setTimeout(poll, currentDelay);
-        }
+      const updatedProgress = {
+          ...progress,
+          lookupHash: progress.lookupHash || progress.pollUrl || ''  // Assign lookupHash properly
       };
-  
-      // Start polling
-      timeoutId = setTimeout(poll, currentDelay);
-      pollInterval.current = timeoutId;
-  
-      // Cleanup after 5 minutes
-      setTimeout(() => {
-        if (pollInterval.current) {
-          clearTimeout(pollInterval.current);
-          pollInterval.current = null;
-        }
-      }, 5 * 60 * 1000);
-    }
+
+      setClipProgress(updatedProgress);
+      setIsClipTrackerCollapsed(false);
+
+      if (updatedProgress.pollUrl && updatedProgress.isProcessing) {
+          if (pollInterval.current) {
+              clearTimeout(pollInterval.current);
+              pollInterval.current = null;
+          }
+
+          let currentDelay = defaultBackoff.initialDelay;
+          let timeoutId: NodeJS.Timeout;
+
+          const poll = async () => {
+              try {
+                  const status = await checkClipStatus(updatedProgress.pollUrl!);
+
+                  if (status.status === "completed" && status.url) {
+                      setClipProgress(prev => prev && {
+                          ...prev,
+                          isProcessing: false,
+                          cdnLink: status.url
+                      });
+                      return;
+                  }
+
+                  currentDelay = Math.min(
+                      currentDelay * defaultBackoff.factor,
+                      defaultBackoff.maxDelay
+                  );
+
+                  timeoutId = setTimeout(poll, currentDelay);
+              } catch (error) {
+                  console.error('Error polling clip status:', error);
+                  timeoutId = setTimeout(poll, currentDelay);
+              }
+          };
+
+          timeoutId = setTimeout(poll, currentDelay);
+          pollInterval.current = timeoutId;
+
+          setTimeout(() => {
+              if (pollInterval.current) {
+                  clearTimeout(pollInterval.current);
+                  pollInterval.current = null;
+              }
+          }, 5 * 60 * 1000);
+      }
   };
+
 
   const getAuth = async () => {
     let auth: AuthConfig;

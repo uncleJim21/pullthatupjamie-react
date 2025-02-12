@@ -71,30 +71,26 @@ export default function ClipTrackerModal({
     if (!clipProgress?.clipId || !lookupHash) return;
 
     setClipHistory(prev => {
-      // Find existing item by lookupHash
       const existingIndex = prev.findIndex(item => item.lookupHash === clipProgress.lookupHash);
 
-      // Create new history item
       const updatedItem: ClipHistoryItem = {
-        creator: clipProgress.creator,
-        episode: clipProgress.episode,
-        timestamps: clipProgress.timestamps,
-        cdnLink: clipProgress.cdnLink,
-        clipId: clipProgress.clipId,
-        episodeImage: clipProgress.episodeImage,
-        timestamp: Date.now(),
-        id: existingIndex >= 0 ? prev[existingIndex].id : Math.random().toString(36).substr(2, 9),
-        lookupHash: lookupHash
+          creator: clipProgress.creator,
+          episode: clipProgress.episode,
+          timestamps: clipProgress.timestamps,
+          cdnLink: clipProgress.cdnLink,
+          clipId: clipProgress.clipId,
+          episodeImage: clipProgress.episodeImage,
+          timestamp: Date.now(),
+          id: existingIndex >= 0 ? prev[existingIndex].id : Math.random().toString(36).substr(2, 9),
+          lookupHash: lookupHash  // Ensure lookupHash is correctly set
       };
 
-      // If item exists, update it and move to top
       if (existingIndex >= 0) {
-        const newHistory = [...prev];
-        newHistory.splice(existingIndex, 1);
-        return [updatedItem, ...newHistory];
+          const newHistory = [...prev];
+          newHistory.splice(existingIndex, 1);
+          return [updatedItem, ...newHistory];
       }
 
-      // If it's a new item, add it to the start
       return [updatedItem, ...prev];
     });
   }, [clipProgress]);

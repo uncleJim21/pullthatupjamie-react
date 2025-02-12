@@ -21,12 +21,13 @@ export interface ClipStatus {
 }
 
 export interface ClipProgress {
-    isProcessing: boolean;
-    creator: string;
-    episode: string;
-    timestamps: number[];
-    clipId: string;
-    cdnLink?: string;
-    episodeImage: string;
-    pollUrl?: string;
-  }
+  isProcessing: boolean;
+  creator: string;
+  episode: string;
+  timestamps: number[];
+  clipId: string;
+  cdnLink?: string;
+  episodeImage: string;
+  pollUrl?: string;
+  lookupHash: string;  // Ensure lookupHash is always defined
+}
