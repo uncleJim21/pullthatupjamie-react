@@ -337,59 +337,73 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   }
 
   const handleClipProgress = (progress: ClipProgress) => {
-      const updatedProgress = {
-          ...progress,
-          lookupHash: progress.lookupHash || progress.pollUrl || ''  // Assign lookupHash properly
-      };
+    if (!progress) return; // Prevent undefined errors
 
-      setClipProgress(updatedProgress);
-      setIsClipTrackerCollapsed(false);
+    // Ensure timeContext exists
+    if (!progress.timestamps || progress.timestamps.length !== 2) {
+        console.error("Invalid clip timestamps received:", progress);
+        return;
+    }
 
-      if (updatedProgress.pollUrl && updatedProgress.isProcessing) {
-          if (pollInterval.current) {
-              clearTimeout(pollInterval.current);
-              pollInterval.current = null;
-          }
+    const [start_time, end_time] = progress.timestamps;
 
-          let currentDelay = defaultBackoff.initialDelay;
-          let timeoutId: NodeJS.Timeout;
+    const updatedProgress: ClipProgress = {
+        ...progress,
+        lookupHash: progress.lookupHash || progress.pollUrl || '', // Ensure lookupHash exists
+        timestamps: [start_time, end_time] // Ensure valid timestamps
+    };
 
-          const poll = async () => {
-              try {
-                  const status = await checkClipStatus(updatedProgress.pollUrl!);
+    setClipProgress(updatedProgress);
+    setIsClipTrackerCollapsed(false);
 
-                  if (status.status === "completed" && status.url) {
-                      setClipProgress(prev => prev && {
-                          ...prev,
-                          isProcessing: false,
-                          cdnLink: status.url
-                      });
-                      return;
-                  }
+    if (updatedProgress.pollUrl && updatedProgress.isProcessing) {
+        if (pollInterval.current) {
+            clearTimeout(pollInterval.current);
+            pollInterval.current = null;
+        }
 
-                  currentDelay = Math.min(
-                      currentDelay * defaultBackoff.factor,
-                      defaultBackoff.maxDelay
-                  );
+        let currentDelay = defaultBackoff.initialDelay;
+        let timeoutId: NodeJS.Timeout;
 
-                  timeoutId = setTimeout(poll, currentDelay);
-              } catch (error) {
-                  console.error('Error polling clip status:', error);
-                  timeoutId = setTimeout(poll, currentDelay);
-              }
-          };
+        const poll = async () => {
+            try {
+                const status = await checkClipStatus(updatedProgress.pollUrl!);
+                
+                if (status.status === "completed" && status.url) {
+                    setClipProgress(prev => prev && {
+                        ...prev,
+                        isProcessing: false,
+                        cdnLink: status.url
+                    });
 
-          timeoutId = setTimeout(poll, currentDelay);
-          pollInterval.current = timeoutId;
+                    return;
+                }
 
-          setTimeout(() => {
-              if (pollInterval.current) {
-                  clearTimeout(pollInterval.current);
-                  pollInterval.current = null;
-              }
-          }, 5 * 60 * 1000);
-      }
-  };
+                currentDelay = Math.min(
+                    currentDelay * defaultBackoff.factor,
+                    defaultBackoff.maxDelay
+                );
+
+                timeoutId = setTimeout(poll, currentDelay);
+            } catch (error) {
+                console.error('Error polling clip status:', error);
+                timeoutId = setTimeout(poll, currentDelay);
+            }
+        };
+
+        timeoutId = setTimeout(poll, currentDelay);
+        pollInterval.current = timeoutId;
+
+        setTimeout(() => {
+            if (pollInterval.current) {
+                clearTimeout(pollInterval.current);
+                pollInterval.current = null;
+            }
+        }, 5 * 60 * 1000);
+    }
+};
+
+  
 
 
   const getAuth = async () => {

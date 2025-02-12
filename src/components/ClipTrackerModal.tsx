@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors } from 'lucide-react';
+import {Play, Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors } from 'lucide-react';
 
 interface ClipHistoryItem {
   creator: string;
@@ -157,7 +157,7 @@ export default function ClipTrackerModal({
                     <div className="flex-shrink-0">
                       {clipProgress?.cdnLink ? (
                         <div onClick={() => clipProgress?.cdnLink && window.open(clipProgress?.cdnLink, '_blank')} className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4 mt-4 cursor-pointer hover:opacity-80">
-                          <Check className="w-5 h-5 text-green-500" />
+                          <Play className="w-5 h-5 text-green-500" />
                         </div>
                       ) : (
                         <div className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4 mt-4">
