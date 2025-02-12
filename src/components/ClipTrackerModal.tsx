@@ -23,6 +23,7 @@ interface ClipTrackerModalProps {
     episodeImage: string;
     lookupHash?: string;
   };
+  hasSearched:boolean;
   isCollapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
 }
@@ -30,6 +31,7 @@ interface ClipTrackerModalProps {
 export default function ClipTrackerModal({
   clipProgress,
   isCollapsed,
+  hasSearched,
   onCollapsedChange
 }: ClipTrackerModalProps) {
   const [clipHistory, setClipHistory] = useState<ClipHistoryItem[]>([]);
@@ -97,11 +99,19 @@ export default function ClipTrackerModal({
     });
   }, [clipProgress]);
 
+  const bottomConstraint = (isCollapsed,hasSearched) => {
+    if(!hasSearched){
+      return 'bottom-[1.0rem]'
+    }
+
+    return isCollapsed ? 'bottom-[11.9rem]' : 'bottom-[13.0rem]'
+  }
+
   return (
     <div className={`fixed z-50 transition-all duration-300 ease-in-out
       xl:right-4 xl:bottom-24 xl:w-[22.5rem] xl:px-0 xl:left-auto xl:transform-none
       left-1/2 -translate-x-1/2 mx-auto w-full max-w-[40rem] px-4
-      ${isCollapsed ? 'bottom-[12.0rem]' : 'bottom-[13.0rem]'}`}
+      ${bottomConstraint(isCollapsed,hasSearched)}`}
     >
       {/* Current Clip */}
       <div className="bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow">

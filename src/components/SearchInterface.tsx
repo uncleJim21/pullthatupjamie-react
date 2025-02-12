@@ -1146,13 +1146,22 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
         <PodcastLoadingPlaceholder />
       )}
 
-      { searchMode === 'podcast-search' && (
-        <ClipTrackerModal
-          clipProgress={clipProgress}
-          isCollapsed={isClipTrackerCollapsed}
-          onCollapsedChange={setIsClipTrackerCollapsed}
-        />
+      {searchMode === 'podcast-search' && (
+        <div
+          className={`fixed w-full z-50 transition-all duration-300 ${
+            hasSearchedInMode('podcast-search') ? 'bottom-24' : 'bottom-0'
+          }`}
+        >
+          <ClipTrackerModal
+            clipProgress={clipProgress}
+            hasSearched={hasSearchedInMode('podcast-search')}
+            isCollapsed={isClipTrackerCollapsed}
+            onCollapsedChange={setIsClipTrackerCollapsed}
+          />
+        </div>
       )}
+
+
 
       {/* Floating Search Bar - Only show after first search */}
       {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && (
