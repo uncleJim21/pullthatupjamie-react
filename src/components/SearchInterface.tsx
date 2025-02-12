@@ -1146,17 +1146,11 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
         <PodcastLoadingPlaceholder />
       )}
 
-      {clipProgress && (
+      { searchMode === 'podcast-search' && (
         <ClipTrackerModal
-          creator={clipProgress.creator}
-          episode={clipProgress.episode}
-          timestamps={clipProgress.timestamps}
-          cdnLink={clipProgress.cdnLink}
-          clipId={clipProgress.clipId}
-          episodeImage={clipProgress.episodeImage}
+          clipProgress={clipProgress}
           isCollapsed={isClipTrackerCollapsed}
           onCollapsedChange={setIsClipTrackerCollapsed}
-          lookupHash={clipProgress.pollUrl}
         />
       )}
 

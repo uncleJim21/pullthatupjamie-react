@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors } from 'lucide-react';
+
 interface ClipHistoryItem {
   creator: string;
   episode: string;
@@ -9,31 +10,27 @@ interface ClipHistoryItem {
   episodeImage: string;
   timestamp: number;
   id: string;
-  lookupHash:string;
+  lookupHash: string;
 }
 
 interface ClipTrackerModalProps {
-  creator: string;
-  episode: string;
-  timestamps: number[];
-  cdnLink?: string;
-  clipId: string;
-  episodeImage: string;
+  clipProgress?: {
+    creator: string;
+    episode: string;
+    timestamps: number[];
+    cdnLink?: string;
+    clipId: string;
+    episodeImage: string;
+    lookupHash?: string;
+  };
   isCollapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
-  lookupHash?: string;
 }
 
 export default function ClipTrackerModal({
-  creator,
-  episode,
-  episodeImage,
-  timestamps,
-  cdnLink,
-  clipId,
+  clipProgress,
   isCollapsed,
-  onCollapsedChange,
-  lookupHash
+  onCollapsedChange
 }: ClipTrackerModalProps) {
   const [clipHistory, setClipHistory] = useState<ClipHistoryItem[]>([]);
   const [isHistoryShown, setIsHistoryShown] = useState(false);
@@ -68,23 +65,24 @@ export default function ClipTrackerModal({
   // Update history when new clip arrives or existing clip updates
   useEffect(() => {
     // Only proceed if we have both clipId and lookupHash
-    if (!clipId || !lookupHash) return;
+    const lookupHash = clipProgress?.lookupHash
+    if (!clipProgress?.clipId || !lookupHash) return;
 
     setClipHistory(prev => {
       // Find existing item by lookupHash
-      const existingIndex = prev.findIndex(item => item.lookupHash === lookupHash);
+      const existingIndex = prev.findIndex(item => item.lookupHash === clipProgress.lookupHash);
 
       // Create new history item
       const updatedItem: ClipHistoryItem = {
-        creator,
-        episode,
-        timestamps,
-        cdnLink,
-        clipId,
-        episodeImage,
+        creator: clipProgress.creator,
+        episode: clipProgress.episode,
+        timestamps: clipProgress.timestamps,
+        cdnLink: clipProgress.cdnLink,
+        clipId: clipProgress.clipId,
+        episodeImage: clipProgress.episodeImage,
         timestamp: Date.now(),
         id: existingIndex >= 0 ? prev[existingIndex].id : Math.random().toString(36).substr(2, 9),
-        lookupHash  // Now this is guaranteed to exist
+        lookupHash: lookupHash
       };
 
       // If item exists, update it and move to top
@@ -97,7 +95,7 @@ export default function ClipTrackerModal({
       // If it's a new item, add it to the start
       return [updatedItem, ...prev];
     });
-  }, [clipId, cdnLink, creator, episode, timestamps, episodeImage, lookupHash]);
+  }, [clipProgress]);
 
   return (
     <div className={`fixed z-50 transition-all duration-300 ease-in-out
@@ -128,26 +126,31 @@ export default function ClipTrackerModal({
           ${isCollapsed ? 'max-h-0' : 'max-h-[500px]'}`}
         >
           {/* Current Clip Section (Hidden on Mobile) */}
-            {!isMobile && (
+            {!clipProgress && (
+              <div className="flex items-center justify-center bg-gray-700 text-white p-4 rounded-md">
+                <p>No clips currently processing</p>
+              </div>
+            )}
+            {!isMobile && clipProgress && (
               <div className="bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow">
 
                 <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isCollapsed ? 'max-h-0' : 'max-h-[500px]'}`}>
                   <div className="flex items-start space-x-4">
                     <div className="ml-2 mb-2 mt-2 w-24 h-24 rounded-lg bg-zinc-800 flex-shrink-0 border border-gray-800 overflow-hidden">
-                      <img src={episodeImage} alt={creator} className="w-full h-full object-cover" />
+                      <img src={clipProgress?.episodeImage} alt={clipProgress?.creator} className="w-full h-full object-cover" />
                     </div>
 
                     <div className="flex-1 min-w-0 mt-2">
-                      <h3 className="text-lg font-semibold text-white truncate">{creator}</h3>
-                      <p className="text-sm text-gray-400 mt-1 line-clamp-2">{episode}</p>
+                      <h3 className="text-lg font-semibold text-white truncate">{clipProgress?.creator}</h3>
+                      <p className="text-sm text-gray-400 mt-1 line-clamp-2">{clipProgress?.episode}</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        Timestamps: {timestamps.map((t) => formatTime(t)).join(' - ')}
+                        Timestamps: {clipProgress?.timestamps.map((t) => formatTime(t)).join(' - ')}
                       </p>
                     </div>
 
                     <div className="flex-shrink-0">
-                      {cdnLink ? (
-                        <div onClick={() => cdnLink && window.open(cdnLink, '_blank')} className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4 mt-4 cursor-pointer hover:opacity-80">
+                      {clipProgress?.cdnLink ? (
+                        <div onClick={() => clipProgress?.cdnLink && window.open(clipProgress?.cdnLink, '_blank')} className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4 mt-4 cursor-pointer hover:opacity-80">
                           <Check className="w-5 h-5 text-green-500" />
                         </div>
                       ) : (
@@ -158,9 +161,9 @@ export default function ClipTrackerModal({
                     </div>
                   </div>
 
-                  {cdnLink && (
+                  {clipProgress?.cdnLink && (
                     <div className="mt-4">
-                      <a href={cdnLink} target="_blank" rel="noopener noreferrer" className="block w-full text-center bg-[#111111] hover:bg-[#1A1A1A] text-white font-medium py-2 px-4 rounded-lg transition-colors border border-gray-800 hover:border-gray-700">
+                      <a href={clipProgress?.cdnLink} target="_blank" rel="noopener noreferrer" className="block w-full text-center bg-[#111111] hover:bg-[#1A1A1A] text-white font-medium py-2 px-4 rounded-lg transition-colors border border-gray-800 hover:border-gray-700">
                         View Clip
                       </a>
                     </div>
