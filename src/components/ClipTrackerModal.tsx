@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {Play, Share, Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors } from 'lucide-react';
+import { API_URL } from '../constants/constants.ts';
 
 interface ClipHistoryItem {
   creator: string;
@@ -43,6 +44,21 @@ export default function ClipTrackerModal({
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const handleShare = (lookupHash?: string|null) => {
+    if (!lookupHash) return;
+    const extractLookupHash = (url) => {
+      return url.split('/').pop();
+    };
+    const finalHash = extractLookupHash(lookupHash);
+  
+    const renderClipUrl = `${API_URL}/api/render-clip/${finalHash}`;
+    const tweetText = encodeURIComponent(`Check out this clip:\n${renderClipUrl}\n\nMade with PullThatUpJamie.ai`);
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
+  
+    window.open(twitterUrl, '_blank');
+  };
+  
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -100,7 +116,7 @@ export default function ClipTrackerModal({
       return 'bottom-[1.0rem]'
     }
 
-    return isCollapsed ? 'bottom-[11.9rem]' : 'bottom-[13.0rem]'
+    return isCollapsed ? 'bottom-[11.6rem]' : 'bottom-[12.6rem]'
   }
 
   return (
@@ -133,7 +149,7 @@ export default function ClipTrackerModal({
         >
           {/* Current Clip Section (Hidden on Mobile) */}
             {!clipProgress && (
-              <div className="flex items-center justify-center bg-gray-700 text-white p-4 rounded-md">
+              <div className="flex items-center justify-center bg-gray-900 text-white p-4 rounded-md">
                 <p>No clips currently processing</p>
               </div>
             )}
@@ -156,8 +172,19 @@ export default function ClipTrackerModal({
 
                     <div className="flex-shrink-0">
                       {clipProgress?.cdnLink ? (
-                        <div onClick={() => clipProgress?.cdnLink && window.open(clipProgress?.cdnLink, '_blank')} className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4 mt-4 cursor-pointer hover:opacity-80">
-                          <Check className="w-5 h-5 text-green-500" />
+                        <div className='pr-6 mt-4'>
+                        <div
+                          onClick={() => clipProgress?.cdnLink && window.open(clipProgress?.cdnLink, '_blank')}
+                          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer opacity-80"
+                        >
+                          <Play className="w-4 h-4 text-green-500" />
+                        </div>
+                        <div
+                          onClick={()=> handleShare(clipProgress?.lookupHash)}
+                          className="w-8 h-8 mt-5 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
+                        >
+                          <Share className="w-4 h-4 text-white" />
+                        </div>
                         </div>
                       ) : (
                         <div className="w-8 h-8 rounded-full flex items-center justify-center pt-10 mr-4 mt-4">
@@ -194,15 +221,12 @@ export default function ClipTrackerModal({
   
       {/* History Items */}
       {(isHistoryShown || (isMobile)) && !isCollapsed && (
-        <div className="mt-2 space-y-2 max-h-[300px] overflow-y-auto bg-black">
+        <div className="mt-2 space-y-2 max-h-[12rem] overflow-y-auto bg-black">
           {clipHistory.map(item => (
             <div
               key={item.id}
-              onClick={() => item.cdnLink && window.open(item.cdnLink, '_blank')}
               className={`bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg p-3 
-                        flex items-center space-x-3 ${
-                          item.cdnLink ? 'cursor-pointer hover:border-gray-600 hover:bg-gray-800/30 relative group' : ''
-                        }`}
+                        flex items-center space-x-3`}
             >
               <img
                 src={item.episodeImage}
@@ -213,7 +237,7 @@ export default function ClipTrackerModal({
                 <p className="text-sm font-medium text-white truncate">
                   {item.creator}
                 </p>
-                <p className="text-xs text-gray-400 truncate">
+                <p className="text-xs text-gray-400 truncate mr-12">
                   {item.episode}
                 </p>
                 <p className="text-xs text-gray-500">
@@ -221,12 +245,24 @@ export default function ClipTrackerModal({
                 </p>
               </div>
               {item.cdnLink ? (
-                <div>
-                  <Check className="w-3 h-3 text-green-500 flex-shrink-0" />
-                  {/* <Share className="w-3 h-3 text-gray-100 flex-shrink-0 mt-3" /> */}
+                <div className='pr-4 mt-3'>
+                  <div
+                    onClick={() => item.cdnLink && window.open(item.cdnLink, '_blank')}
+                    className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer opacity-80"
+                  >
+                    <Play className="w-3 h-3 text-green-500" />
+                  </div>
+                  <div
+                    onClick={() => handleShare(item.lookupHash)}
+                    className="w-6 h-6 mt-3 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
+                  >
+                    <Share className="w-3 h-3 text-white" />
+                  </div>
                 </div>
               ) : (
-                <Loader2 className="w-5 h-5 text-white animate-spin flex-shrink-0" />
+                <div className='pr-4 mt-2'>
+                  <Loader2 className="w-5 h-5 text-white animate-spin flex-shrink-0" />
+                </div>
               )}
             </div>
           ))}

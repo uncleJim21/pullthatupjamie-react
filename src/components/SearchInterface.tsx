@@ -117,7 +117,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const [query, setQuery] = useState('');
   const [model, setModel] = useState('claude-3-sonnet' as ModelType);
   const [searchMode, setSearchMode] = useState(
-    isSharePage ? 'podcast-search' as SearchMode : 'quick' as SearchMode
+    isSharePage ? 'podcast-search' as SearchMode : 'podcast-search' as SearchMode
   );
   const [searchParams] = useSearchParams(); 
   const clipId = searchParams.get('clip');
@@ -172,7 +172,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const resultTextRef = useRef('');
   const eventSourceRef = useRef(null);
   const nextConversationId = useRef(0);
-  const searchSettingsBarStyle = "bg-[#000000] border-gray-800 border shadow-white-glow rounded-lg mt-2 pt-2 pb-2 max-w-3xl pr-1 mx-auto px-4 flex items-start relative"
+  const searchSettingsBarStyle = "bg-[#000000] border-gray-800 border shadow-white-glow rounded-lg mt-2 pt-2 pb-1 max-w-3xl pr-1 mx-auto px-4 flex items-start relative"
   const searchButtonStyle = "ml-auto mt-1 mr-1 pl-3 pr-3 bg-white rounded-lg pt-1 pb-1 border-gray-800 hover:border-gray-700"
 
   //Lightning related
@@ -958,7 +958,8 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
             <div>
               <h1 className="text-3xl font-bold">Pull That Up Jamie!</h1>
               <p className={`text-gray-400 text-md text-shadow-light-white ${hasSearchedInMode(searchMode) ? 'hidden' : ''}`}>
-                Instantly pull up anything with private web search + AI.
+                {searchMode === 'quick' ? 'Instantly pull up anything with private web search + AI.' : ''}
+                {searchMode === 'podcast-search' ? 'Search podcasts and clip them instantly.' : ''}
               </p>
             </div>
           </div>
