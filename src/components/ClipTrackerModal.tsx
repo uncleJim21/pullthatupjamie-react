@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Share, Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors, Link, Twitter, X } from 'lucide-react';
+import {Download, Play, Share, Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors, Link, Twitter, X } from 'lucide-react';
 import { API_URL } from '../constants/constants.ts';
 
 interface ClipHistoryItem {
@@ -40,12 +40,21 @@ export default function ClipTrackerModal({
   const [isMobile, setIsMobile] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [lookupHash, setLookupHash] = useState<string | null>(null);
+  const [lookupHash, setLookupHash] = useState<string | null | undefined>(null);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getCdnLink = (lookupHash?: string | null) => {
+    console.log(`lookupHash:${lookupHash}`)
+    if (!lookupHash) return;
+  
+    // Find the matching clip in the stored history
+    const clip = clipHistory.find(item => item.lookupHash === lookupHash);
+    return clip?.cdnLink;
   };
 
   const getRenderClipUrl = (lookupHash?: string | null) => {
@@ -67,7 +76,40 @@ export default function ClipTrackerModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleShare = (lookupHash?: string | null ) => {
+  const handleDownload = async (lookupHash?: string | null | undefined) => {
+    const cdnLink = getCdnLink(lookupHash);
+    if (!cdnLink) {
+      console.error("No CDN link found for this lookup hash.");
+      return;
+    }
+  
+    try {
+      // Fetch the file as a blob
+      const response = await fetch(cdnLink, { mode: 'cors' });
+      if (!response.ok) throw new Error("Failed to fetch file.");
+      
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+  
+      // Create a hidden download link
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `clip-${lookupHash?.split('/').pop()}.mp4`; // Extract filename from lookupHash
+      document.body.appendChild(link);
+      link.click();
+  
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+  
+      console.log(`Download completed: ${cdnLink}`);
+    } catch (error) {
+      console.error("Download failed:", error);
+    }
+  };
+  
+
+  const handleShare = (lookupHash?: string | null | undefined) => {
     console.log(`handleShare lookupHash:${lookupHash}`)
     setLookupHash(lookupHash);
     setShowShareModal(true);
@@ -158,6 +200,12 @@ export default function ClipTrackerModal({
                 className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
               >
                 {copied ? <Check className="w-6 h-6 text-green-500" /> : <Link className="w-6 h-6 text-white" />}
+              </button>
+              <button
+                onClick={() => handleDownload(lookupHash)}
+                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
+              >
+                <Download className="w-6 h-6 text-white-400" />
               </button>
               <button
                 onClick={() => shareToTwitter(lookupHash)}
