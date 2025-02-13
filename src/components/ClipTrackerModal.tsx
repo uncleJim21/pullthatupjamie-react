@@ -178,6 +178,7 @@ export default function ClipTrackerModal({
       left-1/2 -translate-x-1/2 mx-auto w-full max-w-[40rem] px-4
       ${bottomConstraint(isCollapsed,hasSearched)}`}
     >
+      <ShareModal />
       {/* Current Clip */}
       <div className="bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow">
       <button
@@ -275,7 +276,6 @@ export default function ClipTrackerModal({
       {/* History Items */}
       {(isHistoryShown || (isMobile)) && !isCollapsed && (
         <div className="mt-2 space-y-2 max-h-[12rem] overflow-y-auto bg-black">
-          <ShareModal />
           {clipHistory.map(item => (
             <div
               key={item.id}
