@@ -903,19 +903,20 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
           handleUpgrade();
         }}
       />
-      <RegisterModal 
+      {/* TODO: Reinstate payments */}
+      {/* <RegisterModal 
         isOpen={isRegisterModalOpen} 
         onClose={handleCloseRegisterModal} 
         onLightningSelect={handleLightningSelect} 
         onSubscribeSelect={handleSubscribeSelect} 
-      />
+      /> */}
 
       <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => {setIsCheckoutModalOpen(false)}} onSuccess={handleUpgradeSuccess} />
 
       {isUpgradeSuccessPopUpOpen && (
         <SubscriptionSuccessPopup onClose={() => setIsUpgradeSuccessPopUpOpen(false)} />
       )}
-
+      {/* TODO: Reinstate for payments */}
       {!isRegisterModalOpen && (
         <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
           <AccountButton 
