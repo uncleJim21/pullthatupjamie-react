@@ -58,8 +58,9 @@ export const PodcastSearchResultItem = ({
   const [hasEnded, setHasEnded] = useState(false);
   const [isContinuingBeyondClip, setIsContinuingBeyondClip] = useState(false);
   const [isClipModalOpen, setIsClipModalOpen] = useState(false);
-
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editTimestampsError,setEditTimestampsError] = useState<string|undefined>(undefined);
+  const CLIP_LENGTH_LIMIT_SECONDS = 60 * 10;
 
 
   const audioRef = useRef(null as HTMLAudioElement | null);
@@ -175,7 +176,19 @@ export const PodcastSearchResultItem = ({
     setIsEditModalOpen(true);
   };
 
+  const resetEditTimestampsError = () => {
+    setTimeout(() => {setEditTimestampsError(undefined)},5000);
+  }
+
   const handleUpdateTimestamps = (newStart: number, newEnd: number) => {
+    if(newEnd - newStart > CLIP_LENGTH_LIMIT_SECONDS){
+      setEditTimestampsError(`Error: Clip length of ${CLIP_LENGTH_LIMIT_SECONDS} seconds exceeded.`);
+      resetEditTimestampsError();
+      return
+    }
+    else{
+      setEditTimestampsError(undefined);
+    }
     setIsEditModalOpen(false);
     handleClipConfirm(newStart,newEnd);
   };
@@ -262,6 +275,7 @@ export const PodcastSearchResultItem = ({
             initialStartTime={timeContext.start_time}
             initialEndTime={timeContext.end_time}
             onConfirm={handleUpdateTimestamps}
+            editTimestampsError={editTimestampsError}
           />)
         }
       {isClipModalOpen && (

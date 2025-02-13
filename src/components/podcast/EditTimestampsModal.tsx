@@ -13,6 +13,7 @@ interface EditTimestampsModalProps {
   initialStartTime: number;
   initialEndTime: number;
   onConfirm: (newStartTime: number, newEndTime: number) => void;
+  editTimestampsError?:string;
 }
 
 const EditTimestampsModal: React.FC<EditTimestampsModalProps> = ({
@@ -26,6 +27,7 @@ const EditTimestampsModal: React.FC<EditTimestampsModalProps> = ({
   initialStartTime,
   initialEndTime,
   onConfirm,
+  editTimestampsError
 }) => {
   const [startTime, setStartTime] = useState(initialStartTime);
   const [endTime, setEndTime] = useState(initialEndTime);
@@ -174,6 +176,12 @@ const EditTimestampsModal: React.FC<EditTimestampsModalProps> = ({
           <Scissors className="w-5 h-5 mr-2 text-black" />
           Confirm Edit
         </button>
+        {editTimestampsError && 
+      (
+      <div className="mb-4 mt-4 p-3 bg-red-900/50 border border-red-800 text-red-200 rounded-lg">
+          {editTimestampsError}
+      </div>
+    )}
       </div>
     </div>
   ) : null;
