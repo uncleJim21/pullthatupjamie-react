@@ -122,7 +122,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const [searchParams] = useSearchParams(); 
   const clipId = searchParams.get('clip');
   const [clipProgress, setClipProgress] = useState<ClipProgress | null>(null);
-  const pollInterval = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervals = new Map<string, NodeJS.Timeout>();
 
 
   useEffect(() => {
@@ -337,71 +337,60 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   }
 
   const handleClipProgress = (progress: ClipProgress) => {
-    if (!progress) return; // Prevent undefined errors
+      if (!progress || !progress.clipId || !progress.lookupHash) return;
 
-    // Ensure timeContext exists
-    if (!progress.timestamps || progress.timestamps.length !== 2) {
-        console.error("Invalid clip timestamps received:", progress);
-        return;
-    }
+      const { clipId, lookupHash, pollUrl, isProcessing } = progress;
 
-    const [start_time, end_time] = progress.timestamps;
+      setClipProgress(progress); // Update progress in state
+      setIsClipTrackerCollapsed(false);
 
-    const updatedProgress: ClipProgress = {
-        ...progress,
-        lookupHash: progress.lookupHash || progress.pollUrl || '', // Ensure lookupHash exists
-        timestamps: [start_time, end_time] // Ensure valid timestamps
-    };
+      if (!pollUrl || !isProcessing) return;
 
-    setClipProgress(updatedProgress);
-    setIsClipTrackerCollapsed(false);
+      // Prevent duplicate polling for the same clip
+      if (pollIntervals.has(lookupHash)) {
+          printLog(`Polling already in progress for ${lookupHash}`);
+          return;
+      }
 
-    if (updatedProgress.pollUrl && updatedProgress.isProcessing) {
-        if (pollInterval.current) {
-            clearTimeout(pollInterval.current);
-            pollInterval.current = null;
-        }
+      let currentDelay = defaultBackoff.initialDelay;
 
-        let currentDelay = defaultBackoff.initialDelay;
-        let timeoutId: NodeJS.Timeout;
+      const poll = async () => {
+          try {
+              const status = await checkClipStatus(pollUrl);
 
-        const poll = async () => {
-            try {
-                const status = await checkClipStatus(updatedProgress.pollUrl!);
-                
-                if (status.status === "completed" && status.url) {
-                    setClipProgress(prev => prev && {
-                        ...prev,
-                        isProcessing: false,
-                        cdnLink: status.url
-                    });
+              if (status.status === "completed" && status.url) {
+                  setClipProgress(prev => prev?.lookupHash === lookupHash
+                      ? { ...prev, isProcessing: false, cdnLink: status.url }
+                      : prev
+                  );
 
-                    return;
-                }
+                  // Stop polling for this clip
+                  clearTimeout(pollIntervals.get(lookupHash));
+                  pollIntervals.delete(lookupHash);
+                  return;
+              }
 
-                currentDelay = Math.min(
-                    currentDelay * defaultBackoff.factor,
-                    defaultBackoff.maxDelay
-                );
+              currentDelay = Math.min(currentDelay * defaultBackoff.factor, defaultBackoff.maxDelay);
+              pollIntervals.set(lookupHash, setTimeout(poll, currentDelay));
 
-                timeoutId = setTimeout(poll, currentDelay);
-            } catch (error) {
-                console.error('Error polling clip status:', error);
-                timeoutId = setTimeout(poll, currentDelay);
-            }
-        };
+          } catch (error) {
+              console.error(`Error polling clip status for ${lookupHash}:`, error);
+              pollIntervals.set(lookupHash, setTimeout(poll, currentDelay));
+          }
+      };
 
-        timeoutId = setTimeout(poll, currentDelay);
-        pollInterval.current = timeoutId;
+      // Start polling
+      pollIntervals.set(lookupHash, setTimeout(poll, currentDelay));
 
-        setTimeout(() => {
-            if (pollInterval.current) {
-                clearTimeout(pollInterval.current);
-                pollInterval.current = null;
-            }
-        }, 5 * 60 * 1000);
-    }
-};
+      // Cleanup polling after 5 minutes
+      setTimeout(() => {
+          if (pollIntervals.has(lookupHash)) {
+              clearTimeout(pollIntervals.get(lookupHash));
+              pollIntervals.delete(lookupHash);
+              printLog(`Stopped polling ${lookupHash} after timeout`);
+          }
+      }, 5 * 60 * 1000);
+  };
 
   
 

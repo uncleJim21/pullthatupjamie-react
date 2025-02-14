@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {Download, Play, Share, Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors, Link, Twitter, X } from 'lucide-react';
 import { API_URL,printLog } from '../constants/constants.ts';
+import { checkClipStatus } from '../services/clipService.ts';
 
 interface ClipHistoryItem {
   creator: string;
@@ -124,15 +125,70 @@ export default function ClipTrackerModal({
   
     window.open(twitterUrl, '_blank');
   };
+
+  const updateOldPendingItems = async (historyJSON: ClipHistoryItem[]) => {
+    printLog(`Checking pending clips...`);
   
+    // Filter out clips that are still processing
+    const pendingItems = historyJSON.filter(historyItem => !historyItem.cdnLink);
+  
+    if (pendingItems.length === 0) {
+      printLog("No pending clips found.");
+      return;
+    }
+  
+    printLog(`Pending clips to update: ${pendingItems.length}`);
+  
+    // Iterate over pending clips and check their status
+    for (const pendingClip of pendingItems) {
+      // try {
+        const endpoint = `/api/clip-status/${pendingClip.clipId}`
+        console.log(`endpoint:${endpoint}`)
+        const status = await checkClipStatus(endpoint);
+  
+        if (status.status === "completed" && status.url) {
+          printLog(`Clip completed: ${pendingClip.clipId}, updating...`);
+  
+          // Update clip item in state and localStorage
+          setClipHistory(prevHistory =>
+            prevHistory.map(item =>
+              item.lookupHash === pendingClip.lookupHash
+                ? { ...item, cdnLink: status.url }
+                : item
+            )
+          );
+  
+          // Update localStorage
+          const updatedHistory = historyJSON.map(item =>
+            item.lookupHash === pendingClip.lookupHash
+              ? { ...item, cdnLink: status.url }
+              : item
+          );
+          localStorage.setItem('clipHistory', JSON.stringify(updatedHistory));
+        }
+      // } catch (error) {
+      //   console.error(`Error updating clip ${pendingClip.clipId}:`, error);
+      // }
+    }
+  };
+  
+  const refreshItems = async () =>{
+    const savedHistory = localStorage.getItem('clipHistory');
+    if (savedHistory) {
+      const historyJSON = JSON.parse(savedHistory);
+      setClipHistory(historyJSON);
+      updateOldPendingItems(historyJSON)
+    }
+  }
 
   // Load history from localStorage on mount
   useEffect(() => {
-    const savedHistory = localStorage.getItem('clipHistory');
-    if (savedHistory) {
-      setClipHistory(JSON.parse(savedHistory));
-    }
+    refreshItems();
   }, []);
+
+  useEffect(() => {
+    refreshItems();
+  }, [isCollapsed]);
 
   useEffect(() => {
     const checkScreenSize = () => setIsMobile(window.innerWidth <= 768);
@@ -149,7 +205,7 @@ export default function ClipTrackerModal({
   // Update history when new clip arrives or existing clip updates
   useEffect(() => {
     // Only proceed if we have both clipId and lookupHash
-    printLog(`ClipTrackerModal:${JSON.stringify(clipProgress,null,2)}`)
+    // printLog(`ClipTrackerModal:${JSON.stringify(clipProgress,null,2)}`)
     const lookupHash = clipProgress?.lookupHash
     if (!clipProgress?.clipId || !lookupHash) return;
     onCollapsedChange(false);
