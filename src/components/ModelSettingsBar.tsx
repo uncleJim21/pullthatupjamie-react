@@ -21,10 +21,10 @@ const SearchDropdown = ({ searchMode, setSearchMode, className = "" }: {
       onChange={(e) => setSearchMode(e.target.value as 'quick' | 'expert' | 'podcast-search')}
       className="bg-transparent text-gray-400 border-none focus:outline-none cursor-pointer text-sm pr-8"
     >
-      <option value="quick" className="bg-[#111111]">⚡ Quick</option>
+      <option value="quick" className="bg-[#111111]">🌐 Web Search</option>
       {/* <option value="depth" className="bg-[#111111]">🤿 Depth</option> */}
       <option value="podcast-search" className="bg-[#111111]">🎙️ Podcast Search</option>
-      <option value="expert" className="bg-[#111111]">🔮 Expert</option>
+      {/* <option value="expert" className="bg-[#111111]">🔮 Expert</option> */}
     </select>
     <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none">
     </div>
