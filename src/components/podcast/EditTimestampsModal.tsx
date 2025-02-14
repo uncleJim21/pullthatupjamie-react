@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, Play, Pause, Minus, Plus, Scissors } from "lucide-react";
+import { X, Play, Pause, Minus, Plus, Scissors, RotateCw, RotateCcw } from "lucide-react";
 import { formatTime } from "../../utils/time.ts";
 
 interface EditTimestampsModalProps {
@@ -97,7 +97,7 @@ const EditTimestampsModal: React.FC<EditTimestampsModalProps> = ({
               {episodeTitle}
             </h2>
             <p className="text-gray-400 text-sm">{creator}</p>
-            <p className="text-gray-500 text-xs">{episodeDate || "Date not provided"}</p>
+            {/* <p className="text-gray-500 text-xs">{episodeDate || "Date not provided"}</p> */}
           </div>
         </div>
 
@@ -131,38 +131,72 @@ const EditTimestampsModal: React.FC<EditTimestampsModalProps> = ({
         <div className="flex justify-between items-center mt-4">
           {/* Start Time Controls */}
           <div className="text-white">
-            <span className="block mb-1">Start: {formatTime(startTime)}</span>
+            <span className="block mb-2 text-center">Start: {formatTime(startTime)}</span>
             <div className="flex space-x-2">
               <button
                 onClick={() => setStartTime((t) => Math.max(0, Math.min(t - 1, endTime - 1)))}
                 className="p-2 bg-gray-800 text-white rounded-md"
               >
-                <Minus size={14} />
+                <RotateCcw size={14} />
               </button>
+              <span>1s</span>
               <button
                 onClick={() => setStartTime((t) => Math.min(t + 1, endTime - 1))}
                 className="p-2 bg-gray-800 text-white rounded-md"
               >
-                <Plus size={14} />
+                <RotateCw size={14} />
+              </button>
+            </div>
+            <div className="flex space-x-2 mt-2 mb-2">
+              <button
+                onClick={() => setStartTime((t) => Math.max(0, Math.min(t - 5, endTime - 5)))}
+                className="p-2 bg-gray-800 text-white rounded-md"
+              >
+                <RotateCcw size={14} />
+              </button>
+              <span>5s</span>
+              <button
+                onClick={() => setStartTime((t) => Math.min(t + 5, endTime - 5))}
+                className="p-2 bg-gray-800 text-white rounded-md"
+              >
+                <RotateCw size={14} />
               </button>
             </div>
           </div>
 
           {/* End Time Controls */}
           <div className="text-white">
-            <span className="block mb-1">End: {formatTime(endTime)}</span>
+            <span className="block mb-2 text-center">End: {formatTime(endTime)}</span>
             <div className="flex space-x-2">
+              
               <button
                 onClick={() => setEndTime((t) => Math.max(startTime + 1, t - 1))}
                 className="p-2 bg-gray-800 text-white rounded-md"
               >
-                <Minus size={14} />
+                <RotateCcw size={14} />
               </button>
+              <span>1s</span>
               <button
                 onClick={() => setEndTime((t) => t + 1)}
                 className="p-2 bg-gray-800 text-white rounded-md"
               >
-                <Plus size={14} />
+                <RotateCw size={14} />
+              </button>
+            </div>
+            <div className="flex space-x-2 mt-2 mb-2">
+              
+              <button
+                onClick={() => setEndTime((t) => Math.max(startTime + 5, t - 5))}
+                className="p-2 bg-gray-800 text-white rounded-md"
+              >
+                <RotateCcw size={14} />
+              </button>
+              <span>5s</span>
+              <button
+                onClick={() => setEndTime((t) => t + 5)}
+                className="p-2 bg-gray-800 text-white rounded-md"
+              >
+                <RotateCw size={14} />
               </button>
             </div>
           </div>
