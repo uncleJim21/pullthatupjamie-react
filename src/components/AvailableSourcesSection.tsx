@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Filter } from 'lucide-react';
 import { API_URL, printLog } from '../constants/constants.ts';
 
 interface PodcastSource {
@@ -14,9 +14,10 @@ interface AvailableSourcesProps {
   hasSearched: boolean;
   selectedSources: Set<string>;
   setSelectedSources: React.Dispatch<React.SetStateAction<Set<string>>>;
+  sizeOverride?:string;
 }
 
-const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, hasSearched, selectedSources, setSelectedSources }) => {
+const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, hasSearched, selectedSources, setSelectedSources, sizeOverride }) => {
   const [sources, setSources] = useState<PodcastSource[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(!hasSearched);
@@ -71,7 +72,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
   }
 
   return (
-    <div className="mx-auto max-w-4xl mt-4 pt-4 px-6 relative">
+    <div onClick={ !isExpanded ? () => setIsExpanded(true) : (() => (console.log('')))} className={`mx-auto max-w-4xl mt-4 pt-4 px-6 relative rounded-lg mb-2 ${!isExpanded ? 'pb-1 hover:bg-gray-800' : ''}`}>
       <button 
         className="text-white text-xl font-medium mb-4 flex items-center gap-2 border-white-800 rounded-lg hover:border-gray-700 transition-colors"
         onClick={toggleExpanded}
@@ -79,10 +80,10 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
         <span className={`transform transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`}>
           ▼
         </span>
-        Available Sources
+        Podcast Feeds <Filter className='w-5 h-5' /> <p className='text-sm text-gray-400 '>(18 Feeds)</p>
       </button>
 
-      {isExpanded && (
+      {isExpanded && sources.length > 0 && (
         <>
           <div className="relative border border-gray-800 pt-4 pb-4 rounded-lg">
             <div className="overflow-x-auto px-4">
@@ -90,7 +91,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
                 {sources.map((source, index) => (
                   <div
                     key={index}
-                    className="flex-shrink-0 w-24 lg:w-36 group cursor-pointer"
+                    className={`flex-shrink-0 w-24 lg:w-${sizeOverride ?? '36'} group cursor-pointer`}
                     onClick={() => toggleSource(source.feedId)}
                   >
                     <div className={`relative aspect-square rounded-lg overflow-hidden border group-hover:border-2 transition-colors ${selectedSources.has(source.feedId) ? 'border-gray-300' : 'border-gray-600'}`}>
@@ -109,7 +110,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
                         </div>
                       )}
                     </div>
-                    <p className="my-4 text-lg text-gray-100 text-center truncate transition-colors">
+                    <p className="my-4 text-sm md:text-lg text-gray-100 text-center line-clamp-2 transition-colors select-none">
                       {source.title}
                     </p>
                   </div>

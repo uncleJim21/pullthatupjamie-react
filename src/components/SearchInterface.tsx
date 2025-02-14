@@ -725,14 +725,6 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (pollInterval.current) {
-        clearInterval(pollInterval.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     const loadSharedClip = async () => {
       if (isSharePage && clipId) {
         try {
@@ -1085,7 +1077,14 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     )}
 
       {searchMode === 'podcast-search' && !hasSearchedInMode(searchMode) && (
-        <div className={`mt-12 ${hasSearchedInMode(searchMode) ? 'mb-52' : 'mb-36'}`}>
+        <div className={`mt-4 ${hasSearchedInMode(searchMode) ? 'mb-52' : 'mb-36'}`}>
+          {
+            <AvailableSourcesSection 
+              hasSearched={hasSearchedInMode(searchMode)} 
+              selectedSources={selectedSources} 
+              setSelectedSources={setSelectedSources} 
+              sizeOverride={'24'}
+          />}
           <QuickTopicGrid 
             className=""
             triggerFadeOut={gridFadeOut}
@@ -1138,12 +1137,6 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
               }
             }}
           />
-          {
-            <AvailableSourcesSection 
-              hasSearched={hasSearchedInMode(searchMode)} 
-              selectedSources={selectedSources} 
-              setSelectedSources={setSelectedSources} 
-          />}
         </div>
       )}
 
