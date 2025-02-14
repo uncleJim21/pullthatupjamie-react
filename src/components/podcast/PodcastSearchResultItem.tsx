@@ -127,8 +127,8 @@ export const PodcastSearchResultItem = ({
     end?:number|null
   ) => {
     setIsClipModalOpen(false); // Close the modal
-    const startTime = start ?? timeContext.start_time;
-    const endTime = end ?? timeContext.end_time;
+    const startTime = start ?? timeContext.start_time ?? 0;
+    const endTime = end ?? timeContext.end_time ?? startTime + 15;
     try {
       onClipProgress({
         isProcessing: true,
@@ -139,7 +139,8 @@ export const PodcastSearchResultItem = ({
         episodeImage,
         lookupHash: ''
       });
-  
+      
+      console.log(`makeClip ${shareLink}, ${startTime}, ${endTime}`)
       const response = await makeClip(shareLink,startTime,endTime);
   
       if (response.status === "completed" && response.url) {
