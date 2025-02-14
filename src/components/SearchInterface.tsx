@@ -101,7 +101,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const [query, setQuery] = useState('');
   const [model, setModel] = useState('claude-3-sonnet' as ModelType);
   const [searchMode, setSearchMode] = useState(
-    isSharePage ? 'podcast-search' as SearchMode : 'quick' as SearchMode
+    isSharePage ? 'podcast-search' as SearchMode : 'podcast-search' as SearchMode
   );
   const [searchParams] = useSearchParams(); 
   const clipId = searchParams.get('clip');
@@ -870,9 +870,9 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
           <div className="flex justify-center mb-6">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               {[
-                { mode: 'quick', emoji: '⚡', label: 'Quick Mode' },
+                { mode: 'quick', emoji: '🌐', label: 'Web Search' },
                 { mode: 'podcast-search', emoji: '🎙️', label: 'Podcast Search (Beta)' },
-                { mode: 'expert', emoji: '🔮', label: 'Expert Mode' }
+                // { mode: 'expert', emoji: '🔮', label: 'Expert Mode' }
               ].map(({ mode, emoji, label }) => (
                 <button
                   key={mode}
