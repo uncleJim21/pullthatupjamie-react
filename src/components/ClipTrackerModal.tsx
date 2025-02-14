@@ -239,7 +239,7 @@ export default function ClipTrackerModal({
       return 'bottom-[1.0rem]'
     }
 
-    return isCollapsed ? 'bottom-[11.6rem]' : 'bottom-[12.6rem]'
+    return isCollapsed ? 'bottom-36 sm:bottom-48' : 'bottom-[8.8rem] sm:bottom-[12.6rem]'
   }
 
   const ShareModal = () => {

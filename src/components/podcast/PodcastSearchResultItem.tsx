@@ -318,14 +318,14 @@ export const PodcastSearchResultItem = ({
       )}
         <div className="flex flex-col sm:flex-row">
           {/* Episode Artwork */}
-          <div className="flex-shrink-0 mb-4 sm:mb-0 sm:mr-4">
+          <div className="flex-shrink-0 mb-2 sm:mb-0 sm:mr-4">
             {!imageLoaded && (
               <div className="w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 bg-gray-800 animate-pulse" />
             )}
             <img
               src={episodeImage}
               alt={episode}
-              className={`w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 ${
+              className={`w-20 h-20 sm:w-32 sm:h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 ${
                 imageLoaded ? 'block' : 'hidden'
               }`}
               onLoad={() => setImageLoaded(true)}
@@ -337,7 +337,7 @@ export const PodcastSearchResultItem = ({
             <div className="flex flex-col sm:flex-row sm:justify-between">
               {/* Episode text */}
               <div className="flex-grow pr-0 sm:pr-4">
-                <h3 className="text-lg font-medium text-white line-clamp-3 max-w-md">{episode}</h3>
+                <h3 className="text-lg font-medium text-white line-clamp-1 sm:line-clamp-2 max-w-md">{episode}</h3>
                 <p className="text-sm text-gray-400">{creator}</p>
               </div>
   
@@ -479,7 +479,7 @@ export const PodcastSearchResultItem = ({
       </div>
   
       <div className="p-4 space-y-2">
-        <div className="text-sm text-gray-300 bg-[#0A0A0A] p-3 rounded-md">
+        <div className="text-sm text-gray-300 bg-[#0A0A0A] p-3 rounded-md line-clamp-4 sm:line-clamp-6 pb-1">
           {quote}
         </div>
         <div className="flex justify-between items-center text-xs text-gray-500">

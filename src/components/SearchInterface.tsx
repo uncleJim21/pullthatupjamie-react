@@ -928,7 +928,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
       <br></br>
       <div className={`${hasSearchedInMode(searchMode) ? 'mb-8' : ''} ml-4 mr-4`}>
         {/* Header with Logo */}
-        <div className={`flex justify-center items-center py-8 ${!hasSearchedInMode(searchMode) && 'mt-8'}`}>
+        <div className={`flex justify-center items-center py-8 select-none ${!hasSearchedInMode(searchMode) && 'mt-8'}`}>
           <div className="flex items-center gap-4">
             <img
               src="/jamie-logo.png"
@@ -949,7 +949,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
 
         {/* Search Modes - Now shown when hasSearched is true */}
         { (
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-6 select-none">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               {[
                 { mode: 'quick', emoji: '🌐', label: 'Web Search' },
@@ -978,6 +978,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
             hasSearched={hasSearchedInMode(searchMode)} 
             selectedSources={selectedSources} 
             setSelectedSources={setSelectedSources} 
+            sizeOverride={'24'}
             /> 
           }
 
@@ -1163,7 +1164,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
 
       {/* Floating Search Bar - Only show after first search */}
       {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && (
-        <div className="fixed bottom-12 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 z-50">
+        <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 z-50">
           <form onSubmit={handleSearch} className="relative">
             <textarea
               ref={searchInputRef}
