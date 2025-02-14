@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, Filter, Search } from 'lucide-react';
+import { Check, Filter, Search, Save } from 'lucide-react';
 import { API_URL, printLog } from '../constants/constants.ts';
 
 interface PodcastSource {
@@ -14,8 +14,10 @@ interface AvailableSourcesProps {
   hasSearched: boolean;
   selectedSources: Set<string>;
   setSelectedSources: React.Dispatch<React.SetStateAction<Set<string>>>;
-  sizeOverride?:string;
+  sizeOverride?: string;
 }
+
+const STORAGE_KEY = 'selectedPodcastSources';
 
 const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, hasSearched, selectedSources, setSelectedSources, sizeOverride }) => {
   const [sources, setSources] = useState<PodcastSource[]>([]);
@@ -23,6 +25,15 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(!hasSearched);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isSavingDefault, setIsSavingDefault] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => setIsMobile(window.innerWidth <= 768);
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
   useEffect(() => {
     const fetchSources = async () => {
@@ -30,7 +41,13 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
         const response = await fetch(`${API_URL}/api/get-available-feeds`);
         const data = await response.json();
         setSources(data.results);
-        setFilteredSources(data.results); // Initialize filtered sources
+        setFilteredSources(data.results);
+
+        // Load saved selection from localStorage
+        const savedSelection = localStorage.getItem(STORAGE_KEY);
+        if (savedSelection) {
+          setSelectedSources(new Set(JSON.parse(savedSelection)));
+        }
       } catch (err) {
         setError('Failed to load podcast sources');
         console.error('Error fetching podcast sources:', err);
@@ -38,19 +55,18 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
     };
 
     fetchSources();
-  }, []);
+  }, [setSelectedSources]);
 
   useEffect(() => {
-    if(!isExpanded){
-      setSearchQuery('')
+    if (!isExpanded) {
+      setSearchQuery('');
     }
   }, [isExpanded]);
 
-  // Filter sources dynamically when searchQuery changes
   useEffect(() => {
     const lowerCaseQuery = searchQuery.toLowerCase();
     setFilteredSources(
-      sources.filter(source => 
+      sources.filter(source =>
         source.title.toLowerCase().includes(lowerCaseQuery) ||
         source.description.toLowerCase().includes(lowerCaseQuery)
       )
@@ -79,6 +95,13 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
     setSelectedSources(new Set());
   };
 
+  const saveFilter = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(selectedSources)));
+    printLog('Saved selected podcast sources to localStorage');
+    setIsSavingDefault(true);
+    setInterval(() => (setIsSavingDefault(false)),2000);
+  };
+
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
   };
@@ -92,7 +115,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
   }
 
   return (
-    <div onClick={ !isExpanded ? () => setIsExpanded(true) : (() => (console.log('')))} className={`mx-auto max-w-4xl mt-4 pt-4 px-2 relative rounded-lg mb-2 ${!isExpanded ? 'pb-1 hover:bg-gray-800' : ''}`}>
+    <div onClick={!isExpanded ? () => setIsExpanded(true) : undefined} className={`mx-auto max-w-4xl mt-4 pt-4 px-2 relative rounded-lg mb-2 ${!isExpanded ? 'pb-1 hover:bg-gray-800' : ''}`}>
       <button 
         className="text-white text-xl font-medium mb-4 flex items-center gap-2 border-white-800 rounded-lg hover:border-gray-700 transition-colors"
         onClick={toggleExpanded}
@@ -156,7 +179,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
             </div>
           </div>
 
-          <div className="flex justify-center mt-4 space-x-2">
+          <div className="text-sm flex justify-center mt-4 space-x-2">
             <button
               className="font-bold px-4 py-2 text-black bg-white border border-gray-800 rounded hover:bg-gray-200"
               onClick={selectAll}
@@ -168,6 +191,12 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
               onClick={deselectAll}
             >
               Deselect All
+            </button>
+            <button
+              className="font-bold px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800"
+              onClick={saveFilter}
+            >
+              <span>{!isMobile ? 'Save as Default' : ''} {isSavingDefault ? '✅' : '💾'} </span>
             </button>
           </div>
         </>
