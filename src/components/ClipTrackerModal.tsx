@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {Download, Play, Share, Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors, Link, Twitter, X } from 'lucide-react';
-import { API_URL } from '../constants/constants.ts';
+import { API_URL,printLog } from '../constants/constants.ts';
 
 interface ClipHistoryItem {
   creator: string;
@@ -49,7 +49,7 @@ export default function ClipTrackerModal({
   };
 
   const getCdnLink = (lookupHash?: string | null) => {
-    console.log(`lookupHash:${lookupHash}`)
+    printLog(`lookupHash:${lookupHash}`)
     if (!lookupHash) return;
   
     // Find the matching clip in the stored history
@@ -58,7 +58,7 @@ export default function ClipTrackerModal({
   };
 
   const getRenderClipUrl = (lookupHash?: string | null) => {
-    console.log(`getRenderClipUrl lookupHash:${lookupHash}`)
+    printLog(`getRenderClipUrl lookupHash:${lookupHash}`)
     if (!lookupHash) return;
     const extractLookupHash = (url) => {
       return url.split('/').pop();
@@ -69,7 +69,7 @@ export default function ClipTrackerModal({
     return renderClipUrl;
   }
   const copyToClipboard = (lookupHash?: string | null) => {
-    const url = getRenderClipUrl(lookupHash);
+    const url = getCdnLink(lookupHash);
     if (!url) return;
     navigator.clipboard.writeText(url);
     setCopied(true);
@@ -94,7 +94,8 @@ export default function ClipTrackerModal({
       // Create a hidden download link
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `clip-${lookupHash?.split('/').pop()}.mp4`; // Extract filename from lookupHash
+      const id = clipProgress?.clipId ?? lookupHash?.split('/').pop()
+      link.download = `clip-${id}.mp4`; // Extract filename from lookupHash
       document.body.appendChild(link);
       link.click();
   
@@ -102,7 +103,7 @@ export default function ClipTrackerModal({
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
   
-      console.log(`Download completed: ${cdnLink}`);
+      printLog(`Download completed: ${cdnLink}`);
     } catch (error) {
       console.error("Download failed:", error);
     }
@@ -110,7 +111,7 @@ export default function ClipTrackerModal({
   
 
   const handleShare = (lookupHash?: string | null | undefined) => {
-    console.log(`handleShare lookupHash:${lookupHash}`)
+    printLog(`handleShare lookupHash:${lookupHash}`)
     setLookupHash(lookupHash);
     setShowShareModal(true);
   };
@@ -148,6 +149,7 @@ export default function ClipTrackerModal({
   // Update history when new clip arrives or existing clip updates
   useEffect(() => {
     // Only proceed if we have both clipId and lookupHash
+    printLog(`ClipTrackerModal:${JSON.stringify(clipProgress,null,2)}`)
     const lookupHash = clipProgress?.lookupHash
     if (!clipProgress?.clipId || !lookupHash) return;
     onCollapsedChange(false);

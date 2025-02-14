@@ -137,10 +137,10 @@ export const PodcastSearchResultItem = ({
         timestamps: [startTime, endTime],
         clipId: shareLink,
         episodeImage,
-        lookupHash: ''
+        lookupHash: id
       });
       
-      console.log(`makeClip ${shareLink}, ${startTime}, ${endTime}`)
+      printLog(`makeClip ${shareLink}, ${startTime}, ${endTime}`)
       const response = await makeClip(shareLink,startTime,endTime);
   
       if (response.status === "completed" && response.url) {
@@ -152,7 +152,7 @@ export const PodcastSearchResultItem = ({
           clipId: response.lookupHash,
           episodeImage,
           cdnLink: response.url,
-          lookupHash: ''
+          lookupHash: id
         });
       } else {
         onClipProgress({
@@ -163,7 +163,7 @@ export const PodcastSearchResultItem = ({
           clipId: response.lookupHash,
           episodeImage,
           pollUrl: response.pollUrl,
-          lookupHash: ''
+          lookupHash: id
         });
       }
     } catch (error) {
