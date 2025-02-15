@@ -45,8 +45,28 @@ const EditTimestampsModal: React.FC<EditTimestampsModalProps> = ({
   }, [isPlaying]);
 
   useEffect(() => {
+    const resetToStart = () => {
+      if (audioRef.current) {
+        audioRef.current.currentTime = startTime;//set currentTime to 0 on mount
+      }
+    }
+    setTimeout(resetToStart,100);
+  },[])
+
+  useEffect(() => {
     if (audioRef.current) {
       audioRef.current.currentTime = startTime;
+    }
+  }, [startTime]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = Math.max(endTime - 5, startTime);
+    }
+  }, [endTime]);
+
+  useEffect(() => {
+    if (audioRef.current) {
       const checkTime = () => {
         if (audioRef.current) {
           setCurrentTime(audioRef.current.currentTime);

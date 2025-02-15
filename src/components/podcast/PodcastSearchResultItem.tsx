@@ -86,6 +86,12 @@ export const PodcastSearchResultItem = ({
     }
   }, [isPlaying]);
 
+  useEffect(() => {
+    if(isPlaying === true && isEditModalOpen === true){//pause playback on modal open
+      onPlayPause(id);
+    }
+  },[isEditModalOpen])
+
   const handlePlayPause = async () => {
     if (audioRef.current) {
       try {
