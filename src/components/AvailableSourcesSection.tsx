@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Filter, Search, Save } from 'lucide-react';
 import { API_URL, printLog } from '../constants/constants.ts';
+import { FeedbackForm } from './FeedbackForm.tsx';
 
 interface PodcastSource {
     feedImage: string;
@@ -27,6 +28,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
   const [isExpanded, setIsExpanded] = useState(!hasSearched);
   const [isMobile, setIsMobile] = useState(false);
   const [isSavingDefault, setIsSavingDefault] = useState(false);
+  const [isSendingFeedback,setIsSendingFeedback] = useState(true);
 
   useEffect(() => {
     const checkScreenSize = () => setIsMobile(window.innerWidth <= 768);
@@ -114,8 +116,28 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
     );
   }
 
+  const getFeedbackForm = () => {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+        <div className="bg-[#0A0A0A]rounded-lg shadow-lg max-w-lg w-full relative">
+          <FeedbackForm 
+            mode="request-pod" 
+            stylingClasses="w-full" 
+            title="Our team will consider indexing the podcast for search & clips on your request. Please provide details." 
+            placeholder="Please name the podcast and your reason for request (are you an owner, producer, or fan?)" 
+            onClose={() => setIsSendingFeedback(false)}
+          />
+        </div>
+      </div>
+    );
+  }
+  
+
+  
+
   return (
     <div onClick={!isExpanded ? () => setIsExpanded(true) : undefined} className={`mx-auto max-w-4xl mt-4 pt-4 px-2 relative rounded-lg mb-2 ${!isExpanded ? 'pb-1 hover:bg-gray-800' : ''}`}>
+      {(isSendingFeedback) ? getFeedbackForm() : ''}
       <button 
         className="text-white text-xl font-medium mb-4 flex items-center gap-2 border-white-800 rounded-lg hover:border-gray-700 transition-colors"
         onClick={toggleExpanded}
@@ -134,15 +156,23 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
       {isExpanded && sources.length > 0 && (
         <>
           {/* Search Bar */}
-          <div className="relative mb-4">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search feeds..."
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-gray-600"
-            />
-            <Search className="absolute right-3 top-3 text-gray-400 w-5 h-5" />
+          <div className="relative mb-4 flex flex-col md:flex-row md:items-center md:space-x-4">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search feeds..."
+                className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-gray-600"
+              />
+              <Search className="absolute right-3 top-3 text-gray-400 w-5 h-5" />
+            </div>
+            <button 
+              onClick={() => setIsSendingFeedback(true)}
+              className="mt-2 md:mt-0 px-6 py-2 text-black font-medium bg-white rounded-lg hover:bg-gray-400 md:shrink-0"
+            >
+              Request Podcast
+            </button>
           </div>
 
           <div className="relative border border-gray-800 pt-4 pb-4 rounded-lg">
