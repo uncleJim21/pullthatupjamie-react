@@ -1,6 +1,10 @@
 import { API_URL, AuthConfig, RequestAuthMethod } from "../constants/constants.ts";
 
-export const handleQuoteSearch = async (queryToUse: string,auth:AuthConfig, selectedFeedIds?: string[]) => {
+export const handleQuoteSearch = async (
+  queryToUse: string,
+  auth:AuthConfig, 
+  selectedFeedIds?: string[]
+) => {
   try{
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'

@@ -28,7 +28,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
   const [isExpanded, setIsExpanded] = useState(!hasSearched);
   const [isMobile, setIsMobile] = useState(false);
   const [isSavingDefault, setIsSavingDefault] = useState(false);
-  const [isSendingFeedback,setIsSendingFeedback] = useState(true);
+  const [isSendingFeedback,setIsSendingFeedback] = useState(false);
 
   useEffect(() => {
     const checkScreenSize = () => setIsMobile(window.innerWidth <= 768);
@@ -171,7 +171,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
               onClick={() => setIsSendingFeedback(true)}
               className="mt-2 md:mt-0 px-6 py-2 text-black font-medium bg-white rounded-lg hover:bg-gray-400 md:shrink-0"
             >
-              Request Podcast
+              Request a Podcast
             </button>
           </div>
 

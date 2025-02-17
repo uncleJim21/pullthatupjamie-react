@@ -1,4 +1,4 @@
-import { API_URL } from "../constants/constants.ts";
+import { API_URL, AuthConfig, RequestAuthMethod } from "../constants/constants.ts";
 import { ClipRequestResponse } from "../types/clips.ts";
 
 export async function fetchClipById(clipId: string) {
@@ -18,6 +18,7 @@ export async function fetchClipById(clipId: string) {
 }
 
 export async function makeClip(clipId: string, 
+  auth:AuthConfig, 
   startTime:number|null,
   endTime:number|null
 ): Promise<ClipRequestResponse> {
@@ -25,6 +26,15 @@ export async function makeClip(clipId: string,
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
+
+    // Only add Authorization header for LIGHTNING and SQUARE auth
+    if (auth.type === RequestAuthMethod.LIGHTNING) {
+      const { preimage, paymentHash } = auth.credentials;
+      headers.Authorization = `${preimage}:${paymentHash}`;
+    } else if (auth.type === RequestAuthMethod.SQUARE) {
+      const { username } = auth.credentials;
+      headers.Authorization = `Basic ${btoa(`${username}:`)}`;
+    }
 
     let body = JSON.stringify({
       clipId: clipId
