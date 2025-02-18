@@ -141,7 +141,7 @@ export default function ClipTrackerModal({
   
     // Iterate over pending clips and check their status
     for (const pendingClip of pendingItems) {
-      // try {
+      try {
         const endpoint = `/api/clip-status/${pendingClip.clipId}`
         console.log(`endpoint:${endpoint}`)
         const status = await checkClipStatus(endpoint);
@@ -166,9 +166,9 @@ export default function ClipTrackerModal({
           );
           localStorage.setItem('clipHistory', JSON.stringify(updatedHistory));
         }
-      // } catch (error) {
-      //   console.error(`Error updating clip ${pendingClip.clipId}:`, error);
-      // }
+      } catch (error) {
+        console.error(`Error updating clip ${pendingClip.clipId}:`, error);
+      }
     }
   };
   
@@ -280,7 +280,7 @@ export default function ClipTrackerModal({
 
   return (
     <div className={`fixed z-50 transition-all duration-300 ease-in-out
-      xl:right-4 xl:bottom-24 xl:w-[22.5rem] px-4 xl:left-auto xl:transform-none
+      xl:right-4 xl:bottom-24 xl:w-[22.5rem] px-4 sm:px-24 xl:left-auto xl:transform-none
       left-1/2 -translate-x-1/2 mx-auto w-full max-w-[40rem] sm:px-4
       ${bottomConstraint(isCollapsed,hasSearched)}`}
     >

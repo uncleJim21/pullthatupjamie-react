@@ -4,18 +4,21 @@ import type { PodcastSearchItem } from '../../types/conversation';
 import { PodcastSearchResultItem } from '../podcast/PodcastSearchResultItem.tsx';
 import { BaseConversationLayout } from './BaseConversationLayout.tsx';
 import { ClipProgress } from '../../types/clips.ts';
+import { AuthConfig } from '../../constants/constants.ts';
 
 interface PodcastSearchConversationProps {
   item: PodcastSearchItem;
   clipProgress?: ClipProgress | null;
   onClipProgress: (progress: ClipProgress) => void;
+  authConfig?: AuthConfig | null | undefined;
 }
 
 // PodcastSearchConversation.tsx
 export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps> = ({ 
   item, 
   clipProgress,
-  onClipProgress 
+  onClipProgress,
+  authConfig
 }) => {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
 
@@ -46,6 +49,7 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
             onPlayPause={handlePlayPause}
             onEnded={handleEnded}
             onClipProgress={onClipProgress}
+            authConfig={authConfig}
           />
         ))}
       </div>

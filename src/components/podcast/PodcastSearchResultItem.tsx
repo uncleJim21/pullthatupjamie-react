@@ -4,7 +4,7 @@ import { formatTime } from '../../utils/time.ts';
 import { makeClip } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
 import EditTimestampsModal from "./EditTimestampsModal.tsx";
-
+import { AuthConfig } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
 
 interface PodcastSearchResultItemProps {
@@ -31,6 +31,7 @@ interface PodcastSearchResultItemProps {
   shareLink:string;
   onClipStart: (progress: ClipProgress) => void;
   onClipProgress: (progress: ClipProgress) => void;
+  authConfig?: AuthConfig | null | undefined;
 }
 
 export const PodcastSearchResultItem = ({
@@ -49,7 +50,8 @@ export const PodcastSearchResultItem = ({
   onEnded,
   shareUrl,
   shareLink,
-  onClipProgress
+  onClipProgress,
+  authConfig
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
@@ -132,6 +134,8 @@ export const PodcastSearchResultItem = ({
     start?:number|null,
     end?:number|null
   ) => {
+    printLog(`handleClipConfirm with authConfig:${JSON.stringify(authConfig,null,2)}`)
+    if(!authConfig){return}
     setIsClipModalOpen(false); // Close the modal
     const startTime = start ?? timeContext.start_time ?? 0;
     const endTime = end ?? timeContext.end_time ?? startTime + 15;
@@ -147,7 +151,7 @@ export const PodcastSearchResultItem = ({
       });
       
       printLog(`makeClip ${shareLink}, ${startTime}, ${endTime}`)
-      const response = await makeClip(shareLink,startTime,endTime);
+      const response = await makeClip(shareLink,authConfig,startTime,endTime);
   
       if (response.status === "completed" && response.url) {
         onClipProgress({

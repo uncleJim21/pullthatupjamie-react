@@ -121,6 +121,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   );
   const [searchParams] = useSearchParams(); 
   const clipId = searchParams.get('clip');
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null | undefined>(null);
   const [clipProgress, setClipProgress] = useState<ClipProgress | null>(null);
   const pollIntervals = new Map<string, NodeJS.Timeout>();
 
@@ -336,9 +337,16 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     setIsSignInModalOpen(true);
   }
 
-  const handleClipProgress = (progress: ClipProgress) => {
+  const handleClipProgress = async (progress: ClipProgress) => {
       if (!progress || !progress.clipId || !progress.lookupHash) return;
+      if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+        setIsRegisterModalOpen(true);
+        setSearchState(prev => ({ ...prev, isLoading: false }));
+        return;
+      }
 
+      const freshAuth = await getAuth();
+      setAuthConfig(freshAuth);  // This will automatically propagate down
       const { clipId, lookupHash, pollUrl, isProcessing } = progress;
 
       setClipProgress(progress); // Update progress in state
@@ -652,13 +660,13 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
 
     const auth = await getAuth() as AuthConfig;
-    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
-      setIsRegisterModalOpen(true);
-      setSearchState(prev => ({ ...prev, isLoading: false }));
-      return;
-    }
+    // if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+    //   setIsRegisterModalOpen(true);
+    //   setSearchState(prev => ({ ...prev, isLoading: false }));
+    //   return;
+    // }
     printLog(`Request auth method:${requestAuthMethod}`)
-    const quoteResults = await handleQuoteSearch(query, auth, selectedFeedIds);
+    const quoteResults = await handleQuoteSearch(query, auth,true ,selectedFeedIds);
     setConversation(prev => [...prev, {
       id: searchState.activeConversationId as number,
       type: 'podcast-search' as const,
@@ -723,6 +731,28 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   useEffect(() => {
     updateAuthMethodAndRegisterModalStatus();
   }, []);
+
+  useEffect(() => {
+    const updateAuth = async () => {
+      const auth = await getAuth();
+      console.log("AuthConfig fetched on mount or auth change:", auth);
+      setAuthConfig(auth);
+    };
+  
+    updateAuth(); // Call on mount immediately
+  }, []); // Empty dependency array ensures this runs once when the component mounts
+  
+  // Also update `authConfig` when authentication method changes
+  useEffect(() => {
+    const updateAuth = async () => {
+      const auth = await getAuth();
+      console.log("AuthConfig updated due to requestAuthMethod change:", auth);
+      setAuthConfig(auth);
+    };
+  
+    updateAuth();
+  }, [requestAuthMethod]); // Ensure re-fetching when auth method changes
+  
 
   useEffect(() => {
     const loadSharedClip = async () => {
@@ -884,13 +914,12 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
           handleUpgrade();
         }}
       />
-      {/* TODO: Reinstate payments */}
-      {/* <RegisterModal 
+      <RegisterModal 
         isOpen={isRegisterModalOpen} 
         onClose={handleCloseRegisterModal} 
         onLightningSelect={handleLightningSelect} 
         onSubscribeSelect={handleSubscribeSelect} 
-      /> */}
+      />
 
       <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => {setIsCheckoutModalOpen(false)}} onSuccess={handleUpgradeSuccess} />
 
@@ -1072,6 +1101,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
               item={item} 
               clipProgress={clipProgress}
               onClipProgress={handleClipProgress}
+              authConfig={authConfig} 
             />
           ))}
       </div>
@@ -1094,11 +1124,11 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
               // Instead of relying on the state update, use the topicQuery directly
               try {
                 const auth = await getAuth() as AuthConfig;
-                if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
-                  setIsRegisterModalOpen(true);
-                  setSearchState(prev => ({ ...prev, isLoading: false }));
-                  return;
-                }
+                // if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+                //   setIsRegisterModalOpen(true);
+                //   setSearchState(prev => ({ ...prev, isLoading: false }));
+                //   return;
+                // }
                 setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
                 setSearchHistory(prev => ({...prev, [searchMode]: true}));
                 const selectedFeedIds = Array.from(selectedSources) as string[]
@@ -1145,7 +1175,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
         <PodcastLoadingPlaceholder />
       )}
 
-      {searchMode === 'podcast-search' && (
+      {searchMode === 'podcast-search' && !isRegisterModalOpen && (
         <div
           className={`fixed w-full z-50 transition-all duration-300 ${
             hasSearchedInMode('podcast-search') ? 'bottom-24' : 'bottom-0'
