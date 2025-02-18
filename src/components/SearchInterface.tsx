@@ -178,7 +178,6 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
 
   //Lightning related
   const [isLightningInitialized, setIsLightningInitialized] = useState(false);
-  const paymentInProgressRef = useRef(false);
   const { 
     invoicePool, 
     isLoading: isLoadingInvoices, 
@@ -186,6 +185,8 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     markInvoiceUsed,
     markInvoiceFailed,
     getNextUnpaidInvoice ,
+    getPoolState,
+    setPaymentInProgress,
     cleanupExpiredInvoices,
     refreshPool
   } = useInvoicePool();
@@ -228,83 +229,68 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     refreshEmptyPool();
   };
 
-  const payInvoice = async (bolt11: string) => {
-    if (!isLightningInitialized) {
-      throw new Error('Lightning not initialized');
+  const handleInvoicePayment = async (invoice: Invoice, attemptedHashes = new Set<string>()) => {
+    if (!invoice?.pr) {
+      printLog('Invalid invoice received');
+      return null;
     }
   
-    if (!bolt11) {
-      throw new Error('Invalid invoice: missing bolt11');
+    // Prevent retry loops by tracking attempted payment hashes
+    if (attemptedHashes.has(invoice.paymentHash)) {
+      printLog(`Already attempted payment for hash ${invoice.paymentHash}, skipping`);
+      return null;
     }
-  
-    printLog(`Starting payment with bolt11:${bolt11}`);
-
-    const existingInvoice = invoicePool.find((inv) => inv.pr === bolt11);
-    if (existingInvoice && existingInvoice.preimage) {
-      printLog(`Invoice already paid. Returning preimage: ${existingInvoice.preimage}`);
-      return existingInvoice.preimage;
-    }
+    attemptedHashes.add(invoice.paymentHash);
   
     try {
-      printLog('Calling LightningService.payInvoice...');
-      const preimage = await LightningService.payInvoice(bolt11);
-      printLog(`Payment successful! Preimage:${preimage}`);
+      setPaymentInProgress(true);
   
-      // Find the invoice in the pool and mark it as paid
-      const paidInvoice = invoicePool.find((inv) => inv.pr === bolt11);
-      printLog(`Found paid invoice in pool:${paidInvoice}`);
-  
-      if (paidInvoice && paidInvoice.paymentHash) {
-        markInvoicePaid(paidInvoice.paymentHash, preimage);
-      } else {
-        throw new Error('Invoice found but paymentHash is missing');
+      // Check if this invoice has already been paid
+      const existingPaid = invoicePool.find(
+        inv => inv.paymentHash === invoice.paymentHash && inv.paid
+      );
+      
+      if (existingPaid?.preimage) {
+        printLog('Invoice already paid, returning existing preimage');
+        return existingPaid.preimage;
       }
   
-      return preimage;
+      printLog(`Starting payment with bolt11: ${invoice.pr}`);
+      const preimage = await LightningService.payInvoice(invoice.pr);
+      
+      if (preimage) {
+        printLog(`Payment successful! Preimage: ${preimage}`);
+        markInvoicePaid(invoice.paymentHash, preimage);
+        return preimage;
+      }
+      
+      throw new Error('Payment failed - no preimage received');
     } catch (error) {
       console.error('Payment failed:', error);
-  
-      // Mark the invoice as failed and move to the next one
-      const failedInvoice = invoicePool.find((inv) => inv.pr === bolt11);
-      if (failedInvoice?.paymentHash) {
-        markInvoiceFailed(failedInvoice.paymentHash);
+      
+      // Handle already paid error explicitly
+      if (error.message?.includes('already been paid')) {
+        markInvoiceFailed(invoice.paymentHash);
+        return null;
       }
-  
-      // Try the next unpaid invoice
+      
+      // For other errors, try with a new invoice
+      markInvoiceFailed(invoice.paymentHash);
+      
       const nextInvoice = getNextUnpaidInvoice();
-      if (nextInvoice?.pr) {
+      if (nextInvoice?.pr && !attemptedHashes.has(nextInvoice.paymentHash)) {
         printLog('Retrying with next unpaid invoice...');
-        return await payInvoice(nextInvoice.pr);
-      } else {
-        throw new Error('No unpaid invoices available after payment failure');
+        return await handleInvoicePayment(nextInvoice, attemptedHashes);
       }
-    }
-  };
-  
-
-  const handleInvoicePayment = async (invoice: Invoice) => {
-    if (paymentInProgressRef.current) {
-      printLog('Payment already in progress, skipping...');
-      return null;
-    }
-  
-    // Check if this invoice has already been paid
-    if (invoice.paid) {
-      printLog('Invoice already paid, skipping...');
-      return null;
-    }
-  
-    try {
-      paymentInProgressRef.current = true;
-      const preimage = await payInvoice(invoice.pr);
-      return preimage;
-    } catch (error) {
-      console.error('Payment failed:', error);
+      
+      // If we've tried all available invoices or have no more, return null
+      printLog('No more untried invoices available');
       return null;
     } finally {
-      paymentInProgressRef.current = false;
+      setPaymentInProgress(false);
     }
   };
+  
 
   const handleSuggestionClick = async (suggestion: { title: string, subtitle: string }) => {
     const fullQuery = (`${suggestion.title} ${suggestion.subtitle}`);
@@ -425,6 +411,13 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
           return;
         }
         paidInvoice = retryInvoice;
+      }
+      else{
+        setSearchState(prev => ({
+          ...prev,
+          error: null,
+          isLoading: false
+        }));
       }
       
       auth = {
@@ -795,24 +788,24 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     const checkInvoices = async () => {
       const needsRefresh = await cleanupExpiredInvoices();
       if (needsRefresh) {
-        const nextInvoice = getNextUnpaidInvoice();
-        if (nextInvoice?.pr && !nextInvoice.paid) {
-          await handleInvoicePayment(nextInvoice);
+        const paidInvoice = invoicePool.find(inv => inv.paid && !inv.usedAt);
+        if (!paidInvoice) {
+          const nextInvoice = getNextUnpaidInvoice();
+          if (nextInvoice?.pr) {
+            try {
+              setPaymentInProgress(true);
+              await handleInvoicePayment(nextInvoice);
+            } finally {
+              setPaymentInProgress(false);
+            }
+          }
         }
       }
     };
   
-    if (!cleanupIntervalRef.current) {
-      cleanupIntervalRef.current = setInterval(checkInvoices, 5000);
-    }
-  
-    return () => {
-      if (cleanupIntervalRef.current) {
-        clearInterval(cleanupIntervalRef.current);
-        cleanupIntervalRef.current = undefined;
-      }
-    };
-  }, [cleanupExpiredInvoices, getNextUnpaidInvoice, handleInvoicePayment]);
+    const interval = setInterval(checkInvoices, 5000);
+    return () => clearInterval(interval);
+  }, [cleanupExpiredInvoices, getNextUnpaidInvoice, invoicePool]);
   
   useEffect(() => {
     const checkSignedIn = () => {
@@ -841,55 +834,30 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     };
   }, []);
 
-  useEffect(() => {
-    const ensurePaidInvoice = async () => {
-      if (!isLightningInitialized) return;
-      
-      // Check if we have any paid invoices
-      const hasPaidInvoice = invoicePool.some(inv => inv.paid && !inv.usedAt);
-      
-      if (!hasPaidInvoice) {
-        printLog('No paid invoices found, preparing initial invoice...');
-        const nextInvoice = getNextUnpaidInvoice();
-        if (nextInvoice?.pr && !nextInvoice.paid) {
-          try {
-            await handleInvoicePayment(nextInvoice);
-          } catch (error) {
-            console.error('Failed to prepare initial invoice:', error);
-            // Retry after a delay if first attempt fails
-            setTimeout(ensurePaidInvoice, 2000);
-          }
+
+useEffect(() => {
+  const prepareInitialInvoice = async () => {
+    if (!isLightningInitialized) return;
+    
+    const state = getPoolState();
+    if (state.paidCount === 0) {
+      const nextInvoice = getNextUnpaidInvoice();
+      if (nextInvoice?.pr) {
+        try {
+          setPaymentInProgress(true);
+          await handleInvoicePayment(nextInvoice);
+        } catch (error) {
+          console.error('Failed to prepare initial invoice:', error);
+        } finally {
+          setPaymentInProgress(false);
         }
       }
-    };
+    }
+  };
 
-    ensurePaidInvoice();
-  }, [isLightningInitialized, invoicePool]);
+  prepareInitialInvoice();
+}, [isLightningInitialized, getPoolState, getNextUnpaidInvoice, handleInvoicePayment, setPaymentInProgress]);
 
-// Remove the other payment-related effects
-
-  useEffect(() => {
-    const prepareInitialInvoice = async () => {
-      if (!isLightningInitialized) return;
-      
-      // Check if we have any paid invoices
-      const hasPaidInvoice = invoicePool.some(inv => inv.paid && !inv.usedAt);
-      
-      if (!hasPaidInvoice) {
-        printLog('No paid invoices found, preparing initial invoice...');
-        const nextInvoice = getNextUnpaidInvoice();
-        if (nextInvoice?.pr && !nextInvoice.paid) {
-          try {
-            await handleInvoicePayment(nextInvoice);
-          } catch (error) {
-            console.error('Failed to prepare initial invoice:', error);
-          }
-        }
-      }
-    };
-  
-    prepareInitialInvoice();
-  }, [isLightningInitialized]);
   
 
   useEffect(() => {
