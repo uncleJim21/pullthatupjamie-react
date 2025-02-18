@@ -660,13 +660,13 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
 
     const auth = await getAuth() as AuthConfig;
-    // if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
-    //   setIsRegisterModalOpen(true);
-    //   setSearchState(prev => ({ ...prev, isLoading: false }));
-    //   return;
-    // }
+    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+      setIsRegisterModalOpen(true);
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
     printLog(`Request auth method:${requestAuthMethod}`)
-    const quoteResults = await handleQuoteSearch(query, auth,true ,selectedFeedIds);
+    const quoteResults = await handleQuoteSearch(query, auth, selectedFeedIds);
     setConversation(prev => [...prev, {
       id: searchState.activeConversationId as number,
       type: 'podcast-search' as const,
@@ -1124,11 +1124,11 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
               // Instead of relying on the state update, use the topicQuery directly
               try {
                 const auth = await getAuth() as AuthConfig;
-                // if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
-                //   setIsRegisterModalOpen(true);
-                //   setSearchState(prev => ({ ...prev, isLoading: false }));
-                //   return;
-                // }
+                if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+                  setIsRegisterModalOpen(true);
+                  setSearchState(prev => ({ ...prev, isLoading: false }));
+                  return;
+                }
                 setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
                 setSearchHistory(prev => ({...prev, [searchMode]: true}));
                 const selectedFeedIds = Array.from(selectedSources) as string[]

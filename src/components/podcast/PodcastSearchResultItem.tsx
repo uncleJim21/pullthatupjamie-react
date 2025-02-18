@@ -151,6 +151,7 @@ export const PodcastSearchResultItem = ({
       });
       
       printLog(`makeClip ${shareLink}, ${startTime}, ${endTime}`)
+      printLog(`makeClip auth:${JSON.stringify(authConfig,null,2)}`)
       const response = await makeClip(shareLink,authConfig,startTime,endTime);
   
       if (response.status === "completed" && response.url) {
