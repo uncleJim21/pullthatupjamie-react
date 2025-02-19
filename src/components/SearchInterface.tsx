@@ -869,6 +869,12 @@ useEffect(() => {
     printLog(`model:${model}`)
   }, [model]);
 
+  useEffect(() => {
+    if(searchMode === 'podcast-search' && searchState.isLoading === true){
+
+    }
+  },[searchState])
+
 
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
@@ -975,7 +981,7 @@ useEffect(() => {
           </div>
         )}
 
-        {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && 
+        {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (searchState.isLoading === false) && 
           <AvailableSourcesSection 
             hasSearched={hasSearchedInMode(searchMode)} 
             selectedSources={selectedSources} 
