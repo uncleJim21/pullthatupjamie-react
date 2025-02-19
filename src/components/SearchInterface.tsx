@@ -646,41 +646,46 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     }
   };
 
-  const performQuoteSearch = async () => {
-    setSearchState(prev => ({ ...prev, isLoading: true }));
-    setSearchHistory(prev => ({...prev, [searchMode]: true}));
-    const selectedFeedIds = Array.from(selectedSources) as string[]
-    printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
+  const performQuoteSearch = async () => {  
+  setSearchHistory(prev => ({...prev, [searchMode]: true}));
+  const selectedFeedIds = Array.from(selectedSources) as string[]
+  printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
 
-    const auth = await getAuth() as AuthConfig;
-    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
-      setIsRegisterModalOpen(true);
-      setSearchState(prev => ({ ...prev, isLoading: false }));
-      return;
-    }
-    printLog(`Request auth method:${requestAuthMethod}`)
-    const quoteResults = await handleQuoteSearch(query, auth, selectedFeedIds);
-    setConversation(prev => [...prev, {
-      id: searchState.activeConversationId as number,
-      type: 'podcast-search' as const,
-      query: query,
-      timestamp: new Date(),
-      isStreaming: false,
-      data: {
-        quotes: quoteResults.results
-      }
-    }]);
-    setQuery("");
+  const auth = await getAuth() as AuthConfig;
+  if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+    setIsRegisterModalOpen(true);
     setSearchState(prev => ({ ...prev, isLoading: false }));
+    return;
   }
+  printLog(`Request auth method:${requestAuthMethod}`)
+  const quoteResults = await handleQuoteSearch(query, auth, selectedFeedIds);
+  setConversation(prev => [...prev, {
+    id: searchState.activeConversationId as number,
+    type: 'podcast-search' as const,
+    query: query,
+    timestamp: new Date(),
+    isStreaming: false,
+    data: {
+      quotes: quoteResults.results
+    }
+  }]);
+  setQuery("");
+  // Only set loading to false at the very end
+  setSearchState(prev => ({ ...prev, isLoading: false }));
+}
 
-  const handleSearch = async (e: { preventDefault: () => void; target: HTMLFormElement }) => {
+  const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (searchMode === 'podcast-search') {
       try {
         setGridFadeOut(true);
         setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
-        performQuoteSearch();
+        // Add a small delay to ensure state updates before continuing
+        await new Promise(resolve => {
+          setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
+          setTimeout(resolve, 0);
+        });
+        await performQuoteSearch();
         return;
       } catch (error) {
         console.error('Quote search error:', error);
