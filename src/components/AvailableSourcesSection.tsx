@@ -16,11 +16,21 @@ interface AvailableSourcesProps {
   selectedSources: Set<string>;
   setSelectedSources: React.Dispatch<React.SetStateAction<Set<string>>>;
   sizeOverride?: string;
+  isSendingFeedback: boolean;
+  setIsSendingFeedback: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const STORAGE_KEY = 'selectedPodcastSources';
 
-const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, hasSearched, selectedSources, setSelectedSources, sizeOverride }) => {
+const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ 
+  className, 
+  hasSearched, 
+  selectedSources, 
+  setSelectedSources, 
+  sizeOverride, 
+  isSendingFeedback, 
+  setIsSendingFeedback 
+}) => {  
   const [sources, setSources] = useState<PodcastSource[]>([]);
   const [filteredSources, setFilteredSources] = useState<PodcastSource[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,7 +38,6 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ className, h
   const [isExpanded, setIsExpanded] = useState(!hasSearched);
   const [isMobile, setIsMobile] = useState(false);
   const [isSavingDefault, setIsSavingDefault] = useState(false);
-  const [isSendingFeedback,setIsSendingFeedback] = useState(false);
 
   useEffect(() => {
     const checkScreenSize = () => setIsMobile(window.innerWidth <= 768);

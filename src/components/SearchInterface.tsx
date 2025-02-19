@@ -119,6 +119,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const [searchMode, setSearchMode] = useState(
     isSharePage ? 'podcast-search' as SearchMode : 'podcast-search' as SearchMode
   );
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const [searchParams] = useSearchParams(); 
   const clipId = searchParams.get('clip');
   const [authConfig, setAuthConfig] = useState<AuthConfig | null | undefined>(null);
@@ -986,6 +987,8 @@ useEffect(() => {
             hasSearched={hasSearchedInMode(searchMode)} 
             selectedSources={selectedSources} 
             setSelectedSources={setSelectedSources} 
+            isSendingFeedback={isSendingFeedback}
+            setIsSendingFeedback={setIsSendingFeedback}
             sizeOverride={'24'}
             /> 
           }
@@ -1093,8 +1096,11 @@ useEffect(() => {
               hasSearched={hasSearchedInMode(searchMode)} 
               selectedSources={selectedSources} 
               setSelectedSources={setSelectedSources} 
+              isSendingFeedback={isSendingFeedback}
+              setIsSendingFeedback={setIsSendingFeedback}
               sizeOverride={'24'}
-          />}
+            /> 
+          }
           <QuickTopicGrid 
             className=""
             triggerFadeOut={gridFadeOut}
@@ -1154,7 +1160,7 @@ useEffect(() => {
         <PodcastLoadingPlaceholder />
       )}
 
-      {searchMode === 'podcast-search' && !isRegisterModalOpen && (
+      {searchMode === 'podcast-search' && !isRegisterModalOpen && !isSendingFeedback && (
         <div
           className={`fixed w-full z-50 transition-all duration-300 ${
             hasSearchedInMode('podcast-search') ? 'bottom-24' : 'bottom-0'
@@ -1172,7 +1178,7 @@ useEffect(() => {
 
 
       {/* Floating Search Bar - Only show after first search */}
-      {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && (
+      {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && !isSendingFeedback && (
         <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-50">
           <form onSubmit={handleSearch} className="relative">
             <textarea
