@@ -1,5 +1,5 @@
 import { performSearch } from '../lib/searxng.ts';
-import { fetchClipById } from '../services/clipService.ts';
+import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams } from 'react-router-dom'; 
 import { RequestAuthMethod, AuthConfig } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
@@ -10,8 +10,7 @@ import { DepthModeCard, ExpertModeCard } from './ModeCards.tsx';
 import { RegisterModal } from './RegisterModal.tsx';
 import {SignInModal} from './SignInModal.tsx'
 import LightningService from '../services/lightning.ts'
-import { useInvoicePool } from '../hooks/useInvoicePool.ts';
-import { Invoice } from '../types/invoice.ts';
+import {ClipProgress, ClipStatus, ClipRequest} from '../types/clips.ts'
 import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
 import {AccountButton} from './AccountButton.tsx'
@@ -22,6 +21,8 @@ import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
 import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
+import ClipTrackerModal from './ClipTrackerModal.tsx';
+
 
 export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
 type ModelType = 'gpt-3.5-turbo' | 'claude-3-sonnet';
@@ -40,6 +41,7 @@ interface SearchState {
   error: Error | null;
   sources: Source[];
   activeConversationId?: number;
+  clipProgress?: ClipProgress | null;
 }
 
 interface SearchInterfaceProps {
@@ -49,6 +51,18 @@ interface SearchInterfaceProps {
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
 }
+
+interface BackoffConfig {
+  initialDelay: number;  // Starting delay in ms
+  maxDelay: number;     // Maximum delay in ms
+  factor: number;       // Multiplication factor for each step
+}
+
+const defaultBackoff: BackoffConfig = {
+  initialDelay: 2000,   // Start with 2 seconds
+  maxDelay: 8000,      // Max out at 30 seconds
+  factor: 1.1           // Increase by 50% each time
+};
 
 const SubscriptionSuccessPopup = ({ onClose }: SubscriptionSuccessPopupProps) => (
   <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
@@ -103,8 +117,13 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const [searchMode, setSearchMode] = useState(
     isSharePage ? 'podcast-search' as SearchMode : 'podcast-search' as SearchMode
   );
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const [searchParams] = useSearchParams(); 
   const clipId = searchParams.get('clip');
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null | undefined>(null);
+  const [clipProgress, setClipProgress] = useState<ClipProgress | null>(null);
+  const pollIntervals = new Map<string, NodeJS.Timeout>();
+
 
   useEffect(() => {
     // Parse the searchMode parameter from the URL
@@ -132,11 +151,13 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
+  const [isClipTrackerCollapsed, setIsClipTrackerCollapsed] = useState(true);
 
 
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
   const [requestAuthMethod, setRequestAuthMethod] = useState(RequestAuthMethod.FREE);//free, lightning or square
   const [conversation, setConversation] = useState([] as ConversationItem[]);
+  
 
   const [searchState, setSearchState] = useState({
     query: '',
@@ -151,23 +172,11 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const resultTextRef = useRef('');
   const eventSourceRef = useRef(null);
   const nextConversationId = useRef(0);
-  const searchSettingsBarStyle = "bg-[#000000] border-gray-800 border shadow-white-glow rounded-lg mt-2 pt-2 pb-2 max-w-3xl pr-1 mx-auto px-4 flex items-start relative"
+  const searchSettingsBarStyle = "bg-[#000000] border-gray-800 border shadow-white-glow rounded-lg mt-2 pt-2 pb-1 max-w-3xl pr-1 mx-auto px-4 flex items-start relative"
   const searchButtonStyle = "ml-auto mt-1 mr-1 pl-3 pr-3 bg-white rounded-lg pt-1 pb-1 border-gray-800 hover:border-gray-700"
 
   //Lightning related
   const [isLightningInitialized, setIsLightningInitialized] = useState(false);
-  const paymentInProgressRef = useRef(false);
-  const { 
-    invoicePool, 
-    isLoading: isLoadingInvoices, 
-    markInvoicePaid, 
-    markInvoiceUsed,
-    markInvoiceFailed,
-    getNextUnpaidInvoice ,
-    cleanupExpiredInvoices,
-    refreshPool
-  } = useInvoicePool();
-
   const { 
     registerSubscription, 
     isRegistering, 
@@ -192,97 +201,26 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     setRequestAuthMethod(RequestAuthMethod.FREE);
   };
 
-  const refreshEmptyPool = () => {
-    const existingPool = localStorage.getItem("invoice_pool");
-    if(!existingPool || existingPool === '[]'){
-      refreshPool();
-    }
-  }
-
   const initializeLightning = async () => {
     const success = await LightningService.initialize();
     setIsLightningInitialized(success);
     setRequestAuthMethod(RequestAuthMethod.LIGHTNING);
-    refreshEmptyPool();
   };
 
-  const payInvoice = async (bolt11: string) => {
-    if (!isLightningInitialized) {
-      throw new Error('Lightning not initialized');
-    }
-  
-    if (!bolt11) {
-      throw new Error('Invalid invoice: missing bolt11');
-    }
-  
-    printLog(`Starting payment with bolt11:${bolt11}`);
-
-    const existingInvoice = invoicePool.find((inv) => inv.pr === bolt11);
-    if (existingInvoice && existingInvoice.preimage) {
-      printLog(`Invoice already paid. Returning preimage: ${existingInvoice.preimage}`);
-      return existingInvoice.preimage;
-    }
-  
+  const handlePayment = async () => {
     try {
-      printLog('Calling LightningService.payInvoice...');
-      const preimage = await LightningService.payInvoice(bolt11);
-      printLog(`Payment successful! Preimage:${preimage}`);
-  
-      // Find the invoice in the pool and mark it as paid
-      const paidInvoice = invoicePool.find((inv) => inv.pr === bolt11);
-      printLog(`Found paid invoice in pool:${paidInvoice}`);
-  
-      if (paidInvoice && paidInvoice.paymentHash) {
-        markInvoicePaid(paidInvoice.paymentHash, preimage);
-      } else {
-        throw new Error('Invoice found but paymentHash is missing');
+      const result = await LightningService.handlePayment();
+      if (!result) {
+        throw new Error('Payment failed');
       }
-  
-      return preimage;
+      return result;
     } catch (error) {
       console.error('Payment failed:', error);
-  
-      // Mark the invoice as failed and move to the next one
-      const failedInvoice = invoicePool.find((inv) => inv.pr === bolt11);
-      if (failedInvoice?.paymentHash) {
-        markInvoiceFailed(failedInvoice.paymentHash);
-      }
-  
-      // Try the next unpaid invoice
-      const nextInvoice = getNextUnpaidInvoice();
-      if (nextInvoice?.pr) {
-        printLog('Retrying with next unpaid invoice...');
-        return await payInvoice(nextInvoice.pr);
-      } else {
-        throw new Error('No unpaid invoices available after payment failure');
-      }
+      throw error;
     }
   };
-  
 
-  const handleInvoicePayment = async (invoice: Invoice) => {
-    if (paymentInProgressRef.current) {
-      printLog('Payment already in progress, skipping...');
-      return null;
-    }
   
-    // Check if this invoice has already been paid
-    if (invoice.paid) {
-      printLog('Invoice already paid, skipping...');
-      return null;
-    }
-  
-    try {
-      paymentInProgressRef.current = true;
-      const preimage = await payInvoice(invoice.pr);
-      return preimage;
-    } catch (error) {
-      console.error('Payment failed:', error);
-      return null;
-    } finally {
-      paymentInProgressRef.current = false;
-    }
-  };
 
   const handleSuggestionClick = async (suggestion: { title: string, subtitle: string }) => {
     const fullQuery = (`${suggestion.title} ${suggestion.subtitle}`);
@@ -315,52 +253,96 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     setIsSignInModalOpen(true);
   }
 
+  const handleClipProgress = async (progress: ClipProgress) => {
+      if (!progress || !progress.clipId || !progress.lookupHash) return;
+      if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+        setIsRegisterModalOpen(true);
+        setSearchState(prev => ({ ...prev, isLoading: false }));
+        return;
+      }
+
+      const freshAuth = await getAuth();
+      setAuthConfig(freshAuth);  // This will automatically propagate down
+      const { clipId, lookupHash, pollUrl, isProcessing } = progress;
+
+      setClipProgress(progress); // Update progress in state
+      setIsClipTrackerCollapsed(false);
+
+      if (!pollUrl || !isProcessing) return;
+
+      // Prevent duplicate polling for the same clip
+      if (pollIntervals.has(lookupHash)) {
+          printLog(`Polling already in progress for ${lookupHash}`);
+          return;
+      }
+
+      let currentDelay = defaultBackoff.initialDelay;
+
+      const poll = async () => {
+          try {
+              const status = await checkClipStatus(pollUrl);
+
+              if (status.status === "completed" && status.url) {
+                  setClipProgress(prev => prev?.lookupHash === lookupHash
+                      ? { ...prev, isProcessing: false, cdnLink: status.url }
+                      : prev
+                  );
+
+                  // Stop polling for this clip
+                  clearTimeout(pollIntervals.get(lookupHash));
+                  pollIntervals.delete(lookupHash);
+                  return;
+              }
+
+              currentDelay = Math.min(currentDelay * defaultBackoff.factor, defaultBackoff.maxDelay);
+              pollIntervals.set(lookupHash, setTimeout(poll, currentDelay));
+
+          } catch (error) {
+              console.error(`Error polling clip status for ${lookupHash}:`, error);
+              pollIntervals.set(lookupHash, setTimeout(poll, currentDelay));
+          }
+      };
+
+      // Start polling
+      pollIntervals.set(lookupHash, setTimeout(poll, currentDelay));
+
+      // Cleanup polling after 5 minutes
+      setTimeout(() => {
+          if (pollIntervals.has(lookupHash)) {
+              clearTimeout(pollIntervals.get(lookupHash));
+              pollIntervals.delete(lookupHash);
+              printLog(`Stopped polling ${lookupHash} after timeout`);
+          }
+      }, 5 * 60 * 1000);
+  };
+
+  
+
+
   const getAuth = async () => {
     let auth: AuthConfig;
     if (isLightningInitialized && requestAuthMethod === RequestAuthMethod.LIGHTNING) {
-      // Look for a paid but unused invoice
-      let paidInvoice = invoicePool.find(inv => inv.paid && !inv.usedAt && inv.preimage);
-      if (!paidInvoice?.preimage || !paidInvoice?.paymentHash) {
-        // No paid invoice - trigger refresh and wait briefly
-        await refreshPool();
-        // Small delay to allow new invoices to arrive
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Try again after refresh
-        const retryInvoice = invoicePool.find(inv => inv.paid && !inv.usedAt && inv.preimage);
-        if (!retryInvoice?.preimage || !retryInvoice?.paymentHash) {
-          setSearchState(prev => ({
-            ...prev,
-            error: new Error('Payment required'),
-            isLoading: false
-          }));
-          return;
-        }
-        paidInvoice = retryInvoice;
-      }
-      
-      auth = {
-        type: RequestAuthMethod.LIGHTNING,
-        credentials: {
-          preimage: paidInvoice.preimage,
-          paymentHash: paidInvoice.paymentHash
-        }
-      };
-
-      markInvoiceUsed(paidInvoice.paymentHash);
-      
-      // Fire off next payment asynchronously
-      const futureInvoice = getNextUnpaidInvoice();
-      if (!futureInvoice) {
-        // No unpaid invoice available - trigger refresh
-        refreshPool().catch(error => {
-          console.error('Failed to refresh invoice pool:', error);
-        });
-      } else if (!futureInvoice.paid) {
-        handleInvoicePayment(futureInvoice)
-          .catch(error => {
-            console.error('Failed to pre-pay next invoice:', error);
-          });
+      try {
+        const { preimage, paymentHash } = await handlePayment();
+        auth = {
+          type: RequestAuthMethod.LIGHTNING,
+          credentials: {
+            preimage,
+            paymentHash
+          }
+        };
+        setSearchState(prev => ({
+          ...prev,
+          error: null,
+          isLoading: false
+        }));
+      } catch (error) {
+        setSearchState(prev => ({
+          ...prev,
+          error: new Error('Payment failed: ' + error.message),
+          isLoading: false
+        }));
+        return;
       }
     } else if(requestAuthMethod === RequestAuthMethod.SQUARE) {
       const squareId = localStorage.getItem('squareId');
@@ -378,13 +360,11 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
           username: squareId
         }
       };
+    } else {
+      auth = { type: RequestAuthMethod.FREE, credentials: {} };
     }
-    else{
-      auth = { type: RequestAuthMethod.FREE, credentials:{} };
-    }
-
     return auth as AuthConfig;
-  }
+  };
 
   const handleStreamingSearch = async (overrideQuery?: string) => {
     const queryToUse = overrideQuery || query;
@@ -565,41 +545,46 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     }
   };
 
-  const performQuoteSearch = async () => {
-    setSearchState(prev => ({ ...prev, isLoading: true }));
-    setSearchHistory(prev => ({...prev, [searchMode]: true}));
-    const selectedFeedIds = Array.from(selectedSources) as string[]
-    printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
+  const performQuoteSearch = async () => {  
+  setSearchHistory(prev => ({...prev, [searchMode]: true}));
+  const selectedFeedIds = Array.from(selectedSources) as string[]
+  printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
 
-    const auth = await getAuth() as AuthConfig;
-    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
-      setIsRegisterModalOpen(true);
-      setSearchState(prev => ({ ...prev, isLoading: false }));
-      return;
-    }
-    printLog(`Request auth method:${requestAuthMethod}`)
-    const quoteResults = await handleQuoteSearch(query, auth, selectedFeedIds);
-    setConversation(prev => [...prev, {
-      id: searchState.activeConversationId as number,
-      type: 'podcast-search' as const,
-      query: query,
-      timestamp: new Date(),
-      isStreaming: false,
-      data: {
-        quotes: quoteResults.results
-      }
-    }]);
-    setQuery("");
+  const auth = await getAuth() as AuthConfig;
+  if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+    setIsRegisterModalOpen(true);
     setSearchState(prev => ({ ...prev, isLoading: false }));
+    return;
   }
+  printLog(`Request auth method:${requestAuthMethod}`)
+  const quoteResults = await handleQuoteSearch(query, auth, selectedFeedIds);
+  setConversation(prev => [...prev, {
+    id: searchState.activeConversationId as number,
+    type: 'podcast-search' as const,
+    query: query,
+    timestamp: new Date(),
+    isStreaming: false,
+    data: {
+      quotes: quoteResults.results
+    }
+  }]);
+  setQuery("");
+  // Only set loading to false at the very end
+  setSearchState(prev => ({ ...prev, isLoading: false }));
+}
 
-  const handleSearch = async (e: { preventDefault: () => void; target: HTMLFormElement }) => {
+  const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (searchMode === 'podcast-search') {
       try {
         setGridFadeOut(true);
         setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
-        performQuoteSearch();
+        // Add a small delay to ensure state updates before continuing
+        await new Promise(resolve => {
+          setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
+          setTimeout(resolve, 0);
+        });
+        await performQuoteSearch();
         return;
       } catch (error) {
         console.error('Quote search error:', error);
@@ -619,7 +604,6 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const updateAuthMethodAndRegisterModalStatus = async () => {
     if (localStorage.getItem('bc:config')) {
       setRequestAuthMethod(RequestAuthMethod.LIGHTNING);
-      setTimeout(refreshEmptyPool,1000);
       return;
     } else if (localStorage.getItem('squareId')) {
       setRequestAuthMethod(RequestAuthMethod.SQUARE);
@@ -643,6 +627,28 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   useEffect(() => {
     updateAuthMethodAndRegisterModalStatus();
   }, []);
+
+  useEffect(() => {
+    const updateAuth = async () => {
+      const auth = await getAuth();
+      console.log("AuthConfig fetched on mount or auth change:", auth);
+      setAuthConfig(auth);
+    };
+  
+    updateAuth(); // Call on mount immediately
+  }, []); // Empty dependency array ensures this runs once when the component mounts
+  
+  // Also update `authConfig` when authentication method changes
+  useEffect(() => {
+    const updateAuth = async () => {
+      const auth = await getAuth();
+      console.log("AuthConfig updated due to requestAuthMethod change:", auth);
+      setAuthConfig(auth);
+    };
+  
+    updateAuth();
+  }, [requestAuthMethod]); // Ensure re-fetching when auth method changes
+  
 
   useEffect(() => {
     const loadSharedClip = async () => {
@@ -681,28 +687,6 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     }
   }, [isSharePage, clipId]);
 
-  useEffect(() => {
-    const checkInvoices = async () => {
-      const needsRefresh = await cleanupExpiredInvoices();
-      if (needsRefresh) {
-        const nextInvoice = getNextUnpaidInvoice();
-        if (nextInvoice?.pr && !nextInvoice.paid) {
-          await handleInvoicePayment(nextInvoice);
-        }
-      }
-    };
-  
-    if (!cleanupIntervalRef.current) {
-      cleanupIntervalRef.current = setInterval(checkInvoices, 5000);
-    }
-  
-    return () => {
-      if (cleanupIntervalRef.current) {
-        clearInterval(cleanupIntervalRef.current);
-        cleanupIntervalRef.current = undefined;
-      }
-    };
-  }, [cleanupExpiredInvoices, getNextUnpaidInvoice, handleInvoicePayment]);
   
   useEffect(() => {
     const checkSignedIn = () => {
@@ -732,59 +716,14 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   }, []);
 
   useEffect(() => {
-    const ensurePaidInvoice = async () => {
-      if (!isLightningInitialized) return;
-      
-      // Check if we have any paid invoices
-      const hasPaidInvoice = invoicePool.some(inv => inv.paid && !inv.usedAt);
-      
-      if (!hasPaidInvoice) {
-        printLog('No paid invoices found, preparing initial invoice...');
-        const nextInvoice = getNextUnpaidInvoice();
-        if (nextInvoice?.pr && !nextInvoice.paid) {
-          try {
-            await handleInvoicePayment(nextInvoice);
-          } catch (error) {
-            console.error('Failed to prepare initial invoice:', error);
-            // Retry after a delay if first attempt fails
-            setTimeout(ensurePaidInvoice, 2000);
-          }
-        }
-      }
-    };
-
-    ensurePaidInvoice();
-  }, [isLightningInitialized, invoicePool]);
-
-// Remove the other payment-related effects
-
-  useEffect(() => {
-    const prepareInitialInvoice = async () => {
-      if (!isLightningInitialized) return;
-      
-      // Check if we have any paid invoices
-      const hasPaidInvoice = invoicePool.some(inv => inv.paid && !inv.usedAt);
-      
-      if (!hasPaidInvoice) {
-        printLog('No paid invoices found, preparing initial invoice...');
-        const nextInvoice = getNextUnpaidInvoice();
-        if (nextInvoice?.pr && !nextInvoice.paid) {
-          try {
-            await handleInvoicePayment(nextInvoice);
-          } catch (error) {
-            console.error('Failed to prepare initial invoice:', error);
-          }
-        }
-      }
-    };
-  
-    prepareInitialInvoice();
-  }, [isLightningInitialized]);
-  
-
-  useEffect(() => {
     printLog(`model:${model}`)
   }, [model]);
+
+  useEffect(() => {
+    if(searchMode === 'podcast-search' && searchState.isLoading === true){
+
+    }
+  },[searchState])
 
 
   return (
@@ -816,7 +755,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
       {isUpgradeSuccessPopUpOpen && (
         <SubscriptionSuccessPopup onClose={() => setIsUpgradeSuccessPopUpOpen(false)} />
       )}
-
+      {/* TODO: Reinstate for payments */}
       {!isRegisterModalOpen && (
         <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
           <AccountButton 
@@ -847,7 +786,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
       <br></br>
       <div className={`${hasSearchedInMode(searchMode) ? 'mb-8' : ''} ml-4 mr-4`}>
         {/* Header with Logo */}
-        <div className={`flex justify-center items-center py-8 ${!hasSearchedInMode(searchMode) && 'mt-8'}`}>
+        <div className={`flex justify-center items-center py-8 select-none ${!hasSearchedInMode(searchMode) && 'mt-8'}`}>
           <div className="flex items-center gap-4">
             <img
               src="/jamie-logo.png"
@@ -859,7 +798,8 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
             <div>
               <h1 className="text-3xl font-bold">Pull That Up Jamie!</h1>
               <p className={`text-gray-400 text-md text-shadow-light-white ${hasSearchedInMode(searchMode) ? 'hidden' : ''}`}>
-                Instantly pull up anything with private web search + AI.
+                {searchMode === 'quick' ? 'Instantly pull up anything with private web search + AI.' : ''}
+                {searchMode === 'podcast-search' ? 'Search podcasts and clip them instantly.' : ''}
               </p>
             </div>
           </div>
@@ -867,7 +807,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
 
         {/* Search Modes - Now shown when hasSearched is true */}
         { (
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-6 select-none">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               {[
                 { mode: 'quick', emoji: '🌐', label: 'Web Search' },
@@ -891,11 +831,14 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
           </div>
         )}
 
-        {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && 
+        {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (searchState.isLoading === false) && 
           <AvailableSourcesSection 
             hasSearched={hasSearchedInMode(searchMode)} 
             selectedSources={selectedSources} 
             setSelectedSources={setSelectedSources} 
+            isSendingFeedback={isSendingFeedback}
+            setIsSendingFeedback={setIsSendingFeedback}
+            sizeOverride={'24'}
             /> 
           }
 
@@ -985,13 +928,28 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
         {conversation
           .filter(item => item.type === searchMode)
           .map((item) => (
-            <ConversationRenderer key={item.id} item={item} />
+            <ConversationRenderer 
+              item={item} 
+              clipProgress={clipProgress}
+              onClipProgress={handleClipProgress}
+              authConfig={authConfig} 
+            />
           ))}
       </div>
     )}
 
       {searchMode === 'podcast-search' && !hasSearchedInMode(searchMode) && (
-        <div className={`mt-12 ${hasSearchedInMode(searchMode) ? 'mb-52' : 'mb-36'}`}>
+        <div className={`mt-4 ${hasSearchedInMode(searchMode) ? 'mb-52' : 'mb-36'}`}>
+          {
+            <AvailableSourcesSection 
+              hasSearched={hasSearchedInMode(searchMode)} 
+              selectedSources={selectedSources} 
+              setSelectedSources={setSelectedSources} 
+              isSendingFeedback={isSendingFeedback}
+              setIsSendingFeedback={setIsSendingFeedback}
+              sizeOverride={'24'}
+            /> 
+          }
           <QuickTopicGrid 
             className=""
             triggerFadeOut={gridFadeOut}
@@ -1007,7 +965,9 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
                 }
                 setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
                 setSearchHistory(prev => ({...prev, [searchMode]: true}));
-                handleQuoteSearch(topicQuery,auth).then(quoteResults => {
+                const selectedFeedIds = Array.from(selectedSources) as string[]
+                printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
+                handleQuoteSearch(topicQuery,auth,selectedFeedIds).then(quoteResults => {
                   if(quoteResults === false){
                     setIsRegisterModalOpen();
                     return;
@@ -1042,12 +1002,6 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
               }
             }}
           />
-          {
-            <AvailableSourcesSection 
-              hasSearched={hasSearchedInMode(searchMode)} 
-              selectedSources={selectedSources} 
-              setSelectedSources={setSelectedSources} 
-          />}
         </div>
       )}
 
@@ -1055,9 +1009,26 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
         <PodcastLoadingPlaceholder />
       )}
 
+      {searchMode === 'podcast-search' && !isRegisterModalOpen && !isSendingFeedback && (
+        <div
+          className={`fixed w-full z-50 transition-all duration-300 ${
+            hasSearchedInMode('podcast-search') ? 'bottom-24' : 'bottom-0'
+          }`}
+        >
+          <ClipTrackerModal
+            clipProgress={clipProgress}
+            hasSearched={hasSearchedInMode('podcast-search')}
+            isCollapsed={isClipTrackerCollapsed}
+            onCollapsedChange={setIsClipTrackerCollapsed}
+          />
+        </div>
+      )}
+
+
+
       {/* Floating Search Bar - Only show after first search */}
-      {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && (
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-3xl px-4 z-50">
+      {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && !isSendingFeedback && (
+        <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-50">
           <form onSubmit={handleSearch} className="relative">
             <textarea
               ref={searchInputRef}

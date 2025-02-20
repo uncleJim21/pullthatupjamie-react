@@ -3,10 +3,14 @@ import { API_URL } from "../constants/constants.ts";
 
 
 type FeedbackFormProps = {
-  mode: 'depth' | 'expert';
+  mode: 'depth' | 'expert' | 'request-pod';
+  stylingClasses?: string|null|undefined;
+  title?: string|null|undefined;
+  placeholder?: string|null|undefined;
+  onClose: () => void;
 };
 
-const FeedbackForm: React.FC<FeedbackFormProps> = ({ mode }) => {
+const FeedbackForm: React.FC<FeedbackFormProps> = ({ mode, stylingClasses=null, title=null, placeholder=null, onClose }) => {
   const [email, setEmail] = useState('');
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,14 +59,14 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ mode }) => {
   };
 
   return (
-    <div className="bg-[#111111] rounded-lg p-6">
+    <div className={`bg-[#111111] rounded-lg p-6 ${stylingClasses ? stylingClasses : ''}`}>
       <h3 className="flex items-center gap-2 mb-4 text-gray-300">
         <span>🗳️</span>
-        Subscribe for Updates or Submit Suggestions
+        {title ? title : 'Subscribe for Updates or Submit Suggestions'}
       </h3>
       
       {error && (
-        <div className="mb-4 p-3 bg-red-900/50 border border-red-800 text-red-200 rounded-lg">
+        <div className={`mb-4 p-3 bg-red-900/50 border border-red-800 text-red-200 rounded-lg`}>
           {error}
         </div>
       )}
@@ -78,17 +82,24 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ mode }) => {
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
+          placeholder="Email - we will contact you ASAP"
           disabled={isSubmitting}
           className="w-full bg-[#0A0A0A] border border-gray-800 rounded-lg p-3 text-gray-300 placeholder-gray-500 disabled:opacity-50"
         />
         <textarea
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
-          placeholder="Type your questions or suggestions here"
+          placeholder={`${placeholder}`}
           disabled={isSubmitting}
           className="w-full bg-[#0A0A0A] border border-gray-800 rounded-lg p-3 h-32 text-gray-300 placeholder-gray-500 disabled:opacity-50"
         />
+        <button
+          onClick={onClose}
+          // disabled={isSubmitting || !email || !feedback}
+          className={`w-full bg-black border border-white text-white font-medium py-3 rounded-lg transition-colors`}
+        >
+          Cancel
+        </button>
         <button
           onClick={handleSubmit}
           disabled={isSubmitting || !email || !feedback}
@@ -107,6 +118,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ mode }) => {
           )}
         </button>
       </div>
+
     </div>
   );
 };
