@@ -625,7 +625,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   
 
   useEffect(() => {
-    updateAuthMethodAndRegisterModalStatus();
+    updateAuthMethodAndRegisterModalStatus();    
   }, []);
 
   useEffect(() => {
@@ -1084,12 +1084,20 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
 
       {/* Error Display */}
       {searchState.error && (
-        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 w-full max-w-3xl px-4">
-          <div className="bg-red-900/50 border border-red-800 text-red-200 rounded-lg p-4">
-            {searchState.error.message}
-          </div>
+      <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 w-full max-w-3xl px-4 mb-28 z-50">
+        <div className="bg-red-900/50 border border-red-800 text-red-200 rounded-lg p-4 relative">
+          {/* Close Button */}
+          <button
+            onClick={() => setSearchState(prevState => ({ ...prevState, error: null }))}
+            className="absolute top-2 right-2 text-red-200 hover:text-red-100 focus:outline-none"
+          >
+            ×
+          </button>
+          {searchState.error.message}
         </div>
-      )}
+      </div>
+    )}
+
     </div>
   );
 }
