@@ -145,7 +145,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
   
 
   return (
-    <div onClick={!isExpanded ? () => setIsExpanded(true) : undefined} className={`mx-auto max-w-4xl mt-4 pt-4 px-2 relative rounded-lg mb-2 ${!isExpanded ? 'pb-1 hover:bg-gray-800' : ''}`}>
+    <div onClick={!isExpanded ? () => setIsExpanded(true) : undefined} className={`mx-auto max-w-4xl mt-4 pt-4 px-6 relative rounded-lg mb-2 ${!isExpanded ? 'pb-1 hover:bg-gray-800' : ''}`}>
       {(isSendingFeedback) ? getFeedbackForm() : ''}
       <button 
         className="text-white text-xl font-medium mb-4 flex items-center gap-2 border-white-800 rounded-lg hover:border-gray-700 transition-colors"
