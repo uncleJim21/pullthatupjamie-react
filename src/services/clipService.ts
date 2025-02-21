@@ -28,7 +28,7 @@ export async function makeClip(clipId: string,
     };
 
     // Only add Authorization header for LIGHTNING and SQUARE auth
-    if (auth.type === RequestAuthMethod.LIGHTNING) {
+    if (auth.type === RequestAuthMethod.LIGHTNING && auth.credentials) {
       const { preimage, paymentHash } = auth.credentials;
       headers.Authorization = `${preimage}:${paymentHash}`;
     } else if (auth.type === RequestAuthMethod.SQUARE) {

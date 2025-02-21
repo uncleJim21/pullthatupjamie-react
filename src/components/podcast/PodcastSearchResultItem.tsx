@@ -130,15 +130,16 @@ export const PodcastSearchResultItem = ({
     setIsClipModalOpen(true);
   };
   
-  const handleClipConfirm = async (
-    start?:number|null,
-    end?:number|null
-  ) => {
-    printLog(`handleClipConfirm with authConfig:${JSON.stringify(authConfig,null,2)}`)
-    if(!authConfig){return}
-    setIsClipModalOpen(false); // Close the modal
+  const handleClipConfirm = async (start?:number|null, end?:number|null) => {
+    if (!authConfig || !authConfig.credentials) {
+      console.error('No valid auth credentials available');
+      throw new Error('Authentication required');
+    }
+  
+    setIsClipModalOpen(false);
     const startTime = start ?? timeContext.start_time ?? 0;
     const endTime = end ?? timeContext.end_time ?? startTime + 15;
+  
     try {
       onClipProgress({
         isProcessing: true,
@@ -150,9 +151,10 @@ export const PodcastSearchResultItem = ({
         lookupHash: id
       });
       
-      printLog(`makeClip ${shareLink}, ${startTime}, ${endTime}`)
-      printLog(`makeClip auth:${JSON.stringify(authConfig,null,2)}`)
-      const response = await makeClip(shareLink,authConfig,startTime,endTime);
+      printLog(`makeClip ${shareLink}, ${startTime}, ${endTime}`);
+      printLog(`makeClip auth:${JSON.stringify(authConfig,null,2)}`);
+  
+      const response = await makeClip(shareLink, authConfig, startTime, endTime);
   
       if (response.status === "completed" && response.url) {
         onClipProgress({

@@ -84,15 +84,15 @@ class LightningService {
 
     try {
       const invoice = await this.getInvoice();
-
-      // Attempt payment
-      const result = await this.provider!.sendPayment(invoice.pr);
       
-      // Clear the cached invoice after successful payment
+      // Clear cached invoice immediately - BEFORE payment attempt
       localStorage.removeItem('lightning_invoice');
       this.currentInvoice = null;
 
-      // Fetch a new invoice in the background for next time
+      // Now attempt the payment
+      const result = await this.provider!.sendPayment(invoice.pr);
+      
+      // Get next invoice in background
       this.fetchNewInvoice()
         .then(newInvoice => {
           localStorage.setItem('lightning_invoice', JSON.stringify(newInvoice));
@@ -105,16 +105,9 @@ class LightningService {
       };
     } catch (error) {
       console.error("Payment failed:", error);
-      
-      // Clear cached invoice if it's causing issues
-      if (error.message?.includes('already been paid')) {
-        localStorage.removeItem('lightning_invoice');
-        this.currentInvoice = null;
-      }
-      
       throw error;
     }
-  }
+}
 
   static isInitialized(): boolean {
     return this.provider !== null;
