@@ -216,6 +216,10 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
       return result;
     } catch (error) {
       console.error('Payment failed:', error);
+      if (error.message?.includes('already been paid')) {
+        localStorage.removeItem('lightning_invoice');
+        setSearchState(prev => ({ ...prev, isLoading: false, error: new Error('There was an error paying the invoice. Try again please.') }));
+      }
       throw error;
     }
   };
