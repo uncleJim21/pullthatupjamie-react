@@ -13,6 +13,7 @@ interface ClipHistoryItem {
   timestamp: number;
   id: string;
   lookupHash: string;
+  failed?: boolean;  // Add this
 }
 
 interface ClipTrackerModalProps {
@@ -129,8 +130,7 @@ export default function ClipTrackerModal({
   const updateOldPendingItems = async (historyJSON: ClipHistoryItem[]) => {
     printLog(`Checking pending clips...`);
   
-    // Filter out clips that are still processing
-    const pendingItems = historyJSON.filter(historyItem => !historyItem.cdnLink);
+    const pendingItems = historyJSON.filter(historyItem => !historyItem.cdnLink && !historyItem.failed);
   
     if (pendingItems.length === 0) {
       printLog("No pending clips found.");
@@ -139,13 +139,38 @@ export default function ClipTrackerModal({
   
     printLog(`Pending clips to update: ${pendingItems.length}`);
   
-    // Iterate over pending clips and check their status
     for (const pendingClip of pendingItems) {
       try {
-        const endpoint = `/api/clip-status/${pendingClip.clipId}`
-        console.log(`endpoint:${endpoint}`)
-        const status = await checkClipStatus(endpoint);
+        const endpoint = `/api/clip-status/${pendingClip.clipId}`;
+        console.log(`endpoint:${endpoint}`);
+        const response = await fetch(`${API_URL}${endpoint}`);
+        
+        if (response.status === 404) {
+          // Mark as failed if we get a 404
+          setClipHistory(prevHistory =>
+            prevHistory.map(item =>
+              item.lookupHash === pendingClip.lookupHash
+                ? { ...item, failed: true }
+                : item
+            )
+          );
+          
+          // Update localStorage
+          const updatedHistory = historyJSON.map(item =>
+            item.lookupHash === pendingClip.lookupHash
+              ? { ...item, failed: true }
+              : item
+          );
+          localStorage.setItem('clipHistory', JSON.stringify(updatedHistory));
+          continue;
+        }
   
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+  
+        const status = await response.json();
+        
         if (status.status === "completed" && status.url) {
           printLog(`Clip completed: ${pendingClip.clipId}, updating...`);
   
@@ -171,6 +196,7 @@ export default function ClipTrackerModal({
       }
     }
   };
+
   
   const refreshItems = async () =>{
     const savedHistory = localStorage.getItem('clipHistory');
@@ -418,6 +444,10 @@ export default function ClipTrackerModal({
                   >
                     <Share className="w-3 h-3 text-white" />
                   </div>
+                </div>
+              ) : item.failed ? (
+                <div className='pr-4 mt-2'>
+                  <X className="w-5 h-5 text-red-500 flex-shrink-0" />
                 </div>
               ) : (
                 <div className='pr-4 mt-2'>
