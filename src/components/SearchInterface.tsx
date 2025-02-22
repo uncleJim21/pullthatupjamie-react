@@ -379,6 +379,12 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
       return;
     }
 
+    setSearchState(prev => ({
+      ...prev,
+      error: null,
+      isLoading: true
+    }));
+
     const auth = await getAuth() as AuthConfig;
   
     if (eventSourceRef.current) {
@@ -961,6 +967,11 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
               setQuery(topicQuery);
               // Instead of relying on the state update, use the topicQuery directly
               try {
+                setSearchState(prev => ({
+                  ...prev,
+                  error: null,
+                  isLoading: true
+                }));
                 const auth = await getAuth() as AuthConfig;
                 if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
                   setIsRegisterModalOpen(true);
