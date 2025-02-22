@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Check, Filter, Search, Save } from 'lucide-react';
 import { API_URL, printLog } from '../constants/constants.ts';
 import { FeedbackForm } from './FeedbackForm.tsx';
@@ -38,6 +38,8 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
   const [isExpanded, setIsExpanded] = useState(!hasSearched);
   const [isMobile, setIsMobile] = useState(false);
   const [isSavingDefault, setIsSavingDefault] = useState(false);
+  const hasLoadedDefault = useRef(false);
+
 
   useEffect(() => {
     const checkScreenSize = () => setIsMobile(window.innerWidth <= 768);
@@ -54,10 +56,13 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
         setSources(data.results);
         setFilteredSources(data.results);
 
-        // Load saved selection from localStorage
-        const savedSelection = localStorage.getItem(STORAGE_KEY);
-        if (savedSelection) {
-          setSelectedSources(new Set(JSON.parse(savedSelection)));
+        // Only load saved selection from localStorage on initial mount
+        if (!hasLoadedDefault.current) {
+          const savedSelection = localStorage.getItem(STORAGE_KEY);
+          if (savedSelection) {
+            setSelectedSources(new Set(JSON.parse(savedSelection)));
+          }
+          hasLoadedDefault.current = true;
         }
       } catch (err) {
         setError('Failed to load podcast sources');
