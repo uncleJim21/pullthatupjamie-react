@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { API_URL, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
+import { Copy , Check, QrCodeIcon} from 'lucide-react';
+import QRCodeModal from '../QRCodeModal.tsx';
+
 
 interface Episode {
     id: string;
@@ -35,6 +38,7 @@ const PodcastFeedPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [copied,setCopied] = useState(false);
     const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+    const [qrModalOpen, setQrModalOpen] = useState(false);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -57,6 +61,10 @@ const PodcastFeedPage: React.FC = () => {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const openQRModal = () => {
+    setQrModalOpen(true);
+  }
 
   useEffect(() => {
     console.log(`feedId:${feedId}`)
@@ -134,12 +142,24 @@ const PodcastFeedPage: React.FC = () => {
             <h1 className="text-3xl font-bold mb-2">{feedData.title}</h1>
             <p className="text-lg text-gray-300">by {feedData.creator}</p>
             {feedData.lightningAddress && (
-              <p 
-              className="text-sm text-gray-400 mt-1 underline no-select hover:text-gray-200 cursor-pointer" 
-              onClick={()=>(copyToClipboard())}>
-                {copied ? 'Copied!' : `⚡${feedData.lightningAddress}`}
-            </p>
-            )}
+                <div className="flex items-center gap-2 mt-1">
+                    <p className="text-sm text-gray-400 no-select">
+                    {`⚡ ${feedData.lightningAddress}`}
+                    </p>
+                    <button 
+                    className="text-gray-400 hover:text-gray-300"
+                    onClick={copyToClipboard}
+                    >
+                    {!copied ? <Copy size={16} /> : <Check size={16} />}
+                    </button>
+                    <button 
+                    className="text-gray-400 hover:text-gray-300"
+                    onClick={openQRModal}
+                    >
+                    <QrCodeIcon size={16} />
+                    </button>
+                </div>
+                )}
           </div>
         </div>
       </div>
@@ -199,6 +219,15 @@ const PodcastFeedPage: React.FC = () => {
             presentationContext={PresentationContext.landingPage}
           />
         </div>
+      )}
+
+      {qrModalOpen &&(
+        <QRCodeModal
+            isOpen={qrModalOpen}
+            onClose={() => setQrModalOpen(false)}
+            lightningAddress={feedData?.lightningAddress || ''}
+            title={feedData?.title || ''}
+        />
       )}
 
       {/* Description */}
