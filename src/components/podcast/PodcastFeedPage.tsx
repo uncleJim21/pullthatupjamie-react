@@ -1,33 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { API_URL } from '../../constants/constants.ts';
+import { API_URL, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
-interface PodcastFeedData {
-  id: string;
-  headerColor: string;
-  logoUrl: string;
-  title: string;
-  creator: string;
-  lightningAddress?: string;
-  description: string;
-  episodes: Array<{
+
+interface Episode {
     id: string;
     title: string;
     date: string;
     duration: string;
     audioUrl: string;
-  }>;
-}
+    description?: string;
+    episodeNumber?: string;
+    episodeImage?: string;
+  }
+  
+  interface PodcastFeedData {
+    id: string;
+    headerColor: string;
+    logoUrl: string;
+    title: string;
+    creator: string;
+    lightningAddress?: string;
+    description: string;
+    episodes: Episode[];
+  }
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe';
 
 const PodcastFeedPage: React.FC = () => {
-  const { feedId } = useParams<{ feedId: string }>();
-  const [feedData, setFeedData] = useState<PodcastFeedData | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('Episodes');
-  const [isLoading, setIsLoading] = useState(true);
-  const [copied,setCopied] = useState(false);
-  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+    const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
+    const [feedData, setFeedData] = useState<PodcastFeedData | null>(null);
+    const [featuredEpisode, setFeaturedEpisode] = useState<Episode | null>(null);
+    const [activeTab, setActiveTab] = useState<TabType>('Episodes');
+    const [isLoading, setIsLoading] = useState(true);
+    const [copied,setCopied] = useState(false);
+    const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -64,18 +71,26 @@ const PodcastFeedPage: React.FC = () => {
         }
         const data = await response.json();
         setFeedData(data);
+
+        // If we have an episodeId, find and set the featured episode
+        if (episodeId && data.episodes) {
+          const featured = data.episodes.find(ep => ep.id === episodeId);
+          if (featured) {
+            setFeaturedEpisode(featured);
+          }
+        }
       } catch (error) {
         console.error('Error fetching podcast feed:', error);
-        setFeedData(null); // Explicitly set to null on error
+        setFeedData(null);
       } finally {
         setIsLoading(false);
       }
     };
-  
+
     if (feedId) {
       fetchFeedData();
     }
-  }, [feedId]);
+  }, [feedId, episodeId]);
 
   if (isLoading) {
     return (
@@ -158,12 +173,43 @@ const PodcastFeedPage: React.FC = () => {
         </div>
       </div>
 
+      {featuredEpisode && (
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <h2 className="text-xl font-bold mb-6">Featured Episode</h2>
+          <PodcastSearchResultItem
+            key={featuredEpisode.id}
+            id={featuredEpisode.id}
+            quote={featuredEpisode.description || ''}
+            episode={featuredEpisode.title}
+            creator={feedData?.creator || ''}
+            audioUrl={featuredEpisode.audioUrl}
+            date={featuredEpisode.date}
+            timeContext={{
+              start_time: 0,
+              end_time: 3600
+            }}
+            similarity={{ combined: 1, vector: 1 }}
+            episodeImage={feedData?.logoUrl || ''}
+            isPlaying={currentlyPlayingId === featuredEpisode.id}
+            onPlayPause={handlePlayPause}
+            onEnded={handleEnded}
+            shareUrl={`${FRONTEND_URL}/feed/${feedId}/episode/${featuredEpisode.id}`}
+            shareLink={featuredEpisode.id}
+            authConfig={null}
+            presentationContext={PresentationContext.landingPage}
+          />
+        </div>
+      )}
+
       {/* Description */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <p className="text-gray-300 leading-relaxed">
-          {feedData.description}
-        </p>
-      </div>
+      {!featuredEpisode && (
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <p className="text-gray-300 leading-relaxed">
+            {feedData?.description}
+          </p>
+        </div>
+      )}
+
       {/* Latest Episodes Section */}
         <div className="max-w-4xl mx-auto px-4">
             <h2 className="text-xl font-bold mb-6">Latest Episodes</h2>
@@ -186,7 +232,7 @@ const PodcastFeedPage: React.FC = () => {
                     isPlaying={currentlyPlayingId === episode.id}
                     onPlayPause={handlePlayPause}
                     onEnded={handleEnded}
-                    shareUrl={`/feed/${feedId}/episode/${episode.id}`}
+                    shareUrl={`${FRONTEND_URL}/feed/${feedId}/episode/${episode.id}`}
                     shareLink={episode.id}
                     authConfig={null}
                     presentationContext={PresentationContext.landingPage}
