@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { API_URL, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
+import SubscribeSection from './SubscribeSection.tsx'
 import { Copy , Check, QrCodeIcon} from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 
@@ -15,6 +16,7 @@ interface Episode {
     description?: string;
     episodeNumber?: string;
     episodeImage?: string;
+    listenLink?: string;
   }
   
   interface PodcastFeedData {
@@ -193,82 +195,88 @@ const PodcastFeedPage: React.FC = () => {
         </div>
       </div>
 
-      {featuredEpisode && (
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <h2 className="text-xl font-bold mb-6">Featured Episode</h2>
-          <PodcastSearchResultItem
-            key={featuredEpisode.id}
-            id={featuredEpisode.id}
-            quote={featuredEpisode.description || ''}
-            episode={featuredEpisode.title}
-            creator={feedData?.creator || ''}
-            audioUrl={featuredEpisode.audioUrl}
-            date={featuredEpisode.date}
-            timeContext={{
-              start_time: 0,
-              end_time: 3600
-            }}
-            similarity={{ combined: 1, vector: 1 }}
-            episodeImage={feedData?.logoUrl || ''}
-            isPlaying={currentlyPlayingId === featuredEpisode.id}
-            onPlayPause={handlePlayPause}
-            onEnded={handleEnded}
-            shareUrl={`${FRONTEND_URL}/feed/${feedId}/episode/${featuredEpisode.id}`}
-            shareLink={featuredEpisode.id}
-            authConfig={null}
-            presentationContext={PresentationContext.landingPage}
-          />
-        </div>
-      )}
+      <div className="max-w-4xl mx-auto px-4">
+        {activeTab === 'Episodes' && (
+            <>
+            {featuredEpisode && (
+                <div className="py-8">
+                <h2 className="text-xl font-bold mb-6">Featured Episode</h2>
+                <PodcastSearchResultItem
+                    key={featuredEpisode.id}
+                    id={featuredEpisode.id}
+                    quote={featuredEpisode.description || ''}
+                    episode={featuredEpisode.title}
+                    creator={feedData?.creator || ''}
+                    audioUrl={featuredEpisode.audioUrl}
+                    date={featuredEpisode.date}
+                    timeContext={{
+                    start_time: 0,
+                    end_time: 3600
+                    }}
+                    similarity={{ combined: 1, vector: 1 }}
+                    episodeImage={feedData?.logoUrl || ''}
+                    isPlaying={currentlyPlayingId === featuredEpisode.id}
+                    onPlayPause={handlePlayPause}
+                    onEnded={handleEnded}
+                    shareUrl={`${FRONTEND_URL}/feed/${feedId}/episode/${featuredEpisode.id}`}
+                    shareLink={featuredEpisode.id}
+                    authConfig={null}
+                    presentationContext={PresentationContext.landingPage}
+                />
+                </div>
+            )}
 
-      {qrModalOpen &&(
-        <QRCodeModal
-            isOpen={qrModalOpen}
-            onClose={() => setQrModalOpen(false)}
-            lightningAddress={feedData?.lightningAddress || ''}
-            title={feedData?.title || ''}
-        />
-      )}
+            {!featuredEpisode && (
+                <div className="py-8">
+                <p className="text-gray-300 leading-relaxed">
+                    {feedData?.description}
+                </p>
+                </div>
+            )}
 
-      {/* Description */}
-      {!featuredEpisode && (
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <p className="text-gray-300 leading-relaxed">
-            {feedData?.description}
-          </p>
-        </div>
-      )}
-
-      {/* Latest Episodes Section */}
-        <div className="max-w-4xl mx-auto px-4">
             <h2 className="text-xl font-bold mb-6">Latest Episodes</h2>
             <div className="space-y-4">
                 {Array.isArray(feedData.episodes) && feedData.episodes.map((episode) => (
                 <PodcastSearchResultItem
                     key={episode.id}
                     id={episode.id}
-                    quote={episode.description || ''} // Use empty string if no description
+                    quote={episode.description || ''}
                     episode={episode.title}
                     creator={feedData.creator}
                     audioUrl={episode.audioUrl}
                     date={episode.date}
                     timeContext={{
                     start_time: 0,
-                    end_time: 3600 // Default to 1 hour, or calculate from duration
+                    end_time: 3600
                     }}
                     similarity={{ combined: 1, vector: 1 }}
-                    episodeImage={feedData.logoUrl} // Use podcast logo as episode image
+                    episodeImage={feedData.logoUrl}
                     isPlaying={currentlyPlayingId === episode.id}
                     onPlayPause={handlePlayPause}
                     onEnded={handleEnded}
                     shareUrl={`${FRONTEND_URL}/feed/${feedId}/episode/${episode.id}`}
+                    listenLink={episode.listenLink}
                     shareLink={episode.id}
                     authConfig={null}
                     presentationContext={PresentationContext.landingPage}
                 />
                 ))}
             </div>
+            </>
+        )}
+
+            {activeTab === 'Subscribe' && <SubscribeSection />}
+
         </div>
+
+        {qrModalOpen && (
+        <QRCodeModal
+            isOpen={qrModalOpen}
+            onClose={() => setQrModalOpen(false)}
+            lightningAddress={feedData?.lightningAddress || ''}
+            title={feedData?.title || ''}
+        />
+        )}
     </div>
   );
 };
