@@ -7,6 +7,11 @@ import EditTimestampsModal from "./EditTimestampsModal.tsx";
 import { AuthConfig } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
 
+export enum PresentationContext {
+  search = 'search',
+  landingPage = 'landingPage'
+}
+
 interface PodcastSearchResultItemProps {
   quote: string;
   episode: string;
@@ -29,9 +34,10 @@ interface PodcastSearchResultItemProps {
   onEnded: (id: string) => void;
   shareUrl:string;
   shareLink:string;
-  onClipStart: (progress: ClipProgress) => void;
-  onClipProgress: (progress: ClipProgress) => void;
+  onClipStart?: (progress: ClipProgress) => void;
+  onClipProgress?: (progress: ClipProgress) => void;
   authConfig?: AuthConfig | null | undefined;
+  presentationContext?:PresentationContext;
 }
 
 export const PodcastSearchResultItem = ({
@@ -51,7 +57,8 @@ export const PodcastSearchResultItem = ({
   shareUrl,
   shareLink,
   onClipProgress,
-  authConfig
+  authConfig,
+  presentationContext = PresentationContext.search
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
@@ -137,6 +144,7 @@ export const PodcastSearchResultItem = ({
     }
   
     setIsClipModalOpen(false);
+    if(!onClipProgress){return}
     const startTime = start ?? timeContext.start_time ?? 0;
     const endTime = end ?? timeContext.end_time ?? startTime + 15;
   
@@ -318,13 +326,13 @@ export const PodcastSearchResultItem = ({
                 Edit Timestamps
               </button>
               {/* Clip This Button */}
-              <button
+              {(<button
                 onClick={() => handleClipConfirm(null,null)}
                 className="flex items-center font-bold justify-center px-6 py-3 bg-white text-black rounded-lg hover:bg-gray-400 transition-colors w-full mt-8"
               >
                 <Scissors className="w-5 h-5 mr-2" />
                 Clip This
-              </button>
+              </button>)}
             </div>
           </div>
         </div>
@@ -375,13 +383,14 @@ export const PodcastSearchResultItem = ({
                   <ExternalLink className="h-4 w-4 mr-2" />
                   <span>Listen</span>
                 </button>
-                <button
+                {onClipProgress && (<button
                   className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                   onClick={handleClip}
                 >
                   <Scissors className="h-4 w-4 mr-2" />
                   <span>Clip</span>
                 </button>
+                )}
               </div>
             </div>
   
@@ -495,7 +504,7 @@ export const PodcastSearchResultItem = ({
         <div className="text-sm text-gray-300 bg-[#0A0A0A] p-3 rounded-md line-clamp-4 sm:line-clamp-6 pb-1">
           {quote}
         </div>
-        <div className="flex justify-between items-center text-xs text-gray-500">
+        {presentationContext === PresentationContext.search &&(<div className="flex justify-between items-center text-xs text-gray-500">
           <span>
             Similarity: {(similarity.combined).toFixed(3)}
             {similarity.vector !== similarity.combined && (
@@ -507,7 +516,7 @@ export const PodcastSearchResultItem = ({
           <span>
             {formatTime(timeContext.start_time)} - {formatTime(timeContext.end_time)}
           </span>
-        </div>
+        </div>)}
       </div>
     </div>
   );

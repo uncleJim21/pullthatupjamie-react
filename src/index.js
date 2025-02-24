@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import SearchInterface from './components/SearchInterface.tsx';
+import PodcastFeedPage from './components/podcast/PodcastFeedPage.tsx';
 import { inject } from "@vercel/analytics"
 
 
@@ -11,6 +12,8 @@ const App = () => (
     <Routes>
       <Route path="/" element={<SearchInterface />} />
       <Route path="/share" element={<SearchInterface isSharePage={true} />} />
+      <Route path="/feed/:feedId" element={<PodcastFeedPage />} />
+      <Route path="/feed/:feedId/episode/:episodeId" element={<PodcastFeedPage />} />
     </Routes>
   </BrowserRouter>
 );
