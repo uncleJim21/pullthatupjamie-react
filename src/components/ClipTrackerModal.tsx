@@ -70,6 +70,17 @@ export default function ClipTrackerModal({
     const renderClipUrl = `${API_URL}/api/render-clip/${finalHash}`;
     return renderClipUrl;
   }
+
+
+  const extractLookupHash = (cdnLink:string) => {
+    // Remove the base URL part and split the rest
+    const parts = cdnLink.split('/clips/')[1]?.split('/');
+    if (!parts || parts.length < 3) return null;
+    const fileWithSuffix = parts[2];
+    const file = fileWithSuffix.replace('-clip.mp4', '');
+    return `${file}`;
+  };
+
   const copyToClipboard = (lookupHash?: string | null) => {
     const url = getCdnLink(lookupHash);
     if (!url) return;
@@ -96,7 +107,7 @@ export default function ClipTrackerModal({
       // Create a hidden download link
       const link = document.createElement('a');
       link.href = blobUrl;
-      const id = clipProgress?.clipId ?? lookupHash?.split('/').pop()
+      const id = extractLookupHash(cdnLink);
       link.download = `clip-${id}.mp4`; // Extract filename from lookupHash
       document.body.appendChild(link);
       link.click();
@@ -119,7 +130,13 @@ export default function ClipTrackerModal({
   };
 
   const shareToTwitter = (lookupHash?: string | null) => {
-    const url = getRenderClipUrl(lookupHash);
+    const cdnLink = getCdnLink(lookupHash);
+    if(!cdnLink){
+      throw(`Error sharing. Please try again.`)
+      return;
+    }
+    const id = extractLookupHash(cdnLink);
+    const url = getRenderClipUrl(id);
     if (!url) return;
     const tweetText = encodeURIComponent(`Check out this clip:\n${url}\n\nMade with PullThatUpJamie.ai`);
     const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
