@@ -141,8 +141,7 @@ const PodcastFeedPage: React.FC = () => {
           
           {/* Podcast Info with tinted background */}
           <div className="flex-1">
-            <div className="bg-black bg-opacity-20 px-4 py-3 rounded-lg inline-block">
-              <h1 className="text-3xl font-bold mb-2">{feedData.title}</h1>
+          <div className="bg-black bg-opacity-30 px-4 py-3 rounded-lg inline-block max-w-full mx-2 sm:mx-0">              <h1 className="text-3xl font-bold mb-2">{feedData.title}</h1>
               <p className="text-lg text-white opacity-80">by {feedData.creator}</p>
               {feedData.lightningAddress && (
                 <div className="flex items-center gap-2 mt-1">
@@ -184,7 +183,7 @@ const PodcastFeedPage: React.FC = () => {
                 className={`py-4 px-2 relative ${
                   activeTab === tab 
                     ? 'text-white font-medium' 
-                    : 'text-gray-400 hover:text-gray-300'
+                    : 'text-white opacity-80 hover:text-gray-300'
                 }`}
               >
                 {tab}
