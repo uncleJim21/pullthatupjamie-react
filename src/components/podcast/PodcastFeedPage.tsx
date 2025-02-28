@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { API_URL, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
+import { SubscribeLinks } from './SubscribeSection.tsx';
 import { Copy , Check, QrCodeIcon} from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 
@@ -28,6 +29,7 @@ interface Episode {
     lightningAddress?: string;
     description: string;
     episodes: Episode[];
+    subscribeLinks:SubscribeLinks
   }
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe';
@@ -127,39 +129,49 @@ const PodcastFeedPage: React.FC = () => {
   return (
     <div className="min-h-screen pb-12 bg-black text-white">
       {/* Header Section */}
+      {/* Header Section */}
       <div 
         className="w-full py-8 px-4"
         style={{ backgroundColor: feedData.headerColor }}
       >
-        <div className="max-w-4xl mx-auto flex items-start gap-6 ">
+        <div className="max-w-4xl mx-auto flex items-start gap-6">
           {/* Podcast Logo */}
           <img 
             src={feedData.logoUrl} 
             alt={feedData.title}
-            className="w-32 h-32 rounded-lg shadow-lg border border-gray-700"
+            className="sm:w-32 sm:h-32 w-24 w-24 rounded-lg shadow-lg border border-gray-700"
           />
           
           {/* Podcast Info with tinted background */}
-          <div className="flex-1">
-          <div className="bg-black bg-opacity-30 px-4 py-3 rounded-lg inline-block max-w-full mx-2 sm:mx-0">              <h1 className="text-3xl font-bold mb-2">{feedData.title}</h1>
+          <div className="flex-1 overflow-hidden">
+            <div 
+              className="bg-black bg-opacity-30 px-4 py-3 rounded-lg" 
+              style={{ 
+                display: "inline-block",
+                maxWidth: "calc(100% - 4px)"
+              }}
+            >
+              <h1 className="sm:text-3xl text-xl font-bold mb-2">{feedData.title}</h1>
               <p className="text-lg text-white opacity-80">by {feedData.creator}</p>
               {feedData.lightningAddress && (
-                <div className="flex items-center gap-2 mt-1">
-                    <p className="text-sm text-white opacity-80 no-select">
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <p className="sm:text-sm text-xs text-white opacity-80 no-select truncate max-w-[180px] sm:max-w-none">
                     {`⚡ ${feedData.lightningAddress}`}
-                    </p>
+                  </p>
+                  <div className="flex items-center">
                     <button 
-                    className="text-white hover:text-gray-800 opacity-80"
-                    onClick={copyToClipboard}
+                      className="text-white hover:text-gray-800 opacity-80 mr-2"
+                      onClick={copyToClipboard}
                     >
-                    {!copied ? <Copy size={16} /> : <Check size={16} />}
+                      {!copied ? <Copy size={16} /> : <Check size={16} />}
                     </button>
                     <button 
-                    className="text-white hover:text-gray-800 opacity-80"
-                    onClick={openQRModal}
+                      className="text-white hover:text-gray-800 opacity-80"
+                      onClick={openQRModal}
                     >
-                    <QrCodeIcon size={16} />
+                      <QrCodeIcon size={16} />
                     </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -266,7 +278,13 @@ const PodcastFeedPage: React.FC = () => {
             </>
         )}
 
-            {activeTab === 'Subscribe' && <SubscribeSection />}
+          {activeTab === 'Subscribe' && (
+            <SubscribeSection 
+              spotifyLink={feedData?.subscribeLinks?.spotifyLink || null} 
+              appleLink={feedData?.subscribeLinks?.appleLink || null}
+              youtubeLink={feedData?.subscribeLinks?.youtubeLink || null}
+            />
+          )}
 
         </div>
 
