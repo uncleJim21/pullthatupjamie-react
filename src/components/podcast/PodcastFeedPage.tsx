@@ -139,29 +139,31 @@ const PodcastFeedPage: React.FC = () => {
             className="w-32 h-32 rounded-lg shadow-lg border border-gray-700"
           />
           
-          {/* Podcast Info */}
+          {/* Podcast Info with tinted background */}
           <div className="flex-1">
-            <h1 className="text-3xl font-bold mb-2">{feedData.title}</h1>
-            <p className="text-lg text-gray-300">by {feedData.creator}</p>
-            {feedData.lightningAddress && (
+            <div className="bg-black bg-opacity-20 px-4 py-3 rounded-lg inline-block">
+              <h1 className="text-3xl font-bold mb-2">{feedData.title}</h1>
+              <p className="text-lg text-white opacity-80">by {feedData.creator}</p>
+              {feedData.lightningAddress && (
                 <div className="flex items-center gap-2 mt-1">
-                    <p className="text-sm text-gray-400 no-select">
+                    <p className="text-sm text-white opacity-80 no-select">
                     {`⚡ ${feedData.lightningAddress}`}
                     </p>
                     <button 
-                    className="text-gray-400 hover:text-gray-300"
+                    className="text-white hover:text-gray-800 opacity-80"
                     onClick={copyToClipboard}
                     >
                     {!copied ? <Copy size={16} /> : <Check size={16} />}
                     </button>
                     <button 
-                    className="text-gray-400 hover:text-gray-300"
+                    className="text-white hover:text-gray-800 opacity-80"
                     onClick={openQRModal}
                     >
                     <QrCodeIcon size={16} />
                     </button>
                 </div>
-                )}
+              )}
+            </div>
           </div>
         </div>
       </div>
