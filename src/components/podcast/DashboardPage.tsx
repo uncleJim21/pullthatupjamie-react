@@ -3,16 +3,20 @@ import { useParams } from 'react-router-dom';
 import { PodcastSearchResultItem, PresentationContext } from '../podcast/PodcastSearchResultItem.tsx';
 import { getRecommendedClips, ClipItem } from '../../services/dashboardService.ts';
 
+// Default podcast image to use when none is provided
+const DEFAULT_PODCAST_IMAGE = '/podcast-logo.png'; // Update with your default image path
+
 const DashboardPage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const [enableFieldFiltering, setEnableFieldFiltering] = useState(false);
 
   useEffect(() => {
     fetchRecommendedClips();
-  }, [userId]);
+  }, [userId, enableFieldFiltering]);
 
   const fetchRecommendedClips = async () => {
     if (!userId) return;
@@ -21,7 +25,7 @@ const DashboardPage: React.FC = () => {
     setError(null);
     
     try {
-      const result = await getRecommendedClips(userId);
+      const result = await getRecommendedClips(userId, enableFieldFiltering);
       
       if (result.success) {
         setClips(result.clips);
@@ -48,10 +52,31 @@ const DashboardPage: React.FC = () => {
     setCurrentlyPlayingId(null);
   };
 
+  const toggleFieldFiltering = () => {
+    setEnableFieldFiltering(!enableFieldFiltering);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="max-w-6xl mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold mb-6">Recommended Clips for {userId}</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Recommended Clips for {userId}</h1>
+          
+          <div className="flex items-center">
+            <span className="mr-3 text-sm text-gray-400">
+              {enableFieldFiltering ? 'Using dynamic filters' : 'Using user preferences'}
+            </span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                className="sr-only peer" 
+                checked={enableFieldFiltering}
+                onChange={toggleFieldFiltering}
+              />
+              <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+        </div>
         
         {isLoading ? (
           <div className="flex justify-center items-center py-20">
@@ -72,8 +97,8 @@ const DashboardPage: React.FC = () => {
                 <PodcastSearchResultItem
                   id={clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`}
                   quote={clip.text}
-                  episode={clip.episode_title}
-                  creator={clip.feed_title}
+                  episode={clip.title}
+                  creator={`${clip.feed_title} - ${clip.episode_title}`}
                   audioUrl={clip.audio_url}
                   date=""
                   timeContext={{
@@ -81,24 +106,31 @@ const DashboardPage: React.FC = () => {
                     end_time: clip.end_time
                   }}
                   similarity={{ combined: clip.relevance_score / 100, vector: clip.relevance_score / 100 }}
-                  episodeImage=""
+                  episodeImage={clip.episodeImage || DEFAULT_PODCAST_IMAGE}
                   isPlaying={currentlyPlayingId === (clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`)}
                   onPlayPause={handlePlayPause}
                   onEnded={handleEnded}
-                  shareUrl={`${window.location.origin}/clip/${clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`}`}
+                  shareUrl={`${window.location.origin}/share?clip=${clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`}`}
                   shareLink={clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`}
                   presentationContext={PresentationContext.dashboard}
                 />
                 
-                {/* Simple display of clip duration and expansion status */}
+                {/* Display clip duration and expansion status */}
                 {(clip.duration || clip.expanded_context) && (
-                  <div className="mt-2 pl-4 text-xs text-gray-500">
-                    {clip.duration && <span>Duration: {clip.duration.toFixed(1)}s</span>}
-                    {clip.expanded_context && (
-                      <span className="ml-4 text-blue-400">
-                        Context expanded ({clip.paragraph_ids?.length || 1} paragraphs)
+                  <div className="mt-2 pl-4 text-xs text-gray-500 flex justify-between">
+                    <div>
+                      {clip.duration && <span>Duration: {clip.duration.toFixed(1)}s</span>}
+                      {clip.expanded_context && (
+                        <span className="ml-4 text-blue-400">
+                          Context expanded ({clip.paragraph_ids?.length || 1} paragraphs)
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-gray-400">
+                        Relevance: {clip.relevance_score}%
                       </span>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>

@@ -16,6 +16,7 @@ export interface ClipItem {
   duration?: number;
   paragraph_ids?: string[];
   expanded_context?: boolean;
+  episodeImage?: string;
 }
 
 export interface ClipResponse {
@@ -24,7 +25,10 @@ export interface ClipResponse {
   error?: string;
 }
 
-export async function getRecommendedClips(userId: string): Promise<ClipResponse> {
+export async function getRecommendedClips(
+  userId: string, 
+  enableFieldFiltering: boolean = false
+): Promise<ClipResponse> {
   try {
     const response = await fetch(`${API_URL}/clips/find`, {
       method: 'POST',
@@ -33,11 +37,12 @@ export async function getRecommendedClips(userId: string): Promise<ClipResponse>
       },
       body: JSON.stringify({
         description: "find clips i might like",
-        maxClips: 10,
+        maxClips: 5,
         userId: userId,
-        minDuration: 30,
-        maxDuration: 90,
-        expandContext: true
+        minDuration: 60,
+        maxDuration: 120,
+        expandContext: true,
+        enable_field_filtering: enableFieldFiltering // This ensures we use user preferences when false
       }),
     });
 
