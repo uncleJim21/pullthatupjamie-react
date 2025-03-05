@@ -1,9 +1,20 @@
 // services/authService.ts
+import { API_URL } from "../constants/constants.ts";
 interface SignInResponse {
     token: string;
     subscriptionValid: boolean;
     message: string;
   }
+
+  interface Privileges {
+    feedId: string;
+    access: 'admin' | 'user' | 'viewer'; // Adjust as needed
+}
+
+interface CheckPrivsResponse {
+    privs: Privileges;
+}
+
   
   class AuthService {
     private static readonly AUTH_SERVER_URL = 'https://cascdr-auth-backend-cw4nk.ondigitalocean.app';
@@ -55,6 +66,31 @@ interface SignInResponse {
             token: data.token,
             subscriptionValid: data.subscriptionValid,
             message: data.message
+          };
+        } catch (error) {
+          console.error('Sign up error:', error);
+          throw error;
+        }
+      }
+
+      static async checkPrivs(token:string){
+        try {
+          const response = await fetch(`${API_URL}/api/validate-privs`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token }),
+          });
+    
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Sign up failed');
+          }
+    
+          const privs = await response.json() as CheckPrivsResponse;
+          return {
+            privs
           };
         } catch (error) {
           console.error('Sign up error:', error);

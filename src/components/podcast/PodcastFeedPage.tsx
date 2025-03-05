@@ -6,7 +6,7 @@ import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
 import { Copy , Check, QrCodeIcon} from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
-
+import AuthService from '../../services/authService.ts';
 
 interface Episode {
     id: string;
@@ -31,6 +31,7 @@ interface Episode {
     episodes: Episode[];
     subscribeLinks:SubscribeLinks
   }
+  
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe';
 
@@ -43,6 +44,7 @@ const PodcastFeedPage: React.FC = () => {
     const [copied,setCopied] = useState(false);
     const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
     const [qrModalOpen, setQrModalOpen] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -71,8 +73,31 @@ const PodcastFeedPage: React.FC = () => {
   }
 
   useEffect(() => {
-    console.log(`feedId:${feedId}`)
-  }, []);
+      console.log(`feedId: ${feedId}`);
+
+      const checkPrivileges = async () => {
+          try {
+              const token = localStorage.getItem("auth_token") as string;
+              if(!token){return}
+              const response = await AuthService.checkPrivs(token);
+              console.log(`checkPrivs response:${JSON.stringify(response,null,2)}`)
+              if (response && response.privs.privs && response.privs.privs.feedId === feedId) {
+                  console.log(`Admin privileges granted`);
+                  setIsAdmin(response.privs.privs.access === 'admin');
+              } else {
+                  setIsAdmin(false);
+              }
+          } catch (error) {
+              console.error("Error checking privileges:", error);
+              setIsAdmin(false);
+          }
+      };
+
+      if (feedId) {
+          checkPrivileges();
+      }
+  }, [feedId]); 
+
 
   useEffect(() => {
     const fetchFeedData = async () => {
@@ -129,7 +154,6 @@ const PodcastFeedPage: React.FC = () => {
   return (
     <div className="min-h-screen pb-12 bg-black text-white">
       {/* Header Section */}
-      {/* Header Section */}
       <div 
         className="w-full py-8 px-4"
         style={{ backgroundColor: feedData.headerColor }}
@@ -172,6 +196,12 @@ const PodcastFeedPage: React.FC = () => {
                       <QrCodeIcon size={16} />
                     </button>
                   </div>
+
+                  {isAdmin && (
+                      <div className="absolute top-4 right-4 bg-white text-black text-xs font-semibold px-3 py-1 rounded-full shadow-md">
+                          Admin
+                      </div>
+                  )}
                 </div>
               )}
             </div>

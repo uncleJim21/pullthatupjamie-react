@@ -4,8 +4,8 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import SearchInterface from './components/SearchInterface.tsx';
 import PodcastFeedPage from './components/podcast/PodcastFeedPage.tsx';
+import DashboardPage from './components/podcast/DashboardPage.tsx';
 import { inject } from "@vercel/analytics"
-
 
 const App = () => (
   <BrowserRouter>
@@ -14,6 +14,7 @@ const App = () => (
       <Route path="/share" element={<SearchInterface isSharePage={true} />} />
       <Route path="/feed/:feedId" element={<PodcastFeedPage />} />
       <Route path="/feed/:feedId/episode/:episodeId" element={<PodcastFeedPage />} />
+      <Route path="/dashboard/:userId" element={<DashboardPage />} />
     </Routes>
   </BrowserRouter>
 );

@@ -9,7 +9,8 @@ import { printLog } from '../../constants/constants.ts';
 
 export enum PresentationContext {
   search = 'search',
-  landingPage = 'landingPage'
+  landingPage = 'landingPage',
+  dashboard = 'dashboard'
 }
 
 interface PodcastSearchResultItemProps {
@@ -504,19 +505,32 @@ export const PodcastSearchResultItem = ({
         <div className="text-sm text-gray-300 bg-[#0A0A0A] p-3 rounded-md line-clamp-4 sm:line-clamp-6 pb-1">
           {quote}
         </div>
-        {presentationContext === PresentationContext.search &&(<div className="flex justify-between items-center text-xs text-gray-500">
-          <span>
-            Similarity: {(similarity.combined).toFixed(3)}
-            {similarity.vector !== similarity.combined && (
-              <span className="ml-2 text-gray-600">
-                (Vector: {(similarity.vector).toFixed(3)})
-              </span>
-            )}
-          </span>
-          <span>
-            {formatTime(timeContext.start_time)} - {formatTime(timeContext.end_time)}
-          </span>
-        </div>)}
+        {presentationContext === PresentationContext.search && (
+          <div className="flex justify-between items-center text-xs text-gray-500">
+            <span>
+              Similarity: {(similarity.combined).toFixed(3)}
+              {similarity.vector !== similarity.combined && (
+                <span className="ml-2 text-gray-600">
+                  (Vector: {(similarity.vector).toFixed(3)})
+                </span>
+              )}
+            </span>
+            <span>
+              {formatTime(timeContext.start_time)} - {formatTime(timeContext.end_time)}
+            </span>
+          </div>
+        )}
+
+        {presentationContext === PresentationContext.dashboard && (
+          <div className="flex justify-between items-center text-xs text-gray-500">
+            <span>
+              Relevance: {(similarity.combined * 100).toFixed(0)}%
+            </span>
+            <span>
+              {formatTime(timeContext.start_time)} - {formatTime(timeContext.end_time)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
