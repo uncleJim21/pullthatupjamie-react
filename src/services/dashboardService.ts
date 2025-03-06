@@ -26,7 +26,7 @@ export interface ClipResponse {
 }
 
 export async function getRecommendedClips(
-  userId: string, 
+  feedId: string, 
   enableFieldFiltering: boolean = false
 ): Promise<ClipResponse> {
   try {
@@ -38,7 +38,7 @@ export async function getRecommendedClips(
       body: JSON.stringify({
         description: "find clips i might like",
         maxClips: 5,
-        userId: userId,
+        feedId: feedId,
         minDuration: 60,
         maxDuration: 120,
         expandContext: true,

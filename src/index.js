@@ -14,7 +14,7 @@ const App = () => (
       <Route path="/share" element={<SearchInterface isSharePage={true} />} />
       <Route path="/feed/:feedId" element={<PodcastFeedPage />} />
       <Route path="/feed/:feedId/episode/:episodeId" element={<PodcastFeedPage />} />
-      <Route path="/dashboard/:userId" element={<DashboardPage />} />
+      <Route path="/dashboard/:feedId" element={<DashboardPage />} />
     </Routes>
   </BrowserRouter>
 );
