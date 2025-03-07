@@ -393,6 +393,8 @@ const PodcastFeedPage: React.FC = () => {
                           shareLink={run.recommendations[0].paragraph_ids[0]}
                           authConfig={null}
                           presentationContext={PresentationContext.runHistoryPreview}
+                          runId={run._id}
+                          feedId={feedId}
                         />
                       )}
                     </div>

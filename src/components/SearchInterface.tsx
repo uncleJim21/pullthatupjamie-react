@@ -1,6 +1,6 @@
 import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
-import { useSearchParams } from 'react-router-dom'; 
+import { useSearchParams, useParams } from 'react-router-dom'; 
 import { RequestAuthMethod, AuthConfig } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem } from '../types/conversation.ts';
@@ -22,6 +22,7 @@ import QuickTopicGrid from './QuickTopicGrid.tsx';
 import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
+import PodcastFeedService from '../services/podcastFeedService.ts';
 
 
 export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
@@ -44,8 +45,59 @@ interface SearchState {
   clipProgress?: ClipProgress | null;
 }
 
+interface PodcastQuoteResult {
+  id: string;
+  quote: string;
+  episode: string;
+  creator: string;
+  audioUrl: string;
+  date: string;
+  timeContext: {
+    start_time: number;
+    end_time: number;
+  };
+  similarity: {
+    combined: number;
+    vector: number;
+  };
+  episodeImage: string;
+  shareUrl: string;
+  shareLink: string;
+}
+
+interface PodcastSearchData {
+  quotes: PodcastQuoteResult[];
+}
+
+interface QuickTopicGridProps {
+  triggerFadeOut: boolean;
+  onTopicSelect: (topicQuery: string) => Promise<void>;
+  className?: string;
+}
+
+interface ClipProgressData {
+  creator: string;
+  episode: string;
+  timestamps: number[];
+  cdnLink?: string;
+  clipId: string;
+  episodeImage: string;
+  lookupHash?: string;
+}
+
+const initialSearchState: SearchState = {
+  query: '',
+  result: '',
+  isLoading: false,
+  error: null,
+  sources: [],
+  activeConversationId: undefined,
+  clipProgress: null
+};
+
 interface SearchInterfaceProps {
   isSharePage?: boolean;
+  isClipBatchPage?: boolean;
 }
 
 interface SubscriptionSuccessPopupProps {
@@ -111,35 +163,27 @@ const SUGGESTED_QUERIES = [
 
 
 
-export default function SearchInterface({ isSharePage = false }: SearchInterfaceProps) {  
+export default function SearchInterface({ isSharePage = false, isClipBatchPage = false }: SearchInterfaceProps) {  
   const [query, setQuery] = useState('');
   const [model, setModel] = useState('claude-3-sonnet' as ModelType);
   const [searchMode, setSearchMode] = useState(
-    isSharePage ? 'podcast-search' as SearchMode : 'podcast-search' as SearchMode
+    isSharePage || isClipBatchPage ? 'podcast-search' as SearchMode : 'podcast-search' as SearchMode
   );
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const [searchParams] = useSearchParams(); 
   const clipId = searchParams.get('clip');
+  const { runId, feedId } = useParams<{ runId: string; feedId: string }>();
   const [authConfig, setAuthConfig] = useState<AuthConfig | null | undefined>(null);
-  const [clipProgress, setClipProgress] = useState<ClipProgress | null>(null);
+  const [clipProgress, setClipProgress] = useState<ClipProgressData | undefined>(undefined);
   const pollIntervals = new Map<string, NodeJS.Timeout>();
-
-
-  useEffect(() => {
-    // Parse the searchMode parameter from the URL
-    const mode = searchParams.get('searchMode') as SearchMode;
-    if (mode && ['quick', 'depth', 'expert', 'podcast-search'].includes(mode)) {
-      setSearchMode(mode);
-    }
-  }, [searchParams]);
-
-  const [selectedSources, setSelectedSources] = useState(new Set());
+  const [searchState, setSearchState] = useState<SearchState>(initialSearchState);
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [gridFadeOut, setGridFadeOut] = useState(false);
   const [searchHistory, setSearchHistory] = useState({
     'quick': false,
     'depth': false,
     'expert': false,
-    'podcast-search': isSharePage
+    'podcast-search': isSharePage || isClipBatchPage
   });
   const hasSearchedInMode = (mode: SearchMode): boolean => {
     if (!searchHistory[mode]) return false;
@@ -159,18 +203,10 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   const [conversation, setConversation] = useState([] as ConversationItem[]);
   
 
-  const [searchState, setSearchState] = useState({
-    query: '',
-    result: '',
-    isLoading: isSharePage && !!clipId,
-    error: null,
-    sources: []
-  });
-
-  const searchInputRef = useRef(null);
+  const searchInputRef = useRef<HTMLTextAreaElement>(null);
   const cleanupIntervalRef = useRef();
   const resultTextRef = useRef('');
-  const eventSourceRef = useRef(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
   const nextConversationId = useRef(0);
   const searchSettingsBarStyle = "bg-[#000000] border-gray-800 border shadow-white-glow rounded-lg mt-2 pt-2 pb-1 max-w-3xl pr-1 mx-auto px-4 flex items-start relative"
   const searchButtonStyle = "ml-auto mt-1 mr-1 pl-3 pr-3 bg-white rounded-lg pt-1 pb-1 border-gray-800 hover:border-gray-700"
@@ -583,15 +619,14 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
   setSearchState(prev => ({ ...prev, isLoading: false }));
 }
 
-  const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSearch = async (e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
     if (searchMode === 'podcast-search') {
       try {
         setGridFadeOut(true);
         setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
-        // Add a small delay to ensure state updates before continuing
         await new Promise(resolve => {
-          setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
+          setSearchState(prev => ({ ...prev, isLoading: true }));
           setTimeout(resolve, 0);
         });
         await performQuoteSearch();
@@ -605,8 +640,7 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
         }));
         return;
       }
-    }
-    else{
+    } else {
       await handleStreamingSearch();
     }
   };
@@ -735,6 +769,68 @@ export default function SearchInterface({ isSharePage = false }: SearchInterface
     }
   },[searchState])
 
+  useEffect(() => {
+    const loadClipBatch = async () => {
+      if (isClipBatchPage && runId && feedId) {
+        try {
+          const authToken = localStorage.getItem('auth_token');
+          if (!authToken) {
+            throw new Error('Authentication required');
+          }
+
+          const response = await PodcastFeedService.getClipBatchByRunId(feedId, runId, authToken);
+          if (!response.success || !response.data) {
+            throw new Error(response.error || 'Failed to load clip batch');
+          }
+
+          setConversation([{
+            id: nextConversationId.current++,
+            type: 'podcast-search' as const,
+            query: '', 
+            timestamp: new Date(),
+            isStreaming: false,
+            data: {
+              quotes: response.data.recommendations.map(rec => ({
+                id: rec.paragraph_ids[0],
+                quote: rec.text,
+                episode: rec.title,
+                creator: `${rec.feed_title} - ${rec.episode_title}`,
+                audioUrl: rec.audio_url,
+                date: response.data.run_date,
+                timeContext: {
+                  start_time: rec.start_time,
+                  end_time: rec.end_time
+                },
+                similarity: { 
+                  combined: rec.relevance_score / 100, 
+                  vector: rec.relevance_score / 100 
+                },
+                episodeImage: rec.episode_image,
+                shareUrl: `${window.location.origin}/share?clip=${rec.paragraph_ids[0]}`,
+                shareLink: rec.paragraph_ids[0]
+              }))
+            }
+          }]);
+        } catch (error) {
+          console.error('Error loading clip batch:', error);
+          setSearchState(prev => ({
+            ...prev,
+            error: error as Error,
+            isLoading: false
+          }));
+        } finally {
+          setSearchState(prev => ({ 
+            ...prev, 
+            isLoading: false 
+          }));
+        }
+      }
+    };
+
+    if (isClipBatchPage && runId && feedId) {
+      loadClipBatch();
+    }
+  }, [isClipBatchPage, runId, feedId]);
 
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">

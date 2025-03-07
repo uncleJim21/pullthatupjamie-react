@@ -6,6 +6,7 @@ import { ClipProgress } from '../../types/clips.ts';
 import EditTimestampsModal from "./EditTimestampsModal.tsx";
 import { AuthConfig } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
+import { useNavigate } from 'react-router-dom';
 
 export enum PresentationContext {
   search = 'search',
@@ -40,6 +41,8 @@ interface PodcastSearchResultItemProps {
   onClipProgress?: (progress: ClipProgress) => void;
   authConfig?: AuthConfig | null | undefined;
   presentationContext?:PresentationContext;
+  runId?: string;
+  feedId?: string;
 }
 
 export const PodcastSearchResultItem = ({
@@ -60,7 +63,9 @@ export const PodcastSearchResultItem = ({
   shareLink,
   onClipProgress,
   authConfig,
-  presentationContext = PresentationContext.search
+  presentationContext = PresentationContext.search,
+  runId,
+  feedId
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
@@ -72,7 +77,7 @@ export const PodcastSearchResultItem = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editTimestampsError,setEditTimestampsError] = useState<string|undefined>(undefined);
   const CLIP_LENGTH_LIMIT_SECONDS = 60 * 10;
-
+  const navigate = useNavigate();
 
   const audioRef = useRef(null as HTMLAudioElement | null);
   const progressRef = useRef(null as HTMLDivElement | null);
@@ -83,13 +88,6 @@ export const PodcastSearchResultItem = ({
   : currentTime < timeContext.start_time
   ? 0 // Show 0% if playback is before the clip start time
   : Math.min(((currentTime - timeContext.start_time) / duration) * 100, 100);
-
-
-  useEffect(() => {
-    if (!isPlaying && audioRef.current) {
-      audioRef.current.pause();
-    }
-  }, [isPlaying]);
 
   useEffect(() => {
     if (!isPlaying && audioRef.current) {
@@ -122,7 +120,6 @@ export const PodcastSearchResultItem = ({
       }
     }
   };
-
 
   const handleProgressClick = (e: { clientX: number }) => {
     if (progressRef.current && audioRef.current) {
@@ -288,7 +285,14 @@ export const PodcastSearchResultItem = ({
   // Add conditional rendering based on presentation context
   if (presentationContext === PresentationContext.runHistoryPreview) {
     return (
-      <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
+      <div 
+        className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden cursor-pointer hover:border-gray-700 transition-colors"
+        onClick={() => {
+          if (runId) {
+            navigate(`/feed/${feedId}/clipBatch/${runId}`);
+          }
+        }}
+      >
         <div className="p-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <img

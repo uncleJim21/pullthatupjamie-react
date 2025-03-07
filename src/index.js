@@ -15,6 +15,7 @@ const App = () => (
       <Route path="/feed/:feedId" element={<PodcastFeedPage />} />
       <Route path="/feed/:feedId/episode/:episodeId" element={<PodcastFeedPage />} />
       <Route path="/dashboard/:feedId" element={<DashboardPage />} />
+      <Route path="/feed/:feedId/clipBatch/:runId" element={<SearchInterface isClipBatchPage={true} />} />
     </Routes>
   </BrowserRouter>
 );

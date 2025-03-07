@@ -62,6 +62,12 @@ export interface RunHistoryResponse {
   error?: string;
 }
 
+export interface ClipBatchResponse {
+  success: boolean;
+  data?: RunHistory;
+  error?: string;
+}
+
 class PodcastFeedService {
   static async getFeedData(feedId: string): Promise<PodcastFeedData> {
     try {
@@ -94,6 +100,28 @@ class PodcastFeedService {
       return {
         success: false,
         data: [],
+        error: error instanceof Error ? error.message : 'An unknown error occurred'
+      };
+    }
+  }
+
+  static async getClipBatchByRunId(feedId: string, runId: string, authToken: string): Promise<ClipBatchResponse> {
+    try {
+      const response = await fetch(`${API_URL}/api/podcast-runs/${feedId}/run/${runId}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch clip batch');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching clip batch:', error);
+      return {
+        success: false,
         error: error instanceof Error ? error.message : 'An unknown error occurred'
       };
     }
