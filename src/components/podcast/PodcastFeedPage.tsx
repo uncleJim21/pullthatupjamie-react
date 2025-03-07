@@ -1,66 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { API_URL, FRONTEND_URL } from '../../constants/constants.ts';
+import { FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
 import { Copy , Check, QrCodeIcon} from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
-
-interface Episode {
-    id: string;
-    title: string;
-    date: string;
-    duration: string;
-    audioUrl: string;
-    description?: string;
-    episodeNumber?: string;
-    episodeImage?: string;
-    listenLink?: string;
-  }
-  
-  interface PodcastFeedData {
-    id: string;
-    headerColor: string;
-    logoUrl: string;
-    title: string;
-    creator: string;
-    lightningAddress?: string;
-    description: string;
-    episodes: Episode[];
-    subscribeLinks:SubscribeLinks
-  }
-  
+import PodcastFeedService, { 
+  Episode, 
+  PodcastFeedData, 
+  RunHistory, 
+  RunHistoryRecommendation 
+} from '../../services/podcastFeedService.ts';
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro';
-
-interface RunHistoryRecommendation {
-  title: string;
-  text: string;
-  start_time: number;
-  end_time: number;
-  episode_title: string;
-  feed_title: string;
-  audio_url: string;
-  relevance_score: number;
-  episode_image: string;
-  duration: number;
-  paragraph_ids: string[];
-  expanded_context: boolean;
-  first_word_index: number;
-  last_word_index: number;
-}
-
-interface RunHistory {
-  feed_id: string;
-  run_date: string;
-  filter_scope: {
-    feed_id: string;
-    episode_guid: string;
-  };
-  recommendations: RunHistoryRecommendation[];
-}
 
 const PodcastFeedPage: React.FC = () => {
     const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
@@ -106,19 +60,12 @@ const PodcastFeedPage: React.FC = () => {
     
     try {
       setIsLoadingHistory(true);
-      const response = await fetch(`${API_URL}/api/podcast-runs/${feedId}/recent`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
+      const authToken = localStorage.getItem('auth_token');
+      if (!authToken) return;
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch run history');
-      }
-
-      const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
-        setRunHistory(data.data);
+      const response = await PodcastFeedService.getRunHistory(feedId, authToken);
+      if (response.success) {
+        setRunHistory(response.data);
       }
     } catch (error) {
       console.error('Error fetching run history:', error);
@@ -159,15 +106,13 @@ const PodcastFeedPage: React.FC = () => {
       }
   }, [feedId]); 
 
-
   useEffect(() => {
     const fetchFeedData = async () => {
+      if (!feedId) return;
+      
       try {
-        const response = await fetch(`${API_URL}/api/podcast-feed/${feedId}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        setIsLoading(true);
+        const data = await PodcastFeedService.getFeedData(feedId);
         setFeedData(data);
 
         // If we have an episodeId, find and set the featured episode
@@ -185,9 +130,7 @@ const PodcastFeedPage: React.FC = () => {
       }
     };
 
-    if (feedId) {
-      fetchFeedData();
-    }
+    fetchFeedData();
   }, [feedId, episodeId]);
 
   if (isLoading) {
@@ -380,7 +323,7 @@ const PodcastFeedPage: React.FC = () => {
 
           {activeTab === 'Jamie Pro' && isAdmin && (
             <div className="max-w-4xl mx-auto px-4">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-6 mt-6">
                 <h2 className="text-xl font-bold">Run History</h2>
               </div>
 
