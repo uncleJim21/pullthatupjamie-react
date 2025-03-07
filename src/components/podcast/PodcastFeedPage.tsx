@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { FRONTEND_URL } from '../../constants/constants.ts';
+import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
@@ -84,7 +84,10 @@ const PodcastFeedPage: React.FC = () => {
 
   useEffect(() => {
       console.log(`feedId: ${feedId}`);
-
+      if(DEBUG_MODE){
+        setIsAdmin(true);
+        return;
+      }
       const checkPrivileges = async () => {
           try {
               const token = localStorage.getItem("auth_token") as string;
