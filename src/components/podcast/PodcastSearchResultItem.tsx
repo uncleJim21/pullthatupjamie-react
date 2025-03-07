@@ -290,7 +290,7 @@ export const PodcastSearchResultItem = ({
     return (
       <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
         <div className="p-4">
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <img
               src={episodeImage}
               alt={creator}
@@ -299,7 +299,7 @@ export const PodcastSearchResultItem = ({
               onError={() => setImageLoaded(false)}
             />
             <div className="flex-1 min-w-0">
-              <div className="flex justify-between items-start gap-3">
+              <div className="flex justify-between items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <h3 className="text-xl font-medium text-white mb-1">
                     Clips Batch Run: {new Date(date).toLocaleString()}
@@ -307,7 +307,7 @@ export const PodcastSearchResultItem = ({
                   <p className="text-base text-gray-400 truncate">{creator}</p>
                   <p className="text-base text-gray-400 truncate">{episode}</p>
                 </div>
-                <ChevronRight className="text-gray-400 flex-shrink-0 mt-1.5" size={24} />
+                <ChevronRight className="text-gray-400 flex-shrink-0" size={32} />
               </div>
             </div>
           </div>
