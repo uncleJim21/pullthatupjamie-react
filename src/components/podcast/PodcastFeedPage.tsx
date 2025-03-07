@@ -33,7 +33,34 @@ interface Episode {
   }
   
 
-type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe';
+type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro';
+
+interface RunHistoryRecommendation {
+  title: string;
+  text: string;
+  start_time: number;
+  end_time: number;
+  episode_title: string;
+  feed_title: string;
+  audio_url: string;
+  relevance_score: number;
+  episode_image: string;
+  duration: number;
+  paragraph_ids: string[];
+  expanded_context: boolean;
+  first_word_index: number;
+  last_word_index: number;
+}
+
+interface RunHistory {
+  feed_id: string;
+  run_date: string;
+  filter_scope: {
+    feed_id: string;
+    episode_guid: string;
+  };
+  recommendations: RunHistoryRecommendation[];
+}
 
 const PodcastFeedPage: React.FC = () => {
     const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
@@ -45,6 +72,8 @@ const PodcastFeedPage: React.FC = () => {
     const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
     const [qrModalOpen, setQrModalOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [runHistory, setRunHistory] = useState<RunHistory[]>([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -71,6 +100,38 @@ const PodcastFeedPage: React.FC = () => {
   const openQRModal = () => {
     setQrModalOpen(true);
   }
+
+  const fetchRunHistory = async () => {
+    if (!feedId || !isAdmin) return;
+    
+    try {
+      setIsLoadingHistory(true);
+      const response = await fetch(`${API_URL}/api/podcast-runs/${feedId}/recent`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch run history');
+      }
+
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data)) {
+        setRunHistory(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching run history:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'Jamie Pro' && isAdmin) {
+      fetchRunHistory();
+    }
+  }, [activeTab, isAdmin, feedId]);
 
   useEffect(() => {
       console.log(`feedId: ${feedId}`);
@@ -217,7 +278,8 @@ const PodcastFeedPage: React.FC = () => {
                 'Episodes', 
                 // 'Home', 
                 // 'Top Clips', 
-                'Subscribe'
+                'Subscribe',
+                ...(isAdmin ? ['Jamie Pro'] : [])
             ] as TabType[]).map((tab) => (
               <button
                 key={tab}
@@ -314,6 +376,63 @@ const PodcastFeedPage: React.FC = () => {
               appleLink={feedData?.subscribeLinks?.appleLink || null}
               youtubeLink={feedData?.subscribeLinks?.youtubeLink || null}
             />
+          )}
+
+          {activeTab === 'Jamie Pro' && isAdmin && (
+            <div className="max-w-4xl mx-auto px-4">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold">Run History</h2>
+              </div>
+
+              {isLoadingHistory ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+                </div>
+              ) : runHistory.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <p>No run history available.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {runHistory.map((run, index) => (
+                    <div 
+                      key={index}
+                      className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden hover:border-gray-700 transition-colors cursor-pointer"
+                      onClick={() => console.log(`run history id: ${run.feed_id} tapped`)}
+                    >
+                      {run.recommendations.length > 0 && (
+                        <PodcastSearchResultItem
+                          id={run.recommendations[0].paragraph_ids[0]}
+                          quote={run.recommendations[0].text}
+                          episode={run.recommendations[0].title}
+                          creator={`${run.recommendations[0].feed_title} - ${run.recommendations[0].episode_title}`}
+                          audioUrl={run.recommendations[0].audio_url}
+                          date={run.run_date}
+                          timeContext={{
+                            start_time: run.recommendations[0].start_time,
+                            end_time: run.recommendations[0].end_time
+                          }}
+                          similarity={{ combined: run.recommendations[0].relevance_score / 100, vector: run.recommendations[0].relevance_score / 100 }}
+                          episodeImage={run.recommendations[0].episode_image}
+                          isPlaying={currentlyPlayingId === run.recommendations[0].paragraph_ids[0]}
+                          onPlayPause={handlePlayPause}
+                          onEnded={handleEnded}
+                          shareUrl={`${window.location.origin}/feed/${feedId}`}
+                          shareLink={run.recommendations[0].paragraph_ids[0]}
+                          authConfig={null}
+                          presentationContext={PresentationContext.landingPage}
+                        />
+                      )}
+                      <div className="px-4 py-2 border-t border-gray-800">
+                        <div className="text-sm text-gray-400">
+                          Run Date: {new Date(run.run_date).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
         </div>
