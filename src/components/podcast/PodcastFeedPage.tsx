@@ -341,7 +341,7 @@ const PodcastFeedPage: React.FC = () => {
                     <div 
                       key={index}
                       className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden hover:border-gray-700 transition-colors cursor-pointer"
-                      onClick={() => console.log(`run history id: ${run.feed_id} tapped`)}
+                      onClick={() => console.log(`run history id: ${run._id} tapped`)}
                     >
                       {run.recommendations.length > 0 && (
                         <PodcastSearchResultItem
@@ -363,7 +363,7 @@ const PodcastFeedPage: React.FC = () => {
                           shareUrl={`${window.location.origin}/feed/${feedId}`}
                           shareLink={run.recommendations[0].paragraph_ids[0]}
                           authConfig={null}
-                          presentationContext={PresentationContext.landingPage}
+                          presentationContext={PresentationContext.runHistoryPreview}
                         />
                       )}
                       <div className="px-4 py-2 border-t border-gray-800">

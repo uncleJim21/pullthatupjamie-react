@@ -46,6 +46,7 @@ export interface RunHistoryRecommendation {
 }
 
 export interface RunHistory {
+  _id: string;
   feed_id: string;
   run_date: string;
   filter_scope: {

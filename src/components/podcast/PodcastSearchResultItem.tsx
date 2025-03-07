@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2 } from 'lucide-react';
+import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2, ChevronRight } from 'lucide-react';
 import { formatTime } from '../../utils/time.ts';
 import { makeClip } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
@@ -10,7 +10,8 @@ import { printLog } from '../../constants/constants.ts';
 export enum PresentationContext {
   search = 'search',
   landingPage = 'landingPage',
-  dashboard = 'dashboard'
+  dashboard = 'dashboard',
+  runHistoryPreview = 'runHistoryPreview'
 }
 
 interface PodcastSearchResultItemProps {
@@ -284,7 +285,32 @@ export const PodcastSearchResultItem = ({
     }
   };
   
-  
+  // Add conditional rendering based on presentation context
+  if (presentationContext === PresentationContext.runHistoryPreview) {
+    return (
+      <div className="flex flex-col bg-[#111111] rounded-lg overflow-hidden">
+        <div className="flex items-start p-4 gap-4">
+          <img
+            src={episodeImage}
+            alt={creator}
+            className="w-32 h-32 rounded object-cover flex-shrink-0"
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageLoaded(false)}
+          />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-semibold text-white truncate">
+              Clips Batch Run: {new Date(date).toLocaleString()}
+            </h3>
+            <p className="text-sm text-gray-400 truncate mt-2">{creator}</p>
+            <p className="text-sm text-gray-400 truncate">{episode}</p>
+          </div>
+          <ChevronRight className="text-gray-400 flex-shrink-0 self-center" size={24} />
+        </div>
+      </div>
+    );
+  }
+
+  // Return original component rendering for other contexts
   return (
     <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden z-100">
       <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
