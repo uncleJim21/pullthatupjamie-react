@@ -4,7 +4,7 @@ import { FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy , Check, QrCodeIcon} from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
 import PodcastFeedService, { 
@@ -15,6 +15,7 @@ import PodcastFeedService, {
 } from '../../services/podcastFeedService.ts';
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro';
+type JamieProView = 'chat' | 'history';
 
 const PodcastFeedPage: React.FC = () => {
     const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
@@ -28,6 +29,7 @@ const PodcastFeedPage: React.FC = () => {
     const [isAdmin, setIsAdmin] = useState(false);
     const [runHistory, setRunHistory] = useState<RunHistory[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [jamieProView, setJamieProView] = useState<JamieProView>('history');
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -323,20 +325,47 @@ const PodcastFeedPage: React.FC = () => {
 
           {activeTab === 'Jamie Pro' && isAdmin && (
             <div className="max-w-4xl mx-auto px-4">
-              <div className="flex items-center justify-between mb-6 mt-6">
-                <h2 className="text-xl font-bold">Run History</h2>
+              <div className="flex items-center justify-center mb-8 mt-8">
+                <div className="inline-flex rounded-lg border border-gray-800 p-1.5">
+                  <button
+                    onClick={() => setJamieProView('chat')}
+                    className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                      jamieProView === 'chat'
+                        ? 'bg-gray-800 text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <MessageSquare size={20} className="mr-2.5" />
+                    Chat with Jamie
+                  </button>
+                  <button
+                    onClick={() => setJamieProView('history')}
+                    className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                      jamieProView === 'history'
+                        ? 'bg-gray-800 text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <History size={20} className="mr-2.5" />
+                    Run History
+                  </button>
+                </div>
               </div>
 
-              {isLoadingHistory ? (
+              {jamieProView === 'chat' ? (
+                <div className="text-center py-12 text-gray-400">
+                  <p className="text-lg">Chat functionality coming soon...</p>
+                </div>
+              ) : isLoadingHistory ? (
                 <div className="flex justify-center items-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
                 </div>
               ) : runHistory.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
-                  <p>No run history available.</p>
+                  <p className="text-lg">No run history available.</p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-6 max-w-3xl mx-auto">
                   {runHistory.map((run, index) => (
                     <div 
                       key={index}
@@ -366,11 +395,6 @@ const PodcastFeedPage: React.FC = () => {
                           presentationContext={PresentationContext.runHistoryPreview}
                         />
                       )}
-                      <div className="px-4 py-2 border-t border-gray-800">
-                        <div className="text-sm text-gray-400">
-                          Run Date: {new Date(run.run_date).toLocaleString()}
-                        </div>
-                      </div>
                     </div>
                   ))}
                 </div>
