@@ -13,6 +13,7 @@ import PodcastFeedService, {
   RunHistory, 
   RunHistoryRecommendation 
 } from '../../services/podcastFeedService.ts';
+import { JamieChat } from './JamieChat.tsx';
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro';
 type JamieProView = 'chat' | 'history';
@@ -356,9 +357,11 @@ const PodcastFeedPage: React.FC = () => {
               </div>
 
               {jamieProView === 'chat' ? (
-                <div className="text-center py-12 text-gray-400">
-                  <p className="text-lg">Chat functionality coming soon...</p>
-                </div>
+                feedId ? <JamieChat feedId={feedId} /> : (
+                  <div className="text-center py-12 text-gray-400">
+                    <p className="text-lg">Unable to load chat. Please try again.</p>
+                  </div>
+                )
               ) : isLoadingHistory ? (
                 <div className="flex justify-center items-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
