@@ -338,7 +338,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
           {activeTab === 'Jamie Pro' && isAdmin && (
             <div className="max-w-4xl mx-auto px-4">
-              <div className="flex items-center justify-center mb-8 mt-8">
+              <div className="flex flex-col items-center py-8">
+                <img
+                  src="/jamie-pro-banner.png"
+                  alt="Jamie Pro Banner"
+                  className="max-w-full h-auto"
+                />
+                <p className="text-gray-400 text-xl font-medium mt-2">AI Curated Clips for You</p>
+              </div>
+              
+              <div className="flex items-center justify-center mb-8">
                 <div className="inline-flex rounded-lg border border-gray-800 p-1.5">
                   <button
                     onClick={() => setJamieProView('chat')}
