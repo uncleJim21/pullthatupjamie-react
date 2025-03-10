@@ -7,7 +7,7 @@ import { getRecommendedClips, ClipItem } from '../../services/dashboardService.t
 const DEFAULT_PODCAST_IMAGE = '/podcast-logo.png'; // Update with your default image path
 
 const DashboardPage: React.FC = () => {
-  const { userId } = useParams<{ userId: string }>();
+  const { feedId } = useParams<{ feedId: string }>();
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,16 +16,16 @@ const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     fetchRecommendedClips();
-  }, [userId, enableFieldFiltering]);
+  }, [feedId, enableFieldFiltering]);
 
   const fetchRecommendedClips = async () => {
-    if (!userId) return;
+    if (!feedId) return;
     
     setIsLoading(true);
     setError(null);
     
     try {
-      const result = await getRecommendedClips(userId, enableFieldFiltering);
+      const result = await getRecommendedClips(feedId, enableFieldFiltering);
       
       if (result.success) {
         setClips(result.clips);
@@ -60,7 +60,7 @@ const DashboardPage: React.FC = () => {
     <div className="min-h-screen bg-black text-white">
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Recommended Clips for {userId}</h1>
+          <h1 className="text-2xl font-bold">Recommended Clips for {feedId}</h1>
           
           <div className="flex items-center">
             <span className="mr-3 text-sm text-gray-400">

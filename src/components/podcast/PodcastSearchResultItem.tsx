@@ -1,16 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2 } from 'lucide-react';
+import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2, ChevronRight } from 'lucide-react';
 import { formatTime } from '../../utils/time.ts';
 import { makeClip } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
 import EditTimestampsModal from "./EditTimestampsModal.tsx";
 import { AuthConfig } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
+import { useNavigate } from 'react-router-dom';
 
 export enum PresentationContext {
   search = 'search',
   landingPage = 'landingPage',
-  dashboard = 'dashboard'
+  dashboard = 'dashboard',
+  runHistoryPreview = 'runHistoryPreview'
 }
 
 interface PodcastSearchResultItemProps {
@@ -39,6 +41,8 @@ interface PodcastSearchResultItemProps {
   onClipProgress?: (progress: ClipProgress) => void;
   authConfig?: AuthConfig | null | undefined;
   presentationContext?:PresentationContext;
+  runId?: string;
+  feedId?: string;
 }
 
 export const PodcastSearchResultItem = ({
@@ -59,7 +63,9 @@ export const PodcastSearchResultItem = ({
   shareLink,
   onClipProgress,
   authConfig,
-  presentationContext = PresentationContext.search
+  presentationContext = PresentationContext.search,
+  runId,
+  feedId
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
@@ -71,7 +77,7 @@ export const PodcastSearchResultItem = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editTimestampsError,setEditTimestampsError] = useState<string|undefined>(undefined);
   const CLIP_LENGTH_LIMIT_SECONDS = 60 * 10;
-
+  const navigate = useNavigate();
 
   const audioRef = useRef(null as HTMLAudioElement | null);
   const progressRef = useRef(null as HTMLDivElement | null);
@@ -82,13 +88,6 @@ export const PodcastSearchResultItem = ({
   : currentTime < timeContext.start_time
   ? 0 // Show 0% if playback is before the clip start time
   : Math.min(((currentTime - timeContext.start_time) / duration) * 100, 100);
-
-
-  useEffect(() => {
-    if (!isPlaying && audioRef.current) {
-      audioRef.current.pause();
-    }
-  }, [isPlaying]);
 
   useEffect(() => {
     if (!isPlaying && audioRef.current) {
@@ -121,7 +120,6 @@ export const PodcastSearchResultItem = ({
       }
     }
   };
-
 
   const handleProgressClick = (e: { clientX: number }) => {
     if (progressRef.current && audioRef.current) {
@@ -284,7 +282,45 @@ export const PodcastSearchResultItem = ({
     }
   };
   
-  
+  // Add conditional rendering based on presentation context
+  if (presentationContext === PresentationContext.runHistoryPreview) {
+    return (
+      <div 
+        className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden cursor-pointer hover:border-gray-700 transition-colors"
+        onClick={() => {
+          if (runId) {
+            navigate(`/feed/${feedId}/clipBatch/${runId}`);
+          }
+        }}
+      >
+        <div className="p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <img
+              src={episodeImage}
+              alt={creator}
+              className="w-32 h-32 rounded-md border border-gray-700 object-cover mx-auto sm:mx-0 flex-shrink-0"
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageLoaded(false)}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-xl font-medium text-white mb-1">
+                    Clips Batch Run: {new Date(date).toLocaleString()}
+                  </h3>
+                  <p className="text-base text-gray-400 truncate line-clamp-1">{creator}</p>
+                  <p className="text-base text-gray-400 truncate line-clamp-1">{episode}</p>
+                </div>
+                <ChevronRight className="text-gray-400 flex-shrink-0 ml-2" size={32} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Return original component rendering for other contexts
   return (
     <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden z-100">
       <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
@@ -358,19 +394,19 @@ export const PodcastSearchResultItem = ({
           <div className="flex-grow min-w-0">
             <div className="flex flex-col sm:flex-row sm:justify-between">
               {/* Episode text */}
-              <div className="flex-grow pr-0 sm:pr-4">
+              <div className="flex-grow pr-0 sm:pr-4 min-w-0 max-w-[calc(100%-220px)]">
                 <h3 className="text-lg font-medium text-white line-clamp-1 sm:line-clamp-2 max-w-md">{episode}</h3>
-                <p className="text-sm text-gray-400">{creator}</p>
+                <p className="text-sm text-gray-400 line-clamp-1">{creator}</p>
               </div>
   
               {/* Action Buttons */}
-              <div className="mt-4 sm:mt-0 sm:w-[200px] grid grid-rows-1 grid-flow-col sm:grid-cols-2 sm:grid-flow-row gap-2">
+              <div className="mt-4 sm:mt-0 sm:w-[200px] sm:min-w-[200px] sm:flex-shrink-0 grid grid-rows-1 grid-flow-col sm:grid-cols-2 sm:grid-flow-row gap-2">
                 <button
                   className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                   onClick={handleShare}
                 >
-                  <Link className="h-4 w-4 mr-2" />
-                  <span>{showCopied ? 'Copied!' : 'Link'}</span>
+                  <Link className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">{showCopied ? 'Copied!' : 'Link'}</span>
                 </button>
                 <button
                   className={`flex items-center justify-start px-2 py-2 rounded-md text-sm ${
@@ -381,15 +417,15 @@ export const PodcastSearchResultItem = ({
                   onClick={handleListen}
                   disabled={!listenLink}
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  <span>Listen</span>
+                  <ExternalLink className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">Listen</span>
                 </button>
                 {onClipProgress && (<button
                   className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                   onClick={handleClip}
                 >
-                  <Scissors className="h-4 w-4 mr-2" />
-                  <span>Clip</span>
+                  <Scissors className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">Clip</span>
                 </button>
                 )}
               </div>

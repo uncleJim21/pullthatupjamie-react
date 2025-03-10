@@ -1,41 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { API_URL, FRONTEND_URL } from '../../constants/constants.ts';
+import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy , Check, QrCodeIcon} from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
+import PodcastFeedService, { 
+  Episode, 
+  PodcastFeedData, 
+  RunHistory, 
+  RunHistoryRecommendation 
+} from '../../services/podcastFeedService.ts';
+import { JamieChat } from './JamieChat.tsx';
 
-interface Episode {
-    id: string;
-    title: string;
-    date: string;
-    duration: string;
-    audioUrl: string;
-    description?: string;
-    episodeNumber?: string;
-    episodeImage?: string;
-    listenLink?: string;
-  }
-  
-  interface PodcastFeedData {
-    id: string;
-    headerColor: string;
-    logoUrl: string;
-    title: string;
-    creator: string;
-    lightningAddress?: string;
-    description: string;
-    episodes: Episode[];
-    subscribeLinks:SubscribeLinks
-  }
-  
+type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro';
+type JamieProView = 'chat' | 'history';
 
-type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe';
-
-const PodcastFeedPage: React.FC = () => {
+const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> = ({ initialView, defaultTab }) => {
     const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
     const [feedData, setFeedData] = useState<PodcastFeedData | null>(null);
     const [featuredEpisode, setFeaturedEpisode] = useState<Episode | null>(null);
@@ -45,6 +28,9 @@ const PodcastFeedPage: React.FC = () => {
     const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
     const [qrModalOpen, setQrModalOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [runHistory, setRunHistory] = useState<RunHistory[]>([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [jamieProView, setJamieProView] = useState<JamieProView>('history');
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -72,9 +58,37 @@ const PodcastFeedPage: React.FC = () => {
     setQrModalOpen(true);
   }
 
+  const fetchRunHistory = async () => {
+    if (!feedId || !isAdmin) return;
+    
+    try {
+      setIsLoadingHistory(true);
+      const authToken = localStorage.getItem('auth_token');
+      if (!authToken) return;
+
+      const response = await PodcastFeedService.getRunHistory(feedId, authToken);
+      if (response.success) {
+        setRunHistory(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching run history:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'Jamie Pro' && isAdmin) {
+      fetchRunHistory();
+    }
+  }, [activeTab, isAdmin, feedId]);
+
   useEffect(() => {
       console.log(`feedId: ${feedId}`);
-
+      if(DEBUG_MODE){
+        setIsAdmin(true);
+        return;
+      }
       const checkPrivileges = async () => {
           try {
               const token = localStorage.getItem("auth_token") as string;
@@ -98,15 +112,13 @@ const PodcastFeedPage: React.FC = () => {
       }
   }, [feedId]); 
 
-
   useEffect(() => {
     const fetchFeedData = async () => {
+      if (!feedId) return;
+      
       try {
-        const response = await fetch(`${API_URL}/api/podcast-feed/${feedId}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        setIsLoading(true);
+        const data = await PodcastFeedService.getFeedData(feedId);
         setFeedData(data);
 
         // If we have an episodeId, find and set the featured episode
@@ -124,10 +136,17 @@ const PodcastFeedPage: React.FC = () => {
       }
     };
 
-    if (feedId) {
-      fetchFeedData();
-    }
+    fetchFeedData();
   }, [feedId, episodeId]);
+
+  useEffect(() => {
+    if (feedData && initialView === 'jamiePro') {
+      setActiveTab('Jamie Pro');
+      if (defaultTab === 'history') {
+        setJamieProView('history');
+      }
+    }
+  }, [feedData, initialView, defaultTab]);
 
   if (isLoading) {
     return (
@@ -217,7 +236,8 @@ const PodcastFeedPage: React.FC = () => {
                 'Episodes', 
                 // 'Home', 
                 // 'Top Clips', 
-                'Subscribe'
+                'Subscribe',
+                ...(isAdmin ? ['Jamie Pro'] : [])
             ] as TabType[]).map((tab) => (
               <button
                 key={tab}
@@ -314,6 +334,98 @@ const PodcastFeedPage: React.FC = () => {
               appleLink={feedData?.subscribeLinks?.appleLink || null}
               youtubeLink={feedData?.subscribeLinks?.youtubeLink || null}
             />
+          )}
+
+          {activeTab === 'Jamie Pro' && isAdmin && (
+            <div className="max-w-4xl mx-auto px-4">
+              <div className="flex flex-col items-center py-8">
+                <img
+                  src="/jamie-pro-banner.png"
+                  alt="Jamie Pro Banner"
+                  className="max-w-full h-auto"
+                />
+                <p className="text-gray-400 text-xl font-medium mt-2">AI Curated Clips for You</p>
+              </div>
+              
+              <div className="flex items-center justify-center mb-8">
+                <div className="inline-flex rounded-lg border border-gray-800 p-1.5">
+                  <button
+                    onClick={() => setJamieProView('chat')}
+                    className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                      jamieProView === 'chat'
+                        ? 'bg-gray-800 text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <MessageSquare size={20} className="mr-2.5" />
+                    Chat with Jamie
+                  </button>
+                  <button
+                    onClick={() => setJamieProView('history')}
+                    className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                      jamieProView === 'history'
+                        ? 'bg-gray-800 text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <History size={20} className="mr-2.5" />
+                    Run History
+                  </button>
+                </div>
+              </div>
+
+              {jamieProView === 'chat' ? (
+                feedId ? <JamieChat feedId={feedId} /> : (
+                  <div className="text-center py-12 text-gray-400">
+                    <p className="text-lg">Unable to load chat. Please try again.</p>
+                  </div>
+                )
+              ) : isLoadingHistory ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+                </div>
+              ) : runHistory.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <p className="text-lg">No run history available.</p>
+                </div>
+              ) : (
+                <div className="space-y-6 max-w-3xl mx-auto">
+                  {runHistory.map((run, index) => (
+                    <div 
+                      key={index}
+                      className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden hover:border-gray-700 transition-colors cursor-pointer"
+                      onClick={() => console.log(`run history id: ${run._id} tapped`)}
+                    >
+                      {run.recommendations.length > 0 && (
+                        <PodcastSearchResultItem
+                          id={run.recommendations[0].paragraph_ids[0]}
+                          quote={run.recommendations[0].text}
+                          episode={run.recommendations[0].title}
+                          creator={`${run.recommendations[0].feed_title} - ${run.recommendations[0].episode_title}`}
+                          audioUrl={run.recommendations[0].audio_url}
+                          date={run.run_date}
+                          timeContext={{
+                            start_time: run.recommendations[0].start_time,
+                            end_time: run.recommendations[0].end_time
+                          }}
+                          similarity={{ combined: run.recommendations[0].relevance_score / 100, vector: run.recommendations[0].relevance_score / 100 }}
+                          episodeImage={run.recommendations[0].episode_image}
+                          isPlaying={currentlyPlayingId === run.recommendations[0].paragraph_ids[0]}
+                          onPlayPause={handlePlayPause}
+                          onEnded={handleEnded}
+                          shareUrl={`${window.location.origin}/feed/${feedId}`}
+                          shareLink={run.recommendations[0].paragraph_ids[0]}
+                          authConfig={null}
+                          presentationContext={PresentationContext.runHistoryPreview}
+                          runId={run._id}
+                          feedId={feedId}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
         </div>
