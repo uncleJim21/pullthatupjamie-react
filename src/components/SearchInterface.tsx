@@ -835,17 +835,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
       {isClipBatchPage && (
-        <button 
-          onClick={() => window.location.href = `/feed/${feedId}/jamieProHistory`} 
-          className="absolute top-2 left-4 sm:top-6 sm:left-8 h-8 w-8 flex items-center justify-center bg-transparent text-white rounded-full hover:text-gray-300 focus:outline-none"
-          style={{
-            color: '#C0C0C0',
-            textShadow: '0 0 8px #C0C0C0',
-            fontSize: '24px'
-          }}
-        >
-          ←
-        </button>
+        <div></div>
       )}
       <SignInModal
         isOpen={isSignInModalOpen}
@@ -874,7 +864,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {isUpgradeSuccessPopUpOpen && (
         <SubscriptionSuccessPopup onClose={() => setIsUpgradeSuccessPopUpOpen(false)} />
       )}
-      {/* TODO: Reinstate for payments */}
       {!isRegisterModalOpen && (
         <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
           <AccountButton 
@@ -906,13 +895,26 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       <div className={`${hasSearchedInMode(searchMode) ? 'mb-8' : ''} ml-4 mr-4`}>
         {/* Header with Logo */}
         {isClipBatchPage ? (
-          <div className="flex flex-col items-center py-8">
-            <img
-              src="/jamie-pro-banner.png"
-              alt="Jamie Pro Banner"
-              className="max-w-full h-auto"
-            />
-            <p className="text-gray-400 text-xl font-medium mt-2">AI Curated Clips for You</p>
+          <div className="relative w-full max-w-4xl mx-auto">
+            <button 
+              onClick={() => window.location.href = `/feed/${feedId}/jamieProHistory`} 
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-12 w-12 flex items-center justify-center bg-transparent text-white hover:text-gray-300 focus:outline-none z-10"
+              style={{
+                color: '#C0C0C0',
+                textShadow: '0 0 8px #C0C0C0',
+                fontSize: '32px'
+              }}
+            >
+              ←
+            </button>
+            <div className="flex flex-col items-center py-8">
+              <img
+                src="/jamie-pro-banner.png"
+                alt="Jamie Pro Banner"
+                className="max-w-full h-auto"
+              />
+              <p className="text-gray-400 text-xl font-medium mt-2">AI Curated Clips for You</p>
+            </div>
           </div>
         ) : (
           <div className={`flex justify-center items-center py-8 select-none ${!hasSearchedInMode(searchMode) && 'mt-8'}`}>
