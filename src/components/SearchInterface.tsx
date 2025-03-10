@@ -896,17 +896,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         {/* Header with Logo */}
         {isClipBatchPage ? (
           <div className="relative w-full max-w-4xl mx-auto">
-            <button 
-              onClick={() => window.location.href = `/feed/${feedId}/jamieProHistory`} 
-              className="absolute left-0 top-1/2 -translate-y-1/2 h-12 w-12 flex items-center justify-center bg-transparent text-white hover:text-gray-300 focus:outline-none z-10"
-              style={{
-                color: '#C0C0C0',
-                textShadow: '0 0 8px #C0C0C0',
-                fontSize: '32px'
-              }}
-            >
-              ←
-            </button>
+            <div className="flex justify-start md:block mb-4 md:mb-0">
+              <button 
+                onClick={() => window.location.href = `/feed/${feedId}/jamieProHistory`} 
+                className="md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2 h-12 w-12 flex items-center justify-center bg-transparent text-white hover:text-gray-300 focus:outline-none z-10 ml-4 md:ml-0"
+                style={{
+                  color: '#C0C0C0',
+                  textShadow: '0 0 8px #C0C0C0',
+                  fontSize: '32px'
+                }}
+              >
+                ←
+              </button>
+            </div>
             <div className="flex flex-col items-center py-8">
               <img
                 src="/jamie-pro-banner.png"
