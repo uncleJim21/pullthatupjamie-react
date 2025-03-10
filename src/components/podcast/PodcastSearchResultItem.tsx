@@ -308,10 +308,10 @@ export const PodcastSearchResultItem = ({
                   <h3 className="text-xl font-medium text-white mb-1">
                     Clips Batch Run: {new Date(date).toLocaleString()}
                   </h3>
-                  <p className="text-base text-gray-400 truncate">{creator}</p>
-                  <p className="text-base text-gray-400 truncate">{episode}</p>
+                  <p className="text-base text-gray-400 truncate line-clamp-1">{creator}</p>
+                  <p className="text-base text-gray-400 truncate line-clamp-1">{episode}</p>
                 </div>
-                <ChevronRight className="text-gray-400 flex-shrink-0" size={32} />
+                <ChevronRight className="text-gray-400 flex-shrink-0 ml-2" size={32} />
               </div>
             </div>
           </div>
@@ -394,19 +394,19 @@ export const PodcastSearchResultItem = ({
           <div className="flex-grow min-w-0">
             <div className="flex flex-col sm:flex-row sm:justify-between">
               {/* Episode text */}
-              <div className="flex-grow pr-0 sm:pr-4">
+              <div className="flex-grow pr-0 sm:pr-4 min-w-0 max-w-[calc(100%-220px)]">
                 <h3 className="text-lg font-medium text-white line-clamp-1 sm:line-clamp-2 max-w-md">{episode}</h3>
-                <p className="text-sm text-gray-400">{creator}</p>
+                <p className="text-sm text-gray-400 line-clamp-1">{creator}</p>
               </div>
   
               {/* Action Buttons */}
-              <div className="mt-4 sm:mt-0 sm:w-[200px] grid grid-rows-1 grid-flow-col sm:grid-cols-2 sm:grid-flow-row gap-2">
+              <div className="mt-4 sm:mt-0 sm:w-[200px] sm:min-w-[200px] sm:flex-shrink-0 grid grid-rows-1 grid-flow-col sm:grid-cols-2 sm:grid-flow-row gap-2">
                 <button
                   className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                   onClick={handleShare}
                 >
-                  <Link className="h-4 w-4 mr-2" />
-                  <span>{showCopied ? 'Copied!' : 'Link'}</span>
+                  <Link className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">{showCopied ? 'Copied!' : 'Link'}</span>
                 </button>
                 <button
                   className={`flex items-center justify-start px-2 py-2 rounded-md text-sm ${
@@ -417,15 +417,15 @@ export const PodcastSearchResultItem = ({
                   onClick={handleListen}
                   disabled={!listenLink}
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  <span>Listen</span>
+                  <ExternalLink className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">Listen</span>
                 </button>
                 {onClipProgress && (<button
                   className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                   onClick={handleClip}
                 >
-                  <Scissors className="h-4 w-4 mr-2" />
-                  <span>Clip</span>
+                  <Scissors className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">Clip</span>
                 </button>
                 )}
               </div>

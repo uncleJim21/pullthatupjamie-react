@@ -366,7 +366,7 @@ export default function ClipTrackerModal({
                     </div>
 
                     <div className="flex-1 min-w-0 mt-2">
-                      <h3 className="text-lg font-semibold text-white truncate">{clipProgress?.creator}</h3>
+                      <h3 className="text-lg font-semibold text-white truncate line-clamp-1">{clipProgress?.creator}</h3>
                       <p className="text-sm text-gray-400 mt-1 line-clamp-2">{clipProgress?.episode}</p>
                       <p className="text-xs text-gray-500 mt-1">
                         Timestamps: {clipProgress?.timestamps.map((t) => formatTime(t)).join(' - ')}
@@ -437,10 +437,10 @@ export default function ClipTrackerModal({
                 className="w-12 h-12 rounded-md flex-shrink-0"
               />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
+                <p className="text-sm font-medium text-white truncate line-clamp-1">
                   {item.creator}
                 </p>
-                <p className="text-xs text-gray-400 truncate mr-12">
+                <p className="text-xs text-gray-400 truncate line-clamp-1 mr-12">
                   {item.episode}
                 </p>
                 <p className="text-xs text-gray-500">
@@ -448,7 +448,7 @@ export default function ClipTrackerModal({
                 </p>
               </div>
               {item.cdnLink ? (
-                <div className='pr-4 mt-3'>
+                <div className='pr-4 mt-3 flex-shrink-0'>
                   <div
                     onClick={() => item.cdnLink && window.open(item.cdnLink, '_blank')}
                     className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer opacity-80"
@@ -463,11 +463,11 @@ export default function ClipTrackerModal({
                   </div>
                 </div>
               ) : item.failed ? (
-                <div className='pr-4 mt-2'>
+                <div className='pr-4 mt-2 flex-shrink-0'>
                   <X className="w-5 h-5 text-red-500 flex-shrink-0" />
                 </div>
               ) : (
-                <div className='pr-4 mt-2'>
+                <div className='pr-4 mt-2 flex-shrink-0'>
                   <Loader2 className="w-5 h-5 text-white animate-spin flex-shrink-0" />
                 </div>
               )}
