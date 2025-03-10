@@ -834,6 +834,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
+      {isClipBatchPage && (
+        <button 
+          onClick={() => window.location.href = `/feed/${feedId}/jamieProHistory`} 
+          className="absolute top-2 left-4 sm:top-6 sm:left-8 h-8 w-8 flex items-center justify-center bg-transparent text-white rounded-full hover:text-gray-300 focus:outline-none"
+          style={{
+            color: '#C0C0C0',
+            textShadow: '0 0 8px #C0C0C0',
+            fontSize: '24px'
+          }}
+        >
+          ←
+        </button>
+      )}
       <SignInModal
         isOpen={isSignInModalOpen}
         onClose={() => setIsSignInModalOpen(false)}

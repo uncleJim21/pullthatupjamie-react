@@ -18,7 +18,7 @@ import { JamieChat } from './JamieChat.tsx';
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro';
 type JamieProView = 'chat' | 'history';
 
-const PodcastFeedPage: React.FC = () => {
+const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> = ({ initialView, defaultTab }) => {
     const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
     const [feedData, setFeedData] = useState<PodcastFeedData | null>(null);
     const [featuredEpisode, setFeaturedEpisode] = useState<Episode | null>(null);
@@ -138,6 +138,15 @@ const PodcastFeedPage: React.FC = () => {
 
     fetchFeedData();
   }, [feedId, episodeId]);
+
+  useEffect(() => {
+    if (feedData && initialView === 'jamiePro') {
+      setActiveTab('Jamie Pro');
+      if (defaultTab === 'history') {
+        setJamieProView('history');
+      }
+    }
+  }, [feedData, initialView, defaultTab]);
 
   if (isLoading) {
     return (
