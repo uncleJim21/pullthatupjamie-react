@@ -892,27 +892,38 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       <br></br>
       <div className={`${hasSearchedInMode(searchMode) ? 'mb-8' : ''} ml-4 mr-4`}>
         {/* Header with Logo */}
-        <div className={`flex justify-center items-center py-8 select-none ${!hasSearchedInMode(searchMode) && 'mt-8'}`}>
-          <div className="flex items-center gap-4">
+        {isClipBatchPage ? (
+          <div className="flex flex-col items-center py-8">
             <img
-              src="/jamie-logo.png"
-              alt="Jamie Logo"
-              width={128}
-              height={128}
-              className={`${hasSearchedInMode(searchMode) ? 'w-16 h-16' : ''} w-128 h-128`}
+              src="/jamie-pro-banner.png"
+              alt="Jamie Pro Banner"
+              className="max-w-full h-auto"
             />
-            <div>
-              <h1 className="text-3xl font-bold">Pull That Up Jamie!</h1>
-              <p className={`text-gray-400 text-md text-shadow-light-white ${hasSearchedInMode(searchMode) ? 'hidden' : ''}`}>
-                {searchMode === 'quick' ? 'Instantly pull up anything with private web search + AI.' : ''}
-                {searchMode === 'podcast-search' ? 'Search podcasts and clip them instantly.' : ''}
-              </p>
+            <p className="text-gray-400 text-xl font-medium mt-2">AI Curated Clips for You</p>
+          </div>
+        ) : (
+          <div className={`flex justify-center items-center py-8 select-none ${!hasSearchedInMode(searchMode) && 'mt-8'}`}>
+            <div className="flex items-center gap-4">
+              <img
+                src="/jamie-logo.png"
+                alt="Jamie Logo"
+                width={128}
+                height={128}
+                className={`${hasSearchedInMode(searchMode) ? 'w-16 h-16' : ''} w-128 h-128`}
+              />
+              <div>
+                <h1 className="text-3xl font-bold">Pull That Up Jamie!</h1>
+                <p className={`text-gray-400 text-md text-shadow-light-white ${hasSearchedInMode(searchMode) ? 'hidden' : ''}`}>
+                  {searchMode === 'quick' ? 'Instantly pull up anything with private web search + AI.' : ''}
+                  {searchMode === 'podcast-search' ? 'Search podcasts and clip them instantly.' : ''}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Search Modes - Now shown when hasSearched is true */}
-        { (
+        {!isClipBatchPage && (
           <div className="flex justify-center mb-6 select-none">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               {[
@@ -937,7 +948,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           </div>
         )}
 
-        {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (searchState.isLoading === false) && 
+        {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (searchState.isLoading === false) && !isClipBatchPage && (
           <AvailableSourcesSection 
             hasSearched={hasSearchedInMode(searchMode)} 
             selectedSources={selectedSources} 
@@ -946,7 +957,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             setIsSendingFeedback={setIsSendingFeedback}
             sizeOverride={'24'}
             /> 
-          }
+          )}
 
         {/* Initial Search Form */}
         <div className="max-w-3xl mx-auto px-4">
