@@ -154,7 +154,7 @@ export const JamieChat: React.FC<JamieChatProps> = ({ feedId }) => {
           {topics.map((topic, index) => (
             <li key={index} className="flex items-start">
               <span className="mr-2">•</span>
-              <span>{topic}</span>
+              <span className="break-words">{topic}</span>
             </li>
           ))}
         </ul>
@@ -162,24 +162,28 @@ export const JamieChat: React.FC<JamieChatProps> = ({ feedId }) => {
     };
     
     return (
-      <div className="mt-2">
-        <table className="border-collapse w-full text-white">
-          <tr>
-            <td className="border border-gray-600 px-4 py-1 font-medium">Category</td>
-            <td className="border border-gray-600 px-4 py-1 font-medium">Topics</td>
-          </tr>
-          <tr>
-            <td className="border border-gray-600 px-4 py-1">Preferred Topics</td>
-            <td className="border border-gray-600 px-4 py-1">
-              {formatTopicsList(prefs.preferred_topics || [])}
-            </td>
-          </tr>
-          <tr>
-            <td className="border border-gray-600 px-4 py-1">Excluded Topics</td>
-            <td className="border border-gray-600 px-4 py-1">
-              {formatTopicsList(prefs.excluded_topics || [])}
-            </td>
-          </tr>
+      <div className="mt-2 overflow-x-auto">
+        <table className="border-collapse w-full text-white table-fixed">
+          <thead>
+            <tr>
+              <th className="border border-gray-600 px-2 sm:px-4 py-1 font-medium w-1/3">Category</th>
+              <th className="border border-gray-600 px-2 sm:px-4 py-1 font-medium w-2/3">Topics</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="border border-gray-600 px-2 sm:px-4 py-1">Preferred Topics</td>
+              <td className="border border-gray-600 px-2 sm:px-4 py-1">
+                {formatTopicsList(prefs.preferred_topics || [])}
+              </td>
+            </tr>
+            <tr>
+              <td className="border border-gray-600 px-2 sm:px-4 py-1">Excluded Topics</td>
+              <td className="border border-gray-600 px-2 sm:px-4 py-1">
+                {formatTopicsList(prefs.excluded_topics || [])}
+              </td>
+            </tr>
+          </tbody>
         </table>
       </div>
     );
@@ -243,20 +247,20 @@ export const JamieChat: React.FC<JamieChatProps> = ({ feedId }) => {
     <div className="max-w-3xl mx-auto">
       <div className="bg-[#1A1A1A] border border-gray-700 rounded-xl overflow-hidden relative">
         {/* Messages Container */}
-        <div className="h-[500px] overflow-y-auto p-6 space-y-5">
+        <div className="h-[500px] overflow-y-auto p-4 sm:p-6 space-y-5">
           {messages.map((message) => (
             <div
               key={message.id}
               className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
             >
               <div
-                className={`max-w-[80%] rounded-xl p-4 ${
+                className={`max-w-[90%] sm:max-w-[80%] rounded-xl p-3 sm:p-4 ${
                   message.sender === 'user'
-                    ? 'bg-[#333333] text-white ml-4'
-                    : 'bg-[#232323] text-white mr-4'
+                    ? 'bg-[#333333] text-white ml-2 sm:ml-4'
+                    : 'bg-[#232323] text-white mr-2 sm:mr-4'
                 }`}
               >
-                <div className="text-white">
+                <div className="text-white break-words">
                   {typeof message.text === 'string' ? message.text : message.text}
                 </div>
                 <p className="text-xs mt-2 opacity-50">
@@ -278,23 +282,23 @@ export const JamieChat: React.FC<JamieChatProps> = ({ feedId }) => {
         )}
 
         {/* Input Form */}
-        <form onSubmit={handleSubmit} className="border-t border-gray-700 p-5">
-          <div className="flex items-center gap-3">
+        <form onSubmit={handleSubmit} className="border-t border-gray-700 p-3 sm:p-5">
+          <div className="flex items-center gap-1 sm:gap-3 pr-3 sm:pr-4">
             <input
               ref={inputRef}
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder="Type your message..."
-              className="flex-1 bg-[#2A2A2A] text-white rounded-xl px-5 py-3 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex-1 bg-[#2A2A2A] text-white rounded-xl px-2 sm:px-5 py-2 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-1 focus:ring-blue-500"
               disabled={isUpdating}
             />
             <button
               type="submit"
-              className="bg-white text-black rounded-xl p-3 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-white text-black rounded-xl p-2 sm:p-3 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 mr-2 sm:mr-3"
               disabled={!inputText.trim() || isUpdating}
             >
-              <Send size={20} />
+              <Send size={16} className="sm:w-5 sm:h-5" />
             </button>
           </div>
         </form>
