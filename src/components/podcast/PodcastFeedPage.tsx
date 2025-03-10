@@ -141,12 +141,25 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
   useEffect(() => {
     if (feedData && initialView === 'jamiePro') {
-      setActiveTab('Jamie Pro');
-      if (defaultTab === 'history') {
-        setJamieProView('history');
+      if (isAdmin) {
+        setActiveTab('Jamie Pro');
+        if (defaultTab === 'history') {
+          setJamieProView('history');
+        }
+      } else {
+        setActiveTab('Episodes');
+        console.log('Non-admin user attempted to access Jamie Pro tab, falling back to Episodes tab');
       }
     }
-  }, [feedData, initialView, defaultTab]);
+  }, [feedData, initialView, defaultTab, isAdmin]);
+
+  // Add a useEffect to ensure activeTab is never 'Jamie Pro' for non-admin users
+  useEffect(() => {
+    if (activeTab === 'Jamie Pro' && !isAdmin) {
+      setActiveTab('Episodes');
+      console.log('Non-admin user attempted to access Jamie Pro tab, falling back to Episodes tab');
+    }
+  }, [activeTab, isAdmin]);
 
   if (isLoading) {
     return (
@@ -259,185 +272,230 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       </div>
 
       <div className="max-w-4xl mx-auto px-4">
-        {activeTab === 'Episodes' && (
-            <>
+        {/* Ensure non-admin users can't see Jamie Pro tab content even if activeTab is somehow set to it */}
+        {activeTab === 'Jamie Pro' && !isAdmin ? (
+          // Render Episodes tab content as fallback
+          <>
             {featuredEpisode && (
-                <div className="py-8">
+              <div className="py-8">
                 <h2 className="text-xl font-bold mb-6">Featured Episode</h2>
                 <PodcastSearchResultItem
-                    key={featuredEpisode.id}
-                    id={featuredEpisode.id}
-                    quote={featuredEpisode.description || ''}
-                    episode={featuredEpisode.title}
-                    creator={feedData?.creator || ''}
-                    audioUrl={featuredEpisode.audioUrl}
-                    date={featuredEpisode.date}
-                    timeContext={{
+                  key={featuredEpisode.id}
+                  id={featuredEpisode.id}
+                  quote={featuredEpisode.description || ''}
+                  episode={featuredEpisode.title}
+                  creator={feedData?.creator || ''}
+                  audioUrl={featuredEpisode.audioUrl}
+                  date={featuredEpisode.date}
+                  timeContext={{
                     start_time: 0,
                     end_time: 3600
-                    }}
-                    similarity={{ combined: 1, vector: 1 }}
-                    episodeImage={feedData?.logoUrl || ''}
-                    isPlaying={currentlyPlayingId === featuredEpisode.id}
-                    onPlayPause={handlePlayPause}
-                    onEnded={handleEnded}
-                    shareUrl={`${FRONTEND_URL}/feed/${feedId}/episode/${featuredEpisode.id}`}
-                    shareLink={featuredEpisode.id}
-                    authConfig={null}
-                    presentationContext={PresentationContext.landingPage}
+                  }}
+                  similarity={{ combined: 1, vector: 1 }}
+                  episodeImage={feedData?.logoUrl || ''}
+                  listenLink={featuredEpisode.audioUrl}
+                  isPlaying={currentlyPlayingId === featuredEpisode.id}
+                  onPlayPause={handlePlayPause}
+                  onEnded={handleEnded}
+                  shareUrl=""
+                  shareLink=""
                 />
-                </div>
+              </div>
             )}
-
-            {!featuredEpisode && (
-                <div className="py-8">
-                <p className="text-gray-300 leading-relaxed">
-                    {feedData?.description}
-                </p>
-                </div>
-            )}
-
-            <h2 className="text-xl font-bold mb-6">Latest Episodes</h2>
-            <div className="space-y-4">
-                {Array.isArray(feedData.episodes) && feedData.episodes.map((episode) => (
-                <PodcastSearchResultItem
+            <div className="py-8">
+              <h2 className="text-xl font-bold mb-6">All Episodes</h2>
+              <div className="space-y-6">
+                {feedData.episodes.map(episode => (
+                  <PodcastSearchResultItem
                     key={episode.id}
                     id={episode.id}
                     quote={episode.description || ''}
                     episode={episode.title}
-                    creator={feedData.creator}
+                    creator={feedData?.creator || ''}
                     audioUrl={episode.audioUrl}
                     date={episode.date}
                     timeContext={{
-                    start_time: 0,
-                    end_time: 3600
+                      start_time: 0,
+                      end_time: 3600
                     }}
                     similarity={{ combined: 1, vector: 1 }}
-                    episodeImage={feedData.logoUrl}
+                    episodeImage={feedData?.logoUrl || ''}
+                    listenLink={episode.audioUrl}
                     isPlaying={currentlyPlayingId === episode.id}
                     onPlayPause={handlePlayPause}
                     onEnded={handleEnded}
-                    shareUrl={`${FRONTEND_URL}/feed/${feedId}/episode/${episode.id}`}
-                    listenLink={episode.listenLink}
-                    shareLink={episode.id}
-                    authConfig={null}
-                    presentationContext={PresentationContext.landingPage}
-                />
+                    shareUrl=""
+                    shareLink=""
+                  />
                 ))}
+              </div>
             </div>
-            </>
-        )}
-
-          {activeTab === 'Subscribe' && (
-            <SubscribeSection 
-              spotifyLink={feedData?.subscribeLinks?.spotifyLink || null} 
-              appleLink={feedData?.subscribeLinks?.appleLink || null}
-              youtubeLink={feedData?.subscribeLinks?.youtubeLink || null}
-            />
-          )}
-
-          {activeTab === 'Jamie Pro' && isAdmin && (
-            <div className="max-w-4xl mx-auto px-4">
-              <div className="flex flex-col items-center py-8">
-                <img
-                  src="/jamie-pro-banner.png"
-                  alt="Jamie Pro Banner"
-                  className="max-w-full h-auto"
-                />
-                <p className="text-gray-400 text-xl font-medium mt-2">AI Curated Clips for You</p>
-              </div>
-              
-              <div className="flex items-center justify-center mb-8">
-                <div className="inline-flex rounded-lg border border-gray-800 p-1.5">
-                  <button
-                    onClick={() => setJamieProView('chat')}
-                    className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
-                      jamieProView === 'chat'
-                        ? 'bg-gray-800 text-white'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    <MessageSquare size={20} className="mr-2.5" />
-                    Chat with Jamie
-                  </button>
-                  <button
-                    onClick={() => setJamieProView('history')}
-                    className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
-                      jamieProView === 'history'
-                        ? 'bg-gray-800 text-white'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    <History size={20} className="mr-2.5" />
-                    Run History
-                  </button>
-                </div>
-              </div>
-
-              {jamieProView === 'chat' ? (
-                feedId ? <JamieChat feedId={feedId} /> : (
-                  <div className="text-center py-12 text-gray-400">
-                    <p className="text-lg">Unable to load chat. Please try again.</p>
+          </>
+        ) : (
+          <>
+            {activeTab === 'Episodes' && (
+              <>
+                {featuredEpisode && (
+                  <div className="py-8">
+                    <h2 className="text-xl font-bold mb-6">Featured Episode</h2>
+                    <PodcastSearchResultItem
+                      key={featuredEpisode.id}
+                      id={featuredEpisode.id}
+                      quote={featuredEpisode.description || ''}
+                      episode={featuredEpisode.title}
+                      creator={feedData?.creator || ''}
+                      audioUrl={featuredEpisode.audioUrl}
+                      date={featuredEpisode.date}
+                      timeContext={{
+                        start_time: 0,
+                        end_time: 3600
+                      }}
+                      similarity={{ combined: 1, vector: 1 }}
+                      episodeImage={feedData?.logoUrl || ''}
+                      listenLink={featuredEpisode.audioUrl}
+                      isPlaying={currentlyPlayingId === featuredEpisode.id}
+                      onPlayPause={handlePlayPause}
+                      onEnded={handleEnded}
+                      shareUrl=""
+                      shareLink=""
+                    />
                   </div>
-                )
-              ) : isLoadingHistory ? (
-                <div className="flex justify-center items-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+                )}
+                <div className="py-8">
+                  <h2 className="text-xl font-bold mb-6">All Episodes</h2>
+                  <div className="space-y-6">
+                    {feedData.episodes.map(episode => (
+                      <PodcastSearchResultItem
+                        key={episode.id}
+                        id={episode.id}
+                        quote={episode.description || ''}
+                        episode={episode.title}
+                        creator={feedData?.creator || ''}
+                        audioUrl={episode.audioUrl}
+                        date={episode.date}
+                        timeContext={{
+                          start_time: 0,
+                          end_time: 3600
+                        }}
+                        similarity={{ combined: 1, vector: 1 }}
+                        episodeImage={feedData?.logoUrl || ''}
+                        listenLink={episode.audioUrl}
+                        isPlaying={currentlyPlayingId === episode.id}
+                        onPlayPause={handlePlayPause}
+                        onEnded={handleEnded}
+                        shareUrl=""
+                        shareLink=""
+                      />
+                    ))}
+                  </div>
                 </div>
-              ) : runHistory.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
-                  <p className="text-lg">No run history available.</p>
-                </div>
-              ) : (
-                <div className="space-y-6 max-w-3xl mx-auto">
-                  {runHistory.map((run, index) => (
-                    <div 
-                      key={index}
-                      className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden hover:border-gray-700 transition-colors cursor-pointer"
-                      onClick={() => console.log(`run history id: ${run._id} tapped`)}
+              </>
+            )}
+
+            {activeTab === 'Subscribe' && (
+              <div className="py-8">
+                <SubscribeSection 
+                  spotifyLink={feedData?.subscribeLinks?.spotifyLink || null}
+                  appleLink={feedData?.subscribeLinks?.appleLink || null}
+                  youtubeLink={feedData?.subscribeLinks?.youtubeLink || null}
+                />
+              </div>
+            )}
+
+            {activeTab === 'Jamie Pro' && isAdmin && (
+              <div className="py-8">
+                <div className="flex items-center justify-center mb-8">
+                  <div className="inline-flex rounded-lg border border-gray-800 p-1.5">
+                    <button
+                      onClick={() => setJamieProView('chat')}
+                      className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                        jamieProView === 'chat'
+                          ? 'bg-gray-800 text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
                     >
-                      {run.recommendations.length > 0 && (
-                        <PodcastSearchResultItem
-                          id={run.recommendations[0].paragraph_ids[0]}
-                          quote={run.recommendations[0].text}
-                          episode={run.recommendations[0].title}
-                          creator={`${run.recommendations[0].feed_title} - ${run.recommendations[0].episode_title}`}
-                          audioUrl={run.recommendations[0].audio_url}
-                          date={run.run_date}
-                          timeContext={{
-                            start_time: run.recommendations[0].start_time,
-                            end_time: run.recommendations[0].end_time
-                          }}
-                          similarity={{ combined: run.recommendations[0].relevance_score / 100, vector: run.recommendations[0].relevance_score / 100 }}
-                          episodeImage={run.recommendations[0].episode_image}
-                          isPlaying={currentlyPlayingId === run.recommendations[0].paragraph_ids[0]}
-                          onPlayPause={handlePlayPause}
-                          onEnded={handleEnded}
-                          shareUrl={`${window.location.origin}/feed/${feedId}`}
-                          shareLink={run.recommendations[0].paragraph_ids[0]}
-                          authConfig={null}
-                          presentationContext={PresentationContext.runHistoryPreview}
-                          runId={run._id}
-                          feedId={feedId}
-                        />
-                      )}
-                    </div>
-                  ))}
+                      <MessageSquare size={20} className="mr-2.5" />
+                      Chat with Jamie
+                    </button>
+                    <button
+                      onClick={() => setJamieProView('history')}
+                      className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                        jamieProView === 'history'
+                          ? 'bg-gray-800 text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <History size={20} className="mr-2.5" />
+                      Run History
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
 
-        </div>
-
-        {qrModalOpen && (
-        <QRCodeModal
-            isOpen={qrModalOpen}
-            onClose={() => setQrModalOpen(false)}
-            lightningAddress={feedData?.lightningAddress || ''}
-            title={feedData?.title || ''}
-        />
+                {jamieProView === 'chat' ? (
+                  feedId ? <JamieChat feedId={feedId} /> : (
+                    <div className="text-center py-12 text-gray-400">
+                      <p className="text-lg">Unable to load chat. Please try again.</p>
+                    </div>
+                  )
+                ) : isLoadingHistory ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+                  </div>
+                ) : runHistory.length === 0 ? (
+                  <div className="text-center py-12 text-gray-400">
+                    <p className="text-lg">No run history available.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6 max-w-3xl mx-auto">
+                    {runHistory.map((run, index) => (
+                      <div 
+                        key={index}
+                        className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden hover:border-gray-700 transition-colors cursor-pointer"
+                        onClick={() => console.log(`run history id: ${run._id} tapped`)}
+                      >
+                        {run.recommendations.length > 0 && (
+                          <PodcastSearchResultItem
+                            id={run.recommendations[0].paragraph_ids[0]}
+                            quote={run.recommendations[0].text}
+                            episode={run.recommendations[0].title}
+                            creator={`${run.recommendations[0].feed_title} - ${run.recommendations[0].episode_title}`}
+                            audioUrl={run.recommendations[0].audio_url}
+                            date={run.run_date}
+                            timeContext={{
+                              start_time: run.recommendations[0].start_time,
+                              end_time: run.recommendations[0].end_time
+                            }}
+                            similarity={{ combined: run.recommendations[0].relevance_score / 100, vector: run.recommendations[0].relevance_score / 100 }}
+                            episodeImage={run.recommendations[0].episode_image}
+                            isPlaying={currentlyPlayingId === run.recommendations[0].paragraph_ids[0]}
+                            onPlayPause={handlePlayPause}
+                            onEnded={handleEnded}
+                            shareUrl={`${window.location.origin}/feed/${feedId}`}
+                            shareLink={run.recommendations[0].paragraph_ids[0]}
+                            authConfig={null}
+                            presentationContext={PresentationContext.runHistoryPreview}
+                            runId={run._id}
+                            feedId={feedId}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
+      </div>
+
+      {qrModalOpen && (
+        <QRCodeModal
+          isOpen={qrModalOpen}
+          onClose={() => setQrModalOpen(false)}
+          lightningAddress={feedData?.lightningAddress || ''}
+          title={feedData?.title || ''}
+        />
+      )}
     </div>
   );
 };
