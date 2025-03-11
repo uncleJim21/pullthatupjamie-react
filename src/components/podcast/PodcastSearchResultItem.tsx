@@ -394,8 +394,8 @@ export const PodcastSearchResultItem = ({
           <div className="flex-grow min-w-0">
             <div className="flex flex-col sm:flex-row sm:justify-between">
               {/* Episode text */}
-              <div className="flex-grow pr-0 sm:pr-4 min-w-0 max-w-[calc(100%-220px)]">
-                <h3 className="text-lg font-medium text-white line-clamp-1 sm:line-clamp-2 max-w-md">{episode}</h3>
+              <div className="flex-grow pr-0 sm:pr-4 min-w-0 w-full sm:max-w-[calc(100%-220px)]">
+                <h3 className="text-lg font-medium text-white line-clamp-1 sm:line-clamp-2">{episode}</h3>
                 <p className="text-sm text-gray-400 line-clamp-1">{creator}</p>
               </div>
   
