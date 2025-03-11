@@ -404,6 +404,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
             {activeTab === 'Jamie Pro' && isAdmin && (
               <div className="py-8">
+                {/* Add the Jamie Pro header similar to the batch clips mode */}
+                <div className="flex flex-col items-center mb-8">
+                  <img
+                    src="/jamie-pro-banner.png"
+                    alt="Jamie Pro Banner"
+                    className="max-w-full h-auto"
+                  />
+                  <p className="text-gray-400 text-xl font-medium mt-2">AI Curated Clips for You</p>
+                </div>
+
                 <div className="flex items-center justify-center mb-8">
                   <div className="inline-flex rounded-lg border border-gray-800 p-1.5">
                     <button
