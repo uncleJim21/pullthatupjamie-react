@@ -154,14 +154,13 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
   useEffect(() => {
       console.log(`feedId: ${feedId}`);
-      if(DEBUG_MODE){
-        setIsAdmin(true);
-        return;
-      }
       const checkPrivileges = async () => {
           try {
               const token = localStorage.getItem("auth_token") as string;
-              if(!token){return}
+              if(!token){
+                  setIsAdmin(false);
+                  return;
+              }
               const response = await AuthService.checkPrivs(token);
               console.log(`checkPrivs response:${JSON.stringify(response,null,2)}`)
               if (response && response.privs.privs && response.privs.privs.feedId === feedId) {
@@ -177,7 +176,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       };
 
       if (feedId) {
-          checkPrivileges();
+          if (DEBUG_MODE) {
+              console.log('Debug mode: Simulating admin privileges');
+              // Even in debug mode, still check real privileges but override in development
+              checkPrivileges().then(() => {
+                  // After real check, override for development purposes
+                  setIsAdmin(true);
+              });
+          } else {
+              checkPrivileges();
+          }
       }
   }, [feedId]); 
 
@@ -219,14 +227,21 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         setActiveTab('Episodes');
         console.log('Non-admin user attempted to access Jamie Pro tab, falling back to Episodes tab');
       }
+    } else if (feedData && initialView === 'uploads') {
+      if (isAdmin) {
+        setActiveTab('Uploads');
+      } else {
+        setActiveTab('Episodes');
+        console.log('Non-admin user attempted to access Uploads tab, falling back to Episodes tab');
+      }
     }
   }, [feedData, initialView, defaultTab, isAdmin]);
 
   // Add a useEffect to ensure activeTab is never 'Jamie Pro' for non-admin users
   useEffect(() => {
-    if (activeTab === 'Jamie Pro' && !isAdmin) {
+    if ((activeTab === 'Jamie Pro' || activeTab === 'Uploads') && !isAdmin) {
       setActiveTab('Episodes');
-      console.log('Non-admin user attempted to access Jamie Pro tab, falling back to Episodes tab');
+      console.log('Non-admin user attempted to access restricted tab, falling back to Episodes tab');
     }
   }, [activeTab, isAdmin]);
 
@@ -370,8 +385,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                 // 'Home', 
                 // 'Top Clips', 
                 'Subscribe',
-                ...(isAdmin ? ['Jamie Pro'] : []),
-                'Uploads'
+                ...(isAdmin ? ['Jamie Pro', 'Uploads'] : [])
             ] as TabType[]).map((tab) => (
               <button
                 key={tab}
@@ -393,8 +407,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       </div>
 
       <div className="max-w-4xl mx-auto px-4">
-        {/* Ensure non-admin users can't see Jamie Pro tab content even if activeTab is somehow set to it */}
-        {activeTab === 'Jamie Pro' && !isAdmin ? (
+        {/* Ensure non-admin users can't see Jamie Pro or Uploads tab content even if activeTab is somehow set to it */}
+        {(activeTab === 'Jamie Pro' || activeTab === 'Uploads') && !isAdmin ? (
           // Render Episodes tab content as fallback
           <>
             {featuredEpisode && (
