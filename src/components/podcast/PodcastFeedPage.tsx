@@ -4,7 +4,7 @@ import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy, Check, QrCodeIcon, MessageSquare, History } from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History, Link } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
 import PodcastFeedService, { 
@@ -14,8 +14,9 @@ import PodcastFeedService, {
   RunHistoryRecommendation 
 } from '../../services/podcastFeedService.ts';
 import { JamieChat } from './JamieChat.tsx';
+import UploadModal from '../UploadModal.tsx';
 
-type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro';
+type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history';
 
 const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> = ({ initialView, defaultTab }) => {
@@ -31,6 +32,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [runHistory, setRunHistory] = useState<RunHistory[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [jamieProView, setJamieProView] = useState<JamieProView>('history');
+    const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -161,6 +163,14 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     }
   }, [activeTab, isAdmin]);
 
+  const openUploadModal = () => {
+    setUploadModalOpen(true);
+  };
+
+  const closeUploadModal = () => {
+    setUploadModalOpen(false);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -250,7 +260,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                 // 'Home', 
                 // 'Top Clips', 
                 'Subscribe',
-                ...(isAdmin ? ['Jamie Pro'] : [])
+                ...(isAdmin ? ['Jamie Pro'] : []),
+                'Uploads'
             ] as TabType[]).map((tab) => (
               <button
                 key={tab}
@@ -402,6 +413,26 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
               </div>
             )}
 
+            {activeTab === 'Uploads' && (
+              <div className="py-8">
+                <button
+                  onClick={openUploadModal}
+                  className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+                >
+                  + Upload
+                </button>
+                <div className="mt-4 bg-[#111111] border border-gray-800 rounded-lg p-4 flex justify-between items-center">
+                  <div>
+                    <p className="text-white">&lt;Filename&gt;</p>
+                    <p className="text-gray-400">Uploaded 9/25/25</p>
+                  </div>
+                  <button onClick={() => console.log('Link icon clicked')}>
+                    <Link className="text-white" size={20} />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'Jamie Pro' && isAdmin && (
               <div className="py-8">
                 {/* Add the Jamie Pro header similar to the batch clips mode */}
@@ -505,6 +536,10 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           lightningAddress={feedData?.lightningAddress || ''}
           title={feedData?.title || ''}
         />
+      )}
+
+      {uploadModalOpen && (
+        <UploadModal onClose={closeUploadModal} />
       )}
     </div>
   );
