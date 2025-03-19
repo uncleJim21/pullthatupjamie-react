@@ -4,7 +4,7 @@ import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy, Check, QrCodeIcon, MessageSquare, History, Link } from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
 import PodcastFeedService, { 
@@ -415,12 +415,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
             {activeTab === 'Uploads' && (
               <div className="py-8">
-                <button
-                  onClick={openUploadModal}
-                  className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
-                >
-                  + Upload
-                </button>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold">Your Uploads</h2>
+                  <button
+                    onClick={openUploadModal}
+                    className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors flex items-center font-medium"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload
+                  </button>
+                </div>
                 <div className="mt-4 bg-[#111111] border border-gray-800 rounded-lg p-4 flex justify-between items-center">
                   <div>
                     <p className="text-white">&lt;Filename&gt;</p>

@@ -158,7 +158,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
         
         <div 
           className={`border-2 border-dashed ${uploadState === 'error' ? 'border-red-500' : 'border-gray-600'} rounded-lg p-8 mb-4 transition-colors
-            ${!file && uploadState === 'idle' ? 'hover:border-blue-500' : ''}`}
+            ${!file && uploadState === 'idle' ? 'hover:border-white/60' : ''}`}
           onDrop={uploadState === 'idle' ? handleDrop : undefined}
           onDragOver={uploadState === 'idle' ? handleDragOver : undefined}
         >
@@ -189,7 +189,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
           <div className="mb-4">
             <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-blue-500 transition-all duration-300"
+                className="h-full bg-white transition-all duration-300"
                 style={{ width: `${uploadProgress}%` }}
               />
             </div>
@@ -217,10 +217,10 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
                 />
                 <button
                   onClick={handleCopyUrl}
-                  className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-r-md"
+                  className="bg-white hover:bg-gray-200 text-black px-3 py-2 rounded-r-md transition-colors font-medium"
                   title="Copy URL"
                 >
-                  {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
+                  {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
                 </button>
               </div>
             )}
@@ -240,7 +240,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
           {!file && uploadState === 'idle' && (
             <label 
               htmlFor="fileInput" 
-              className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 cursor-pointer disabled:opacity-50"
+              className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 cursor-pointer disabled:opacity-50 transition-colors font-medium"
             >
               Select File
             </label>
@@ -251,7 +251,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
             <button
               onClick={handleUpload}
               disabled={false}
-              className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center"
+              className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center transition-colors font-medium"
             >
               Upload File
             </button>
@@ -261,7 +261,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
           {uploadState === 'uploading' && (
             <button
               onClick={handleCancel}
-              className="bg-gray-700 text-white px-4 py-2 rounded-md hover:bg-gray-600 flex items-center justify-center"
+              className="border border-white/80 text-white px-4 py-2 rounded-md hover:bg-white/10 flex items-center justify-center transition-colors font-medium"
             >
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Cancel Upload
@@ -272,7 +272,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
           {uploadState === 'success' && (
             <button
               onClick={onClose}
-              className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
+              className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors font-medium"
             >
               Done
             </button>
