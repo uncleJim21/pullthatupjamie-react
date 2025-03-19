@@ -4,7 +4,7 @@ import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload } from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
 import PodcastFeedService, { 
@@ -15,6 +15,7 @@ import PodcastFeedService, {
 } from '../../services/podcastFeedService.ts';
 import { JamieChat } from './JamieChat.tsx';
 import UploadModal from '../UploadModal.tsx';
+import UploadService, { UploadItem } from '../../services/uploadService.ts';
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history';
@@ -33,6 +34,10 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [jamieProView, setJamieProView] = useState<JamieProView>('history');
     const [uploadModalOpen, setUploadModalOpen] = useState(false);
+    const [uploads, setUploads] = useState<UploadItem[]>([]);
+    const [isLoadingUploads, setIsLoadingUploads] = useState(false);
+    const [uploadsError, setUploadsError] = useState<string | null>(null);
+    const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -79,9 +84,36 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     }
   };
 
+  const fetchUploads = async () => {
+    if (!feedId) return;
+    
+    try {
+      setIsLoadingUploads(true);
+      setUploadsError(null);
+      
+      const authToken = localStorage.getItem('auth_token');
+      if (!authToken) {
+        setUploadsError('Authentication required');
+        return;
+      }
+
+      const response = await UploadService.getUploadsList(authToken);
+      setUploads(response.uploads);
+    } catch (error) {
+      console.error('Error fetching uploads:', error);
+      setUploadsError('Failed to load uploads. Please try again.');
+    } finally {
+      setIsLoadingUploads(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'Jamie Pro' && isAdmin) {
       fetchRunHistory();
+    }
+    
+    if (activeTab === 'Uploads') {
+      fetchUploads();
     }
   }, [activeTab, isAdmin, feedId]);
 
@@ -169,6 +201,48 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
   const closeUploadModal = () => {
     setUploadModalOpen(false);
+    // Refresh uploads list after modal closes
+    if (activeTab === 'Uploads') {
+      fetchUploads();
+    }
+  };
+
+  const formatBytes = (bytes: number, decimals = 2) => {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  const cleanFileName = (fileName: string) => {
+    // Remove timestamp prefix if it exists (like "1742402062188-")
+    const timestampPattern = /^\d{10,13}-/;
+    return fileName.replace(timestampPattern, '');
+  };
+
+  const handleCopyFileUrl = (url: string, key: string) => {
+    navigator.clipboard.writeText(url)
+      .then(() => {
+        setCopiedLinkId(key);
+        setTimeout(() => setCopiedLinkId(null), 2000);
+      })
+      .catch(err => {
+        console.error('Failed to copy file URL:', err);
+      });
   };
 
   if (isLoading) {
@@ -425,15 +499,62 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                     Upload
                   </button>
                 </div>
-                <div className="mt-4 bg-[#111111] border border-gray-800 rounded-lg p-4 flex justify-between items-center">
-                  <div>
-                    <p className="text-white">&lt;Filename&gt;</p>
-                    <p className="text-gray-400">Uploaded 9/25/25</p>
+                
+                {isLoadingUploads ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
                   </div>
-                  <button onClick={() => console.log('Link icon clicked')}>
-                    <Link className="text-white" size={20} />
-                  </button>
-                </div>
+                ) : uploadsError ? (
+                  <div className="p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-400">
+                    {uploadsError}
+                  </div>
+                ) : uploads.length === 0 ? (
+                  <div className="p-8 bg-[#111111] border border-gray-800 rounded-lg text-center">
+                    <p className="text-gray-400">No uploads found. Click the Upload button to add files.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Sort uploads by date, newest first */}
+                    {uploads
+                      .slice()
+                      .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
+                      .map((upload) => (
+                        <div 
+                          key={upload.key}
+                          className="bg-[#111111] border border-gray-800 rounded-lg p-4 flex justify-between items-center hover:border-gray-700 transition-colors"
+                        >
+                          <div>
+                            <p className="text-white font-medium">{cleanFileName(upload.fileName)}</p>
+                            <div className="flex text-gray-400 text-sm mt-1 space-x-4">
+                              <p>Uploaded {formatDate(upload.lastModified)}</p>
+                              <p>{formatBytes(upload.size)}</p>
+                            </div>
+                          </div>
+                          <div className="flex space-x-3">
+                            <button
+                              onClick={() => handleCopyFileUrl(upload.publicUrl, upload.key)}
+                              className="text-white hover:text-gray-300 transition-colors"
+                              title="Copy link"
+                            >
+                              {copiedLinkId === upload.key ? 
+                                <Check className="w-5 h-5 text-green-500" /> : 
+                                <Link className="w-5 h-5" />
+                              }
+                            </button>
+                            <a 
+                              href={upload.publicUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-white hover:text-gray-300 transition-colors"
+                              title="Open file"
+                            >
+                              <ExternalLink className="w-5 h-5" />
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
             )}
 

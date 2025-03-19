@@ -9,6 +9,22 @@ export const ProcessingStatus = {
   ERROR: 'ERROR'
 };
 
+// Interface for upload item
+export interface UploadItem {
+  key: string;
+  fileName: string;
+  size: number;
+  lastModified: string;
+  publicUrl: string;
+}
+
+// Interface for list uploads response
+export interface ListUploadsResponse {
+  uploads: UploadItem[];
+  count: number;
+  feedId: string;
+}
+
 // Processing state management
 class ProcessingState {
   private listeners: Set<Function>;
@@ -42,6 +58,31 @@ interface PresignedUrlResponse {
   maxSizeBytes: number;
   maxSizeMB: number;
 }
+
+/**
+ * Fetch list of uploaded files
+ */
+export const getUploadsList = async (authToken: string): Promise<ListUploadsResponse> => {
+  try {
+    const response = await fetch(`${API_URL}/api/list-uploads`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch uploads: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching uploads list:', error);
+    throw error;
+  }
+};
 
 // Get a presigned URL for file upload
 export const getPresignedUrl = async (
@@ -271,6 +312,7 @@ const UploadService = {
   directUpload,
   processFileUpload,
   cancelUpload,
+  getUploadsList,
   ProcessingStatus,
   processingState
 };
