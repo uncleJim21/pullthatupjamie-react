@@ -18,10 +18,19 @@ export interface UploadItem {
   publicUrl: string;
 }
 
+// Interface for pagination data
+export interface PaginationData {
+  page: number;
+  pageSize: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  totalCount: number;
+}
+
 // Interface for list uploads response
 export interface ListUploadsResponse {
   uploads: UploadItem[];
-  count: number;
+  pagination: PaginationData;
   feedId: string;
 }
 
@@ -62,9 +71,9 @@ interface PresignedUrlResponse {
 /**
  * Fetch list of uploaded files
  */
-export const getUploadsList = async (authToken: string): Promise<ListUploadsResponse> => {
+export const getUploadsList = async (authToken: string, page: number = 1): Promise<ListUploadsResponse> => {
   try {
-    const response = await fetch(`${API_URL}/api/list-uploads`, {
+    const response = await fetch(`${API_URL}/api/list-uploads?page=${page}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

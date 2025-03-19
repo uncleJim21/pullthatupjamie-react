@@ -4,7 +4,7 @@ import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink } from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
 import PodcastFeedService, { 
@@ -15,7 +15,7 @@ import PodcastFeedService, {
 } from '../../services/podcastFeedService.ts';
 import { JamieChat } from './JamieChat.tsx';
 import UploadModal from '../UploadModal.tsx';
-import UploadService, { UploadItem } from '../../services/uploadService.ts';
+import UploadService, { UploadItem, PaginationData } from '../../services/uploadService.ts';
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history';
@@ -36,8 +36,11 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [uploadModalOpen, setUploadModalOpen] = useState(false);
     const [uploads, setUploads] = useState<UploadItem[]>([]);
     const [isLoadingUploads, setIsLoadingUploads] = useState(false);
+    const [isLoadingMoreUploads, setIsLoadingMoreUploads] = useState(false);
     const [uploadsError, setUploadsError] = useState<string | null>(null);
     const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
+    const [paginationData, setPaginationData] = useState<PaginationData | null>(null);
+    const [currentPage, setCurrentPage] = useState<number>(1);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -84,12 +87,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     }
   };
 
-  const fetchUploads = async () => {
+  const fetchUploads = async (page: number = 1, append: boolean = false) => {
     if (!feedId) return;
     
     try {
-      setIsLoadingUploads(true);
-      setUploadsError(null);
+      if (page === 1) {
+        setIsLoadingUploads(true);
+        setUploadsError(null);
+      } else {
+        setIsLoadingMoreUploads(true);
+      }
       
       const authToken = localStorage.getItem('auth_token');
       if (!authToken) {
@@ -97,13 +104,39 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         return;
       }
 
-      const response = await UploadService.getUploadsList(authToken);
-      setUploads(response.uploads);
+      const response = await UploadService.getUploadsList(authToken, page);
+      
+      // Sort uploads by date from latest to oldest
+      const sortedUploads = [...response.uploads].sort(
+        (a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+      );
+      
+      if (append) {
+        // When appending, merge with existing uploads and re-sort to ensure correct order
+        setUploads(prevUploads => {
+          const combinedUploads = [...prevUploads, ...sortedUploads];
+          return combinedUploads.sort(
+            (a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+          );
+        });
+      } else {
+        setUploads(sortedUploads);
+      }
+      
+      setPaginationData(response.pagination);
+      setCurrentPage(response.pagination.page);
     } catch (error) {
       console.error('Error fetching uploads:', error);
       setUploadsError('Failed to load uploads. Please try again.');
     } finally {
       setIsLoadingUploads(false);
+      setIsLoadingMoreUploads(false);
+    }
+  };
+
+  const loadMoreUploads = () => {
+    if (paginationData && paginationData.hasNextPage) {
+      fetchUploads(currentPage + 1, true);
     }
   };
 
@@ -113,7 +146,9 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     }
     
     if (activeTab === 'Uploads') {
-      fetchUploads();
+      // Reset to first page when tab changes to Uploads
+      setCurrentPage(1);
+      fetchUploads(1, false);
     }
   }, [activeTab, isAdmin, feedId]);
 
@@ -203,7 +238,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     setUploadModalOpen(false);
     // Refresh uploads list after modal closes
     if (activeTab === 'Uploads') {
-      fetchUploads();
+      setCurrentPage(1);
+      fetchUploads(1, false);
     }
   };
 
@@ -327,8 +363,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
       {/* Navigation Tabs */}
       <div className="border-b border-gray-800" style={{ backgroundColor: feedData.headerColor }}>
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="flex gap-8">
+        <div className="max-w-4xl mx-auto px-4 overflow-x-auto">
+          <div className="flex gap-8 min-w-max">
             {([
                 'Episodes', 
                 // 'Home', 
@@ -513,27 +549,27 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                     <p className="text-gray-400">No uploads found. Click the Upload button to add files.</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {/* Sort uploads by date, newest first */}
-                    {uploads
-                      .slice()
-                      .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
-                      .map((upload) => (
+                  <div>
+                    <div className="space-y-3 mb-4">
+                      {/* Uploads already sorted from latest to oldest */}
+                      {uploads.map((upload) => (
                         <div 
                           key={upload.key}
-                          className="bg-[#111111] border border-gray-800 rounded-lg p-4 flex justify-between items-center hover:border-gray-700 transition-colors"
+                          className="bg-[#111111] border border-gray-800 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:border-gray-700 transition-colors"
                         >
-                          <div>
-                            <p className="text-white font-medium">{cleanFileName(upload.fileName)}</p>
-                            <div className="flex text-gray-400 text-sm mt-1 space-x-4">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-medium truncate" title={cleanFileName(upload.fileName)}>
+                              {cleanFileName(upload.fileName)}
+                            </p>
+                            <div className="flex flex-wrap text-gray-400 text-sm mt-1 gap-4">
                               <p>Uploaded {formatDate(upload.lastModified)}</p>
                               <p>{formatBytes(upload.size)}</p>
                             </div>
                           </div>
-                          <div className="flex space-x-3">
+                          <div className="flex space-x-3 self-end sm:self-center">
                             <button
                               onClick={() => handleCopyFileUrl(upload.publicUrl, upload.key)}
-                              className="text-white hover:text-gray-300 transition-colors"
+                              className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
                               title="Copy link"
                             >
                               {copiedLinkId === upload.key ? 
@@ -545,7 +581,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                               href={upload.publicUrl} 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="text-white hover:text-gray-300 transition-colors"
+                              className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
                               title="Open file"
                             >
                               <ExternalLink className="w-5 h-5" />
@@ -553,6 +589,37 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                           </div>
                         </div>
                       ))}
+                    </div>
+                    
+                    {/* Pagination - Load More button */}
+                    {paginationData && paginationData.hasNextPage && (
+                      <div className="flex justify-center mt-6">
+                        <button
+                          onClick={loadMoreUploads}
+                          disabled={isLoadingMoreUploads}
+                          className="flex items-center gap-2 bg-[#1A1A1A] hover:bg-[#252525] text-white px-6 py-3 rounded-md border border-gray-700 transition-colors font-medium"
+                        >
+                          {isLoadingMoreUploads ? (
+                            <>
+                              <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                              <span>Loading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-5 h-5" />
+                              <span>Load More</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Pagination information */}
+                    {paginationData && (
+                      <div className="text-center text-gray-500 text-sm mt-4">
+                        Showing {uploads.length} of {paginationData.totalCount} uploads
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
