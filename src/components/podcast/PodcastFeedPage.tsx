@@ -4,7 +4,7 @@ import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown } from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share2 } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
 import PodcastFeedService, { 
@@ -15,6 +15,7 @@ import PodcastFeedService, {
 } from '../../services/podcastFeedService.ts';
 import { JamieChat } from './JamieChat.tsx';
 import UploadModal from '../UploadModal.tsx';
+import ShareModal from '../ShareModal.tsx';
 import UploadService, { UploadItem, PaginationData } from '../../services/uploadService.ts';
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
@@ -41,6 +42,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
     const [paginationData, setPaginationData] = useState<PaginationData | null>(null);
     const [currentPage, setCurrentPage] = useState<number>(1);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [currentShareUrl, setCurrentShareUrl] = useState<string | null>(null);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -294,6 +297,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       .catch(err => {
         console.error('Failed to copy file URL:', err);
       });
+  };
+
+  const openShareModal = (url: string) => {
+    setCurrentShareUrl(url);
+    setIsShareModalOpen(true);
+  };
+
+  const closeShareModal = () => {
+    setIsShareModalOpen(false);
+    setCurrentShareUrl(null);
   };
 
   if (isLoading) {
@@ -591,6 +604,13 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                                 <Link className="w-5 h-5" />
                               }
                             </button>
+                            <button
+                              onClick={() => openShareModal(upload.publicUrl)}
+                              className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
+                              title="Share file"
+                            >
+                              <Share2 className="w-5 h-5" />
+                            </button>
                             <a 
                               href={upload.publicUrl} 
                               target="_blank" 
@@ -746,6 +766,21 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
       {uploadModalOpen && (
         <UploadModal onClose={closeUploadModal} />
+      )}
+
+      {isShareModalOpen && currentShareUrl && (
+        <ShareModal
+          isOpen={isShareModalOpen}
+          onClose={closeShareModal}
+          fileUrl={currentShareUrl}
+          title="Share Your Upload"
+          itemName="upload"
+          showCopy={false}
+          showNostr={true}
+          copySuccessMessage="Link copied!"
+          downloadButtonLabel="Download File"
+          nostrButtonLabel="Share on Nostr"
+        />
       )}
     </div>
   );
