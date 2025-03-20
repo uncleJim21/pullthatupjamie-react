@@ -1,6 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Check, Link, Twitter, X, Share2 } from 'lucide-react';
 import { API_URL, printLog } from '../constants/constants.ts';
+import NostrPostModal from './NostrPostModal.tsx';
+
+// Define type for Nostr window extension
+declare global {
+  interface Window {
+    nostr?: {
+      getPublicKey: () => Promise<string>;
+      signEvent: (event: any) => Promise<any>;
+      nip04?: {
+        encrypt?: (pubkey: string, plaintext: string) => Promise<string>;
+        decrypt?: (pubkey: string, ciphertext: string) => Promise<string>;
+      };
+    };
+  }
+}
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -36,6 +51,48 @@ const ShareModal: React.FC<ShareModalProps> = ({
   nostrButtonLabel
 }) => {
   const [copied, setCopied] = useState(false);
+  const [hasNostrExtension, setHasNostrExtension] = useState(false);
+  const [nostrPublicKey, setNostrPublicKey] = useState<string | null>(null);
+  const [isNostrModalOpen, setIsNostrModalOpen] = useState(false);
+  const [nostrShareResult, setNostrShareResult] = useState<string | null>(null);
+
+  // Check if Nostr extension is available
+  useEffect(() => {
+    const checkNostrExtension = async () => {
+      try {
+        if (window.nostr) {
+          setHasNostrExtension(true);
+          // Try to get the public key from the extension
+          try {
+            const pubKey = await window.nostr.getPublicKey();
+            setNostrPublicKey(pubKey);
+            printLog(`Nostr extension found with public key: ${pubKey}`);
+          } catch (keyError) {
+            printLog("Nostr extension found but couldn't get public key");
+          }
+        } else {
+          setHasNostrExtension(false);
+        }
+      } catch (error) {
+        setHasNostrExtension(false);
+        console.error("Error checking for Nostr extension:", error);
+      }
+    };
+
+    if (showNostr) {
+      checkNostrExtension();
+    }
+  }, [showNostr]);
+
+  useEffect(() => {
+    if (nostrShareResult) {
+      const timer = setTimeout(() => {
+        setNostrShareResult(null);
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [nostrShareResult]);
 
   if (!isOpen || !fileUrl) return null;
 
@@ -88,11 +145,16 @@ const ShareModal: React.FC<ShareModalProps> = ({
     window.open(twitterUrl, '_blank');
   };
 
-  const shareToNostr = () => {
+  const shareToNostr = async () => {
     if (!fileUrl) return;
-    console.log(`Sharing to Nostr: ${fileUrl}`);
-    // Placeholder for future Nostr integration
-    printLog(`Nostr share initiated for: ${fileUrl}`);
+    
+    console.log(`Opening Nostr post modal for: ${fileUrl}`);
+    setIsNostrModalOpen(true);
+  };
+
+  const handleNostrPublishResult = (success: boolean) => {
+    setNostrShareResult(success ? '✅ Shared to Nostr!' : '❌ Failed to share to Nostr');
+    setIsNostrModalOpen(false);
   };
 
   return (
@@ -137,8 +199,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
           {showNostr && (
             <button
               onClick={shareToNostr}
-              className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
-              title={nostrButtonLabel || "Share on Nostr"}
+              className={`w-12 h-12 flex items-center justify-center rounded-full ${hasNostrExtension ? 'bg-gray-600 hover:bg-gray-700' : 'bg-gray-800 opacity-70'} cursor-pointer`}
+              title={hasNostrExtension ? (nostrButtonLabel || "Share on Nostr") : "Nostr extension required"}
             >
               <img 
                 src="/nostr-logo-square.png" 
@@ -149,8 +211,26 @@ const ShareModal: React.FC<ShareModalProps> = ({
             </button>
           )}
         </div>
+        
         {copied && <p className="text-sm text-green-400 mt-2">{copySuccessMessage}</p>}
+        {nostrShareResult && <p className="text-sm text-green-400 mt-2">{nostrShareResult}</p>}
+        
+        {showNostr && !hasNostrExtension && (
+          <p className="text-xs text-gray-400 mt-3">
+            To use Nostr sharing, please install a browser extension like nos2x or Flamingo.
+          </p>
+        )}
       </div>
+
+      {isNostrModalOpen && fileUrl && (
+        <NostrPostModal
+          isOpen={isNostrModalOpen}
+          onClose={() => setIsNostrModalOpen(false)}
+          fileUrl={fileUrl}
+          itemName={itemName}
+          onPublish={handleNostrPublishResult}
+        />
+      )}
     </div>
   );
 };
