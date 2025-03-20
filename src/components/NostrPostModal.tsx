@@ -35,6 +35,30 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
   const [publishStatus, setPublishStatus] = useState<{[key: string]: string}>({});
   const [relayConnections, setRelayConnections] = useState<{[key: string]: WebSocket | null}>({});
 
+  // Add effect to hide search bar when modal is open
+  useEffect(() => {
+    // Find all search forms - more reliable than class-based selector
+    const searchForms = document.querySelectorAll('form[class*="relative"]');
+    
+    if (isOpen && searchForms.length > 0) {
+      // Hide all search forms
+      searchForms.forEach(form => {
+        if (form instanceof HTMLElement) {
+          form.style.display = 'none';
+        }
+      });
+    }
+
+    return () => {
+      // Restore visibility of search forms when modal closes
+      searchForms.forEach(form => {
+        if (form instanceof HTMLElement) {
+          form.style.display = '';
+        }
+      });
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     // Initialize content with default text
     setContent(`Check out this ${itemName}:\n\n${fileUrl}\n\nShared via PullThatUpJamie.ai`);
@@ -233,7 +257,7 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-50 p-4 sm:p-6 md:p-8">
-      <div className="bg-black border border-gray-800 rounded-xl p-6 sm:p-8 w-full max-w-sm sm:max-w-md md:max-w-xl text-center relative shadow-xl">
+      <div className="bg-black border border-gray-800 rounded-xl p-6 sm:p-8 w-full max-w-sm sm:max-w-md md:max-w-xl text-center relative shadow-xl transform -translate-y-12">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors">
           <X className="w-6 h-6" />
         </button>
@@ -253,6 +277,15 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
             </p>
             <div className="space-y-3 max-w-xs mx-auto">
               <p className="text-gray-400 text-sm font-medium">Popular extensions:</p>
+              <a 
+                href="https://getalby.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center"
+              >
+                <span> Alby</span>
+                <span className="ml-2 text-xs text-gray-400"></span>
+              </a>
               <a 
                 href="https://github.com/fiatjaf/nos2x" 
                 target="_blank" 
@@ -317,20 +350,22 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
                     <div key={relay} className="flex items-center justify-between">
                       <span className="text-gray-400 truncate max-w-[180px]">{relay.replace('wss://', '')}</span>
                       <span className={`
-                        ${publishStatus[relay] === 'idle' ? 'text-gray-500' : ''}
-                        ${publishStatus[relay] === 'connecting' ? 'text-yellow-500' : ''}
-                        ${publishStatus[relay] === 'connected' ? 'text-blue-500' : ''}
-                        ${publishStatus[relay] === 'publishing' ? 'text-yellow-500' : ''}
-                        ${publishStatus[relay] === 'published' ? 'text-green-500' : ''}
-                        ${publishStatus[relay] === 'failed' || publishStatus[relay] === 'timeout' ? 'text-red-500' : ''}
+                        px-2 py-0.5 rounded text-xs font-medium
+                        ${publishStatus[relay] === 'idle' ? 'bg-gray-800 text-gray-400' : ''}
+                        ${publishStatus[relay] === 'connecting' ? 'bg-blue-900/30 text-blue-300' : ''}
+                        ${publishStatus[relay] === 'connected' ? 'bg-yellow-900/30 text-yellow-300' : ''}
+                        ${publishStatus[relay] === 'publishing' ? 'bg-yellow-900/50 text-yellow-300' : ''}
+                        ${publishStatus[relay] === 'published' ? 'bg-green-900/30 text-green-300' : ''}
+                        ${publishStatus[relay] === 'failed' ? 'bg-red-900/30 text-red-300' : ''}
+                        ${publishStatus[relay] === 'timeout' ? 'bg-orange-900/30 text-orange-300' : ''}
                       `}>
-                        {publishStatus[relay] === 'idle' && 'Waiting...'}
+                        {publishStatus[relay] === 'idle' && 'Idle'}
                         {publishStatus[relay] === 'connecting' && 'Connecting...'}
                         {publishStatus[relay] === 'connected' && 'Connected'}
                         {publishStatus[relay] === 'publishing' && 'Publishing...'}
-                        {publishStatus[relay] === 'published' && 'Published ✓'}
-                        {publishStatus[relay] === 'failed' && 'Failed ✗'}
-                        {publishStatus[relay] === 'timeout' && 'Timeout ✗'}
+                        {publishStatus[relay] === 'published' && 'Published'}
+                        {publishStatus[relay] === 'failed' && 'Failed'}
+                        {publishStatus[relay] === 'timeout' && 'Timeout'}
                       </span>
                     </div>
                   ))}
@@ -338,26 +373,34 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
               </div>
             )}
             
-            <div className="flex justify-between sm:justify-end items-center space-x-4">
-              <div className="text-gray-400 text-sm mr-auto">
-                {content.length} characters
-              </div>
+            <div className="flex space-x-4 justify-center">
               <button
                 onClick={onClose}
-                className="px-5 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
                 disabled={isPublishing}
+                className={`px-5 py-2 rounded-lg border border-gray-700 text-gray-300 
+                  ${isPublishing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
               >
                 Cancel
               </button>
               <button
                 onClick={handlePublish}
-                disabled={isPublishing || !content.trim()}
-                className={`px-5 py-2 bg-white text-black rounded-lg font-medium 
-                  ${isPublishing || !content.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200'} 
-                  transition-colors`}
+                disabled={isPublishing || content.trim().length === 0}
+                className={`px-5 py-2 rounded-lg bg-purple-600 text-white font-medium 
+                  ${(isPublishing || content.trim().length === 0) ? 
+                    'opacity-50 cursor-not-allowed' : 
+                    'hover:bg-purple-500 transition-colors'}`}
               >
-                {isPublishing ? 'Publishing...' : 'Publish to Nostr'}
+                {isPublishing ? (
+                  <span className="flex items-center">
+                    <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                    Publishing...
+                  </span>
+                ) : 'Publish'}
               </button>
+            </div>
+            
+            <div className="text-gray-500 text-xs mt-4">
+              <p>Character count: {content.length}</p>
             </div>
           </>
         )}
@@ -366,4 +409,4 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
   );
 };
 
-export default NostrPostModal; 
+export default NostrPostModal;
