@@ -775,10 +775,13 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           fileUrl={currentShareUrl}
           title="Share Your Upload"
           itemName="upload"
-          showCopy={false}
+          showCopy={true}
+          showDownload={true}
+          showTwitter={true}
           showNostr={true}
           copySuccessMessage="Link copied!"
           downloadButtonLabel="Download File"
+          twitterButtonLabel="Share on Twitter"
           nostrButtonLabel="Share on Nostr"
         />
       )}

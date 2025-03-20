@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Twitter } from 'lucide-react';
 import { printLog } from '../constants/constants.ts';
 
-// Define relay pool
+// Define relay pool for Nostr
 export const relayPool = [
   "wss://relay.primal.net",
   "wss://relay.damus.io",
@@ -13,20 +13,43 @@ export const relayPool = [
   "wss://relay.snort.social"
 ];
 
-interface NostrPostModalProps {
+// Define type for Nostr window extension
+declare global {
+  interface Window {
+    nostr?: {
+      getPublicKey: () => Promise<string>;
+      signEvent: (event: any) => Promise<any>;
+      nip04?: {
+        encrypt?: (pubkey: string, plaintext: string) => Promise<string>;
+        decrypt?: (pubkey: string, ciphertext: string) => Promise<string>;
+      };
+    };
+  }
+}
+
+export enum SocialPlatform {
+  Twitter = 'twitter',
+  Nostr = 'nostr'
+}
+
+interface SocialShareModalProps {
   isOpen: boolean;
   onClose: () => void;
   fileUrl: string;
   itemName?: string;
-  onPublish: (success: boolean) => void;
+  onComplete: (success: boolean, platform: SocialPlatform) => void;
+  platform: SocialPlatform;
+  renderUrl?: string; // URL to use in place of fileUrl for Twitter sharing
 }
 
-const NostrPostModal: React.FC<NostrPostModalProps> = ({
+const SocialShareModal: React.FC<SocialShareModalProps> = ({
   isOpen,
   onClose,
   fileUrl,
   itemName = 'file',
-  onPublish
+  onComplete,
+  platform,
+  renderUrl
 }) => {
   const [content, setContent] = useState<string>('');
   const [isPublishing, setIsPublishing] = useState(false);
@@ -35,7 +58,7 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
   const [publishStatus, setPublishStatus] = useState<{[key: string]: string}>({});
   const [relayConnections, setRelayConnections] = useState<{[key: string]: WebSocket | null}>({});
 
-  // Add effect to hide search bar when modal is open
+  // Effect to hide search bar when modal is open
   useEffect(() => {
     // Find all search forms - more reliable than class-based selector
     const searchForms = document.querySelectorAll('form[class*="relative"]');
@@ -59,29 +82,34 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
     };
   }, [isOpen]);
 
+  // Initialize content with default text and check for Nostr extension if needed
   useEffect(() => {
-    // Initialize content with default text
-    setContent(`Check out this ${itemName}:\n\n${fileUrl}\n\nShared via PullThatUpJamie.ai`);
+    // No default content, empty textarea with just placeholder
+    setContent('');
     
-    // Check for Nostr extension
-    checkNostrExtension();
+    // Check for Nostr extension only if platform is Nostr
+    if (platform === SocialPlatform.Nostr) {
+      checkNostrExtension();
 
-    // Initialize relay status
-    const initialStatus: {[key: string]: string} = {};
-    relayPool.forEach(relay => {
-      initialStatus[relay] = 'idle';
-    });
-    setPublishStatus(initialStatus);
+      // Initialize relay status
+      const initialStatus: {[key: string]: string} = {};
+      relayPool.forEach(relay => {
+        initialStatus[relay] = 'idle';
+      });
+      setPublishStatus(initialStatus);
+    }
 
     return () => {
       // Clean up WebSocket connections when component unmounts
-      Object.values(relayConnections).forEach(conn => {
-        if (conn && conn.readyState === WebSocket.OPEN) {
-          conn.close();
-        }
-      });
+      if (platform === SocialPlatform.Nostr) {
+        Object.values(relayConnections).forEach(conn => {
+          if (conn && conn.readyState === WebSocket.OPEN) {
+            conn.close();
+          }
+        });
+      }
     };
-  }, [fileUrl, itemName]);
+  }, [fileUrl, itemName, platform]);
 
   const checkNostrExtension = async () => {
     try {
@@ -103,6 +131,7 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
     }
   };
 
+  // Nostr-specific functions
   const connectToRelay = (relay: string): Promise<WebSocket> => {
     return new Promise((resolve, reject) => {
       try {
@@ -197,10 +226,13 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
     }
 
     try {
+      // Add the URL and attribution to the content text before sending
+      const finalContent = `${content}\n\n${fileUrl}\n\nShared via https://pullthatupjamie.ai`;
+      
       // Construct a new Nostr event (kind 1 - text note)
       const event = {
         kind: 1,
-        content,
+        content: finalContent,
         tags: [],
         created_at: Math.floor(Date.now() / 1000),
         pubkey: nostrPublicKey || ''
@@ -232,28 +264,49 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
     }
   };
 
-  const handlePublish = async () => {
-    if (!hasNostrExtension) {
-      onPublish(false);
-      return;
-    }
+  const shareToTwitter = () => {
+    // Add the URL and attribution to the content before sending to Twitter
+    const urlToShare = renderUrl || fileUrl;
+    // Append the URL and attribution to the content
+    const finalContent = `${content}\n\n${urlToShare}\n\nShared via https://pullthatupjamie.ai`;
+    
+    const tweetText = encodeURIComponent(finalContent);
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
+  
+    window.open(twitterUrl, '_blank');
+    
+    // Consider Twitter sharing always successful when the window opens
+    onComplete(true, SocialPlatform.Twitter);
+    onClose();
+  };
 
+  const handlePublish = async () => {
     setIsPublishing(true);
+    
     try {
-      const success = await publishToNostr();
-      setIsPublishing(false);
-      onPublish(success);
-      if (success) {
-        onClose();
+      if (platform === SocialPlatform.Nostr) {
+        if (!hasNostrExtension) {
+          onComplete(false, SocialPlatform.Nostr);
+          return;
+        }
+        
+        const success = await publishToNostr();
+        setIsPublishing(false);
+        onComplete(success, SocialPlatform.Nostr);
+        if (success) {
+          onClose();
+        }
+      } else if (platform === SocialPlatform.Twitter) {
+        shareToTwitter();
       }
     } catch (error) {
-      console.error("Error during Nostr publishing:", error);
+      console.error(`Error during ${platform} publishing:`, error);
       setIsPublishing(false);
-      onPublish(false);
+      onComplete(false, platform);
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !fileUrl) return null;
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-50 p-4 sm:p-6 md:p-8">
@@ -262,9 +315,11 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
           <X className="w-6 h-6" />
         </button>
         
-        <h2 className="text-2xl font-semibold text-white mb-6">Share to Nostr</h2>
+        <h2 className="text-2xl font-semibold text-white mb-6">
+          {platform === SocialPlatform.Nostr ? 'Share to Nostr' : 'Share to Twitter'}
+        </h2>
         
-        {!hasNostrExtension ? (
+        {platform === SocialPlatform.Nostr && !hasNostrExtension ? (
           <div className="text-center py-8 px-4">
             <img 
               src="/nostr-logo-square.png" 
@@ -283,8 +338,8 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center"
               >
-                <span> Alby</span>
-                <span className="ml-2 text-xs text-gray-400"></span>
+                <span className="font-bold">Alby</span>
+                <span className="ml-2 text-xs text-gray-400">(Recommended)</span>
               </a>
               <a 
                 href="https://github.com/fiatjaf/nos2x" 
@@ -308,20 +363,20 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
           <>
             <div className="flex items-center mb-4 px-2">
               <div className="w-10 h-10 rounded-full bg-gray-800 mr-3 flex items-center justify-center overflow-hidden">
-                <img 
-                  src="/nostr-logo-square.png" 
-                  alt="Nostr" 
-                  className="w-6 h-6"
-                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
-                />
+                {platform === SocialPlatform.Nostr ? (
+                  <img 
+                    src="/nostr-logo-square.png" 
+                    alt="Nostr" 
+                    className="w-6 h-6"
+                    style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+                  />
+                ) : (
+                  <Twitter className="w-6 h-6 text-blue-400" />
+                )}
               </div>
               <div className="text-left">
-                <p className="text-white font-medium">Your Nostr Post</p>
-                <p className="text-gray-400 text-sm">
-                  {nostrPublicKey ? 
-                    `${nostrPublicKey.substring(0, 8)}...${nostrPublicKey.substring(nostrPublicKey.length - 8)}` : 
-                    'Anonymous'
-                  }
+                <p className="text-white font-medium">
+                  {platform === SocialPlatform.Nostr ? 'Your Nostr Post' : 'Your Tweet'}
                 </p>
               </div>
             </div>
@@ -329,12 +384,16 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="w-full h-48 bg-gray-900 text-white border border-gray-700 rounded-xl p-4 mb-6 text-base focus:border-gray-500 focus:outline-none"
-              placeholder="Write your Nostr post..."
+              className="w-full h-48 bg-gray-900 text-white border border-gray-700 rounded-xl p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
+              placeholder={`Write about this ${itemName}...`}
               style={{ resize: "vertical", minHeight: "120px" }}
             />
             
-            {isPublishing && (
+            <div className="text-gray-400 text-xs mb-6 text-left pl-1">
+              The link to your {itemName} and attribution will be added automatically when you publish.
+            </div>
+            
+            {platform === SocialPlatform.Nostr && isPublishing && (
               <div className="mb-6 border border-gray-800 rounded-lg p-3 bg-gray-900">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-white font-medium">Publishing to relays...</h3>
@@ -385,22 +444,22 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
               <button
                 onClick={handlePublish}
                 disabled={isPublishing || content.trim().length === 0}
-                className={`px-5 py-2 rounded-lg bg-purple-600 text-white font-medium 
+                className={`px-5 py-2 rounded-lg ${platform === SocialPlatform.Twitter ? 'bg-blue-600' : 'bg-purple-600'} text-white font-medium 
                   ${(isPublishing || content.trim().length === 0) ? 
                     'opacity-50 cursor-not-allowed' : 
-                    'hover:bg-purple-500 transition-colors'}`}
+                    platform === SocialPlatform.Twitter ? 'hover:bg-blue-500 transition-colors' : 'hover:bg-purple-500 transition-colors'}`}
               >
                 {isPublishing ? (
                   <span className="flex items-center">
                     <Loader2 className="animate-spin w-4 h-4 mr-2" />
                     Publishing...
                   </span>
-                ) : 'Publish'}
+                ) : (platform === SocialPlatform.Twitter ? 'Tweet' : 'Publish')}
               </button>
             </div>
             
             <div className="text-gray-500 text-xs mt-4">
-              <p>Character count: {content.length}</p>
+              <p className="mb-1">Character count: {content.length}</p>
             </div>
           </>
         )}
@@ -409,4 +468,4 @@ const NostrPostModal: React.FC<NostrPostModalProps> = ({
   );
 };
 
-export default NostrPostModal;
+export default SocialShareModal; 

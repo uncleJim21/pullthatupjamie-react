@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Download, Check, Link, Twitter, X, Share2 } from 'lucide-react';
-import { API_URL, printLog } from '../constants/constants.ts';
-import NostrPostModal from './NostrPostModal.tsx';
+import React, { useState } from 'react';
+import { Download, Check, Link, Twitter, X } from 'lucide-react';
+import { printLog } from '../constants/constants.ts';
+import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 
 // Define type for Nostr window extension
 declare global {
@@ -51,48 +51,19 @@ const ShareModal: React.FC<ShareModalProps> = ({
   nostrButtonLabel
 }) => {
   const [copied, setCopied] = useState(false);
-  const [hasNostrExtension, setHasNostrExtension] = useState(false);
-  const [nostrPublicKey, setNostrPublicKey] = useState<string | null>(null);
-  const [isNostrModalOpen, setIsNostrModalOpen] = useState(false);
-  const [nostrShareResult, setNostrShareResult] = useState<string | null>(null);
+  const [activePlatform, setActivePlatform] = useState<SocialPlatform | null>(null);
+  const [shareResult, setShareResult] = useState<string | null>(null);
 
-  // Check if Nostr extension is available
-  useEffect(() => {
-    const checkNostrExtension = async () => {
-      try {
-        if (window.nostr) {
-          setHasNostrExtension(true);
-          // Try to get the public key from the extension
-          try {
-            const pubKey = await window.nostr.getPublicKey();
-            setNostrPublicKey(pubKey);
-            printLog(`Nostr extension found with public key: ${pubKey}`);
-          } catch (keyError) {
-            printLog("Nostr extension found but couldn't get public key");
-          }
-        } else {
-          setHasNostrExtension(false);
-        }
-      } catch (error) {
-        setHasNostrExtension(false);
-        console.error("Error checking for Nostr extension:", error);
-      }
-    };
-
-    if (showNostr) {
-      checkNostrExtension();
-    }
-  }, [showNostr]);
-
-  useEffect(() => {
-    if (nostrShareResult) {
+  // Clear share result message after a timeout
+  React.useEffect(() => {
+    if (shareResult) {
       const timer = setTimeout(() => {
-        setNostrShareResult(null);
+        setShareResult(null);
       }, 3000);
       
       return () => clearTimeout(timer);
     }
-  }, [nostrShareResult]);
+  }, [shareResult]);
 
   if (!isOpen || !fileUrl) return null;
 
@@ -136,100 +107,105 @@ const ShareModal: React.FC<ShareModalProps> = ({
     }
   };
 
-  const shareToTwitter = () => {
-    if (!fileUrl) return;
-    
-    const tweetText = encodeURIComponent(`Check out this ${itemName}:\n${fileUrl}\n\nMade with PullThatUpJamie.ai`);
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
-  
-    window.open(twitterUrl, '_blank');
+  const handleSocialShareComplete = (success: boolean, platform: SocialPlatform) => {
+    if (success) {
+      setShareResult(`✅ Shared to ${platform === SocialPlatform.Twitter ? 'Twitter' : 'Nostr'}!`);
+    } else {
+      setShareResult(`❌ Failed to share to ${platform === SocialPlatform.Twitter ? 'Twitter' : 'Nostr'}`);
+    }
   };
 
-  const shareToNostr = async () => {
-    if (!fileUrl) return;
+  // Extract render URL for Twitter if it exists (e.g., for clips)
+  const getRenderUrl = () => {
+    if (!fileUrl) return undefined;
     
-    console.log(`Opening Nostr post modal for: ${fileUrl}`);
-    setIsNostrModalOpen(true);
-  };
-
-  const handleNostrPublishResult = (success: boolean) => {
-    setNostrShareResult(success ? '✅ Shared to Nostr!' : '❌ Failed to share to Nostr');
-    setIsNostrModalOpen(false);
+    // Check if this is a clip URL and extract the ID for a render URL
+    if (fileUrl.includes('/clips/')) {
+      const urlParts = fileUrl.split('/');
+      const fileIndex = urlParts.findIndex(part => part === 'clips');
+      
+      if (fileIndex !== -1 && fileIndex + 2 < urlParts.length) {
+        const clipId = urlParts[fileIndex + 2].replace('-clip.mp4', '');
+        return `${window.location.origin}/api/render-clip/${clipId}`;
+      }
+    }
+    
+    return undefined;
   };
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
-      <div className="bg-black border border-gray-800 rounded-lg p-6 w-80 text-center relative">
-        <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white">
-          <X className="w-5 h-5" />
-        </button>
-        <h2 className="text-lg font-semibold text-white">{title}</h2>
-
-        <div className="flex justify-center mt-4 gap-4">
-          {showCopy && (
-            <button
-              onClick={copyToClipboard}
-              className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
-              title={copyButtonLabel || "Copy Link"}
-            >
-              {copied ? <Check className="w-6 h-6 text-green-500" /> : <Link className="w-6 h-6 text-white" />}
-            </button>
-          )}
-          
-          {showDownload && (
-            <button
-              onClick={handleDownload}
-              className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
-              title={downloadButtonLabel || "Download"}
-            >
-              <Download className="w-6 h-6 text-white" />
-            </button>
-          )}
-          
-          {showTwitter && (
-            <button
-              onClick={shareToTwitter}
-              className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
-              title={twitterButtonLabel || "Share on Twitter"}
-            >
-              <Twitter className="w-6 h-6 text-blue-400" />
-            </button>
-          )}
-
-          {showNostr && (
-            <button
-              onClick={shareToNostr}
-              className={`w-12 h-12 flex items-center justify-center rounded-full ${hasNostrExtension ? 'bg-gray-600 hover:bg-gray-700' : 'bg-gray-800 opacity-70'} cursor-pointer`}
-              title={hasNostrExtension ? (nostrButtonLabel || "Share on Nostr") : "Nostr extension required"}
-            >
-              <img 
-                src="/nostr-logo-square.png" 
-                alt="Nostr" 
-                className="w-6 h-6" 
-                style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
-              />
-            </button>
-          )}
-        </div>
-        
-        {copied && <p className="text-sm text-green-400 mt-2">{copySuccessMessage}</p>}
-        {nostrShareResult && <p className="text-sm text-green-400 mt-2">{nostrShareResult}</p>}
-        
-        {showNostr && !hasNostrExtension && (
-          <p className="text-xs text-gray-400 mt-3">
-            To use Nostr sharing, please install a browser extension like nos2x or Flamingo.
-          </p>
-        )}
-      </div>
-
-      {isNostrModalOpen && fileUrl && (
-        <NostrPostModal
-          isOpen={isNostrModalOpen}
-          onClose={() => setIsNostrModalOpen(false)}
+      {/* Social media share modal (Twitter or Nostr) */}
+      {activePlatform !== null && (
+        <SocialShareModal
+          isOpen={activePlatform !== null}
+          onClose={() => setActivePlatform(null)}
           fileUrl={fileUrl}
           itemName={itemName}
-          onPublish={handleNostrPublishResult}
+          onComplete={handleSocialShareComplete}
+          platform={activePlatform}
+          renderUrl={getRenderUrl()}
         />
+      )}
+      
+      {/* Main share modal */}
+      {activePlatform === null && (
+        <div className="bg-black border border-gray-800 rounded-lg p-6 w-80 text-center relative">
+          <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+          <h2 className="text-lg font-semibold text-white">{title}</h2>
+
+          <div className="flex justify-center mt-4 gap-4">
+            {showCopy && (
+              <button
+                onClick={copyToClipboard}
+                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
+                title={copyButtonLabel || "Copy Link"}
+              >
+                {copied ? <Check className="w-6 h-6 text-green-500" /> : <Link className="w-6 h-6 text-white" />}
+              </button>
+            )}
+            
+            {showDownload && (
+              <button
+                onClick={handleDownload}
+                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
+                title={downloadButtonLabel || "Download"}
+              >
+                <Download className="w-6 h-6 text-white" />
+              </button>
+            )}
+            
+            {showTwitter && (
+              <button
+                onClick={() => setActivePlatform(SocialPlatform.Twitter)}
+                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
+                title={twitterButtonLabel || "Share on Twitter"}
+              >
+                <Twitter className="w-6 h-6 text-blue-400" />
+              </button>
+            )}
+
+            {showNostr && (
+              <button
+                onClick={() => setActivePlatform(SocialPlatform.Nostr)}
+                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
+                title={nostrButtonLabel || "Share on Nostr"}
+              >
+                <img 
+                  src="/nostr-logo-square.png" 
+                  alt="Nostr" 
+                  className="w-6 h-6" 
+                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+                />
+              </button>
+            )}
+          </div>
+          
+          {copied && <p className="text-sm text-green-400 mt-2">{copySuccessMessage}</p>}
+          {shareResult && <p className="text-sm text-green-400 mt-2">{shareResult}</p>}
+        </div>
       )}
     </div>
   );

@@ -130,21 +130,6 @@ export default function ClipTrackerModal({
     setShowShareModal(true);
   };
 
-  const shareToTwitter = (lookupHash?: string | null) => {
-    const cdnLink = getCdnLink(lookupHash);
-    if(!cdnLink){
-      throw(`Error sharing. Please try again.`)
-      return;
-    }
-    const id = extractLookupHash(cdnLink);
-    const url = getRenderClipUrl(id);
-    if (!url) return;
-    const tweetText = encodeURIComponent(`Check out this clip:\n${url}\n\nMade with PullThatUpJamie.ai`);
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
-  
-    window.open(twitterUrl, '_blank');
-  };
-
   const updateOldPendingItems = async (historyJSON: ClipHistoryItem[]) => {
     printLog(`Checking pending clips...`);
   
