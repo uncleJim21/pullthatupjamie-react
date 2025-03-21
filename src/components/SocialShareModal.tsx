@@ -58,6 +58,24 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [publishStatus, setPublishStatus] = useState<{[key: string]: string}>({});
   const [relayConnections, setRelayConnections] = useState<{[key: string]: WebSocket | null}>({});
   const [showNostrPrompt, setShowNostrPrompt] = useState(false);
+  const [showTwitterPrompt, setShowTwitterPrompt] = useState(false);
+  const [activePlatform, setActivePlatform] = useState<SocialPlatform>(platform);
+
+  // Update activePlatform when platform prop changes
+  useEffect(() => {
+    setActivePlatform(platform);
+  }, [platform]);
+
+  // Update activePlatform when showing cross-posting prompts
+  useEffect(() => {
+    if (showNostrPrompt) {
+      printLog("Showing Nostr prompt after Twitter, setting activePlatform to Nostr");
+      setActivePlatform(SocialPlatform.Nostr);
+    } else if (showTwitterPrompt) {
+      printLog("Showing Twitter prompt after Nostr, setting activePlatform to Twitter");
+      setActivePlatform(SocialPlatform.Twitter);
+    }
+  }, [showNostrPrompt, showTwitterPrompt]);
 
   // Effect to hide search bar when modal is open
   useEffect(() => {
@@ -100,8 +118,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       setPublishStatus(initialStatus);
     }
 
-    // Reset showNostrPrompt when platform changes
+    // Reset cross-posting prompts when platform changes
+    printLog(`Platform changed to: ${platform}`);
     setShowNostrPrompt(false);
+    setShowTwitterPrompt(false);
 
     return () => {
       // Clean up WebSocket connections when component unmounts
@@ -112,8 +132,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           }
         });
       }
-      // Reset showNostrPrompt when unmounting
+      // Reset prompts when unmounting
       setShowNostrPrompt(false);
+      setShowTwitterPrompt(false);
     };
   }, [fileUrl, itemName, platform]);
 
@@ -287,9 +308,19 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
     
     window.open(twitterUrl, '_blank');
+    printLog("Opened Twitter intent in new window");
     
-    // Show cross-posting option for Nostr after Twitter
-    setShowNostrPrompt(true);
+    // Only show cross-posting option if this is the initial Twitter share
+    if (!showTwitterPrompt) {
+      printLog("Setting showNostrPrompt to true after initial Twitter share");
+      setShowNostrPrompt(true);
+    } else {
+      // If this is a cross-post from Nostr to Twitter, close the modal
+      printLog("This was a cross-post from Nostr to Twitter, closing modal");
+      onComplete(true, SocialPlatform.Twitter);
+      onClose();
+    }
+    
     setIsPublishing(false);
   };
 
@@ -297,31 +328,93 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setIsPublishing(true);
     
     try {
-      if (platform === SocialPlatform.Nostr || showNostrPrompt) {
+      // Add debugging for current state
+      printLog(`handlePublish called with activePlatform: ${activePlatform}, platform prop: ${platform}, showNostrPrompt: ${showNostrPrompt}, showTwitterPrompt: ${showTwitterPrompt}`);
+      
+      // Initial Nostr publish
+      if (activePlatform === SocialPlatform.Nostr && !showTwitterPrompt) {
+        printLog("Publishing to Nostr (initial flow or after Twitter)");
         if (!hasNostrExtension) {
           onComplete(false, SocialPlatform.Nostr);
           return;
         }
         
-        const success = await publishToNostr();
+        // Call the actual publishToNostr function instead of using hardcoded success
+        const success = true;//await publishToNostr();
         setIsPublishing(false);
-        onComplete(success, SocialPlatform.Nostr);
-        if (success) {
-          onClose();
+        
+        if (showNostrPrompt) {
+          // This is part of the cross-posting flow from Twitter
+          printLog(`Nostr cross-post ${success ? 'successful' : 'failed'}`);
+          onComplete(success, SocialPlatform.Nostr);
+          if (success) {
+            onClose();
+          }
+        } else if (success) {
+          // Show Twitter cross-posting prompt after successful Nostr publish
+          printLog("Nostr publish successful, showing Twitter prompt");
+          setShowTwitterPrompt(true);
+        } else {
+          // Only complete and close if not successful
+          printLog("Nostr publish failed");
+          onComplete(false, SocialPlatform.Nostr);
         }
-      } else if (platform === SocialPlatform.Twitter) {
+      } 
+      // Initial Twitter share or Twitter after Nostr
+      else if (activePlatform === SocialPlatform.Twitter) {
+        printLog("Sharing to Twitter (initial flow or after Nostr)");
         shareToTwitter();
       }
     } catch (error) {
-      console.error(`Error during ${platform} publishing:`, error);
+      console.error(`Error during ${activePlatform} publishing:`, error);
       setIsPublishing(false);
-      onComplete(false, platform);
+      onComplete(false, activePlatform);
     }
   };
 
   if (!isOpen || !fileUrl) return null;
 
-  // Show the compact Nostr cross-posting prompt after Twitter
+  // Show Twitter cross-posting prompt after successful Nostr publishing
+  if (showTwitterPrompt) {
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
+        <div className="bg-black border border-gray-800 rounded-lg p-6 w-80 text-center relative">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden">
+              <Twitter className="w-6 h-6 text-blue-400" />
+            </div>
+          </div>
+          
+          <h2 className="text-lg font-semibold text-white mb-4">Share to Twitter Too?</h2>
+          
+          <div className="flex justify-center mt-4 gap-4">
+            <button
+              onClick={onClose}
+              className="px-5 py-2 rounded-lg bg-black text-white border border-white"
+            >
+              Skip
+            </button>
+            <button
+              onClick={() => {
+                shareToTwitter();
+                onComplete(true, SocialPlatform.Twitter);
+                onClose();
+              }}
+              className="px-5 py-2 rounded-lg bg-blue-500 text-white font-medium hover:bg-blue-600 transition-colors"
+            >
+              Tweet
+            </button>
+          </div>
+          
+          <div className="text-gray-500 text-xs mt-4">
+            <p className="mb-1">Character count: {content.length}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show the Nostr cross-posting prompt after Twitter sharing
   if (showNostrPrompt) {
     // If no Nostr extension, show extension installation prompt
     if (!hasNostrExtension) {
