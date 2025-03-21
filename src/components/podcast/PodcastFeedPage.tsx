@@ -4,7 +4,7 @@ import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share2 } from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
 import PodcastFeedService, { 
@@ -609,7 +609,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                               className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
                               title="Share file"
                             >
-                              <Share2 className="w-5 h-5" />
+                              <Share className="w-5 h-5" />
                             </button>
                             <a 
                               href={upload.publicUrl} 

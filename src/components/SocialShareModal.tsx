@@ -340,7 +340,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         }
         
         // Call the actual publishToNostr function instead of using hardcoded success
-        const success = true;//await publishToNostr();
+        const success = await publishToNostr();
         setIsPublishing(false);
         
         if (showNostrPrompt) {
