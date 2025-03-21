@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {Download, Play, Share, Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors, Link, Twitter, X } from 'lucide-react';
 import { API_URL,printLog } from '../constants/constants.ts';
 import { checkClipStatus } from '../services/clipService.ts';
+import ShareModal from './ShareModal.tsx';
 
 interface ClipHistoryItem {
   creator: string;
@@ -127,21 +128,6 @@ export default function ClipTrackerModal({
     printLog(`handleShare lookupHash:${lookupHash}`)
     setLookupHash(lookupHash);
     setShowShareModal(true);
-  };
-
-  const shareToTwitter = (lookupHash?: string | null) => {
-    const cdnLink = getCdnLink(lookupHash);
-    if(!cdnLink){
-      throw(`Error sharing. Please try again.`)
-      return;
-    }
-    const id = extractLookupHash(cdnLink);
-    const url = getRenderClipUrl(id);
-    if (!url) return;
-    const tweetText = encodeURIComponent(`Check out this clip:\n${url}\n\nMade with PullThatUpJamie.ai`);
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
-  
-    window.open(twitterUrl, '_blank');
   };
 
   const updateOldPendingItems = async (historyJSON: ClipHistoryItem[]) => {
@@ -285,49 +271,29 @@ export default function ClipTrackerModal({
     return isCollapsed ? 'bottom-36 sm:bottom-48' : 'bottom-[8.8rem] sm:bottom-[12.6rem]'
   }
 
-  const ShareModal = () => {
-    if(!showShareModal) { return}
-    return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 rounded-lg p-6 w-80 text-center relative">
-            <button onClick={() => setShowShareModal(false)} className="absolute top-2 right-2 text-gray-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="text-lg font-semibold text-white">Share This Clip</h2>
-
-            <div className="flex justify-center mt-4 gap-4">
-              <button
-                onClick={() => copyToClipboard(lookupHash)}
-                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
-              >
-                {copied ? <Check className="w-6 h-6 text-green-500" /> : <Link className="w-6 h-6 text-white" />}
-              </button>
-              <button
-                onClick={() => handleDownload(lookupHash)}
-                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
-              >
-                <Download className="w-6 h-6 text-white-400" />
-              </button>
-              <button
-                onClick={() => shareToTwitter(lookupHash)}
-                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
-              >
-                <Twitter className="w-6 h-6 text-blue-400" />
-              </button>
-            </div>
-            {copied && <p className="text-sm text-green-400 mt-2">Copied to clipboard!</p>}
-          </div>
-        </div>
-    )
-  }
-
   return (
     <div className={`fixed z-50 transition-all duration-300 ease-in-out
       xl:right-4 xl:bottom-24 xl:w-[22.5rem] px-4 sm:px-24 xl:left-auto xl:transform-none
       left-1/2 -translate-x-1/2 mx-auto w-full max-w-[40rem] sm:px-4
       ${bottomConstraint(isCollapsed,hasSearched)}`}
     >
-      <ShareModal />
+      {showShareModal && lookupHash && (
+        <ShareModal 
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          fileUrl={getCdnLink(lookupHash)}
+          title="Share This Clip"
+          itemName="clip"
+          showCopy={true}
+          showDownload={true}
+          showTwitter={true}
+          showNostr={true}
+          copySuccessMessage="Clip link copied!"
+          downloadButtonLabel="Download Clip"
+          twitterButtonLabel="Tweet Clip"
+          nostrButtonLabel="Share on Nostr"
+        />
+      )}
       {/* Current Clip */}
       <div className="bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow">
       <button
