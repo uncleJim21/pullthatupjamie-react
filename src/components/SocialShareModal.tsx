@@ -57,6 +57,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [nostrPublicKey, setNostrPublicKey] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<{[key: string]: string}>({});
   const [relayConnections, setRelayConnections] = useState<{[key: string]: WebSocket | null}>({});
+  const [showNostrPrompt, setShowNostrPrompt] = useState(false);
 
   // Effect to hide search bar when modal is open
   useEffect(() => {
@@ -99,6 +100,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       setPublishStatus(initialStatus);
     }
 
+    // Reset showNostrPrompt when platform changes
+    setShowNostrPrompt(false);
+
     return () => {
       // Clean up WebSocket connections when component unmounts
       if (platform === SocialPlatform.Nostr) {
@@ -108,8 +112,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           }
         });
       }
+      // Reset showNostrPrompt when unmounting
+      setShowNostrPrompt(false);
     };
   }, [fileUrl, itemName, platform]);
+
+  // Effect to check for Nostr extension when showing the cross-posting prompt
+  useEffect(() => {
+    if (showNostrPrompt) {
+      checkNostrExtension();
+    }
+  }, [showNostrPrompt]);
 
   const checkNostrExtension = async () => {
     try {
@@ -272,19 +285,19 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     
     const tweetText = encodeURIComponent(finalContent);
     const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
-  
+    
     window.open(twitterUrl, '_blank');
     
-    // Consider Twitter sharing always successful when the window opens
-    onComplete(true, SocialPlatform.Twitter);
-    onClose();
+    // Show cross-posting option for Nostr after Twitter
+    setShowNostrPrompt(true);
+    setIsPublishing(false);
   };
 
   const handlePublish = async () => {
     setIsPublishing(true);
     
     try {
-      if (platform === SocialPlatform.Nostr) {
+      if (platform === SocialPlatform.Nostr || showNostrPrompt) {
         if (!hasNostrExtension) {
           onComplete(false, SocialPlatform.Nostr);
           return;
@@ -307,6 +320,114 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   };
 
   if (!isOpen || !fileUrl) return null;
+
+  // Show the compact Nostr cross-posting prompt after Twitter
+  if (showNostrPrompt) {
+    // If no Nostr extension, show extension installation prompt
+    if (!hasNostrExtension) {
+      return (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
+          <div className="bg-black border border-gray-800 rounded-lg p-6 w-96 text-center relative">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden">
+                <img 
+                  src="/nostr-logo-square.png" 
+                  alt="Nostr" 
+                  className="w-6 h-6"
+                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+                />
+              </div>
+            </div>
+            
+            <h2 className="text-lg font-semibold text-white mb-4">Nostr Extension Required</h2>
+            
+            <p className="text-gray-300 mb-6">
+              You need a Nostr browser extension to publish this post.
+            </p>
+            
+            <div className="space-y-3 max-w-xs mx-auto mb-4">
+              <a 
+                href="https://getalby.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center"
+              >
+                <span className="font-bold">Alby</span>
+                <span className="ml-2 text-xs text-gray-400">(Recommended)</span>
+              </a>
+            </div>
+            
+            <button
+              onClick={onClose}
+              className="px-5 py-2 rounded-lg bg-black text-white border border-white"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
+        <div className="bg-black border border-gray-800 rounded-lg p-6 w-80 text-center relative">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden">
+              <img 
+                src="/nostr-logo-square.png" 
+                alt="Nostr" 
+                className="w-6 h-6"
+                style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+              />
+            </div>
+          </div>
+          
+          <h2 className="text-lg font-semibold text-white mb-4">Share to Nostr Too?</h2>
+          
+          <div className="flex justify-center mt-4 gap-4">
+            <button
+              onClick={onClose}
+              className="px-5 py-2 rounded-lg bg-black text-white border border-white"
+            >
+              Skip
+            </button>
+            <button
+              onClick={handlePublish}
+              disabled={isPublishing}
+              className={`px-5 py-2 rounded-lg bg-purple-600 text-white font-medium 
+                ${isPublishing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-500 transition-colors'}`}
+            >
+              {isPublishing ? (
+                <span className="flex items-center">
+                  <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                  Publishing...
+                </span>
+              ) : 'Publish'}
+            </button>
+          </div>
+          
+          <div className="text-gray-500 text-xs mt-4">
+            <p className="mb-1">Character count: {content.length}</p>
+          </div>
+          
+          {/* Publishing status for Nostr */}
+          {isPublishing && (
+            <div className="mt-4 border border-gray-800 rounded-lg p-3 bg-gray-900">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-white font-medium text-sm">Publishing to relays...</h3>
+                <div className="flex items-center">
+                  <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                  <span className="text-xs text-gray-400">
+                    {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-50 p-4 sm:p-6 md:p-8">
