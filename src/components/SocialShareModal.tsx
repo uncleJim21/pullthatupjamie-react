@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Twitter, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Loader2, Twitter, Sparkles, ChevronDown, ChevronUp, ChevronRight, Info, Save } from 'lucide-react';
 import { printLog } from '../constants/constants.ts';
 import { generateAssistContent } from '../services/jamieAssistService.ts';
 
@@ -70,6 +70,38 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [showAdvancedPrefs, setShowAdvancedPrefs] = useState(false);
   const [additionalPrefs, setAdditionalPrefs] = useState<string>('');
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [prefsSuccessfullySaved, setPrefsSuccessfullySaved] = useState(false);
+
+  // Function to save preferences to localStorage
+  const saveJamieAssistPreferences = () => {
+    try {
+      localStorage.setItem('jamieAssistDefaults', additionalPrefs);
+      setPrefsSuccessfullySaved(true);
+      
+      // Reset the success indicator after 2 seconds
+      setTimeout(() => {
+        setPrefsSuccessfullySaved(false);
+      }, 2000);
+      
+      printLog('Jamie Assist preferences saved to localStorage');
+    } catch (error) {
+      console.error('Error saving Jamie Assist preferences:', error);
+    }
+  };
+  
+  // Function to load preferences from localStorage
+  const loadJamieAssistPreferences = () => {
+    try {
+      const savedPrefs = localStorage.getItem('jamieAssistDefaults');
+      if (savedPrefs) {
+        setAdditionalPrefs(savedPrefs);
+        printLog('Jamie Assist preferences loaded from localStorage');
+      }
+    } catch (error) {
+      console.error('Error loading Jamie Assist preferences:', error);
+    }
+  };
 
   // Update activePlatform when platform prop changes
   useEffect(() => {
@@ -132,6 +164,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     printLog(`Platform changed to: ${platform}`);
     setShowNostrPrompt(false);
     setShowTwitterPrompt(false);
+
+    // Load any saved Jamie Assist preferences
+    loadJamieAssistPreferences();
 
     return () => {
       // Clean up WebSocket connections when component unmounts
@@ -442,6 +477,66 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
+  // Render the Jamie Assist info modal
+  const renderInfoModal = () => {
+    if (!showInfoModal) return null;
+    
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className="bg-black border border-gray-800 rounded-xl p-4 sm:p-6 w-full max-w-md text-center relative shadow-xl max-h-[90vh] flex flex-col">
+          <button 
+            onClick={() => setShowInfoModal(false)} 
+            className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors z-10"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          
+          <div className="mb-4 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center mr-3">
+              <Sparkles className="w-6 h-6 text-white" />
+            </div>
+            <h2 className="text-xl font-semibold text-white">Jamie Assist</h2>
+          </div>
+          
+          <div className="text-left overflow-y-auto px-1 flex-1" style={{ scrollbarWidth: 'thin' }}>
+            <p className="text-gray-300 mb-4">
+              Jamie Assist helps you craft engaging social media posts about your clip using AI.
+            </p>
+            
+            <h3 className="text-white font-medium mb-2">What it does:</h3>
+            <ul className="list-disc list-inside text-gray-300 space-y-1.5 mb-4 ml-1">
+              <li>Generates promotional text based on the clip content</li>
+              <li>Completes your thoughts if you've started writing</li>
+              <li>Creates posts from scratch if your text area is empty</li>
+              <li>Adapts to your preferences (tone, style, hashtags)</li>
+            </ul>
+            
+            <h3 className="text-white font-medium mb-2">How to use it:</h3>
+            <ol className="list-decimal list-inside text-gray-300 space-y-1.5 mb-4 ml-1">
+              <li>Optionally start writing your post</li>
+              <li>Click "Jamie Assist" to generate content</li>
+              <li>Use "Advanced Preferences" to specify tone or style</li>
+              <li>Edit the generated text as needed before sharing</li>
+            </ol>
+            
+            <div className="p-3 bg-gray-900/60 border border-gray-800 rounded-lg mt-4 mb-4">
+              <p className="text-gray-400 text-sm">
+                <span className="text-amber-500">Tip:</span> The link to your clip and attribution will be added automatically when you publish.
+              </p>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => setShowInfoModal(false)}
+            className="mt-4 px-6 py-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium hover:from-amber-400 hover:to-amber-500 transition-colors"
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (!isOpen || !fileUrl) return null;
 
   // Show Twitter cross-posting prompt after successful Nostr publishing
@@ -677,7 +772,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               onClick={() => setShowAdvancedPrefs(!showAdvancedPrefs)}
               className="flex items-center text-gray-400 hover:text-white text-sm mb-2"
             >
-              Advanced Preferences {showAdvancedPrefs ? <ChevronUp className="ml-1 w-4 h-4" /> : <ChevronDown className="ml-1 w-4 h-4" />}
+              Advanced Preferences {showAdvancedPrefs ? <ChevronUp className="ml-1 w-4 h-4" /> : <ChevronRight className="ml-1 w-4 h-4" />}
             </button>
             
             {showAdvancedPrefs && (
@@ -688,10 +783,19 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 <textarea
                   value={additionalPrefs}
                   onChange={(e) => setAdditionalPrefs(e.target.value)}
-                  className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg p-3 text-sm"
+                  className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg p-3 text-sm mb-3"
                   placeholder="E.g.: Professional tone, include hashtags #podcast #JRE"
                   rows={2}
                 />
+                <div className="flex justify-end">
+                  <button
+                    onClick={saveJamieAssistPreferences}
+                    className="flex items-center space-x-1 px-3 py-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-sm transition-colors"
+                  >
+                    <Save className="w-3.5 h-3.5 mr-1.5" />
+                    <span>{prefsSuccessfullySaved ? 'Saved!' : 'Save as Default'}</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -735,25 +839,37 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             </div>
           )}
           
-          <div className="flex space-x-3 justify-center mb-3">
-            <button
-              onClick={handleJamieAssist}
-              disabled={isGeneratingContent || isPublishing || !lookupHash}
-              className={`px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
-                ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
-            >
-              {isGeneratingContent ? (
-                <span className="flex items-center">
-                  <Loader2 className="animate-spin w-4 h-4 mr-2" />
-                  Generating...
-                </span>
-              ) : (
-                <span className="flex items-center">
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Jamie Assist
-                </span>
-              )}
-            </button>
+          {/* Jamie Assist button and info button */}
+          <div className="flex justify-center mb-3">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleJamieAssist}
+                disabled={isGeneratingContent || isPublishing || !lookupHash}
+                className={`px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
+                  ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
+              >
+                {isGeneratingContent ? (
+                  <span className="flex items-center">
+                    <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                    Generating...
+                  </span>
+                ) : (
+                  <span className="flex items-center">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Jamie Assist
+                  </span>
+                )}
+              </button>
+              
+              <button
+                onClick={() => setShowInfoModal(true)}
+                className="flex items-center space-x-1 px-2 py-1 rounded-full border border-gray-700 group hover:bg-gray-800 hover:border-amber-500/30 transition-colors"
+                title="About Jamie Assist"
+                aria-label="Learn more about Jamie Assist"
+              >
+                <Info className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-500" />
+              </button>
+            </div>
           </div>
           
           <div className="flex space-x-4 justify-center">
@@ -803,6 +919,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         {renderMainModalContent()}
       </div>
+      
+      {renderInfoModal()}
     </div>
   );
 };
