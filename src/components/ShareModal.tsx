@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Download, Check, Link, Twitter, X } from 'lucide-react';
-import { printLog } from '../constants/constants.ts';
+import { printLog, API_URL } from '../constants/constants.ts';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 
 // Define type for Nostr window extension
@@ -119,18 +119,26 @@ const ShareModal: React.FC<ShareModalProps> = ({
   const getRenderUrl = () => {
     if (!fileUrl) return undefined;
     
-    // Check if this is a clip URL and extract the ID for a render URL
-    if (fileUrl.includes('/clips/')) {
-      const urlParts = fileUrl.split('/');
-      const fileIndex = urlParts.findIndex(part => part === 'clips');
-      
-      if (fileIndex !== -1 && fileIndex + 2 < urlParts.length) {
-        const clipId = urlParts[fileIndex + 2].replace('-clip.mp4', '');
-        return `${window.location.origin}/api/render-clip/${clipId}`;
+    try {
+      // Check if this is a clip URL 
+      if (fileUrl.includes('/clips/')) {
+        // Using a more robust approach to extract the hash
+        const urlParts = fileUrl.split('/');
+        // Get the last part which should be something like "a7db24696467edc2bf881d78ddcc7a29d3c2f5f7134c0d34318aca6d84f91985-clip.mp4"
+        const lastPart = urlParts[urlParts.length - 1];
+        
+        // Extract the hash by removing the "-clip.mp4" suffix
+        if (lastPart && lastPart.includes('-clip.mp4')) {
+          const hash = lastPart.replace('-clip.mp4', '');
+          return `${API_URL}/api/render-clip/${hash}`;
+        }
       }
+      
+      return undefined;
+    } catch (error) {
+      console.error("Error generating render URL:", error);
+      return undefined;
     }
-    
-    return undefined;
   };
 
   return (
