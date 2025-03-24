@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {Download, Play, Share, Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors, Link, Twitter, X } from 'lucide-react';
-import { API_URL,printLog } from '../constants/constants.ts';
+import { API_URL, printLog, AuthConfig } from '../constants/constants.ts';
 import { checkClipStatus } from '../services/clipService.ts';
 import ShareModal from './ShareModal.tsx';
 
@@ -30,13 +30,15 @@ interface ClipTrackerModalProps {
   hasSearched:boolean;
   isCollapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
+  auth?: AuthConfig;
 }
 
 export default function ClipTrackerModal({
   clipProgress,
   isCollapsed,
   hasSearched,
-  onCollapsedChange
+  onCollapsedChange,
+  auth
 }: ClipTrackerModalProps) {
   const [clipHistory, setClipHistory] = useState<ClipHistoryItem[]>([]);
   const [isHistoryShown, setIsHistoryShown] = useState(false);
@@ -52,11 +54,15 @@ export default function ClipTrackerModal({
   };
 
   const getCdnLink = (lookupHash?: string | null) => {
-    printLog(`lookupHash:${lookupHash}`)
+    printLog(`getCdnLink lookupHash:${lookupHash}`);
     if (!lookupHash) return;
   
     // Find the matching clip in the stored history
-    const clip = clipHistory.find(item => item.lookupHash === lookupHash);
+    const clip = clipHistory.find(item => 
+      item.lookupHash === lookupHash || // Match by lookupHash
+      item.clipId === lookupHash        // Or match by clipId
+    );
+    
     return clip?.cdnLink;
   };
 
@@ -168,8 +174,33 @@ export default function ClipTrackerModal({
   
 
   const handleShare = (lookupHash?: string | null | undefined) => {
-    printLog(`handleShare lookupHash:${lookupHash}`)
-    setLookupHash(lookupHash);
+    printLog(`handleShare lookupHash:${lookupHash}`);
+    
+    // Find the associated clip
+    let effectiveLookupHash = lookupHash;
+    
+    // When a lookupHash is provided, try to find the corresponding clip
+    if (lookupHash) {
+      const clip = clipHistory.find(item => item.lookupHash === lookupHash);
+      
+      // If we found a matching clip and it has a clipId, use that as the effective lookup hash
+      if (clip && clip.clipId) {
+        printLog(`Using clipId ${clip.clipId} instead of lookupHash ${lookupHash}`);
+        effectiveLookupHash = clip.clipId;
+      }
+    }
+    
+    // For current clip, prefer using clipId over lookupHash
+    if (lookupHash && clipProgress && clipProgress.lookupHash === lookupHash && clipProgress.clipId) {
+      printLog(`Using current clip's clipId ${clipProgress.clipId} instead of lookupHash ${lookupHash}`);
+      effectiveLookupHash = clipProgress.clipId;
+    }
+    
+    printLog(`Final lookupHash for sharing: ${effectiveLookupHash}`);
+    const cdnLink = getCdnLink(lookupHash);
+    printLog(`CDN link for sharing: ${cdnLink}`);
+    
+    setLookupHash(effectiveLookupHash);
     setShowShareModal(true);
   };
 
@@ -276,30 +307,38 @@ export default function ClipTrackerModal({
 
   // Update history when new clip arrives or existing clip updates
   useEffect(() => {
-    // Only proceed if we have both clipId and lookupHash
-    // printLog(`ClipTrackerModal:${JSON.stringify(clipProgress,null,2)}`)
-    const lookupHash = clipProgress?.lookupHash
-    if (!clipProgress?.clipId || !lookupHash) return;
+    // Only proceed if we have clipId
+    if (!clipProgress?.clipId) return;
+    
+    // Ensure we have a valid lookupHash
+    const lookupHash = clipProgress.lookupHash || clipProgress.clipId;
+    
+    printLog(`Updating clip history with clipId: ${clipProgress.clipId}, lookupHash: ${lookupHash}`);
     onCollapsedChange(false);
+    
     setClipHistory(prev => {
-      const existingIndex = prev.findIndex(item => item.lookupHash === clipProgress.lookupHash);
+      // Look for existing clip by clipId (primary) or lookupHash (fallback)
+      const existingIndex = prev.findIndex(item => 
+        item.clipId === clipProgress.clipId || 
+        (lookupHash && item.lookupHash === lookupHash)
+      );
 
       const updatedItem: ClipHistoryItem = {
-          creator: clipProgress.creator,
-          episode: clipProgress.episode,
-          timestamps: clipProgress.timestamps,
-          cdnLink: clipProgress.cdnLink,
-          clipId: clipProgress.clipId,
-          episodeImage: clipProgress.episodeImage,
-          timestamp: Date.now(),
-          id: existingIndex >= 0 ? prev[existingIndex].id : Math.random().toString(36).substr(2, 9),
-          lookupHash: lookupHash  // Ensure lookupHash is correctly set
+        creator: clipProgress.creator,
+        episode: clipProgress.episode,
+        timestamps: clipProgress.timestamps,
+        cdnLink: clipProgress.cdnLink,
+        clipId: clipProgress.clipId,
+        episodeImage: clipProgress.episodeImage,
+        timestamp: Date.now(),
+        id: existingIndex >= 0 ? prev[existingIndex].id : Math.random().toString(36).substr(2, 9),
+        lookupHash: lookupHash // Ensure we're using the correct lookupHash
       };
 
       if (existingIndex >= 0) {
-          const newHistory = [...prev];
-          newHistory.splice(existingIndex, 1);
-          return [updatedItem, ...newHistory];
+        const newHistory = [...prev];
+        newHistory.splice(existingIndex, 1);
+        return [updatedItem, ...newHistory];
       }
 
       return [updatedItem, ...prev];
@@ -323,7 +362,10 @@ export default function ClipTrackerModal({
       {showShareModal && lookupHash && (
         <ShareModal 
           isOpen={showShareModal}
-          onClose={() => setShowShareModal(false)}
+          onClose={() => {
+            printLog(`Closing ShareModal with lookupHash: ${lookupHash}`);
+            setShowShareModal(false);
+          }}
           fileUrl={getCdnLink(lookupHash)}
           title="Share This Clip"
           itemName="clip"
@@ -335,6 +377,8 @@ export default function ClipTrackerModal({
           downloadButtonLabel="Download Clip"
           twitterButtonLabel="Tweet Clip"
           nostrButtonLabel="Share on Nostr"
+          lookupHash={lookupHash}
+          auth={auth}
         />
       )}
       {/* Current Clip */}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Twitter } from 'lucide-react';
+import { X, Loader2, Twitter, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { printLog } from '../constants/constants.ts';
+import { generateAssistContent } from '../services/jamieAssistService.ts';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -40,6 +41,8 @@ interface SocialShareModalProps {
   onComplete: (success: boolean, platform: SocialPlatform) => void;
   platform: SocialPlatform;
   renderUrl?: string; // URL to use in place of fileUrl for Twitter sharing
+  lookupHash?: string; // Added lookupHash for Jamie Assist
+  auth?: any; // Auth object for API calls
 }
 
 const SocialShareModal: React.FC<SocialShareModalProps> = ({
@@ -49,7 +52,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   itemName = 'file',
   onComplete,
   platform,
-  renderUrl
+  renderUrl,
+  lookupHash,
+  auth
 }) => {
   const [content, setContent] = useState<string>('');
   const [isPublishing, setIsPublishing] = useState(false);
@@ -60,6 +65,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [showNostrPrompt, setShowNostrPrompt] = useState(false);
   const [showTwitterPrompt, setShowTwitterPrompt] = useState(false);
   const [activePlatform, setActivePlatform] = useState<SocialPlatform>(platform);
+  
+  // Jamie Assist states
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [showAdvancedPrefs, setShowAdvancedPrefs] = useState(false);
+  const [additionalPrefs, setAdditionalPrefs] = useState<string>('');
 
   // Update activePlatform when platform prop changes
   useEffect(() => {
@@ -144,6 +154,19 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       checkNostrExtension();
     }
   }, [showNostrPrompt]);
+
+  // Effect to initialize and check lookupHash
+  useEffect(() => {
+    if (lookupHash) {
+      if (typeof lookupHash === 'string' && lookupHash.startsWith('undefined-')) {
+        console.error(`Invalid lookupHash format detected on mount: ${lookupHash}`);
+      } else {
+        printLog(`SocialShareModal initialized with lookupHash: ${lookupHash}`);
+      }
+    } else {
+      printLog('SocialShareModal initialized without lookupHash');
+    }
+  }, [lookupHash]);
 
   const checkNostrExtension = async () => {
     try {
@@ -322,6 +345,53 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
     
     setIsPublishing(false);
+  };
+
+  const handleJamieAssist = async () => {
+    // Validate lookupHash
+    if (!lookupHash) {
+      console.error("Missing lookupHash for Jamie Assist");
+      return;
+    }
+    
+    // Handle case where lookupHash is in "undefined-X" format
+    if (typeof lookupHash === 'string' && lookupHash.startsWith('undefined-')) {
+      console.error(`Invalid lookupHash format: ${lookupHash}`);
+      return;
+    }
+    
+    // Check for auth
+    if (!auth) {
+      console.error("Missing auth for Jamie Assist");
+      return;
+    }
+
+    printLog(`Calling Jamie Assist with lookupHash: ${lookupHash}`);
+    setIsGeneratingContent(true);
+    
+    try {
+      // Prepare additional prefs string
+      let prefs = additionalPrefs;
+      if (content.trim()) {
+        prefs = `User started this post, please help finish it with similar text: ${content}\n${prefs}`;
+      }
+      
+      // Call Jamie Assist service
+      await generateAssistContent(
+        lookupHash,
+        prefs,
+        auth,
+        (generatedContent) => {
+          // This callback updates the content as it streams in
+          setContent(generatedContent);
+        }
+      );
+      
+    } catch (error) {
+      console.error("Error with Jamie Assist:", error);
+    } finally {
+      setIsGeneratingContent(false);
+    }
   };
 
   const handlePublish = async () => {
@@ -522,6 +592,204 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     );
   }
 
+  // Render the main modal content
+  const renderMainModalContent = () => {
+    if (platform === SocialPlatform.Nostr && !hasNostrExtension) {
+      return (
+        <div className="text-center py-8 px-4">
+          <img 
+            src="/nostr-logo-square.png" 
+            alt="Nostr" 
+            className="w-20 h-20 mx-auto mb-6"
+            style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+          />
+          <p className="text-gray-300 mb-6 text-lg">
+            You need a Nostr browser extension to publish this post.
+          </p>
+          <div className="space-y-3 max-w-xs mx-auto">
+            <p className="text-gray-400 text-sm font-medium">Popular extensions:</p>
+            <a 
+              href="https://getalby.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center"
+            >
+              <span className="font-bold">Alby</span>
+              <span className="ml-2 text-xs text-gray-400">(Recommended)</span>
+            </a>
+            <a 
+              href="https://github.com/fiatjaf/nos2x" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
+            >
+              nos2x
+            </a>
+            <a 
+              href="https://www.getflamingo.org/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
+            >
+              Flamingo
+            </a>
+          </div>
+        </div>
+      );
+    } else {
+      return (
+        <>
+          <div className="flex items-center mb-4 px-2">
+            <div className="w-10 h-10 rounded-full bg-gray-800 mr-3 flex items-center justify-center overflow-hidden">
+              {platform === SocialPlatform.Nostr ? (
+                <img 
+                  src="/nostr-logo-square.png" 
+                  alt="Nostr" 
+                  className="w-6 h-6"
+                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+                />
+              ) : (
+                <Twitter className="w-6 h-6 text-blue-400" />
+              )}
+            </div>
+            <div className="text-left">
+              <p className="text-white font-medium">
+                {platform === SocialPlatform.Nostr ? 'Your Nostr Post' : 'Your Tweet'}
+              </p>
+            </div>
+          </div>
+          
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="w-full h-48 bg-gray-900 text-white border border-gray-700 rounded-xl p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
+            placeholder={`Write about this ${itemName}...`}
+            style={{ resize: "vertical", minHeight: "120px" }}
+          />
+          
+          <div className="text-gray-400 text-xs mb-3 text-left pl-1">
+            The link to your {itemName} and attribution will be added automatically when you publish.
+          </div>
+          
+          {/* Jamie Assist Advanced Preferences */}
+          <div className="mb-6">
+            <button 
+              onClick={() => setShowAdvancedPrefs(!showAdvancedPrefs)}
+              className="flex items-center text-gray-400 hover:text-white text-sm mb-2"
+            >
+              Advanced Preferences {showAdvancedPrefs ? <ChevronUp className="ml-1 w-4 h-4" /> : <ChevronDown className="ml-1 w-4 h-4" />}
+            </button>
+            
+            {showAdvancedPrefs && (
+              <div className="border border-gray-800 rounded-lg p-3 bg-gray-900 mb-3">
+                <label className="block text-sm text-gray-300 mb-1 text-left">
+                  Specify tone, style or preferred hashtags:
+                </label>
+                <textarea
+                  value={additionalPrefs}
+                  onChange={(e) => setAdditionalPrefs(e.target.value)}
+                  className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg p-3 text-sm"
+                  placeholder="E.g.: Professional tone, include hashtags #podcast #JRE"
+                  rows={2}
+                />
+              </div>
+            )}
+          </div>
+          
+          {platform === SocialPlatform.Nostr && isPublishing && (
+            <div className="mb-6 border border-gray-800 rounded-lg p-3 bg-gray-900">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-white font-medium">Publishing to relays...</h3>
+                <div className="flex items-center">
+                  <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                  <span className="text-sm text-gray-400">
+                    {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2 max-h-32 overflow-y-auto text-left text-xs">
+                {relayPool.map((relay) => (
+                  <div key={relay} className="flex items-center justify-between">
+                    <span className="text-gray-400 truncate max-w-[180px]">{relay.replace('wss://', '')}</span>
+                    <span className={`
+                      px-2 py-0.5 rounded text-xs font-medium
+                      ${publishStatus[relay] === 'idle' ? 'bg-gray-800 text-gray-400' : ''}
+                      ${publishStatus[relay] === 'connecting' ? 'bg-blue-900/30 text-blue-300' : ''}
+                      ${publishStatus[relay] === 'connected' ? 'bg-yellow-900/30 text-yellow-300' : ''}
+                      ${publishStatus[relay] === 'publishing' ? 'bg-yellow-900/50 text-yellow-300' : ''}
+                      ${publishStatus[relay] === 'published' ? 'bg-green-900/30 text-green-300' : ''}
+                      ${publishStatus[relay] === 'failed' ? 'bg-red-900/30 text-red-300' : ''}
+                      ${publishStatus[relay] === 'timeout' ? 'bg-orange-900/30 text-orange-300' : ''}
+                    `}>
+                      {publishStatus[relay] === 'idle' && 'Idle'}
+                      {publishStatus[relay] === 'connecting' && 'Connecting...'}
+                      {publishStatus[relay] === 'connected' && 'Connected'}
+                      {publishStatus[relay] === 'publishing' && 'Publishing...'}
+                      {publishStatus[relay] === 'published' && 'Published'}
+                      {publishStatus[relay] === 'failed' && 'Failed'}
+                      {publishStatus[relay] === 'timeout' && 'Timeout'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="flex space-x-3 justify-center mb-3">
+            <button
+              onClick={handleJamieAssist}
+              disabled={isGeneratingContent || isPublishing || !lookupHash}
+              className={`px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
+                ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
+            >
+              {isGeneratingContent ? (
+                <span className="flex items-center">
+                  <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                  Generating...
+                </span>
+              ) : (
+                <span className="flex items-center">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Jamie Assist
+                </span>
+              )}
+            </button>
+          </div>
+          
+          <div className="flex space-x-4 justify-center">
+            <button
+              onClick={onClose}
+              disabled={isPublishing || isGeneratingContent}
+              className={`px-5 py-2 rounded-lg border border-gray-700 text-gray-300 
+                ${(isPublishing || isGeneratingContent) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handlePublish}
+              disabled={isPublishing || isGeneratingContent || content.trim().length === 0}
+              className={`px-5 py-2 rounded-lg ${platform === SocialPlatform.Twitter ? 'bg-blue-600' : 'bg-purple-600'} text-white font-medium 
+                ${(isPublishing || isGeneratingContent || content.trim().length === 0) ? 
+                  'opacity-50 cursor-not-allowed' : 
+                  platform === SocialPlatform.Twitter ? 'hover:bg-blue-500 transition-colors' : 'hover:bg-purple-500 transition-colors'}`}
+            >
+              {isPublishing ? (
+                <span className="flex items-center">
+                  <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                  Publishing...
+                </span>
+              ) : (platform === SocialPlatform.Twitter ? 'Tweet' : 'Publish')}
+            </button>
+          </div>
+          
+          <div className="text-gray-500 text-xs mt-4">
+            <p className="mb-1">Character count: {content.length}</p>
+          </div>
+        </>
+      );
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-50 p-4 sm:p-6 md:p-8">
       <div className="bg-black border border-gray-800 rounded-xl p-6 sm:p-8 w-full max-w-sm sm:max-w-md md:max-w-xl text-center relative shadow-xl transform -translate-y-12">
@@ -533,150 +801,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           {platform === SocialPlatform.Nostr ? 'Share to Nostr' : 'Share to Twitter'}
         </h2>
         
-        {platform === SocialPlatform.Nostr && !hasNostrExtension ? (
-          <div className="text-center py-8 px-4">
-            <img 
-              src="/nostr-logo-square.png" 
-              alt="Nostr" 
-              className="w-20 h-20 mx-auto mb-6"
-              style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
-            />
-            <p className="text-gray-300 mb-6 text-lg">
-              You need a Nostr browser extension to publish this post.
-            </p>
-            <div className="space-y-3 max-w-xs mx-auto">
-              <p className="text-gray-400 text-sm font-medium">Popular extensions:</p>
-              <a 
-                href="https://getalby.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center"
-              >
-                <span className="font-bold">Alby</span>
-                <span className="ml-2 text-xs text-gray-400">(Recommended)</span>
-              </a>
-              <a 
-                href="https://github.com/fiatjaf/nos2x" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
-              >
-                nos2x
-              </a>
-              <a 
-                href="https://www.getflamingo.org/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
-              >
-                Flamingo
-              </a>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center mb-4 px-2">
-              <div className="w-10 h-10 rounded-full bg-gray-800 mr-3 flex items-center justify-center overflow-hidden">
-                {platform === SocialPlatform.Nostr ? (
-                  <img 
-                    src="/nostr-logo-square.png" 
-                    alt="Nostr" 
-                    className="w-6 h-6"
-                    style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
-                  />
-                ) : (
-                  <Twitter className="w-6 h-6 text-blue-400" />
-                )}
-              </div>
-              <div className="text-left">
-                <p className="text-white font-medium">
-                  {platform === SocialPlatform.Nostr ? 'Your Nostr Post' : 'Your Tweet'}
-                </p>
-              </div>
-            </div>
-            
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="w-full h-48 bg-gray-900 text-white border border-gray-700 rounded-xl p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
-              placeholder={`Write about this ${itemName}...`}
-              style={{ resize: "vertical", minHeight: "120px" }}
-            />
-            
-            <div className="text-gray-400 text-xs mb-6 text-left pl-1">
-              The link to your {itemName} and attribution will be added automatically when you publish.
-            </div>
-            
-            {platform === SocialPlatform.Nostr && isPublishing && (
-              <div className="mb-6 border border-gray-800 rounded-lg p-3 bg-gray-900">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-white font-medium">Publishing to relays...</h3>
-                  <div className="flex items-center">
-                    <Loader2 className="animate-spin w-4 h-4 mr-2" />
-                    <span className="text-sm text-gray-400">
-                      {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
-                    </span>
-                  </div>
-                </div>
-                <div className="space-y-2 max-h-32 overflow-y-auto text-left text-xs">
-                  {relayPool.map((relay) => (
-                    <div key={relay} className="flex items-center justify-between">
-                      <span className="text-gray-400 truncate max-w-[180px]">{relay.replace('wss://', '')}</span>
-                      <span className={`
-                        px-2 py-0.5 rounded text-xs font-medium
-                        ${publishStatus[relay] === 'idle' ? 'bg-gray-800 text-gray-400' : ''}
-                        ${publishStatus[relay] === 'connecting' ? 'bg-blue-900/30 text-blue-300' : ''}
-                        ${publishStatus[relay] === 'connected' ? 'bg-yellow-900/30 text-yellow-300' : ''}
-                        ${publishStatus[relay] === 'publishing' ? 'bg-yellow-900/50 text-yellow-300' : ''}
-                        ${publishStatus[relay] === 'published' ? 'bg-green-900/30 text-green-300' : ''}
-                        ${publishStatus[relay] === 'failed' ? 'bg-red-900/30 text-red-300' : ''}
-                        ${publishStatus[relay] === 'timeout' ? 'bg-orange-900/30 text-orange-300' : ''}
-                      `}>
-                        {publishStatus[relay] === 'idle' && 'Idle'}
-                        {publishStatus[relay] === 'connecting' && 'Connecting...'}
-                        {publishStatus[relay] === 'connected' && 'Connected'}
-                        {publishStatus[relay] === 'publishing' && 'Publishing...'}
-                        {publishStatus[relay] === 'published' && 'Published'}
-                        {publishStatus[relay] === 'failed' && 'Failed'}
-                        {publishStatus[relay] === 'timeout' && 'Timeout'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            <div className="flex space-x-4 justify-center">
-              <button
-                onClick={onClose}
-                disabled={isPublishing}
-                className={`px-5 py-2 rounded-lg border border-gray-700 text-gray-300 
-                  ${isPublishing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handlePublish}
-                disabled={isPublishing || content.trim().length === 0}
-                className={`px-5 py-2 rounded-lg ${platform === SocialPlatform.Twitter ? 'bg-blue-600' : 'bg-purple-600'} text-white font-medium 
-                  ${(isPublishing || content.trim().length === 0) ? 
-                    'opacity-50 cursor-not-allowed' : 
-                    platform === SocialPlatform.Twitter ? 'hover:bg-blue-500 transition-colors' : 'hover:bg-purple-500 transition-colors'}`}
-              >
-                {isPublishing ? (
-                  <span className="flex items-center">
-                    <Loader2 className="animate-spin w-4 h-4 mr-2" />
-                    Publishing...
-                  </span>
-                ) : (platform === SocialPlatform.Twitter ? 'Tweet' : 'Publish')}
-              </button>
-            </div>
-            
-            <div className="text-gray-500 text-xs mt-4">
-              <p className="mb-1">Character count: {content.length}</p>
-            </div>
-          </>
-        )}
+        {renderMainModalContent()}
       </div>
     </div>
   );

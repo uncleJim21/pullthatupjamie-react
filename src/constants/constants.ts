@@ -1,4 +1,4 @@
-export const DEBUG_MODE = false;
+export const DEBUG_MODE = true;
 export const FRONTEND_URL = DEBUG_MODE ?  'http://localhost:3000' : 'https://pullthatupjamie.ai';
 export const API_URL = DEBUG_MODE ? "http://localhost:4132" : "https://pullthatupjamie-nsh57.ondigitalocean.app";
 export const MONTHLY_PRICE_STRING = "$9.99"
