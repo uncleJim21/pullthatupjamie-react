@@ -63,23 +63,66 @@ export default function ClipTrackerModal({
   const getRenderClipUrl = (lookupHash?: string | null) => {
     printLog(`getRenderClipUrl lookupHash:${lookupHash}`)
     if (!lookupHash) return;
-    const extractLookupHash = (url) => {
-      return url.split('/').pop();
-    };
-    const finalHash = extractLookupHash(lookupHash);
-  
-    const renderClipUrl = `${API_URL}/api/render-clip/${finalHash}`;
-    return renderClipUrl;
+    
+    try {
+      // Get the CDN link for the clip from history
+      const clip = clipHistory.find(item => item.lookupHash === lookupHash);
+      const cdnLink = clip?.cdnLink;
+      
+      if (cdnLink) {
+        // Get the last part of the URL path which contains the hash
+        const urlParts = cdnLink.split('/');
+        const lastPart = urlParts[urlParts.length - 1];
+        
+        // Extract the hash by removing the "-clip.mp4" suffix
+        if (lastPart && lastPart.includes('-clip.mp4')) {
+          const hash = lastPart.replace('-clip.mp4', '');
+          return `${API_URL}/api/render-clip/${hash}`;
+        }
+      }
+      
+      // Fallback to the old extraction if no CDN link is available
+      // or if the parsing above didn't work
+      return `${API_URL}/api/render-clip/${lookupHash}`;
+    } catch (error) {
+      console.error("Error generating render clip URL:", error);
+      return `${API_URL}/api/render-clip/${lookupHash}`;
+    }
   }
 
 
   const extractLookupHash = (cdnLink:string) => {
-    // Remove the base URL part and split the rest
-    const parts = cdnLink.split('/clips/')[1]?.split('/');
-    if (!parts || parts.length < 3) return null;
-    const fileWithSuffix = parts[2];
-    const file = fileWithSuffix.replace('-clip.mp4', '');
-    return `${file}`;
+    try {
+      // Get the last part of the URL which should be the filename with hash
+      const urlParts = cdnLink.split('/');
+      const lastPart = urlParts[urlParts.length - 1];
+      
+      // Extract the hash by removing the "-clip.mp4" suffix
+      if (lastPart && lastPart.includes('-clip.mp4')) {
+        return lastPart.replace('-clip.mp4', '');
+      }
+      
+      // Fallback to old method if the above doesn't work
+      const parts = cdnLink.split('/clips/')[1]?.split('/');
+      if (!parts || parts.length < 3) return null;
+      
+      // Try the last part first (which should be the filename)
+      const fileWithSuffix = parts[parts.length - 1];
+      if (fileWithSuffix && fileWithSuffix.includes('-clip.mp4')) {
+        return fileWithSuffix.replace('-clip.mp4', '');
+      }
+      
+      // If that doesn't work, try the old way
+      const oldFileWithSuffix = parts[2];
+      if (oldFileWithSuffix) {
+        return oldFileWithSuffix.replace('-clip.mp4', '');
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Error extracting lookup hash:", error);
+      return null;
+    }
   };
 
   const copyToClipboard = (lookupHash?: string | null) => {
