@@ -1159,6 +1159,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             hasSearched={hasSearchedInMode('podcast-search')}
             isCollapsed={isClipTrackerCollapsed}
             onCollapsedChange={setIsClipTrackerCollapsed}
+            auth={authConfig}
           />
         </div>
       )}

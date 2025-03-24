@@ -32,6 +32,8 @@ interface ShareModalProps {
   downloadButtonLabel?: string;
   copyButtonLabel?: string;
   nostrButtonLabel?: string;
+  lookupHash?: string;
+  auth?: any;
 }
 
 const ShareModal: React.FC<ShareModalProps> = ({
@@ -48,7 +50,9 @@ const ShareModal: React.FC<ShareModalProps> = ({
   twitterButtonLabel,
   downloadButtonLabel,
   copyButtonLabel,
-  nostrButtonLabel
+  nostrButtonLabel,
+  lookupHash,
+  auth
 }) => {
   const [copied, setCopied] = useState(false);
   const [activePlatform, setActivePlatform] = useState<SocialPlatform | null>(null);
@@ -115,6 +119,27 @@ const ShareModal: React.FC<ShareModalProps> = ({
     }
   };
 
+  // Extract clip ID directly from fileUrl
+  const extractClipIdFromUrl = (url?: string): string | undefined => {
+    if (!url) return undefined;
+    
+    try {
+      // Handle clip URL pattern
+      if (url.includes('/clips/')) {
+        const urlParts = url.split('/');
+        const lastPart = urlParts[urlParts.length - 1];
+        
+        if (lastPart && lastPart.includes('-clip.mp4')) {
+          return lastPart.replace('-clip.mp4', '');
+        }
+      }
+      return undefined;
+    } catch (error) {
+      console.error("Error extracting clip ID from URL:", error);
+      return undefined;
+    }
+  };
+
   // Extract render URL for Twitter if it exists (e.g., for clips)
   const getRenderUrl = () => {
     if (!fileUrl) return undefined;
@@ -122,14 +147,16 @@ const ShareModal: React.FC<ShareModalProps> = ({
     try {
       // Check if this is a clip URL 
       if (fileUrl.includes('/clips/')) {
-        // Using a more robust approach to extract the hash
-        const urlParts = fileUrl.split('/');
-        // Get the last part which should be something like "a7db24696467edc2bf881d78ddcc7a29d3c2f5f7134c0d34318aca6d84f91985-clip.mp4"
-        const lastPart = urlParts[urlParts.length - 1];
+        // Extract the hash from the file URL
+        const hash = extractClipIdFromUrl(fileUrl);
         
-        // Extract the hash by removing the "-clip.mp4" suffix
-        if (lastPart && lastPart.includes('-clip.mp4')) {
-          const hash = lastPart.replace('-clip.mp4', '');
+        if (hash) {
+          // If no lookupHash was provided or it's an "undefined-X" format, use the extracted hash
+          if (!lookupHash || (typeof lookupHash === 'string' && lookupHash.startsWith('undefined-'))) {
+            printLog(`Extracted clip ID ${hash} from URL to use as lookupHash`);
+            lookupHash = hash;
+          }
+          
           return `${API_URL}/api/render-clip/${hash}`;
         }
       }
@@ -141,8 +168,33 @@ const ShareModal: React.FC<ShareModalProps> = ({
     }
   };
 
+  // Ensure we have a valid lookupHash
+  const getValidLookupHash = (): string | undefined => {
+    // First, try to use the provided lookupHash if it's valid
+    if (lookupHash && typeof lookupHash === 'string' && !lookupHash.startsWith('undefined-')) {
+      printLog(`Using provided lookupHash: ${lookupHash}`);
+      return lookupHash;
+    }
+    
+    // If no valid lookupHash, extract from fileUrl
+    const extractedId = extractClipIdFromUrl(fileUrl);
+    if (extractedId) {
+      printLog(`Using extracted clip ID from URL: ${extractedId}`);
+      return extractedId;
+    }
+    
+    // If we still don't have a valid ID, log an error
+    if (lookupHash) {
+      printLog(`Invalid lookupHash format: ${lookupHash}, and couldn't extract ID from URL: ${fileUrl}`);
+    } else {
+      printLog(`No lookupHash provided and couldn't extract ID from URL: ${fileUrl}`);
+    }
+    
+    return undefined;
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50 sm:mb-0 mb-48">
       {/* Social media share modal (Twitter or Nostr) */}
       {activePlatform !== null && (
         <SocialShareModal
@@ -153,6 +205,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
           onComplete={handleSocialShareComplete}
           platform={activePlatform}
           renderUrl={getRenderUrl()}
+          lookupHash={getValidLookupHash()}
+          auth={auth}
         />
       )}
       
