@@ -74,6 +74,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [prefsSuccessfullySaved, setPrefsSuccessfullySaved] = useState(false);
   const [jamieAssistError, setJamieAssistError] = useState<string | null>(null);
+  const [lastJamieAssistCall, setLastJamieAssistCall] = useState<number>(0);
+  const [userEditedSinceLastAssist, setUserEditedSinceLastAssist] = useState<boolean>(false);
   
   // RegisterModal states
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
@@ -390,6 +392,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const handleJamieAssist = async () => {
     // Clear any previous errors
     setJamieAssistError(null);
+
+    // Get current timestamp
+    const currentTime = Date.now();
+    
+    // Check if this is a back-to-back call without user edits
+    const isBackToBackCall = (currentTime - lastJamieAssistCall < 10000) && !userEditedSinceLastAssist;
+    
+    // Update last call timestamp
+    setLastJamieAssistCall(currentTime);
+    
+    // Reset user edit tracking flag
+    setUserEditedSinceLastAssist(false);
     
     // Validate lookupHash
     if (!lookupHash) {
@@ -417,9 +431,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setIsGeneratingContent(true);
     
     try {
+      // If this is a back-to-back call, clear the content and start fresh
+      if (isBackToBackCall) {
+        printLog("Back-to-back Jamie Assist call detected - starting from scratch");
+        setContent('');
+      }
+      
       // Prepare additional prefs string
       let prefs = additionalPrefs;
-      if (content.trim()) {
+      
+      // Only use existing content if it's not a back-to-back call
+      if (content.trim() && !isBackToBackCall) {
         prefs = `User started this post, please help finish it with similar text: ${content}\n${prefs}`;
       }
       
@@ -503,6 +525,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       console.error(`Error during ${activePlatform} publishing:`, error);
       setIsPublishing(false);
       onComplete(false, activePlatform);
+    }
+  };
+
+  // Function to handle content changes and track user edits
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value;
+    setContent(newContent);
+    
+    // Only mark as edited if there's actual content
+    if (newContent.trim() !== '') {
+      // Mark that user has edited content since last Jamie Assist call
+      setUserEditedSinceLastAssist(true);
     }
   };
 
@@ -882,7 +916,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         <textarea
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={handleContentChange}
           className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
           placeholder={`Write about this ${itemName}...`}
           style={{ resize: "none", height: "120px", minHeight: "100px" }}
