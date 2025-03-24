@@ -1,5 +1,16 @@
 import { API_URL, AuthConfig, RequestAuthMethod, printLog } from "../constants/constants.ts";
 
+// Custom error class to include HTTP status
+export class JamieAssistError extends Error {
+  status: number;
+  
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+    this.name = 'JamieAssistError';
+  }
+}
+
 export const generateAssistContent = async (
   lookupHash: string,
   additionalPrefs: string = "",
@@ -39,7 +50,17 @@ export const generateAssistContent = async (
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // Handle different error status codes
+      if (response.status === 429) {
+        printLog('Jamie Assist rate limit exceeded (429)');
+        throw new JamieAssistError('Rate limit exceeded. Please upgrade your account.', 429);
+      } else if (response.status === 401 || response.status === 403) {
+        printLog(`Jamie Assist authentication error (${response.status})`);
+        throw new JamieAssistError('Authentication failed. Please sign in again.', response.status);
+      } else {
+        printLog(`Jamie Assist HTTP error (${response.status})`);
+        throw new JamieAssistError(`Service error: ${response.statusText}`, response.status);
+      }
     }
 
     // Handle the streaming response

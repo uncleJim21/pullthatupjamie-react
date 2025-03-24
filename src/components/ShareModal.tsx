@@ -194,7 +194,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50 sm:mb-0 mb-48">
       {/* Social media share modal (Twitter or Nostr) */}
       {activePlatform !== null && (
         <SocialShareModal

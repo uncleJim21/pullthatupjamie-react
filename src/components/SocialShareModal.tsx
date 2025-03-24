@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Twitter, Sparkles, ChevronDown, ChevronUp, ChevronRight, Info, Save } from 'lucide-react';
 import { printLog } from '../constants/constants.ts';
-import { generateAssistContent } from '../services/jamieAssistService.ts';
+import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
+import RegisterModal from './RegisterModal.tsx';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -72,6 +73,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [additionalPrefs, setAdditionalPrefs] = useState<string>('');
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [prefsSuccessfullySaved, setPrefsSuccessfullySaved] = useState(false);
+  const [jamieAssistError, setJamieAssistError] = useState<string | null>(null);
+  
+  // RegisterModal states
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
 
   // Function to save preferences to localStorage
   const saveJamieAssistPreferences = () => {
@@ -383,21 +388,28 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   };
 
   const handleJamieAssist = async () => {
+    // Clear any previous errors
+    setJamieAssistError(null);
+    
     // Validate lookupHash
     if (!lookupHash) {
       console.error("Missing lookupHash for Jamie Assist");
+      setJamieAssistError("Unable to generate content: Missing clip reference.");
       return;
     }
     
     // Handle case where lookupHash is in "undefined-X" format
     if (typeof lookupHash === 'string' && lookupHash.startsWith('undefined-')) {
       console.error(`Invalid lookupHash format: ${lookupHash}`);
+      setJamieAssistError("Unable to generate content: Invalid clip reference.");
       return;
     }
     
     // Check for auth
     if (!auth) {
       console.error("Missing auth for Jamie Assist");
+      // Instead of showing error, open the register modal
+      setIsRegisterModalOpen(true);
       return;
     }
 
@@ -422,8 +434,25 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         }
       );
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error with Jamie Assist:", error);
+      
+      // Handle rate limit (429) errors specifically
+      if (error instanceof JamieAssistError) {
+        if (error.status === 429) {
+          setJamieAssistError("You've reached your usage limit. Please upgrade your account to continue using Jamie Assist.");
+        } else if (error.status === 401 || error.status === 403) {
+          // Show register modal for auth errors
+          setIsRegisterModalOpen(true);
+        } else {
+          setJamieAssistError(`Service error: ${error.message}`);
+        }
+      } else if (error.status === 429 || (error.message && error.message.includes('429'))) {
+        setJamieAssistError("You've reached your usage limit. Please upgrade or sign into your account to continue using Jamie Assist.");
+      } else {
+        // Generic error message for other cases
+        setJamieAssistError("An error occurred while generating content. Please try again later.");
+      }
     } finally {
       setIsGeneratingContent(false);
     }
@@ -535,6 +564,25 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         </div>
       </div>
     );
+  };
+
+  // Register Modal handlers
+  const handleCloseRegisterModal = () => {
+    setIsRegisterModalOpen(false);
+  };
+
+  const handleLightningSelect = () => {
+    setIsRegisterModalOpen(false);
+    // This would typically redirect to lightning flow or trigger parent callback
+    printLog("Lightning wallet connection selected");
+    setJamieAssistError("Please complete the Lightning connection in the popup window.");
+  };
+
+  const handleSubscribeSelect = () => {
+    setIsRegisterModalOpen(false);
+    // This would typically redirect to subscription flow or trigger parent callback
+    printLog("Subscription selected");
+    setJamieAssistError("Please complete the subscription process in the new window.");
   };
 
   if (!isOpen || !fileUrl) return null;
@@ -682,162 +730,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               </div>
             </div>
           )}
-        </div>
-      </div>
-    );
-  }
-
-  // Render the main modal content
-  const renderMainModalContent = () => {
-    if (platform === SocialPlatform.Nostr && !hasNostrExtension) {
-      return (
-        <div className="text-center py-8 px-4">
-          <img 
-            src="/nostr-logo-square.png" 
-            alt="Nostr" 
-            className="w-20 h-20 mx-auto mb-6"
-            style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
-          />
-          <p className="text-gray-300 mb-6 text-lg">
-            You need a Nostr browser extension to publish this post.
-          </p>
-          <div className="space-y-3 max-w-xs mx-auto">
-            <p className="text-gray-400 text-sm font-medium">Popular extensions:</p>
-            <a 
-              href="https://getalby.com" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center"
-            >
-              <span className="font-bold">Alby</span>
-              <span className="ml-2 text-xs text-gray-400">(Recommended)</span>
-            </a>
-            <a 
-              href="https://github.com/fiatjaf/nos2x" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
-            >
-              nos2x
-            </a>
-            <a 
-              href="https://www.getflamingo.org/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
-            >
-              Flamingo
-            </a>
-          </div>
-        </div>
-      );
-    } else {
-      return (
-        <>
-          <div className="flex items-center mb-4 px-2">
-            <div className="w-10 h-10 rounded-full bg-gray-800 mr-3 flex items-center justify-center overflow-hidden">
-              {platform === SocialPlatform.Nostr ? (
-                <img 
-                  src="/nostr-logo-square.png" 
-                  alt="Nostr" 
-                  className="w-6 h-6"
-                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
-                />
-              ) : (
-                <Twitter className="w-6 h-6 text-blue-400" />
-              )}
-            </div>
-            <div className="text-left">
-              <p className="text-white font-medium">
-                {platform === SocialPlatform.Nostr ? 'Your Nostr Post' : 'Your Tweet'}
-              </p>
-            </div>
-          </div>
-          
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="w-full h-48 bg-gray-900 text-white border border-gray-700 rounded-xl p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
-            placeholder={`Write about this ${itemName}...`}
-            style={{ resize: "vertical", minHeight: "120px" }}
-          />
-          
-          <div className="text-gray-400 text-xs mb-3 text-left pl-1">
-            The link to your {itemName} and attribution will be added automatically when you publish.
-          </div>
-          
-          {/* Jamie Assist Advanced Preferences */}
-          <div className="mb-6">
-            <button 
-              onClick={() => setShowAdvancedPrefs(!showAdvancedPrefs)}
-              className="flex items-center text-gray-400 hover:text-white text-sm mb-2"
-            >
-              Advanced Preferences {showAdvancedPrefs ? <ChevronUp className="ml-1 w-4 h-4" /> : <ChevronRight className="ml-1 w-4 h-4" />}
-            </button>
-            
-            {showAdvancedPrefs && (
-              <div className="border border-gray-800 rounded-lg p-3 bg-gray-900 mb-3">
-                <label className="block text-sm text-gray-300 mb-1 text-left">
-                  Specify tone, style or preferred hashtags:
-                </label>
-                <textarea
-                  value={additionalPrefs}
-                  onChange={(e) => setAdditionalPrefs(e.target.value)}
-                  className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg p-3 text-sm mb-3"
-                  placeholder="E.g.: Professional tone, include hashtags #podcast #JRE"
-                  rows={2}
-                />
-                <div className="flex justify-end">
-                  <button
-                    onClick={saveJamieAssistPreferences}
-                    className="flex items-center space-x-1 px-3 py-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-sm transition-colors"
-                  >
-                    <Save className="w-3.5 h-3.5 mr-1.5" />
-                    <span>{prefsSuccessfullySaved ? 'Saved!' : 'Save as Default'}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          {platform === SocialPlatform.Nostr && isPublishing && (
-            <div className="mb-6 border border-gray-800 rounded-lg p-3 bg-gray-900">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-white font-medium">Publishing to relays...</h3>
-                <div className="flex items-center">
-                  <Loader2 className="animate-spin w-4 h-4 mr-2" />
-                  <span className="text-sm text-gray-400">
-                    {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2 max-h-32 overflow-y-auto text-left text-xs">
-                {relayPool.map((relay) => (
-                  <div key={relay} className="flex items-center justify-between">
-                    <span className="text-gray-400 truncate max-w-[180px]">{relay.replace('wss://', '')}</span>
-                    <span className={`
-                      px-2 py-0.5 rounded text-xs font-medium
-                      ${publishStatus[relay] === 'idle' ? 'bg-gray-800 text-gray-400' : ''}
-                      ${publishStatus[relay] === 'connecting' ? 'bg-blue-900/30 text-blue-300' : ''}
-                      ${publishStatus[relay] === 'connected' ? 'bg-yellow-900/30 text-yellow-300' : ''}
-                      ${publishStatus[relay] === 'publishing' ? 'bg-yellow-900/50 text-yellow-300' : ''}
-                      ${publishStatus[relay] === 'published' ? 'bg-green-900/30 text-green-300' : ''}
-                      ${publishStatus[relay] === 'failed' ? 'bg-red-900/30 text-red-300' : ''}
-                      ${publishStatus[relay] === 'timeout' ? 'bg-orange-900/30 text-orange-300' : ''}
-                    `}>
-                      {publishStatus[relay] === 'idle' && 'Idle'}
-                      {publishStatus[relay] === 'connecting' && 'Connecting...'}
-                      {publishStatus[relay] === 'connected' && 'Connected'}
-                      {publishStatus[relay] === 'publishing' && 'Publishing...'}
-                      {publishStatus[relay] === 'published' && 'Published'}
-                      {publishStatus[relay] === 'failed' && 'Failed'}
-                      {publishStatus[relay] === 'timeout' && 'Timeout'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           
           {/* Jamie Assist button and info button */}
           <div className="flex justify-center mb-3">
@@ -872,6 +764,20 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             </div>
           </div>
           
+          {/* Jamie Assist Error Message */}
+          {jamieAssistError && (
+            <div className="mb-4 px-4 py-3 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300 relative">
+              <button 
+                onClick={() => setJamieAssistError(null)}
+                className="absolute top-2 right-2 text-red-400 hover:text-red-300"
+                aria-label="Dismiss error"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="pr-6">{jamieAssistError}</div>
+            </div>
+          )}
+          
           <div className="flex space-x-4 justify-center">
             <button
               onClick={onClose}
@@ -901,19 +807,227 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           <div className="text-gray-500 text-xs mt-4">
             <p className="mb-1">Character count: {content.length}</p>
           </div>
-        </>
+        </div>
+      </div>
+    );
+  }
+
+  // Define the renderMainModalContent function to use in the return statement
+  const renderMainModalContent = () => {
+    if (platform === SocialPlatform.Nostr && !hasNostrExtension) {
+      return (
+        <div className="text-center py-4 sm:py-8 px-2 sm:px-4">
+          <img 
+            src="/nostr-logo-square.png" 
+            alt="Nostr" 
+            className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6"
+            style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+          />
+          <p className="text-gray-300 mb-4 sm:mb-6 text-base sm:text-lg">
+            You need a Nostr browser extension to publish this post.
+          </p>
+          <div className="space-y-2 sm:space-y-3 max-w-xs mx-auto">
+            <p className="text-gray-400 text-sm font-medium">Popular extensions:</p>
+            <a 
+              href="https://getalby.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center"
+            >
+              <span className="font-bold">Alby</span>
+              <span className="ml-2 text-xs text-gray-400">(Recommended)</span>
+            </a>
+            <a 
+              href="https://github.com/fiatjaf/nos2x" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
+            >
+              nos2x
+            </a>
+            <a 
+              href="https://www.getflamingo.org/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
+            >
+              Flamingo
+            </a>
+          </div>
+        </div>
       );
     }
+    
+    return (
+      <>
+        <div className="flex items-center mb-3 sm:mb-4 px-2">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-800 mr-2 sm:mr-3 flex items-center justify-center overflow-hidden">
+            {platform === SocialPlatform.Nostr ? (
+              <img 
+                src="/nostr-logo-square.png" 
+                alt="Nostr" 
+                className="w-5 h-5 sm:w-6 sm:h-6"
+                style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+              />
+            ) : (
+              <Twitter className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+            )}
+          </div>
+          <div className="text-left">
+            <p className="text-white font-medium">
+              {platform === SocialPlatform.Nostr ? 'Your Nostr Post' : 'Your Tweet'}
+            </p>
+          </div>
+        </div>
+        
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
+          placeholder={`Write about this ${itemName}...`}
+          style={{ resize: "none", height: "120px", minHeight: "100px" }}
+        />
+        
+        <div className="text-gray-400 text-xs mb-2 sm:mb-3 text-left pl-1">
+          The link to your {itemName} and attribution will be added automatically when you publish.
+        </div>
+        
+        {/* Jamie Assist Advanced Preferences */}
+        <div className="mb-4 sm:mb-6">
+          <button 
+            onClick={() => setShowAdvancedPrefs(!showAdvancedPrefs)}
+            className="flex items-center text-gray-400 hover:text-white text-sm mb-1 sm:mb-2"
+          >
+            Advanced Preferences {showAdvancedPrefs ? <ChevronUp className="ml-1 w-4 h-4" /> : <ChevronRight className="ml-1 w-4 h-4" />}
+          </button>
+          
+          {showAdvancedPrefs && (
+            <div className="border border-gray-800 rounded-lg p-2 sm:p-3 bg-gray-900 mb-2 sm:mb-3">
+              <label className="block text-sm text-gray-300 mb-1 text-left">
+                Specify tone, style or preferred hashtags:
+              </label>
+              <textarea
+                value={additionalPrefs}
+                onChange={(e) => setAdditionalPrefs(e.target.value)}
+                className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg p-2 sm:p-3 text-sm mb-2 sm:mb-3"
+                placeholder="E.g.: Professional tone, include hashtags #podcast #JRE"
+                rows={1}
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={saveJamieAssistPreferences}
+                  className="flex items-center space-x-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-sm transition-colors"
+                >
+                  <Save className="w-3.5 h-3.5 mr-1.5" />
+                  <span>{prefsSuccessfullySaved ? 'Saved!' : 'Save as Default'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {platform === SocialPlatform.Nostr && isPublishing && (
+          <div className="mb-4 sm:mb-6 border border-gray-800 rounded-lg p-2 sm:p-3 bg-gray-900">
+            <div className="flex items-center justify-between mb-1 sm:mb-2">
+              <h3 className="text-white font-medium text-sm">Publishing to relays...</h3>
+              <div className="flex items-center">
+                <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                <span className="text-xs sm:text-sm text-gray-400">
+                  {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Jamie Assist button and info button */}
+        <div className="flex justify-center mb-3">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleJamieAssist}
+              disabled={isGeneratingContent || isPublishing || !lookupHash}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
+                ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
+            >
+              {isGeneratingContent ? (
+                <span className="flex items-center">
+                  <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                  Generating...
+                </span>
+              ) : (
+                <span className="flex items-center">
+                  <Sparkles className="w-4 h-4 mr-1 sm:mr-2" />
+                  Jamie Assist
+                </span>
+              )}
+            </button>
+            
+            <button
+              onClick={() => setShowInfoModal(true)}
+              className="flex items-center space-x-1 px-2 py-1 rounded-full border border-gray-700 group hover:bg-gray-800 hover:border-amber-500/30 transition-colors"
+              title="About Jamie Assist"
+              aria-label="Learn more about Jamie Assist"
+            >
+              <Info className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-500" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Jamie Assist Error Message */}
+        {jamieAssistError && (
+          <div className="mb-3 sm:mb-4 px-3 sm:px-4 py-2 sm:py-3 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300 relative">
+            <button 
+              onClick={() => setJamieAssistError(null)}
+              className="absolute top-1 sm:top-2 right-1 sm:right-2 text-red-400 hover:text-red-300"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="pr-6">{jamieAssistError}</div>
+          </div>
+        )}
+        
+        <div className="flex space-x-3 sm:space-x-4 justify-center">
+          <button
+            onClick={onClose}
+            disabled={isPublishing || isGeneratingContent}
+            className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-gray-700 text-gray-300 
+              ${(isPublishing || isGeneratingContent) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handlePublish}
+            disabled={isPublishing || isGeneratingContent || content.trim().length === 0}
+            className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg ${platform === SocialPlatform.Twitter ? 'bg-blue-600' : 'bg-purple-600'} text-white font-medium 
+              ${(isPublishing || isGeneratingContent || content.trim().length === 0) ? 
+                'opacity-50 cursor-not-allowed' : 
+                platform === SocialPlatform.Twitter ? 'hover:bg-blue-500 transition-colors' : 'hover:bg-purple-500 transition-colors'}`}
+          >
+            {isPublishing ? (
+              <span className="flex items-center">
+                <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                Publishing...
+              </span>
+            ) : (platform === SocialPlatform.Twitter ? 'Tweet' : 'Publish')}
+          </button>
+        </div>
+        
+        <div className="text-gray-500 text-xs mt-2 sm:mt-4">
+          <p className="sm:mb-1">Character count: {content.length}</p>
+        </div>
+      </>
+    );
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-50 p-4 sm:p-6 md:p-8">
-      <div className="bg-black border border-gray-800 rounded-xl p-6 sm:p-8 w-full max-w-sm sm:max-w-md md:max-w-xl text-center relative shadow-xl transform -translate-y-12">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-50 p-2 sm:p-4 md:p-8">
+      <div className="bg-black border border-gray-800 rounded-xl md:rounded-xl p-4 sm:p-6 w-full sm:max-w-sm md:max-w-md lg:max-w-xl text-center relative shadow-xl sm:transform sm:-translate-y-12 max-h-[100vh] sm:max-h-[80vh] overflow-y-auto sm:overflow-visible">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-10">
           <X className="w-6 h-6" />
         </button>
         
-        <h2 className="text-2xl font-semibold text-white mb-6">
+        <h2 className="text-xl sm:text-2xl font-semibold text-white mb-4 sm:mb-6">
           {platform === SocialPlatform.Nostr ? 'Share to Nostr' : 'Share to Twitter'}
         </h2>
         
@@ -921,6 +1035,14 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       </div>
       
       {renderInfoModal()}
+      
+      {/* RegisterModal overlay */}
+      <RegisterModal 
+        isOpen={isRegisterModalOpen}
+        onClose={handleCloseRegisterModal}
+        onLightningSelect={handleLightningSelect}
+        onSubscribeSelect={handleSubscribeSelect}
+      />
     </div>
   );
 };
