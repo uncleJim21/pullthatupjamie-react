@@ -487,15 +487,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       // Add debugging for current state
       printLog(`handlePublish called with activePlatform: ${activePlatform}, platform prop: ${platform}, showNostrPrompt: ${showNostrPrompt}, showTwitterPrompt: ${showTwitterPrompt}`);
       
-      // Initial Nostr publish
-      if (activePlatform === SocialPlatform.Nostr && !showTwitterPrompt) {
-        printLog("Publishing to Nostr (initial flow or after Twitter)");
+      // Use platform to determine the correct publish method, not activePlatform
+      if (platform === SocialPlatform.Nostr) {
+        printLog("Publishing to Nostr");
         if (!hasNostrExtension) {
           onComplete(false, SocialPlatform.Nostr);
           return;
         }
         
-        // Call the actual publishToNostr function instead of using hardcoded success
+        // Call the actual publishToNostr function
         const success = await publishToNostr();
         setIsPublishing(false);
         
@@ -516,15 +516,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           onComplete(false, SocialPlatform.Nostr);
         }
       } 
-      // Initial Twitter share or Twitter after Nostr
-      else if (activePlatform === SocialPlatform.Twitter) {
-        printLog("Sharing to Twitter (initial flow or after Nostr)");
+      // Twitter share
+      else if (platform === SocialPlatform.Twitter) {
+        printLog("Sharing to Twitter");
         shareToTwitter();
       }
     } catch (error) {
-      console.error(`Error during ${activePlatform} publishing:`, error);
+      console.error(`Error during ${platform} publishing:`, error);
       setIsPublishing(false);
-      onComplete(false, activePlatform);
+      onComplete(false, platform);
     }
   };
 
@@ -732,7 +732,16 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               Skip
             </button>
             <button
-              onClick={handlePublish}
+              onClick={async () => {
+                setIsPublishing(true);
+                // Call publishToNostr directly for cross-posting
+                const success = await publishToNostr();
+                setIsPublishing(false);
+                if (success) {
+                  onComplete(true, SocialPlatform.Nostr);
+                  onClose();
+                }
+              }}
               disabled={isPublishing}
               className={`px-5 py-2 rounded-lg bg-purple-600 text-white font-medium 
                 ${isPublishing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-500 transition-colors'}`}
@@ -744,10 +753,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 </span>
               ) : 'Publish'}
             </button>
-          </div>
-          
-          <div className="text-gray-500 text-xs mt-4">
-            <p className="mb-1">Character count: {content.length}</p>
           </div>
           
           {/* Publishing status for Nostr */}
@@ -764,83 +769,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               </div>
             </div>
           )}
-          
-          {/* Jamie Assist button and info button */}
-          <div className="flex justify-center mb-3">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleJamieAssist}
-                disabled={isGeneratingContent || isPublishing || !lookupHash}
-                className={`px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
-                  ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
-              >
-                {isGeneratingContent ? (
-                  <span className="flex items-center">
-                    <Loader2 className="animate-spin w-4 h-4 mr-2" />
-                    Generating...
-                  </span>
-                ) : (
-                  <span className="flex items-center">
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Jamie Assist
-                  </span>
-                )}
-              </button>
-              
-              <button
-                onClick={() => setShowInfoModal(true)}
-                className="flex items-center space-x-1 px-2 py-1 rounded-full border border-gray-700 group hover:bg-gray-800 hover:border-amber-500/30 transition-colors"
-                title="About Jamie Assist"
-                aria-label="Learn more about Jamie Assist"
-              >
-                <Info className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-500" />
-              </button>
-            </div>
-          </div>
-          
-          {/* Jamie Assist Error Message */}
-          {jamieAssistError && (
-            <div className="mb-4 px-4 py-3 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300 relative">
-              <button 
-                onClick={() => setJamieAssistError(null)}
-                className="absolute top-2 right-2 text-red-400 hover:text-red-300"
-                aria-label="Dismiss error"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <div className="pr-6">{jamieAssistError}</div>
-            </div>
-          )}
-          
-          <div className="flex space-x-4 justify-center">
-            <button
-              onClick={onClose}
-              disabled={isPublishing || isGeneratingContent}
-              className={`px-5 py-2 rounded-lg border border-gray-700 text-gray-300 
-                ${(isPublishing || isGeneratingContent) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handlePublish}
-              disabled={isPublishing || isGeneratingContent || content.trim().length === 0}
-              className={`px-5 py-2 rounded-lg ${platform === SocialPlatform.Twitter ? 'bg-blue-600' : 'bg-purple-600'} text-white font-medium 
-                ${(isPublishing || isGeneratingContent || content.trim().length === 0) ? 
-                  'opacity-50 cursor-not-allowed' : 
-                  platform === SocialPlatform.Twitter ? 'hover:bg-blue-500 transition-colors' : 'hover:bg-purple-500 transition-colors'}`}
-            >
-              {isPublishing ? (
-                <span className="flex items-center">
-                  <Loader2 className="animate-spin w-4 h-4 mr-2" />
-                  Publishing...
-                </span>
-              ) : (platform === SocialPlatform.Twitter ? 'Tweet' : 'Publish')}
-            </button>
-          </div>
-          
-          <div className="text-gray-500 text-xs mt-4">
-            <p className="mb-1">Character count: {content.length}</p>
-          </div>
         </div>
       </div>
     );
@@ -1030,21 +958,37 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           >
             Cancel
           </button>
-          <button
-            onClick={handlePublish}
-            disabled={isPublishing || isGeneratingContent || content.trim().length === 0}
-            className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg ${platform === SocialPlatform.Twitter ? 'bg-blue-600' : 'bg-purple-600'} text-white font-medium 
-              ${(isPublishing || isGeneratingContent || content.trim().length === 0) ? 
-                'opacity-50 cursor-not-allowed' : 
-                platform === SocialPlatform.Twitter ? 'hover:bg-blue-500 transition-colors' : 'hover:bg-purple-500 transition-colors'}`}
-          >
-            {isPublishing ? (
-              <span className="flex items-center">
-                <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                Publishing...
-              </span>
-            ) : (platform === SocialPlatform.Twitter ? 'Tweet' : 'Publish')}
-          </button>
+          {platform === SocialPlatform.Twitter ? (
+            <button
+              onClick={shareToTwitter}
+              disabled={isPublishing || isGeneratingContent || content.trim().length === 0}
+              className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-blue-600 text-white font-medium 
+                ${(isPublishing || isGeneratingContent || content.trim().length === 0) ? 
+                  'opacity-50 cursor-not-allowed' : 'hover:bg-blue-500 transition-colors'}`}
+            >
+              {isPublishing ? (
+                <span className="flex items-center">
+                  <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                  Tweeting...
+                </span>
+              ) : 'Tweet'}
+            </button>
+          ) : (
+            <button
+              onClick={handlePublish}
+              disabled={isPublishing || isGeneratingContent || content.trim().length === 0}
+              className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-purple-600 text-white font-medium 
+                ${(isPublishing || isGeneratingContent || content.trim().length === 0) ? 
+                  'opacity-50 cursor-not-allowed' : 'hover:bg-purple-500 transition-colors'}`}
+            >
+              {isPublishing ? (
+                <span className="flex items-center">
+                  <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                  Publishing...
+                </span>
+              ) : 'Publish'}
+            </button>
+          )}
         </div>
         
         <div className="text-gray-500 text-xs mt-2 sm:mt-4">
