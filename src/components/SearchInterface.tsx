@@ -190,6 +190,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     return searchHistory[mode];
   };
 
+  // Helper to check if any modal is currently open
+  const isAnyModalOpen = (): boolean => {
+    return isRegisterModalOpen || 
+           isSignInModalOpen || 
+           isCheckoutModalOpen || 
+           isUpgradeSuccessPopUpOpen || 
+           isSendingFeedback;
+  };
+
   //Modals
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
@@ -864,7 +873,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {isUpgradeSuccessPopUpOpen && (
         <SubscriptionSuccessPopup onClose={() => setIsUpgradeSuccessPopUpOpen(false)} />
       )}
-      {!isRegisterModalOpen && (
+      {!isAnyModalOpen() && (
         <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
           <AccountButton 
             onConnect={() => initializeLightning()}
@@ -1108,7 +1117,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
                 handleQuoteSearch(topicQuery,auth,selectedFeedIds).then(quoteResults => {
                   if(quoteResults === false){
-                    setIsRegisterModalOpen();
+                    setIsRegisterModalOpen(true);
                     return;
                   }
                   setConversation(prev => [...prev, {
@@ -1148,7 +1157,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <PodcastLoadingPlaceholder />
       )}
 
-      {searchMode === 'podcast-search' && !isRegisterModalOpen && !isSendingFeedback && (
+      {searchMode === 'podcast-search' && !isAnyModalOpen() && (
         <div
           className={`fixed w-full z-50 transition-all duration-300 ${
             hasSearchedInMode('podcast-search') ? 'bottom-24' : 'bottom-0'
@@ -1159,7 +1168,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             hasSearched={hasSearchedInMode('podcast-search')}
             isCollapsed={isClipTrackerCollapsed}
             onCollapsedChange={setIsClipTrackerCollapsed}
-            auth={authConfig}
+            auth={authConfig || undefined}
           />
         </div>
       )}
@@ -1167,7 +1176,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
 
       {/* Floating Search Bar - Only show after first search */}
-      {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isRegisterModalOpen && !isSignInModalOpen && !isSendingFeedback && (
+      {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isAnyModalOpen() && (
         <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-50">
           <form onSubmit={handleSearch} className="relative">
             <textarea
