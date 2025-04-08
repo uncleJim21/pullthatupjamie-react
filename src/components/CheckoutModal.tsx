@@ -7,7 +7,7 @@ import PaymentFormComponent from './PaymentFormComponent.tsx';
 import { MONTHLY_PRICE_STRING, DEBUG_MODE, printLog } from '../constants/constants.ts';
 
 const steps = ['Sign In', 'Billing', 'Card'];
-const paymentServerUrl = DEBUG_MODE === false ? "https://cascdr-auth-backend-cw4nk.ondigitalocean.app" : "http://localhost:4000";
+const paymentServerUrl = DEBUG_MODE === false ? "https://cascdr-auth-backend-cw4nk.ondigitalocean.app" : "http://localhost:4020";
 
 export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
   const [activeStep, setActiveStep] = useState(1);
