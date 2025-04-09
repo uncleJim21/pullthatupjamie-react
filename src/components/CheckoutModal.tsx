@@ -9,7 +9,33 @@ import { MONTHLY_PRICE_STRING, DEBUG_MODE, printLog } from '../constants/constan
 const steps = ['Sign In', 'Billing', 'Card'];
 const paymentServerUrl = DEBUG_MODE === false ? "https://cascdr-auth-backend-cw4nk.ondigitalocean.app" : "http://localhost:4020";
 
-export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
+interface CheckoutModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  productName?: string;
+  customDescription?: string;
+  customFeatures?: string[];
+  customPrice?: string;
+}
+
+// Define a type for the Square card object
+interface SquareCard {
+  tokenize: () => Promise<{
+    status: string;
+    token: string;
+  }>;
+}
+
+export const CheckoutModal: React.FC<CheckoutModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSuccess,
+  productName = "amber",
+  customDescription,
+  customFeatures,
+  customPrice
+}) => {
   const [activeStep, setActiveStep] = useState(1);
   const [consent, setConsent] = useState(false);
   const [formData, setFormData] = useState({
@@ -24,7 +50,17 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
   });
   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
   const [paymentFailed, setPaymentFailed] = useState(false);
-  const [card, setCard] = useState(null);
+  const [card, setCard] = useState<SquareCard | null>(null);
+
+  // Determine the plan display information
+  const displayPrice = customPrice || MONTHLY_PRICE_STRING.replace('$', '');
+  const displayDescription = customDescription || "Productivity and Privacy at your fingertips with Jamie & other CASCDR apps.";
+  const displayFeatures = customFeatures || [
+    "Unlimited usage",
+    "Access 20+ CASCDR Apps",
+    "Early previews of new features"
+  ];
+  const displayPlan = productName === "jamie-pro" ? "Jamie Pro Plan" : "Jamie Plan Selected";
 
   const handleNext = () => setActiveStep(activeStep + 1);
   const handleBack = () => setActiveStep(activeStep - 1);
@@ -66,7 +102,7 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
                 body: JSON.stringify({
                   email: userEmail,
                   paymentToken,
-                  productName: "amber",
+                  productName: productName,
                   cardholderName,
                   card
                 })
@@ -132,14 +168,10 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
         <div className="flex flex-col lg:flex-row h-full">
           <div className="w-full lg:w-1/3 p-4 hidden lg:flex items-center justify-center">
           <PricingCard 
-              plan="Jamie Plan Selected"
-              price={MONTHLY_PRICE_STRING.replace('$', '')}
-              description="Productivity and Privacy at your fingertips with Jamie & other CASCDR apps."
-              features={[
-                "Unlimited usage",
-                "Access 20+ CASCDR Apps",
-                "Early previews of new features"
-              ]}
+              plan={displayPlan}
+              price={displayPrice}
+              description={displayDescription}
+              features={displayFeatures}
             />
           </div>
 
@@ -183,7 +215,7 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
                     fontWeight: 'normal'
                   }}
                 >
-                  Jamie Plan: {MONTHLY_PRICE_STRING}/mo
+                  {displayPlan}: ${displayPrice}/mo
                 </Typography>
               </div>
 
@@ -234,7 +266,7 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
                   }
                   label={
                     <Typography variant="caption" sx={{ color: 'white' }}>
-                      I consent to saving my payment information for a monthly subscription at {MONTHLY_PRICE_STRING}
+                      I consent to saving my payment information for a monthly subscription at ${displayPrice}
                     </Typography>
                   }
                   sx={{ marginTop: '0.5rem', color: 'white' }}
