@@ -71,7 +71,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     try {
         if(!card){throw new Error('Square API error');}
         const result = await card.tokenize();
+        // Get existing email from localStorage or create a formatted user identifier
         const userEmail = localStorage.getItem('squareId');
+        
+        // If there's no email in localStorage and we need to create one,
+        // we'll pass the cardholder name to the backend which can handle verification
+        const cardholderName = `${formData.firstName} ${formData.lastName}`;
+        
         const statusContainer = document.getElementById('payment-status-container');
         setIsPaymentProcessing(true);
         setPaymentFailed(false);
@@ -93,7 +99,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 "country":formData.country
             }
             }
-            const cardholderName = `${formData.firstName} ${formData.lastName}`
             const response = await fetch(`${paymentServerUrl}/purchase-subscription`, {
                 method: 'POST',
                 headers: {

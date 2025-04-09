@@ -163,6 +163,10 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
 
   const handlePodcastDetailsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Save the user's email to localStorage for later use
+    localStorage.setItem('squareId', podcastDetails.email);
+    
     if (userRole === 'podcaster') {
       setIsJamiePro(true);
       setRequestFlowStep(RequestFlowStep.CHECKOUT);
@@ -179,6 +183,11 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
       setRequestFlowStep(RequestFlowStep.CHECKOUT);
       setIsCheckoutOpen(true);
     } else {
+      // Save user email to localStorage if not already set
+      if (!localStorage.getItem('squareId')) {
+        localStorage.setItem('squareId', podcastDetails.email);
+      }
+      
       // Just register their vote and show success
       submitPodcastRequest({
         email: podcastDetails.email,
@@ -224,6 +233,11 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
   };
 
   const handleCheckoutSuccess = () => {
+    // Save user email to localStorage if not already set
+    if (!localStorage.getItem('squareId')) {
+      localStorage.setItem('squareId', podcastDetails.email);
+    }
+    
     submitPodcastRequest({
       email: podcastDetails.email,
       podcastName: podcastDetails.podcastName,
@@ -416,7 +430,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
           <div className="text-center">
             <h2 className="text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4">Success!</h2>
             <p className="text-gray-300 text-sm sm:text-base mb-4 sm:mb-6">
-              Our team will add the pod if there's enough interest! Tell your friends to get on PullThatUpJamie.ai and strengthen your case!
+              Welcome Aboard! We will add your podcast to the search index shortly! One of our team members will be in touch within 1 business day.
             </p>
             <div className="flex justify-center mb-4 sm:mb-6">
               <div className="bg-green-500 rounded-full p-1.5 sm:p-2">
@@ -551,7 +565,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
-                          target.src = '/podcast-placeholder.png';
+                          target.src = '/podcast-logo.png';
                         }}
                       />
                       {selectedSources.has(source.feedId) && (
