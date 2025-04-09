@@ -3,23 +3,35 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 50px;
-  margin-bottom: 50px;
+  margin-top: 0;
+  margin-bottom: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 #payment-form {
   background: #f2f2f2; /* Light grey background */
-  padding: 20px;
+  padding: 15px;
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   width: 100%;
-  max-width: 480px; /* Reasonable width, adjust as needed */
+  max-width: 100%; /* Full width for mobile */
   box-sizing: border-box;
-  color:black;
+  color: black;
 }
 
 #card-container {
-  margin: 20px 0; /* Space out elements within the form */
+  margin: 10px 0; /* Reduced space */
+  width: 100%;
+  max-height: 90px; /* Control height */
+  overflow: visible;
+}
+
+/* Square iframe specific styles */
+#card-container iframe {
+  max-width: 100% !important; 
+  min-height: 40px !important;
+  height: auto !important;
 }
 
 #card-button {
@@ -41,5 +53,12 @@
 
 #payment-status-container {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+/* Ensure the Square input fields stay properly sized */
+.input-container {
+  height: auto !important;
+  max-height: 40px !important;
 }

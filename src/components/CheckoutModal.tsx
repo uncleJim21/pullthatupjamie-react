@@ -128,9 +128,9 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-      <div className="bg-black w-[90%] max-h-[90vh] overflow-auto shadow-[0_0_15px_rgba(255,255,255,0.4)] rounded-lg">
+      <div className="bg-black w-[95%] sm:w-[90%] max-h-[90vh] overflow-auto shadow-[0_0_15px_rgba(255,255,255,0.4)] rounded-lg">
         <div className="flex flex-col lg:flex-row h-full">
-          <div className="w-full lg:w-1/3 p-4 flex items-center justify-center min-h-[400px]">
+          <div className="w-full lg:w-1/3 p-4 hidden lg:flex items-center justify-center">
           <PricingCard 
               plan="Jamie Plan Selected"
               price={MONTHLY_PRICE_STRING.replace('$', '')}
@@ -146,39 +146,64 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
           <div className="w-full lg:w-2/3">
             <Paper
               sx={{
-                padding: '1rem',
-                width: '90%',
+                padding: { xs: '0.75rem', sm: '1rem' },
+                width: '95%',
                 maxWidth: '600px',
                 borderRadius: '12px',
                 backgroundColor: 'black',
                 color: 'white',
                 boxShadow: '0 4px 10px rgba(0, 0, 0, 0.5)',
                 margin: '0 auto',
+                position: 'relative',
               }}
             >
               <div className="flex justify-end">
-                <button className="text-white text-xl px-4 py-2" onClick={onClose}>
+                <button className="text-white text-xl px-3 py-1 absolute top-1 right-1" onClick={onClose}>
                   X
                 </button>
               </div>
               
-              <Typography variant="h5" align="center" sx={{ marginBottom: '1rem', color: 'white' }}>
+              <Typography variant="h5" align="center" sx={{ 
+                marginTop: { xs: 2, sm: 3 },
+                marginBottom: { xs: 0, sm: 0.5 }, 
+                color: 'white', 
+                fontSize: { xs: '1.2rem', sm: '1.5rem' }
+              }}>
                 {activeStep === 0 ? 'Subscribe' : 'Checkout'}
               </Typography>
+
+              <div className="lg:hidden">
+                <Typography 
+                  variant="subtitle2" 
+                  align="center" 
+                  sx={{ 
+                    color: 'rgba(255,255,255,0.8)', 
+                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                    mb: 1,
+                    fontWeight: 'normal'
+                  }}
+                >
+                  Jamie Plan: {MONTHLY_PRICE_STRING}/mo
+                </Typography>
+              </div>
 
               <Stepper
                 activeStep={activeStep}
                 sx={{
-                  marginBottom: '1.5rem',
+                  marginBottom: { xs: '0.5rem', sm: '1rem' },
                   '& .MuiStepLabel-root .Mui-completed': { color: 'white' },
                   '& .MuiStepLabel-root .Mui-active': { color: 'white' },
                   '& .MuiStepLabel-root .MuiStepIcon-root': {
                     color: 'white',
+                    fontSize: { xs: '1rem', sm: '1.25rem' },
                     '& .MuiStepIcon-text': { fill: 'black' },
                   },
-                  '& .MuiStepLabel-label': { color: 'white' },
+                  '& .MuiStepLabel-label': { 
+                    color: 'white',
+                    fontSize: { xs: '0.7rem', sm: '0.8rem' }
+                  },
                   '& .MuiStepLabel-label.Mui-active': { color: 'white !important' },
-                  '& .MuiStepConnector-line': { borderColor: 'white', borderTopWidth: '4px' },
+                  '& .MuiStepConnector-line': { borderColor: 'white', borderTopWidth: '3px' },
                   '& .MuiStepConnector-root.Mui-active .MuiStepConnector-line': {
                     borderColor: 'white',
                   },
@@ -191,17 +216,43 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
                 ))}
               </Stepper>
 
-              <div>{getStepContent(activeStep)}</div>
+              <div className={activeStep === 2 ? 'max-h-[200px] overflow-visible' : ''}>{getStepContent(activeStep)}</div>
 
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem' }}>
+              {activeStep === 2 && (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={consent}
+                      onChange={(e) => setConsent(e.target.checked)}
+                      sx={{ 
+                        color: 'white',
+                        '&.Mui-checked': { color: 'white' },
+                        padding: '2px',
+                        '& .MuiSvgIcon-root': { fontSize: 18 }
+                      }}
+                    />
+                  }
+                  label={
+                    <Typography variant="caption" sx={{ color: 'white' }}>
+                      I consent to saving my payment information for a monthly subscription at {MONTHLY_PRICE_STRING}
+                    </Typography>
+                  }
+                  sx={{ marginTop: '0.5rem', color: 'white' }}
+                />
+              )}
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', marginTop: { xs: '0.5rem', sm: '1rem' } }}>
                 {activeStep > 0 && (
                   <Button
                     variant="contained"
                     onClick={handleBack}
                     disabled={activeStep < 2}
+                    size="small"
                     sx={{
                       backgroundColor: 'white',
                       color: 'black',
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      padding: { xs: '4px 8px', sm: '6px 12px' },
                       '&:hover': { backgroundColor: '#e0e0e0' },
                       '&:disabled': { backgroundColor: '#404040', color: '#808080' },
                     }}
@@ -214,9 +265,12 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
                     variant="contained"
                     onClick={handleNext}
                     disabled={!formData.firstName}
+                    size="small"
                     sx={{
                       backgroundColor: 'white',
                       color: 'black',
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      padding: { xs: '4px 8px', sm: '6px 12px' },
                       '&:hover': { backgroundColor: '#e0e0e0' },
                       '&:disabled': { backgroundColor: '#404040', color: '#808080' },
                     }}
@@ -228,34 +282,20 @@ export const CheckoutModal = ({ isOpen, onClose, onSuccess }) => {
                     variant="contained"
                     onClick={handlePayment}
                     disabled={!consent || isPaymentProcessing}
+                    size="small"
                     sx={{
                       backgroundColor: 'white',
                       color: 'black',
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      padding: { xs: '4px 8px', sm: '6px 12px' },
                       '&:hover': { backgroundColor: '#e0e0e0' },
                       '&:disabled': { backgroundColor: '#404040', color: '#808080' },
                     }}
                   >
-                    {isPaymentProcessing ? <BeatLoader color="#000" /> : 'Subscribe'}
+                    {isPaymentProcessing ? <BeatLoader color="#000" size={5} /> : 'Subscribe'}
                   </Button>
                 )}
               </Box>
-
-              {activeStep === 2 && (
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={consent}
-                      onChange={(e) => setConsent(e.target.checked)}
-                      sx={{ 
-                        color: 'white',
-                        '&.Mui-checked': { color: 'white' }
-                      }}
-                    />
-                  }
-                  label={`I consent to saving my payment information for a monthly subscription at ${MONTHLY_PRICE_STRING}`}
-                  sx={{ marginTop: '1rem', color: 'white' }}
-                />
-              )}
             </Paper>
           </div>
         </div>
