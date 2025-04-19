@@ -4,7 +4,7 @@ import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share } from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share, Shield } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
 import PodcastFeedService, { 
@@ -16,6 +16,7 @@ import PodcastFeedService, {
 import { JamieChat } from './JamieChat.tsx';
 import UploadModal from '../UploadModal.tsx';
 import ShareModal from '../ShareModal.tsx';
+import SignInModal from '../SignInModal.tsx';
 import UploadService, { UploadItem, PaginationData } from '../../services/uploadService.ts';
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
@@ -44,6 +45,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [currentShareUrl, setCurrentShareUrl] = useState<string | null>(null);
+    const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
+    const [error, setError] = useState<{ status: number; message: string } | null>(null);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -72,19 +75,64 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   }
 
   const fetchRunHistory = async () => {
-    if (!feedId || !isAdmin) return;
+    if (!feedId) return;
     
     try {
       setIsLoadingHistory(true);
+      setError(null);
+      
       const authToken = localStorage.getItem('auth_token');
-      if (!authToken) return;
+      if (!authToken) {
+        // Only prompt for sign-in if we're specifically in the jamiePro view
+        if (initialView === 'jamiePro') {
+          setIsSignInModalOpen(true);
+        } else {
+          // For regular feed views, just show empty state without prompting
+          setRunHistory([]);
+        }
+        setIsLoadingHistory(false);
+        return;
+      }
 
       const response = await PodcastFeedService.getRunHistory(feedId, authToken);
       if (response.success) {
         setRunHistory(response.data);
+      } else if (response.error) {
+        // Check for specific error messages that indicate unauthorized access
+        if (response.error.startsWith('401:') || response.error.includes('Authentication required')) {
+          if (initialView === 'jamiePro') {
+            setIsSignInModalOpen(true);
+          } else {
+            // For regular feed views, just show empty state without prompting
+            setRunHistory([]);
+          }
+        } else if (response.error.startsWith('403:') || response.error.includes('Permission') || response.error.includes('Forbidden')) {
+          setError({ status: 403, message: 'You do not have permission to access this content' });
+        } else {
+          console.error('Error fetching run history:', response.error);
+        }
       }
     } catch (error) {
       console.error('Error fetching run history:', error);
+      
+      // Try to parse error status from the error message
+      if (error instanceof Error) {
+        const errorMessage = error.message;
+        if (errorMessage.startsWith('401:') || errorMessage.includes('Authentication required')) {
+          if (initialView === 'jamiePro') {
+            setIsSignInModalOpen(true);
+          } else {
+            // For regular feed views, just show empty state without prompting
+            setRunHistory([]);
+          }
+        } else if (errorMessage.startsWith('403:') || errorMessage.includes('Permission') || errorMessage.includes('Forbidden')) {
+          setError({ status: 403, message: 'You do not have permission to access this content' });
+        } else {
+          setError({ status: 500, message: 'Failed to load run history' });
+        }
+      } else {
+        setError({ status: 500, message: 'An unknown error occurred' });
+      }
     } finally {
       setIsLoadingHistory(false);
     }
@@ -144,16 +192,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   };
 
   useEffect(() => {
-    if (activeTab === 'Jamie Pro' && isAdmin) {
+    if (activeTab === 'Jamie Pro') {
       fetchRunHistory();
     }
     
     if (activeTab === 'Uploads') {
       // Reset to first page when tab changes to Uploads
       setCurrentPage(1);
-      fetchUploads(1, false);
+      fetchUploads();
     }
-  }, [activeTab, isAdmin, feedId]);
+  }, [activeTab]);
 
   useEffect(() => {
       console.log(`feedId: ${feedId}`);
@@ -221,15 +269,11 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
   useEffect(() => {
     if (feedData && initialView === 'jamiePro') {
-      if (isAdmin) {
-        setActiveTab('Jamie Pro');
-        if (defaultTab === 'history') {
-          setJamieProView('history');
-        }
-      } else {
-        setActiveTab('Episodes');
-        console.log('Non-admin user attempted to access Jamie Pro tab, falling back to Episodes tab');
+      setActiveTab('Jamie Pro');
+      if (defaultTab === 'history') {
+        setJamieProView('history');
       }
+      // Let the fetchRunHistory function handle unauthorized access
     } else if (feedData && initialView === 'uploads') {
       if (isAdmin) {
         setActiveTab('Uploads');
@@ -242,7 +286,9 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
   // Add a useEffect to ensure activeTab is never 'Jamie Pro' for non-admin users
   useEffect(() => {
-    if ((activeTab === 'Jamie Pro' || activeTab === 'Uploads') && !isAdmin) {
+    // Don't forcibly change the tab for Jamie Pro since we want to allow users to view it
+    // but see an error message if they're not authorized
+    if (activeTab === 'Uploads' && !isAdmin) {
       setActiveTab('Episodes');
       console.log('Non-admin user attempted to access restricted tab, falling back to Episodes tab');
     }
@@ -258,6 +304,15 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     if (activeTab === 'Uploads') {
       setCurrentPage(1);
       fetchUploads(1, false);
+    }
+  };
+
+  const handleUploadSuccess = () => {
+    setUploadModalOpen(false);
+    // Refresh the uploads list
+    if (activeTab === 'Uploads') {
+      setCurrentPage(1);
+      fetchUploads();
     }
   };
 
@@ -708,6 +763,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   <div className="flex justify-center items-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
                   </div>
+                ) : error && error.status === 403 ? (
+                  <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden p-6 max-w-3xl mx-auto">
+                    <div className="flex flex-col items-center text-center">
+                      <Shield className="w-12 h-12 text-gray-400 mb-4" />
+                      <h3 className="text-xl font-medium text-white mb-3">Access Restricted</h3>
+                      <p className="text-gray-400 mb-4">
+                        You don't have permission to view this content. Please contact the feed administrator.
+                      </p>
+                    </div>
+                  </div>
                 ) : runHistory.length === 0 ? (
                   <div className="text-center py-12 text-gray-400">
                     <p className="text-lg">No run history available.</p>
@@ -718,7 +783,11 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       <div 
                         key={index}
                         className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden hover:border-gray-700 transition-colors cursor-pointer"
-                        onClick={() => console.log(`run history id: ${run._id} tapped`)}
+                        onClick={() => {
+                          if (run._id && feedId) {
+                            window.location.href = `/feed/${feedId}/clipBatch/${run._id}`;
+                          }
+                        }}
                       >
                         {run.recommendations.length > 0 && (
                           <PodcastSearchResultItem
@@ -743,6 +812,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                             presentationContext={PresentationContext.runHistoryPreview}
                             runId={run._id}
                             feedId={feedId}
+                            onSignInClick={() => setIsSignInModalOpen(true)}
+                            error={error || undefined}
                           />
                         )}
                       </div>
@@ -785,6 +856,19 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           nostrButtonLabel="Share on Nostr"
         />
       )}
+
+      <SignInModal
+        isOpen={isSignInModalOpen}
+        onClose={() => setIsSignInModalOpen(false)}
+        onSignInSuccess={() => {
+          setIsSignInModalOpen(false);
+          window.location.reload(); // Reload the page after successful sign-in to retry access
+        }}
+        onSignUpSuccess={() => {
+          setIsSignInModalOpen(false);
+          window.location.reload(); // Reload the page after successful sign-up to retry access
+        }}
+      />
     </div>
   );
 };

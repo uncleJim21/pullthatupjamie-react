@@ -91,7 +91,13 @@ class PodcastFeedService {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch run history');
+        if (response.status === 401) {
+          throw new Error(`401: Authentication required`);
+        } else if (response.status === 403) {
+          throw new Error(`403: You do not have permission to access this content`);
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
       }
 
       return await response.json();
@@ -114,7 +120,13 @@ class PodcastFeedService {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch clip batch');
+        if (response.status === 401) {
+          throw new Error(`401: Authentication required`);
+        } else if (response.status === 403) {
+          throw new Error(`403: You do not have permission to access this content`);
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
       }
 
       return await response.json();

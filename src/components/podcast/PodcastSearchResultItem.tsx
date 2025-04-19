@@ -43,6 +43,8 @@ interface PodcastSearchResultItemProps {
   presentationContext?:PresentationContext;
   runId?: string;
   feedId?: string;
+  onSignInClick?: () => void;
+  error?: { status: number; message: string } | undefined;
 }
 
 export const PodcastSearchResultItem = ({
@@ -65,7 +67,9 @@ export const PodcastSearchResultItem = ({
   authConfig,
   presentationContext = PresentationContext.search,
   runId,
-  feedId
+  feedId,
+  onSignInClick,
+  error
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
@@ -133,12 +137,26 @@ export const PodcastSearchResultItem = ({
   };
   
   const handleClip = () => {
+    // Check for authentication before opening the clip modal
+    if (!authConfig || !authConfig.credentials) {
+      console.error('No valid auth credentials available');
+      if (onSignInClick) {
+        // Call the sign-in callback if provided
+        onSignInClick();
+        return;
+      }
+    }
     setIsClipModalOpen(true);
   };
   
   const handleClipConfirm = async (start?:number|null, end?:number|null) => {
     if (!authConfig || !authConfig.credentials) {
       console.error('No valid auth credentials available');
+      if (onSignInClick) {
+        // Call the sign-in callback if provided
+        onSignInClick();
+        return;
+      }
       throw new Error('Authentication required');
     }
   
@@ -213,6 +231,18 @@ export const PodcastSearchResultItem = ({
     else{
       setEditTimestampsError(undefined);
     }
+    
+    // Check for authentication before continuing
+    if (!authConfig || !authConfig.credentials) {
+      console.error('No valid auth credentials available');
+      setIsEditModalOpen(false);
+      if (onSignInClick) {
+        // Call the sign-in callback if provided
+        onSignInClick();
+        return;
+      }
+    }
+    
     setIsEditModalOpen(false);
     handleClipConfirm(newStart,newEnd);
   };
