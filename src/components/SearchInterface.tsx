@@ -784,42 +784,91 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         try {
           const authToken = localStorage.getItem('auth_token');
           if (!authToken) {
-            throw new Error('Authentication required');
+            // User is not signed in - show sign in prompt
+            setIsSignInModalOpen(true);
+            setSearchState(prev => ({ ...prev, isLoading: false }));
+            return;
           }
 
-          const response = await PodcastFeedService.getClipBatchByRunId(feedId, runId, authToken);
-          if (!response.success || !response.data) {
-            throw new Error(response.error || 'Failed to load clip batch');
-          }
-
-          setConversation([{
-            id: nextConversationId.current++,
-            type: 'podcast-search' as const,
-            query: '', 
-            timestamp: new Date(),
-            isStreaming: false,
-            data: {
-              quotes: response.data.recommendations.map(rec => ({
-                id: rec.paragraph_ids[0],
-                quote: rec.text,
-                episode: rec.title,
-                creator: `${rec.feed_title} - ${rec.episode_title}`,
-                audioUrl: rec.audio_url,
-                date: response.data.run_date,
-                timeContext: {
-                  start_time: rec.start_time,
-                  end_time: rec.end_time
-                },
-                similarity: { 
-                  combined: rec.relevance_score / 100, 
-                  vector: rec.relevance_score / 100 
-                },
-                episodeImage: rec.episode_image,
-                shareUrl: `${window.location.origin}/share?clip=${rec.paragraph_ids[0]}`,
-                shareLink: rec.paragraph_ids[0]
-              }))
+          try {
+            const response = await PodcastFeedService.getClipBatchByRunId(feedId, runId, authToken);
+            
+            if (!response.success) {
+              // Check if it's an authorization error (user is signed in but not authorized)
+              if (response.error) {
+                if (response.error.startsWith('401:')) {
+                  setIsSignInModalOpen(true);
+                  return;
+                } else if (response.error.startsWith('403:')) {
+                  setSearchState(prev => ({
+                    ...prev, 
+                    error: new Error("You don't have permission to access this content. Please contact the feed administrator."),
+                    isLoading: false
+                  }));
+                  return;
+                }
+              }
+              
+              throw new Error(response.error || 'Failed to load clip batch');
             }
-          }]);
+
+            if (!response.data) {
+              throw new Error('No data returned');
+            }
+
+            setConversation([{
+              id: nextConversationId.current++,
+              type: 'podcast-search' as const,
+              query: '', 
+              timestamp: new Date(),
+              isStreaming: false,
+              data: {
+                quotes: response.data.recommendations.map(rec => ({
+                  id: rec.paragraph_ids[0],
+                  quote: rec.text,
+                  episode: rec.title,
+                  creator: `${rec.feed_title} - ${rec.episode_title}`,
+                  audioUrl: rec.audio_url,
+                  date: response.data.run_date,
+                  timeContext: {
+                    start_time: rec.start_time,
+                    end_time: rec.end_time
+                  },
+                  similarity: { 
+                    combined: rec.relevance_score / 100, 
+                    vector: rec.relevance_score / 100 
+                  },
+                  episodeImage: rec.episode_image,
+                  shareUrl: `${window.location.origin}/share?clip=${rec.paragraph_ids[0]}`,
+                  shareLink: rec.paragraph_ids[0]
+                }))
+              }
+            }]);
+          } catch (error) {
+            console.error('Error loading clip batch:', error);
+            
+            // Handle 401/403 errors
+            if (error instanceof Error) {
+              const errorMessage = error.message;
+              if (errorMessage.startsWith('401:') || errorMessage.includes('Authentication required')) {
+                setIsSignInModalOpen(true);
+                return;
+              } else if (errorMessage.startsWith('403:') || errorMessage.includes('permission') || errorMessage.includes('Permission') || errorMessage.includes('Forbidden')) {
+                setSearchState(prev => ({
+                  ...prev, 
+                  error: new Error("You don't have permission to access this content. Please contact the feed administrator."),
+                  isLoading: false
+                }));
+                return;
+              } else {
+                setSearchState(prev => ({
+                  ...prev,
+                  error: error as Error,
+                  isLoading: false
+                }));
+              }
+            }
+          }
         } catch (error) {
           console.error('Error loading clip batch:', error);
           setSearchState(prev => ({
@@ -850,15 +899,25 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         isOpen={isSignInModalOpen}
         onClose={() => setIsSignInModalOpen(false)}
         onSignInSuccess={() => {
-          setRequestAuthMethod(RequestAuthMethod.SQUARE); // or other appropriate method
+          setRequestAuthMethod(RequestAuthMethod.SQUARE);
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
-          // Any additional success handling
+          
+          // For clipBatch pages, reload to retry access after authentication
+          if (isClipBatchPage) {
+            window.location.reload();
+          }
         }}
         onSignUpSuccess={()=>{
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
-          handleUpgrade();
+          
+          // For clipBatch pages, reload to retry access after authentication
+          if (isClipBatchPage) {
+            window.location.reload();
+          } else {
+            handleUpgrade();
+          }
         }}
       />
       <RegisterModal 
