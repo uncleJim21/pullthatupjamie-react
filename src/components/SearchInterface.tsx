@@ -161,11 +161,41 @@ const SUGGESTED_QUERIES = [
   }
 ];
 
-
+interface PodcastStats {
+  clipCount: number;
+  episodeCount: number;
+  feedCount: number;
+}
 
 export default function SearchInterface({ isSharePage = false, isClipBatchPage = false }: SearchInterfaceProps) {  
   const [query, setQuery] = useState('');
   const [model, setModel] = useState('claude-3-sonnet' as ModelType);
+  
+  // Podcast stats - these will be updated from API later
+  const [podcastStats, setPodcastStats] = useState<PodcastStats>({
+    clipCount: 423587,
+    episodeCount: 394,
+    feedCount: 51
+  });
+  
+  // Function to fetch podcast stats from API - will be implemented later
+  const fetchPodcastStats = async () => {
+    // This will be implemented in the future to fetch from API
+    // For now, we're using the default values
+    
+    // Example of future implementation:
+    // try {
+    //   const response = await fetch('/api/podcast-stats');
+    //   const data = await response.json();
+    //   setPodcastStats({
+    //     clipCount: data.clipCount,
+    //     episodeCount: data.episodeCount,
+    //     feedCount: data.feedCount
+    //   });
+    // } catch (error) {
+    //   console.error('Failed to fetch podcast stats:', error);
+    // }
+  };
   
   // Get the mode from URL parameters if available
   // This allows users to specify the search mode via URL parameter, e.g. ?mode=web-search or ?mode=podcast-search
@@ -688,6 +718,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     updateAuthMethodAndRegisterModalStatus();    
   }, []);
 
+  // Add useEffect for fetching podcast stats
+  useEffect(() => {
+    // This is where we'll call fetchPodcastStats in the future
+    // For now, we're just using the default values
+
+    // Uncomment this line when ready to fetch from API:
+    // fetchPodcastStats();
+  }, []);
+
   useEffect(() => {
     const updateAuth = async () => {
       const auth = await getAuth();
@@ -1103,6 +1142,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             </div>
           </form>
           )}
+          
+          {/* Stats display for podcast search mode */}
+          {!hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (
+            <div className="text-center mt-8 text-gray-300">
+              <p>Search <span className="font-bold">{podcastStats.clipCount.toLocaleString()}</span> clips from <span className="font-bold">{podcastStats.episodeCount.toLocaleString()}</span> episodes on <span className="font-bold">{podcastStats.feedCount}</span> feeds</p>
+            </div>
+          )}
+
           {/* Suggested Queries */}
           {!hasSearchedInMode(searchMode) && searchMode === 'web-search' && (
             <div className="mt-24 mb-8">
