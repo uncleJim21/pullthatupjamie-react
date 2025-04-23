@@ -8,7 +8,7 @@ export interface BaseConversationItem {
   isStreaming: boolean;
 }
 
-export interface QuickModeData {
+export interface WebSearchModeData {
   result: string;
   sources: Source[];
 }
@@ -22,9 +22,9 @@ export interface PodcastSearchData {
   quotes: QuoteResult[];
 }
 
-export interface QuickModeItem extends BaseConversationItem {
-  type: 'quick';
-  data: QuickModeData;
+export interface WebSearchModeItem extends BaseConversationItem {
+  type: 'web-search';
+  data: WebSearchModeData;
 }
 
 export interface ExpertModeItem extends BaseConversationItem {
@@ -37,4 +37,8 @@ export interface PodcastSearchItem extends BaseConversationItem {
   data: PodcastSearchData;
 }
 
-export type ConversationItem = QuickModeItem | ExpertModeItem | PodcastSearchItem;
+// For backward compatibility, alias WebSearchModeItem as QuickModeItem
+export type QuickModeItem = WebSearchModeItem;
+export type QuickModeData = WebSearchModeData;
+
+export type ConversationItem = WebSearchModeItem | ExpertModeItem | PodcastSearchItem;

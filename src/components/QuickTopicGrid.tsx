@@ -34,9 +34,10 @@ const QuickTopicCard: React.FC<QuickTopicCardProps> = ({
 interface QuickTopicGridProps {
   onTopicSelect: (query: string) => void;
   triggerFadeOut?: boolean; // New prop to trigger fade out from parent
+  className?: string; // Add className prop
 }
 
-const QuickTopicGrid: React.FC<QuickTopicGridProps> = ({ onTopicSelect , triggerFadeOut=false}) => {
+const QuickTopicGrid: React.FC<QuickTopicGridProps> = ({ onTopicSelect, triggerFadeOut=false, className="" }) => {
   const [fadeOut, setFadeOut] = useState(false);
   const [isGridVisible, setIsGridVisible] = useState(true);
 
@@ -94,7 +95,7 @@ const QuickTopicGrid: React.FC<QuickTopicGridProps> = ({ onTopicSelect , trigger
   if (!isGridVisible) return null;
 
   return (
-    <div className="px-4 max-w-4xl mx-auto">
+    <div className={`px-4 max-w-4xl mx-auto ${className}`}>
       <h2 className="text-xl font-bold text-white mb-6">Quick Topics</h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
         {topics.map((topic, index) => (

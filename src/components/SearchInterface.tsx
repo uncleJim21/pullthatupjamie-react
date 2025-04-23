@@ -3,10 +3,9 @@ import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
 import { RequestAuthMethod, AuthConfig } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
-import { ConversationItem } from '../types/conversation.ts';
+import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef} from 'react';
 import { ModelSettingsBar } from './ModelSettingsBar.tsx';
-import { DepthModeCard, ExpertModeCard } from './ModeCards.tsx';
 import { RegisterModal } from './RegisterModal.tsx';
 import {SignInModal} from './SignInModal.tsx'
 import LightningService from '../services/lightning.ts'
@@ -15,7 +14,6 @@ import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
 import {AccountButton} from './AccountButton.tsx'
 import {CheckoutModal} from './CheckoutModal.tsx'
-import { QuickModeItem } from '../types/conversation.ts';
 import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
@@ -25,7 +23,7 @@ import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
 
 
-export type SearchMode = 'quick' | 'depth' | 'expert' | 'podcast-search';
+export type SearchMode = 'web-search' | 'podcast-search';
 type ModelType = 'gpt-3.5-turbo' | 'claude-3-sonnet';
 let buffer = '';
 
@@ -76,13 +74,15 @@ interface QuickTopicGridProps {
 }
 
 interface ClipProgressData {
+  isProcessing: boolean;
   creator: string;
   episode: string;
   timestamps: number[];
   cdnLink?: string;
   clipId: string;
   episodeImage: string;
-  lookupHash?: string;
+  lookupHash: string;
+  pollUrl?: string;
 }
 
 const initialSearchState: SearchState = {
@@ -166,11 +166,20 @@ const SUGGESTED_QUERIES = [
 export default function SearchInterface({ isSharePage = false, isClipBatchPage = false }: SearchInterfaceProps) {  
   const [query, setQuery] = useState('');
   const [model, setModel] = useState('claude-3-sonnet' as ModelType);
+  
+  // Get the mode from URL parameters if available
+  // This allows users to specify the search mode via URL parameter, e.g. ?mode=web-search or ?mode=podcast-search
+  const [searchParams] = useSearchParams();
+  const modeParam = searchParams.get('mode');
+  
   const [searchMode, setSearchMode] = useState(
-    isSharePage || isClipBatchPage ? 'podcast-search' as SearchMode : 'podcast-search' as SearchMode
+    // Only use the modeParam if it's a valid SearchMode
+    modeParam && ['web-search', 'podcast-search'].includes(modeParam) 
+      ? modeParam as SearchMode 
+      : (isSharePage || isClipBatchPage ? 'podcast-search' as SearchMode : 'podcast-search' as SearchMode)
   );
+  
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
-  const [searchParams] = useSearchParams(); 
   const clipId = searchParams.get('clip');
   const { runId, feedId } = useParams<{ runId: string; feedId: string }>();
   const [authConfig, setAuthConfig] = useState<AuthConfig | null | undefined>(null);
@@ -180,9 +189,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [gridFadeOut, setGridFadeOut] = useState(false);
   const [searchHistory, setSearchHistory] = useState({
-    'quick': false,
-    'depth': false,
-    'expert': false,
+    'web-search': false,
     'podcast-search': isSharePage || isClipBatchPage
   });
   const hasSearchedInMode = (mode: SearchMode): boolean => {
@@ -442,7 +449,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     
     setConversation(prev => [...prev, {
       id: conversationId,
-      type: 'quick' as const,
+      type: 'web-search' as const,
       query: queryToUse, // Note: changed from query to queryToUse
       timestamp: new Date(),
       isStreaming: true,
@@ -450,7 +457,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         result: '',
         sources: []
       }
-    } as QuickModeItem]);
+    } as WebSearchModeItem]);
   
     setSearchState(prev => ({
       ...prev,
@@ -518,14 +525,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   }));
                   setConversation(prev => 
                     prev.map(item => {
-                      if (item.id === conversationId && item.type === 'quick') {
+                      if (item.id === conversationId && item.type === 'web-search') {
                         return {
                           ...item,
                           data: {
                             ...item.data,
                             sources
                           }
-                        } as QuickModeItem;
+                        } as WebSearchModeItem;
                       }
                       return item;
                     })
@@ -536,14 +543,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   resultTextRef.current += parsed.data;
                   setConversation(prev => 
                     prev.map(item => {
-                      if (item.id === conversationId && item.type === 'quick') {
+                      if (item.id === conversationId && item.type === 'web-search') {
                         return {
                           ...item,
                           data: {
                             ...item.data,
                             result: resultTextRef.current
                           }
-                        } as QuickModeItem;
+                        } as WebSearchModeItem;
                       }
                       return item;
                     })
@@ -999,8 +1006,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               <div>
                 <h1 className="text-3xl font-bold">Pull That Up Jamie!</h1>
                 <p className={`text-gray-400 text-md text-shadow-light-white ${hasSearchedInMode(searchMode) ? 'hidden' : ''}`}>
-                  {searchMode === 'quick' ? 'Instantly pull up anything with private web search + AI.' : ''}
-                  {searchMode === 'podcast-search' ? 'Search podcasts and clip them instantly.' : ''}
+                  {searchMode === 'web-search' ? 'Instantly pull up anything with private web search + AI.' : ''}
+                  {searchMode === 'podcast-search' ? 'Find the exact moment of your favorite podcast' : ''}
                 </p>
               </div>
             </div>
@@ -1008,13 +1015,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         )}
 
         {/* Search Modes - Now shown when hasSearched is true */}
+        {/* COMMENTED OUT: Hide the segmented control for modes
         {!isClipBatchPage && (
           <div className="flex justify-center mb-6 select-none">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               {[
-                { mode: 'quick', emoji: '🌐', label: 'Web Search' },
+                { mode: 'web-search', emoji: '🌐', label: 'Web Search' },
                 { mode: 'podcast-search', emoji: '🎙️', label: 'Podcast Search (Beta)' },
-                // { mode: 'expert', emoji: '🔮', label: 'Expert Mode' }
               ].map(({ mode, emoji, label }) => (
                 <button
                   key={mode}
@@ -1032,6 +1039,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             </div>
           </div>
         )}
+        */}
 
         {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (searchState.isLoading === false) && !isClipBatchPage && (
           <AvailableSourcesSection 
@@ -1046,7 +1054,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
         {/* Initial Search Form */}
         <div className="max-w-3xl mx-auto px-4">
-          {!hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && (
+          {!hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && (
             <form onSubmit={handleSearch} className="relative">
             <textarea
               ref={searchInputRef}
@@ -1054,7 +1062,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               onChange={(e) => setQuery(e.target.value)}
               placeholder={searchMode === 'podcast-search' ? `Search Thousands of Podcast Clips` : `How Can I Help You Today?`}
               className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-              // disabled={searchMode !== "quick"}
+              // disabled={searchMode !== "web-search"}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -1096,7 +1104,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           </form>
           )}
           {/* Suggested Queries */}
-          {!hasSearchedInMode(searchMode) && searchMode === "quick" && (
+          {!hasSearchedInMode(searchMode) && searchMode === 'web-search' && (
             <div className="mt-24 mb-8">
               <h3 className="text-gray-400 text-sm font-medium mb-4">Suggested</h3>
               <div className="space-y-4">
@@ -1119,7 +1127,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
 
       {/* Conversation History */}
-      {conversation.length > 0 && (searchMode !== 'expert') && (
+      {conversation.length > 0 && (
       <div
         className={`max-w-4xl mx-auto px-4 space-y-8 ${
           searchMode === 'podcast-search' && conversation.length > 0
@@ -1142,6 +1150,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
       {searchMode === 'podcast-search' && !hasSearchedInMode(searchMode) && (
         <div className={`mt-4 ${hasSearchedInMode(searchMode) ? 'mb-52' : 'mb-36'}`}>
+          {/* COMMENTED OUT: Hide available sources in initial view
           {
             <AvailableSourcesSection 
               hasSearched={hasSearchedInMode(searchMode)} 
@@ -1152,6 +1161,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               sizeOverride={'24'}
             /> 
           }
+          */}
+          {/* COMMENTED OUT: Hide quick topics grid
           <QuickTopicGrid 
             className=""
             triggerFadeOut={gridFadeOut}
@@ -1209,6 +1220,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               }
             }}
           />
+          */}
         </div>
       )}
 
@@ -1235,7 +1247,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
 
       {/* Floating Search Bar - Only show after first search */}
-      {hasSearchedInMode(searchMode) && (searchMode === "quick" || searchMode === 'podcast-search') && !isAnyModalOpen() && (
+      {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
         <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-50">
           <form onSubmit={handleSearch} className="relative">
             <textarea
@@ -1244,7 +1256,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               onChange={(e) => setQuery(e.target.value)}
               placeholder={searchMode === 'podcast-search' ? `Search Thousands of Podcast Clips` : `How Can I Help You Today?`}
               className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 pl-4 pr-32 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-              // disabled={searchMode === "quick"}
+              // disabled={searchMode === 'web-search'}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -1287,8 +1299,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           </form>
         </div>
       )}
-      {searchMode === 'depth' && <DepthModeCard />}
-      {searchMode === 'expert' && <ExpertModeCard />}
+      {searchMode === 'web-search' && (
+        <p> </p>
+      )}
 
       {/* Error Display */}
       {searchState.error && (

@@ -2,12 +2,13 @@ import React from 'react';
 import { SourceTile } from '../SourceTile.tsx';
 import { StreamingText } from '../StreamingText.tsx';
 import { BaseConversationLayout } from './BaseConversationLayout.tsx';
-import type { QuickModeItem } from '../../types/conversation';
+import type { WebSearchModeItem } from '../../types/conversation';
 
 interface QuickModeConversationProps {
-  item: QuickModeItem;
+  item: WebSearchModeItem;
 }
 
+// This component should eventually be renamed to WebSearchModeConversation
 export const QuickModeConversation: React.FC<QuickModeConversationProps> = ({ item }) => {
   return (
     <BaseConversationLayout query={item.query}>
