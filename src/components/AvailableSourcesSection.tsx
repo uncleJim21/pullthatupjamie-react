@@ -456,7 +456,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
   };
 
   return (
-    <div onClick={!isExpanded ? () => setIsExpanded(true) : undefined} className={`mx-auto max-w-4xl mt-4 pt-4 px-6 relative rounded-lg mb-2 ${!isExpanded ? 'pb-1 hover:bg-gray-800' : ''}`}>
+    <div onClick={!isExpanded ? () => setIsExpanded(true) : undefined} className={`mx-auto max-w-4xl mt-4 pt-4 px-6 relative rounded-lg mb-2 select-none ${!isExpanded ? 'pb-1 hover:bg-gray-800' : ''}`}>
       {isSendingFeedback && requestFlowStep !== RequestFlowStep.INITIAL && requestFlowStep !== RequestFlowStep.CHECKOUT && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4 sm:p-0">
           <div className="bg-[#0A0A0A] rounded-lg shadow-lg max-w-lg w-full relative">
@@ -485,7 +485,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
       )}
 
       <button 
-        className="text-white text-xl font-medium mb-4 flex items-center gap-2 border-white-800 rounded-lg hover:border-gray-700 transition-colors"
+        className="text-white text-xl font-medium mb-4 flex items-center gap-2 border-white-800 rounded-lg hover:border-gray-700 transition-colors select-none"
         onClick={toggleExpanded}
       >
         <span className={`transform transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`}>
@@ -515,7 +515,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
             </div>
             <button 
               onClick={startRequestFlow}
-              className="mt-2 md:mt-0 px-6 py-2 text-black font-medium bg-white rounded-lg hover:bg-gray-400 md:shrink-0"
+              className="mt-2 md:mt-0 px-6 py-2 text-black font-medium bg-white rounded-lg hover:bg-gray-400 md:shrink-0 select-none"
             >
               Request a Podcast
             </button>
@@ -531,27 +531,28 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
                     isSelected={selectedSources.has(source.feedId)}
                     onClick={toggleSource}
                     sizeClass={`w-24 lg:w-${sizeOverride ?? '36'}`}
+                    customTitleClass="text-xs sm:text-sm md:text-base lg:text-lg"
                   />
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="text-sm flex justify-center mt-4 space-x-2">
+          <div className="text-sm flex justify-center mt-4 space-x-2 select-none">
             <button
-              className="font-bold px-4 py-2 text-black bg-white border border-gray-800 rounded hover:bg-gray-200"
+              className="font-bold px-4 py-2 text-black bg-white border border-gray-800 rounded hover:bg-gray-200 select-none"
               onClick={selectAll}
             >
               Select All
             </button>
             <button
-              className="font-bold px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800"
+              className="font-bold px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800 select-none"
               onClick={deselectAll}
             >
               Deselect All
             </button>
             <button
-              className="font-bold px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800"
+              className="font-bold px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800 select-none"
               onClick={saveFilter}
             >
               <span>{!isMobile ? 'Save as Default' : ''} {isSavingDefault ? '✅' : '💾'} </span>

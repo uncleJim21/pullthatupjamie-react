@@ -25,7 +25,7 @@ const PodcastSourceItem: React.FC<PodcastSourceItemProps> = ({
 }) => {
   return (
     <div
-      className={`flex-shrink-0 ${sizeClass} group cursor-pointer`}
+      className={`flex-shrink-0 ${sizeClass} group cursor-pointer select-none`}
       onClick={() => onClick(source.feedId)}
     >
       <div className={`relative aspect-square rounded-lg overflow-hidden border group-hover:border-2 transition-colors ${isSelected ? 'border-gray-300' : 'border-gray-600'} ${customImageClass}`}>
@@ -45,7 +45,7 @@ const PodcastSourceItem: React.FC<PodcastSourceItemProps> = ({
         )}
       </div>
       {!imageOnly && (
-        <p className={`my-4 text-sm md:text-lg text-gray-100 text-center line-clamp-2 transition-colors select-none ${customTitleClass}`}>
+        <p className="my-2 py-1 px-1 text-gray-100 text-center line-clamp-2 transition-colors text-md sm:text-base md:text-lg font-medium select-none">
           {source.title}
         </p>
       )}

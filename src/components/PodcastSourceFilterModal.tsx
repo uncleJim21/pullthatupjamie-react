@@ -232,20 +232,20 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
   const renderUserTypeSelection = () => {
     return (
       <div className="bg-black p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-4 sm:mb-6">
+        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-4 sm:mb-6 select-none">
           Which Accurately Describes You?
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
           <button
             onClick={() => handleUserTypeSelection('fan')}
-            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors select-none"
           >
             <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">🪭</div>
             <span className="text-white text-sm sm:text-base font-medium">Fan</span>
           </button>
           <button
             onClick={() => handleUserTypeSelection('podcaster')}
-            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors select-none"
           >
             <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">🎙️</div>
             <span className="text-white text-sm sm:text-base font-medium">Podcaster/Team</span>
@@ -254,13 +254,13 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
         <div className="flex justify-between">
           <button
             onClick={resetRequestFlow}
-            className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors select-none"
           >
             Cancel
           </button>
           <button
             disabled={userRole === null}
-            className={`${userRole !== null ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors`}
+            className={`${userRole !== null ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors select-none`}
           >
             Next
           </button>
@@ -274,7 +274,7 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
     
     return (
       <div className="bg-black p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-2">
+        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-2 select-none">
           More Details Please <span className="text-xl sm:text-2xl">✍️</span>
         </h2>
         <form onSubmit={handlePodcastDetailsSubmit} className="space-y-3 sm:space-y-4">
@@ -311,13 +311,13 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
             <button
               type="button"
               onClick={() => setRequestFlowStep(RequestFlowStep.USER_TYPE)}
-              className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors"
+              className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors select-none"
             >
               Back
             </button>
             <button
               type="submit"
-              className={`${isFormComplete ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors`}
+              className={`${isFormComplete ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors select-none`}
               disabled={!isFormComplete}
             >
               Next
@@ -331,20 +331,20 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
   const renderFanOptions = () => {
     return (
       <div className="bg-black p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-4 sm:mb-6">
+        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-4 sm:mb-6 select-none">
           How Bad Do You Want to Add the Podcast?
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
           <button
             onClick={() => handleFanOptionSelection('vote')}
-            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors select-none"
           >
             <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">🗳️</div>
             <span className="text-white text-sm sm:text-base font-medium text-center">I Just Want to Vote</span>
           </button>
           <button
             onClick={() => handleFanOptionSelection('pay')}
-            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors select-none"
           >
             <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">💰</div>
             <span className="text-white text-sm sm:text-base font-medium text-center">Willing to Pay</span>
@@ -353,13 +353,13 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
         <div className="flex justify-between">
           <button
             onClick={() => setRequestFlowStep(RequestFlowStep.PODCAST_DETAILS)}
-            className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors select-none"
           >
             Back
           </button>
           <button
             disabled={paymentOption === null}
-            className={`${paymentOption !== null ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors`}
+            className={`${paymentOption !== null ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors select-none`}
           >
             Next
           </button>
@@ -373,7 +373,7 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
       <div className="bg-black p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md border border-green-500">
         {isPurchaseSuccess ? (
           // Purchase success modal
-          <div className="text-center">
+          <div className="text-center select-none">
             <h2 className="text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4">Success!</h2>
             <p className="text-gray-300 text-sm sm:text-base mb-4 sm:mb-6">
               Welcome Aboard! We will add your podcast to the search index shortly! One of our team members will be in touch within 1 business day.
@@ -392,7 +392,7 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
           </div>
         ) : (
           // Vote success modal
-          <div className="text-center">
+          <div className="text-center select-none">
             <h2 className="text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4">Your Vote is Cast!</h2>
             <p className="text-gray-300 text-sm sm:text-base mb-4 sm:mb-6">
               Our team will add the pod if there's enough interest! Tell your friends to get on PullThatUpJamie.ai and strengthen your case!
@@ -453,7 +453,7 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
   `;
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black bg-opacity-80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black bg-opacity-80 backdrop-blur-sm select-none">
       <style>{scrollbarStyles}</style>
       
       {isCheckoutOpen && (
@@ -480,43 +480,43 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
           {getRenderRequestFlow()}
         </div>
       ) : (
-        <div className="bg-black border border-gray-800 rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-gray-800 flex justify-between items-center">
-            <h2 className="text-white text-xl font-semibold">Filter by Podcast Feed</h2>
+        <div className="bg-black border border-gray-800 rounded-lg shadow-lg w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="p-3 border-b border-gray-800 flex justify-between items-center">
+            <h2 className="text-white text-lg font-medium">Filter by Podcast Feed</h2>
             <button 
               onClick={onClose}
               className="text-white hover:text-gray-300 transition-colors"
               aria-label="Close"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="p-4">
-            <div className="relative mb-4">
+          <div className="p-3">
+            <div className="relative mb-3">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search feeds..."
-                className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-gray-600"
+                className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-gray-600 text-sm"
               />
-              <Search className="absolute right-3 top-3 text-gray-400 w-5 h-5" />
+              <Search className="absolute right-3 top-2 text-gray-400 w-4 h-4" />
             </div>
 
             <button 
               onClick={startRequestFlow}
-              className="w-full mb-4 px-6 py-2 text-black font-medium bg-white rounded-lg hover:bg-gray-200 flex justify-center items-center"
+              className="w-full mb-3 px-4 py-2 text-black font-medium bg-white rounded-lg hover:bg-gray-200 flex justify-center items-center text-sm"
             >
               Request a Podcast
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
             {error ? (
               <div className="text-red-500 p-4">{error}</div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 {filteredSources.map((source, index) => (
                   <PodcastSourceItem
                     key={index}
@@ -525,35 +525,36 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
                     onClick={toggleSource}
                     sizeClass="w-[70%] mx-auto"
                     customImageClass="border-2"
-                    customTitleClass="text-sm"
+                    imageOnly={false}
+                    showCheckmark={true}
                   />
                 ))}
               </div>
             )}
           </div>
 
-          <div className="p-4 border-t border-gray-800">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="p-3 border-t border-gray-800">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               <button
-                className="px-4 py-2 text-black bg-white rounded hover:bg-gray-200 text-sm font-medium"
+                className="px-3 py-1.5 text-black bg-white rounded hover:bg-gray-200 text-xs font-medium"
                 onClick={selectAll}
               >
                 Select All
               </button>
               <button
-                className="px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800 text-sm font-medium"
+                className="px-3 py-1.5 text-white bg-black border border-white rounded hover:bg-gray-800 text-xs font-medium"
                 onClick={deselectAll}
               >
                 Deselect All
               </button>
               <button
-                className="px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800 text-sm font-medium"
+                className="px-3 py-1.5 text-white bg-black border border-white rounded hover:bg-gray-800 text-xs font-medium"
                 onClick={saveAsDefault}
               >
                 <span>Save as Default {isSaving ? '✅' : '💾'}</span>
               </button>
               <button
-                className="px-4 py-2 text-black bg-white rounded hover:bg-gray-200 text-sm font-medium"
+                className="px-3 py-1.5 text-black bg-white rounded hover:bg-gray-200 text-xs font-medium"
                 onClick={handleDone}
               >
                 Done
