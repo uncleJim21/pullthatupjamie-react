@@ -21,7 +21,7 @@ export const ConversationRenderer: React.FC<ConversationRendererProps> = ({
   authConfig
 }) => {
   switch (item.type) {
-    case 'quick':
+    case 'web-search':
       return <QuickModeConversation item={item} />;
     case 'expert':
       return <ExpertModeConversation item={item} />;

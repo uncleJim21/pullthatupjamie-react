@@ -4,27 +4,25 @@ import { useState } from 'react';
 interface ModelSettingsBarProps {
   model: 'gpt-3.5-turbo' | 'claude-3-sonnet';
   setModel: (model: 'gpt-3.5-turbo' | 'claude-3-sonnet') => void;
-  searchMode: 'quick' | 'expert' | 'podcast-search';
-  setSearchMode: (mode: 'quick' | 'expert' | 'podcast-search') => void;
+  searchMode: 'web-search' | 'podcast-search';
+  setSearchMode: (mode: 'web-search' | 'podcast-search') => void;
   dropUp?: boolean;  // New prop
   className?: string;
 }
 
 const SearchDropdown = ({ searchMode, setSearchMode, className = "" }: { 
-  searchMode: 'quick' | 'expert' | 'podcast-search';
-  setSearchMode: (mode: 'quick' | 'expert' | 'podcast-search') => void;
+  searchMode: 'web-search' | 'podcast-search';
+  setSearchMode: (mode: 'web-search' | 'podcast-search') => void;
   className?: string;
 }) => (
   <div className={`absolute right-20 top-1/2 -translate-y-1/2 mr-6 ${className}`}>
     <select
       value={searchMode}
-      onChange={(e) => setSearchMode(e.target.value as 'quick' | 'expert' | 'podcast-search')}
+      onChange={(e) => setSearchMode(e.target.value as 'web-search' | 'podcast-search')}
       className="bg-transparent text-gray-400 border-none focus:outline-none cursor-pointer text-sm pr-8"
     >
-      <option value="quick" className="bg-[#111111]">🌐 Web Search</option>
-      {/* <option value="depth" className="bg-[#111111]">🤿 Depth</option> */}
+      <option value="web-search" className="bg-[#111111]">🌐 Web Search</option>
       <option value="podcast-search" className="bg-[#111111]">🎙️ Podcast Search</option>
-      {/* <option value="expert" className="bg-[#111111]">🔮 Expert</option> */}
     </select>
     <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none">
     </div>
