@@ -20,6 +20,7 @@ import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
+import { Filter } from 'lucide-react';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -169,6 +170,9 @@ interface PodcastStats {
 export default function SearchInterface({ isSharePage = false, isClipBatchPage = false }: SearchInterfaceProps) {  
   const [query, setQuery] = useState('');
   const [model, setModel] = useState('claude-3-sonnet' as ModelType);
+  
+  // Add state for filter button
+  const [filterClicked, setFilterClicked] = useState(false);
   
   // Podcast stats - these will be updated from API later
   const [podcastStats, setPodcastStats] = useState<PodcastStats>({
@@ -944,8 +948,21 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
   }, [isClipBatchPage, runId, feedId]);
 
+  // Function to handle filter button click
+  const handleFilterClick = (e: React.MouseEvent) => {
+    // Prevent event from bubbling up to parent form
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Just print the function name without triggering search
+    console.log("handleFilterClick");
+    printLog("handleFilterClick function called");
+  };
+
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
+      {/* Remove the original floating filter button */}
+      
       {isClipBatchPage && (
         <div></div>
       )}
@@ -1103,12 +1120,36 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <div className="max-w-3xl mx-auto px-4">
           {!hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && (
             <form onSubmit={handleSearch} className="relative">
+            {/* Filter button - desktop version (outside search bar) */}
+            {searchMode === 'podcast-search' && (
+              <div className="absolute -right-14 top-0 z-10 hidden md:block">
+                <button
+                  onClick={handleFilterClick}
+                  className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
+                  aria-label="Filter"
+                >
+                  <Filter className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+            {/* Filter button - mobile version (inside search bar) */}
+            {searchMode === 'podcast-search' && (
+              <div className="absolute right-3 top-3 z-10 md:hidden">
+                <button
+                  onClick={handleFilterClick}
+                  className="flex items-center justify-center text-white hover:text-gray-300 transition-colors"
+                  aria-label="Filter"
+                >
+                  <Filter className="w-5 h-5" />
+                </button>
+              </div>
+            )}
             <textarea
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `How Can I Help You Today?`}
-              className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
+              className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-10 md:pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
               // disabled={searchMode !== "web-search"}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -1305,6 +1346,30 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
         <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-50">
           <form onSubmit={handleSearch} className="relative">
+            {/* Filter button - desktop version (outside search bar) */}
+            {searchMode === 'podcast-search' && (
+              <div className="absolute -right-14 top-0 z-10 hidden md:block">
+                <button
+                  onClick={handleFilterClick}
+                  className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
+                  aria-label="Filter"
+                >
+                  <Filter className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+            {/* Filter button - mobile version (inside search bar) */}
+            {searchMode === 'podcast-search' && (
+              <div className="absolute right-14 top-3 z-10 md:hidden">
+                <button
+                  onClick={handleFilterClick}
+                  className="flex items-center justify-center text-white hover:text-gray-300 transition-colors"
+                  aria-label="Filter"
+                >
+                  <Filter className="w-5 h-5" />
+                </button>
+              </div>
+            )}
             <textarea
               ref={searchInputRef}
               value={query}
