@@ -3,13 +3,7 @@ import { Check, Filter, Search, Save } from 'lucide-react';
 import { API_URL, printLog } from '../constants/constants.ts';
 import { FeedbackForm } from './FeedbackForm.tsx';
 import { CheckoutModal } from './CheckoutModal.tsx';
-
-interface PodcastSource {
-    feedImage: string;
-    title: string;
-    description: string;
-    feedId: string;  
-}
+import PodcastSourceItem, { PodcastSource } from './PodcastSourceItem.tsx';
 
 interface AvailableSourcesProps {
   className?: string;
@@ -553,31 +547,13 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
             <div className="overflow-x-auto px-4">
               <div className="flex space-x-4">
                 {filteredSources.map((source, index) => (
-                  <div
+                  <PodcastSourceItem
                     key={index}
-                    className={`flex-shrink-0 w-24 lg:w-${sizeOverride ?? '36'} group cursor-pointer`}
-                    onClick={() => toggleSource(source.feedId)}
-                  >
-                    <div className={`relative aspect-square rounded-lg overflow-hidden border group-hover:border-2 transition-colors ${selectedSources.has(source.feedId) ? 'border-gray-300' : 'border-gray-600'}`}>
-                      <img
-                        src={source.feedImage}
-                        alt={source.title}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = '/podcast-logo.png';
-                        }}
-                      />
-                      {selectedSources.has(source.feedId) && (
-                        <div className="absolute bottom-1 right-1 bg-white rounded-full p-0.5 border border-black">
-                          <Check className="w-4 h-4 text-black" />
-                        </div>
-                      )}
-                    </div>
-                    <p className="my-4 text-sm md:text-lg text-gray-100 text-center line-clamp-2 transition-colors select-none">
-                      {source.title}
-                    </p>
-                  </div>
+                    source={source}
+                    isSelected={selectedSources.has(source.feedId)}
+                    onClick={toggleSource}
+                    sizeClass={`w-24 lg:w-${sizeOverride ?? '36'}`}
+                  />
                 ))}
               </div>
             </div>
