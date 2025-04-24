@@ -1,12 +1,6 @@
 import React from 'react';
 import { Check } from 'lucide-react';
-
-export interface PodcastSource {
-  feedImage: string;
-  title: string;
-  description: string;
-  feedId: string;
-}
+import { PodcastSource } from '../services/podcastSourceService.ts';
 
 interface PodcastSourceItemProps {
   source: PodcastSource;

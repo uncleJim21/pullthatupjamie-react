@@ -3,7 +3,8 @@ import { Check, Filter, Search, Save } from 'lucide-react';
 import { API_URL, printLog } from '../constants/constants.ts';
 import { FeedbackForm } from './FeedbackForm.tsx';
 import { CheckoutModal } from './CheckoutModal.tsx';
-import PodcastSourceItem, { PodcastSource } from './PodcastSourceItem.tsx';
+import PodcastSourceItem from './PodcastSourceItem.tsx';
+import { fetchAvailableSources, submitPodcastRequest, PodcastSource } from '../services/podcastSourceService.ts';
 
 interface AvailableSourcesProps {
   className?: string;
@@ -69,10 +70,9 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
   useEffect(() => {
     const fetchSources = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/get-available-feeds`);
-        const data = await response.json();
-        setSources(data.results);
-        setFilteredSources(data.results);
+        const results = await fetchAvailableSources();
+        setSources(results);
+        setFilteredSources(results);
 
         // Only load saved selection from localStorage on initial mount
         if (!hasLoadedDefault.current) {
@@ -189,41 +189,16 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
         podcastUrl: podcastDetails.podcastUrl,
         role: 'fan',
         paymentIntent: 'vote'
+      })
+      .then(() => {
+        setIsSuccess(true);
+        setIsPurchaseSuccess(false);
+        setRequestFlowStep(RequestFlowStep.SUCCESS);
+      })
+      .catch(error => {
+        console.error('Error submitting podcast request:', error);
       });
-      setIsSuccess(true);
-      setIsPurchaseSuccess(false);
-      setRequestFlowStep(RequestFlowStep.SUCCESS);
     }
-  };
-
-  const submitPodcastRequest = (data: any) => {
-    // Submit to JamieFeedback collection via API
-    fetch(`${API_URL}/api/feedback`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: data.email,
-        feedback: `Podcast Request: ${data.podcastName} ${data.podcastUrl ? `(${data.podcastUrl})` : ''}`,
-        timestamp: new Date().toISOString(),
-        mode: 'request-pod',
-        userRole: data.role,
-        paymentIntent: data.paymentIntent
-      }),
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Failed to submit podcast request');
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log('Podcast request submitted successfully:', data);
-    })
-    .catch(error => {
-      console.error('Error submitting podcast request:', error);
-    });
   };
 
   const handleCheckoutSuccess = () => {
@@ -236,21 +211,24 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
       email: podcastDetails.email,
       podcastName: podcastDetails.podcastName,
       podcastUrl: podcastDetails.podcastUrl,
-      role: userRole,
+      role: userRole as 'fan' | 'podcaster',
       paymentIntent: userRole === 'podcaster' ? 'business' : 'pay'
+    })
+    .then(() => {
+      setIsCheckoutOpen(false);
+      
+      // For voting flow (no payment), isJamiePro should remain false
+      if (paymentOption === 'vote') {
+        setIsJamiePro(false);
+      }
+      
+      setIsSuccess(true);
+      setIsPurchaseSuccess(true);
+      setRequestFlowStep(RequestFlowStep.SUCCESS);
+    })
+    .catch(error => {
+      console.error('Error submitting podcast request:', error);
     });
-    setIsCheckoutOpen(false);
-    
-    // For voting flow (no payment), isJamiePro should remain false
-    if (paymentOption === 'vote') {
-      setIsJamiePro(false);
-    }
-    // For JamiePro product, set isJamiePro to true
-    // Note: isJamiePro is already set to true when the JamiePro checkout is initiated
-    
-    setIsSuccess(true);
-    setIsPurchaseSuccess(true);
-    setRequestFlowStep(RequestFlowStep.SUCCESS);
   };
 
   const resetRequestFlow = () => {
