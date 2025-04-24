@@ -431,8 +431,31 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Custom scrollbar styles
+  const scrollbarStyles = `
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #000000;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #ffffff;
+      border-radius: 4px;
+      border: 2px solid #000000;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: #cccccc;
+    }
+  `;
+
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black bg-opacity-80 backdrop-blur-sm">
+      <style>{scrollbarStyles}</style>
+      
       {isCheckoutOpen && (
         <CheckoutModal 
           isOpen={isCheckoutOpen} 
@@ -489,7 +512,7 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
             {error ? (
               <div className="text-red-500 p-4">{error}</div>
             ) : (
@@ -500,7 +523,7 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
                     source={source}
                     isSelected={selectedSources.has(source.feedId)}
                     onClick={toggleSource}
-                    sizeClass="w-full"
+                    sizeClass="w-[70%] mx-auto"
                     customImageClass="border-2"
                     customTitleClass="text-sm"
                   />
@@ -509,8 +532,8 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
             )}
           </div>
 
-          <div className="p-4 border-t border-gray-800 flex flex-wrap justify-between gap-2">
-            <div className="flex space-x-2">
+          <div className="p-4 border-t border-gray-800">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
               <button
                 className="px-4 py-2 text-black bg-white rounded hover:bg-gray-200 text-sm font-medium"
                 onClick={selectAll}
@@ -529,13 +552,13 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
               >
                 <span>Save as Default {isSaving ? '✅' : '💾'}</span>
               </button>
+              <button
+                className="px-4 py-2 text-black bg-white rounded hover:bg-gray-200 text-sm font-medium"
+                onClick={handleDone}
+              >
+                Done
+              </button>
             </div>
-            <button
-              className="px-8 py-2 text-black bg-white rounded hover:bg-gray-200 text-sm font-medium"
-              onClick={handleDone}
-            >
-              Done
-            </button>
           </div>
         </div>
       )}
