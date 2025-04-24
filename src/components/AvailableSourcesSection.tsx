@@ -4,7 +4,7 @@ import { API_URL, printLog } from '../constants/constants.ts';
 import { FeedbackForm } from './FeedbackForm.tsx';
 import { CheckoutModal } from './CheckoutModal.tsx';
 import PodcastSourceItem from './PodcastSourceItem.tsx';
-import { fetchAvailableSources, submitPodcastRequest, PodcastSource } from '../services/podcastSourceService.ts';
+import { fetchAvailableSources, submitPodcastRequest, PodcastSource, sortPodcastSources } from '../services/podcastSourceService.ts';
 
 interface AvailableSourcesProps {
   className?: string;
@@ -45,6 +45,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
   const [isMobile, setIsMobile] = useState(false);
   const [isSavingDefault, setIsSavingDefault] = useState(false);
   const hasLoadedDefault = useRef(false);
+  const sourcesContainerRef = useRef<HTMLDivElement>(null);
 
   // Podcast request flow state
   const [requestFlowStep, setRequestFlowStep] = useState<RequestFlowStep>(RequestFlowStep.INITIAL);
@@ -72,13 +73,17 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
       try {
         const results = await fetchAvailableSources();
         setSources(results);
-        setFilteredSources(results);
-
+        
         // Only load saved selection from localStorage on initial mount
-        if (!hasLoadedDefault.current) {
+        // and only if the selectedSources is empty (hasn't been modified yet)
+        if (!hasLoadedDefault.current && selectedSources.size === 0) {
           const savedSelection = localStorage.getItem(STORAGE_KEY);
           if (savedSelection) {
-            setSelectedSources(new Set(JSON.parse(savedSelection)));
+            try {
+              setSelectedSources(new Set(JSON.parse(savedSelection)));
+            } catch (e) {
+              console.error('Error parsing saved podcast sources:', e);
+            }
           }
           hasLoadedDefault.current = true;
         }
@@ -89,23 +94,31 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
     };
 
     fetchSources();
-  }, [setSelectedSources]);
+  }, [setSelectedSources, selectedSources.size]);
+
+  // Update filtered sources when sources, selectedSources, or searchQuery changes
+  useEffect(() => {
+    const lowerCaseQuery = searchQuery.toLowerCase();
+    const filtered = sources.filter(source =>
+      source.title.toLowerCase().includes(lowerCaseQuery) ||
+      source.description.toLowerCase().includes(lowerCaseQuery)
+    );
+    
+    // Sort the filtered sources with selected sources first, then alphabetically
+    const sortedFiltered = sortPodcastSources(filtered, selectedSources);
+    setFilteredSources(sortedFiltered);
+    
+    // Scroll to top when selection changes
+    if (sourcesContainerRef.current) {
+      sourcesContainerRef.current.scrollLeft = 0;
+    }
+  }, [searchQuery, sources, selectedSources]);
 
   useEffect(() => {
     if (!isExpanded) {
       setSearchQuery('');
     }
   }, [isExpanded]);
-
-  useEffect(() => {
-    const lowerCaseQuery = searchQuery.toLowerCase();
-    setFilteredSources(
-      sources.filter(source =>
-        source.title.toLowerCase().includes(lowerCaseQuery) ||
-        source.description.toLowerCase().includes(lowerCaseQuery)
-      )
-    );
-  }, [searchQuery, sources]);
 
   const toggleSource = (feedId: string) => {
     setSelectedSources(prev => {
@@ -134,6 +147,21 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
     printLog('Saved selected podcast sources to localStorage');
     setIsSavingDefault(true);
     setInterval(() => (setIsSavingDefault(false)),2000);
+  };
+
+  const resetToDefault = () => {
+    // Load the default selection from localStorage
+    const savedSelection = localStorage.getItem(STORAGE_KEY);
+    if (savedSelection) {
+      try {
+        setSelectedSources(new Set(JSON.parse(savedSelection)));
+      } catch (e) {
+        console.error('Error parsing saved podcast sources:', e);
+      }
+    } else {
+      // If there's no saved selection, just deselect all
+      setSelectedSources(new Set());
+    }
   };
 
   const toggleExpanded = () => {
@@ -522,11 +550,11 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
           </div>
 
           <div className="relative border border-gray-800 pt-4 pb-4 rounded-lg">
-            <div className="overflow-x-auto px-4">
+            <div ref={sourcesContainerRef} className="overflow-x-auto px-4">
               <div className="flex space-x-4">
                 {filteredSources.map((source, index) => (
                   <PodcastSourceItem
-                    key={index}
+                    key={source.feedId}
                     source={source}
                     isSelected={selectedSources.has(source.feedId)}
                     onClick={toggleSource}
@@ -555,7 +583,13 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
               className="font-bold px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800 select-none"
               onClick={saveFilter}
             >
-              <span>{!isMobile ? 'Save as Default' : ''} {isSavingDefault ? '✅' : '💾'} </span>
+              {isSavingDefault ? 'Saved!' : 'Save as Default'}
+            </button>
+            <button
+              className="font-bold px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800 select-none"
+              onClick={resetToDefault}
+            >
+              Reset to Default
             </button>
           </div>
         </>

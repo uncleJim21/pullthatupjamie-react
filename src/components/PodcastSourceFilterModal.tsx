@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Check, Filter, Search, X } from 'lucide-react';
-import { fetchAvailableSources, submitPodcastRequest, PodcastSource } from '../services/podcastSourceService.ts';
+import { fetchAvailableSources, submitPodcastRequest, PodcastSource, sortPodcastSources } from '../services/podcastSourceService.ts';
 import PodcastSourceItem from './PodcastSourceItem.tsx';
 import { CheckoutModal } from './CheckoutModal.tsx';
 import { printLog } from '../constants/constants.ts';
@@ -36,6 +36,10 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const sourcesContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Keep track of whether sources have already been fetched
+  const hasSourcesLoaded = useRef(false);
 
   // Podcast request flow state
   const [requestFlowStep, setRequestFlowStep] = useState<RequestFlowStep>(RequestFlowStep.INITIAL);
@@ -61,11 +65,22 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      // Log the current selected sources when the modal opens
+      printLog(`Modal opened with selectedSources: ${JSON.stringify(Array.from(selectedSources))}`);
+      
       const fetchSources = async () => {
         try {
-          const results = await fetchAvailableSources();
-          setSources(results);
-          setFilteredSources(results);
+          // Only fetch sources if they haven't been loaded yet
+          if (!hasSourcesLoaded.current || sources.length === 0) {
+            const results = await fetchAvailableSources();
+            setSources(results);
+            hasSourcesLoaded.current = true;
+            printLog(`Fetched ${results.length} sources`);
+          }
+          
+          // We intentionally don't load from localStorage here
+          // to preserve the current selection that was passed to the modal
+          
         } catch (err) {
           setError('Failed to load podcast sources');
           console.error('Error fetching podcast sources:', err);
@@ -83,15 +98,23 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
 
   useEffect(() => {
     const lowerCaseQuery = searchQuery.toLowerCase();
-    setFilteredSources(
-      sources.filter(source =>
-        source.title.toLowerCase().includes(lowerCaseQuery) ||
-        source.description.toLowerCase().includes(lowerCaseQuery)
-      )
+    const filtered = sources.filter(source =>
+      source.title.toLowerCase().includes(lowerCaseQuery) ||
+      source.description.toLowerCase().includes(lowerCaseQuery)
     );
-  }, [searchQuery, sources]);
+    
+    // Sort the filtered sources with selected sources first, then alphabetically
+    const sortedFiltered = sortPodcastSources(filtered, selectedSources);
+    setFilteredSources(sortedFiltered);
+    
+    // Scroll to top when selection changes
+    if (sourcesContainerRef.current) {
+      sourcesContainerRef.current.scrollTop = 0;
+    }
+  }, [searchQuery, sources, selectedSources]);
 
   const toggleSource = (feedId: string) => {
+    printLog(`Toggling source: ${feedId}`);
     setSelectedSources(prev => {
       const newSet = new Set(prev);
       if (newSet.has(feedId)) {
@@ -99,26 +122,51 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
       } else {
         newSet.add(feedId);
       }
+      printLog(`Selection after toggle: ${JSON.stringify(Array.from(newSet))}`);
       return newSet;
     });
   };
 
   const selectAll = () => {
     const allFeedIds = new Set(filteredSources.map(source => source.feedId));
+    printLog(`Selecting all ${allFeedIds.size} sources`);
     setSelectedSources(allFeedIds);
   };
 
   const deselectAll = () => {
+    printLog('Deselecting all sources');
     setSelectedSources(new Set());
   };
 
   const saveAsDefault = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(selectedSources)));
+    printLog(`Saved ${selectedSources.size} sources as default`);
     setIsSaving(true);
     setTimeout(() => setIsSaving(false), 1500);
   };
 
+  const resetToDefault = () => {
+    // Load the default selection from localStorage
+    const savedSelection = localStorage.getItem(STORAGE_KEY);
+    if (savedSelection) {
+      try {
+        const parsedSources = new Set<string>(JSON.parse(savedSelection));
+        printLog(`Reset to default: ${JSON.stringify(Array.from(parsedSources))}`);
+        setSelectedSources(parsedSources);
+      } catch (e) {
+        console.error('Error parsing saved podcast sources:', e);
+      }
+    } else {
+      // If there's no saved selection, just deselect all
+      printLog('No default selection found, deselecting all');
+      setSelectedSources(new Set());
+    }
+  };
+
   const handleDone = () => {
+    // Save the current selection to localStorage before closing
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(selectedSources)));
+    printLog(`Modal closed with selection: ${JSON.stringify(Array.from(selectedSources))}`);
     onClose();
   };
 
@@ -512,14 +560,14 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+          <div ref={sourcesContainerRef} className="flex-1 overflow-y-auto p-2 custom-scrollbar">
             {error ? (
               <div className="text-red-500 p-4">{error}</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {filteredSources.map((source, index) => (
+                {filteredSources.map((source) => (
                   <PodcastSourceItem
-                    key={index}
+                    key={source.feedId}
                     source={source}
                     isSelected={selectedSources.has(source.feedId)}
                     onClick={toggleSource}
@@ -558,6 +606,14 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
                 onClick={handleDone}
               >
                 Done
+              </button>
+            </div>
+            <div className="mt-2 flex justify-center">
+              <button
+                className="px-3 py-1.5 text-white bg-black border border-white rounded hover:bg-gray-800 text-xs font-medium"
+                onClick={resetToDefault}
+              >
+                Reset to Default
               </button>
             </div>
           </div>

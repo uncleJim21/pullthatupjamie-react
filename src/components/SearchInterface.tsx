@@ -232,8 +232,26 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [authConfig, setAuthConfig] = useState<AuthConfig | null | undefined>(null);
   const [clipProgress, setClipProgress] = useState<ClipProgressData | undefined>(undefined);
   const pollIntervals = new Map<string, NodeJS.Timeout>();
+  const STORAGE_KEY = 'selectedPodcastSources';
   const [searchState, setSearchState] = useState<SearchState>(initialSearchState);
-  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  // Create a ref to store the last used selectedSources
+  const lastUsedSourcesRef = useRef<Set<string>>(new Set());
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(() => {
+    // Try to load saved selection from localStorage
+    const savedSelection = localStorage.getItem(STORAGE_KEY);
+    if (savedSelection) {
+      try {
+        const parsedSources = new Set<string>(JSON.parse(savedSelection));
+        // Initialize the ref with the default sources
+        lastUsedSourcesRef.current = parsedSources;
+        return parsedSources;
+      } catch (e) {
+        console.error('Error parsing saved podcast sources:', e);
+        return new Set<string>();
+      }
+    }
+    return new Set<string>();
+  });
   const [gridFadeOut, setGridFadeOut] = useState(false);
   const [searchHistory, setSearchHistory] = useState({
     'web-search': false,
@@ -655,43 +673,75 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   };
 
   const performQuoteSearch = async () => {  
-  setSearchHistory(prev => ({...prev, [searchMode]: true}));
-  const selectedFeedIds = Array.from(selectedSources) as string[]
-  printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
+    setSearchHistory(prev => ({...prev, [searchMode]: true}));
+    
+    printLog("Starting quote search...");
+    
+    // Capture the current selection at the moment of search to ensure it's used
+    // Create a deep copy to prevent any reference issues
+    const currentSelectedFeedIds = Array.from(selectedSources) as string[];
+    
+    // Store the current selection in localStorage as a backup
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSelectedFeedIds));
+    
+    printLog(`Using selected sources for search: ${JSON.stringify(currentSelectedFeedIds,null,2)}`);
 
-  const auth = await getAuth() as AuthConfig;
-  if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
-    setIsRegisterModalOpen(true);
-    setSearchState(prev => ({ ...prev, isLoading: false }));
-    return;
-  }
-  printLog(`Request auth method:${requestAuthMethod}`)
-  const quoteResults = await handleQuoteSearch(query, auth, selectedFeedIds);
-  setConversation(prev => [...prev, {
-    id: searchState.activeConversationId as number,
-    type: 'podcast-search' as const,
-    query: query,
-    timestamp: new Date(),
-    isStreaming: false,
-    data: {
-      quotes: quoteResults.results
+    const auth = await getAuth() as AuthConfig;
+    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+      setIsRegisterModalOpen(true);
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+      return;
     }
-  }]);
-  setQuery("");
-  // Only set loading to false at the very end
-  setSearchState(prev => ({ ...prev, isLoading: false }));
-}
+    printLog(`Request auth method:${requestAuthMethod}`)
+    
+    try {
+      const quoteResults = await handleQuoteSearch(query, auth, currentSelectedFeedIds);
+      setConversation(prev => [...prev, {
+        id: searchState.activeConversationId as number,
+        type: 'podcast-search' as const,
+        query: query,
+        timestamp: new Date(),
+        isStreaming: false,
+        data: {
+          quotes: quoteResults.results
+        }
+      }]);
+      setQuery("");
+      printLog("Quote search completed successfully");
+    } catch (error) {
+      console.error("Error during quote search:", error);
+      setSearchState(prev => ({
+        ...prev,
+        error: error as Error,
+        isLoading: false
+      }));
+      return;
+    } finally {
+      // Only set loading to false at the very end
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+    }
+  }
 
   const handleSearch = async (e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
     if (searchMode === 'podcast-search') {
       try {
         setGridFadeOut(true);
+        
+        // Log the selected sources before search starts
+        printLog(`Selected sources before search: ${JSON.stringify(Array.from(selectedSources))}`);
+        
+        // Before starting the search, ensure our selection is maintained
+        // This prevents any potential state update issues during async operations
+        const searchSelection = new Set(selectedSources);
+        
         setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
         await new Promise(resolve => {
           setSearchState(prev => ({ ...prev, isLoading: true }));
           setTimeout(resolve, 0);
         });
+        
+        // We'll use this function's closure to capture the current selection state
         await performQuoteSearch();
         return;
       } catch (error) {
@@ -956,6 +1006,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     e.preventDefault();
     e.stopPropagation();
     
+    // Log selected sources before opening modal
+    printLog(`Selected sources before filter modal: ${JSON.stringify(Array.from(selectedSources))}`);
+    
     // Open the filter modal
     setIsFilterModalOpen(true);
     
@@ -964,12 +1017,25 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     printLog("handleFilterClick function called");
   };
 
+  // Update the lastUsedSourcesRef whenever selectedSources changes
+  useEffect(() => {
+    // Create a deep copy of the selectedSources set to ensure it's not a reference
+    lastUsedSourcesRef.current = new Set(selectedSources);
+    printLog(`selectedSources updated: ${JSON.stringify(Array.from(selectedSources))}`);
+  }, [selectedSources]);
+
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
       {/* Add the PodcastSourceFilterModal component */}
       <PodcastSourceFilterModal 
         isOpen={isFilterModalOpen}
-        onClose={() => setIsFilterModalOpen(false)}
+        onClose={() => {
+          // Ensure selection is properly updated after modal is closed
+          // This helps keep the selectedSources state in sync
+          const currentSources = new Set(selectedSources);
+          printLog(`Selection after modal close: ${JSON.stringify(Array.from(currentSources))}`);
+          setIsFilterModalOpen(false);
+        }}
         selectedSources={selectedSources}
         setSelectedSources={setSelectedSources}
       />

@@ -16,6 +16,26 @@ interface PodcastRequestData {
 }
 
 /**
+ * Sorts podcast sources with selected sources first, then alphabetically by title
+ * @param {PodcastSource[]} sources - Array of podcast sources
+ * @param {Set<string>} selectedSources - Set of selected source IDs
+ * @returns {PodcastSource[]} Sorted array of podcast sources
+ */
+export function sortPodcastSources(sources: PodcastSource[], selectedSources: Set<string>): PodcastSource[] {
+  return [...sources].sort((a, b) => {
+    // First criterion: Selected sources come first
+    const aSelected = selectedSources.has(a.feedId);
+    const bSelected = selectedSources.has(b.feedId);
+    
+    if (aSelected && !bSelected) return -1;
+    if (!aSelected && bSelected) return 1;
+    
+    // Second criterion: Alphabetical order by title
+    return a.title.localeCompare(b.title);
+  });
+}
+
+/**
  * Fetches all available podcast sources
  * @returns {Promise<PodcastSource[]>} Array of podcast sources
  */
