@@ -21,6 +21,7 @@ import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
 import { Filter } from 'lucide-react';
+import PodcastSourceFilterModal from './PodcastSourceFilterModal.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -171,8 +172,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [query, setQuery] = useState('');
   const [model, setModel] = useState('claude-3-sonnet' as ModelType);
   
-  // Add state for filter button
+  // Update state for filter button
   const [filterClicked, setFilterClicked] = useState(false);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   
   // Podcast stats - these will be updated from API later
   const [podcastStats, setPodcastStats] = useState<PodcastStats>({
@@ -954,6 +956,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     e.preventDefault();
     e.stopPropagation();
     
+    // Open the filter modal
+    setIsFilterModalOpen(true);
+    
     // Just print the function name without triggering search
     console.log("handleFilterClick");
     printLog("handleFilterClick function called");
@@ -961,7 +966,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
-      {/* Remove the original floating filter button */}
+      {/* Add the PodcastSourceFilterModal component */}
+      <PodcastSourceFilterModal 
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        selectedSources={selectedSources}
+        setSelectedSources={setSelectedSources}
+      />
       
       {isClipBatchPage && (
         <div></div>
