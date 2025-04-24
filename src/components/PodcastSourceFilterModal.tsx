@@ -602,18 +602,18 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
                 <span>Save as Default {isSaving ? '✅' : '💾'}</span>
               </button>
               <button
-                className="px-3 py-1.5 text-black bg-white rounded hover:bg-gray-200 text-xs font-medium"
-                onClick={handleDone}
-              >
-                Done
-              </button>
-            </div>
-            <div className="mt-2 flex justify-center">
-              <button
                 className="px-3 py-1.5 text-white bg-black border border-white rounded hover:bg-gray-800 text-xs font-medium"
                 onClick={resetToDefault}
               >
                 Reset to Default
+              </button>
+            </div>
+            <div className="mt-2 flex justify-center">
+              <button
+                className="px-3 py-1.5 text-black bg-white rounded hover:bg-gray-200 text-xs font-medium w-1/2"
+                onClick={handleDone}
+              >
+                Done
               </button>
             </div>
           </div>
