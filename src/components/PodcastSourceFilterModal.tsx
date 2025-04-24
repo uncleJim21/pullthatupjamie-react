@@ -1,19 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, Filter, Search, Save } from 'lucide-react';
-import { API_URL, printLog } from '../constants/constants.ts';
-import { FeedbackForm } from './FeedbackForm.tsx';
-import { CheckoutModal } from './CheckoutModal.tsx';
-import PodcastSourceItem from './PodcastSourceItem.tsx';
+import { Check, Filter, Search, X } from 'lucide-react';
 import { fetchAvailableSources, submitPodcastRequest, PodcastSource, sortPodcastSources } from '../services/podcastSourceService.ts';
+import PodcastSourceItem from './PodcastSourceItem.tsx';
+import { CheckoutModal } from './CheckoutModal.tsx';
+import { printLog } from '../constants/constants.ts';
 
-interface AvailableSourcesProps {
-  className?: string;
-  hasSearched: boolean;
+interface PodcastSourceFilterModalProps {
+  isOpen: boolean;
+  onClose: () => void;
   selectedSources: Set<string>;
   setSelectedSources: React.Dispatch<React.SetStateAction<Set<string>>>;
-  sizeOverride?: string;
-  isSendingFeedback: boolean;
-  setIsSendingFeedback: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const STORAGE_KEY = 'selectedPodcastSources';
@@ -28,24 +24,22 @@ enum RequestFlowStep {
   SUCCESS = 5
 }
 
-const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({ 
-  className, 
-  hasSearched, 
-  selectedSources, 
-  setSelectedSources, 
-  sizeOverride, 
-  isSendingFeedback, 
-  setIsSendingFeedback 
-}) => {  
+const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
+  isOpen,
+  onClose,
+  selectedSources,
+  setSelectedSources
+}) => {
   const [sources, setSources] = useState<PodcastSource[]>([]);
   const [filteredSources, setFilteredSources] = useState<PodcastSource[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [isExpanded, setIsExpanded] = useState(!hasSearched);
+  const [isSaving, setIsSaving] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [isSavingDefault, setIsSavingDefault] = useState(false);
-  const hasLoadedDefault = useRef(false);
   const sourcesContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Keep track of whether sources have already been fetched
+  const hasSourcesLoaded = useRef(false);
 
   // Podcast request flow state
   const [requestFlowStep, setRequestFlowStep] = useState<RequestFlowStep>(RequestFlowStep.INITIAL);
@@ -60,6 +54,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
   const [isJamiePro, setIsJamiePro] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isPurchaseSuccess, setIsPurchaseSuccess] = useState(false);
+  const [isRequestingPodcast, setIsRequestingPodcast] = useState(false);
 
   useEffect(() => {
     const checkScreenSize = () => setIsMobile(window.innerWidth <= 768);
@@ -69,34 +64,38 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
   }, []);
 
   useEffect(() => {
-    const fetchSources = async () => {
-      try {
-        const results = await fetchAvailableSources();
-        setSources(results);
-        
-        // Only load saved selection from localStorage on initial mount
-        // and only if the selectedSources is empty (hasn't been modified yet)
-        if (!hasLoadedDefault.current && selectedSources.size === 0) {
-          const savedSelection = localStorage.getItem(STORAGE_KEY);
-          if (savedSelection) {
-            try {
-              setSelectedSources(new Set(JSON.parse(savedSelection)));
-            } catch (e) {
-              console.error('Error parsing saved podcast sources:', e);
-            }
+    if (isOpen) {
+      // Log the current selected sources when the modal opens
+      printLog(`Modal opened with selectedSources: ${JSON.stringify(Array.from(selectedSources))}`);
+      
+      const fetchSources = async () => {
+        try {
+          // Only fetch sources if they haven't been loaded yet
+          if (!hasSourcesLoaded.current || sources.length === 0) {
+            const results = await fetchAvailableSources();
+            setSources(results);
+            hasSourcesLoaded.current = true;
+            printLog(`Fetched ${results.length} sources`);
           }
-          hasLoadedDefault.current = true;
+          
+          // We intentionally don't load from localStorage here
+          // to preserve the current selection that was passed to the modal
+          
+        } catch (err) {
+          setError('Failed to load podcast sources');
+          console.error('Error fetching podcast sources:', err);
         }
-      } catch (err) {
-        setError('Failed to load podcast sources');
-        console.error('Error fetching podcast sources:', err);
-      }
-    };
+      };
 
-    fetchSources();
-  }, [setSelectedSources, selectedSources.size]);
+      fetchSources();
+    }
 
-  // Update filtered sources when sources, selectedSources, or searchQuery changes
+    // Reset request flow state when modal opens
+    if (isOpen && requestFlowStep !== RequestFlowStep.INITIAL) {
+      resetRequestFlow();
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     const lowerCaseQuery = searchQuery.toLowerCase();
     const filtered = sources.filter(source =>
@@ -110,17 +109,12 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
     
     // Scroll to top when selection changes
     if (sourcesContainerRef.current) {
-      sourcesContainerRef.current.scrollLeft = 0;
+      sourcesContainerRef.current.scrollTop = 0;
     }
   }, [searchQuery, sources, selectedSources]);
 
-  useEffect(() => {
-    if (!isExpanded) {
-      setSearchQuery('');
-    }
-  }, [isExpanded]);
-
   const toggleSource = (feedId: string) => {
+    printLog(`Toggling source: ${feedId}`);
     setSelectedSources(prev => {
       const newSet = new Set(prev);
       if (newSet.has(feedId)) {
@@ -128,25 +122,27 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
       } else {
         newSet.add(feedId);
       }
-      printLog(`newSet:${JSON.stringify(Array.from(newSet))}`);
+      printLog(`Selection after toggle: ${JSON.stringify(Array.from(newSet))}`);
       return newSet;
     });
   };
 
   const selectAll = () => {
     const allFeedIds = new Set(filteredSources.map(source => source.feedId));
+    printLog(`Selecting all ${allFeedIds.size} sources`);
     setSelectedSources(allFeedIds);
   };
 
   const deselectAll = () => {
+    printLog('Deselecting all sources');
     setSelectedSources(new Set());
   };
 
-  const saveFilter = () => {
+  const saveAsDefault = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(selectedSources)));
-    printLog('Saved selected podcast sources to localStorage');
-    setIsSavingDefault(true);
-    setInterval(() => (setIsSavingDefault(false)),2000);
+    printLog(`Saved ${selectedSources.size} sources as default`);
+    setIsSaving(true);
+    setTimeout(() => setIsSaving(false), 1500);
   };
 
   const resetToDefault = () => {
@@ -154,24 +150,30 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
     const savedSelection = localStorage.getItem(STORAGE_KEY);
     if (savedSelection) {
       try {
-        setSelectedSources(new Set(JSON.parse(savedSelection)));
+        const parsedSources = new Set<string>(JSON.parse(savedSelection));
+        printLog(`Reset to default: ${JSON.stringify(Array.from(parsedSources))}`);
+        setSelectedSources(parsedSources);
       } catch (e) {
         console.error('Error parsing saved podcast sources:', e);
       }
     } else {
       // If there's no saved selection, just deselect all
+      printLog('No default selection found, deselecting all');
       setSelectedSources(new Set());
     }
   };
 
-  const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
+  const handleDone = () => {
+    // Save the current selection to localStorage before closing
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(selectedSources)));
+    printLog(`Modal closed with selection: ${JSON.stringify(Array.from(selectedSources))}`);
+    onClose();
   };
 
   // Podcast request flow functions
   const startRequestFlow = () => {
     setRequestFlowStep(RequestFlowStep.USER_TYPE);
-    setIsSendingFeedback(true);
+    setIsRequestingPodcast(true);
   };
 
   const handleUserTypeSelection = (type: 'fan' | 'podcaster') => {
@@ -268,38 +270,30 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
       podcastName: '',
       podcastUrl: ''
     });
-    setIsSendingFeedback(false);
+    setIsRequestingPodcast(false);
     setIsJamiePro(false);
     setIsSuccess(false);
     setIsPurchaseSuccess(false);
     setIsCheckoutOpen(false);
   };
 
-  if (error) {
-    return (
-      <div className="text-red-500 p-4">
-        {error}
-      </div>
-    );
-  }
-
   const renderUserTypeSelection = () => {
     return (
       <div className="bg-black p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-4 sm:mb-6">
+        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-4 sm:mb-6 select-none">
           Which Accurately Describes You?
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
           <button
             onClick={() => handleUserTypeSelection('fan')}
-            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors select-none"
           >
             <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">🪭</div>
             <span className="text-white text-sm sm:text-base font-medium">Fan</span>
           </button>
           <button
             onClick={() => handleUserTypeSelection('podcaster')}
-            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors select-none"
           >
             <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">🎙️</div>
             <span className="text-white text-sm sm:text-base font-medium">Podcaster/Team</span>
@@ -308,13 +302,13 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
         <div className="flex justify-between">
           <button
             onClick={resetRequestFlow}
-            className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors select-none"
           >
             Cancel
           </button>
           <button
             disabled={userRole === null}
-            className={`${userRole !== null ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors`}
+            className={`${userRole !== null ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors select-none`}
           >
             Next
           </button>
@@ -328,7 +322,7 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
     
     return (
       <div className="bg-black p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-2">
+        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-2 select-none">
           More Details Please <span className="text-xl sm:text-2xl">✍️</span>
         </h2>
         <form onSubmit={handlePodcastDetailsSubmit} className="space-y-3 sm:space-y-4">
@@ -365,13 +359,13 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
             <button
               type="button"
               onClick={() => setRequestFlowStep(RequestFlowStep.USER_TYPE)}
-              className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors"
+              className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors select-none"
             >
               Back
             </button>
             <button
               type="submit"
-              className={`${isFormComplete ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors`}
+              className={`${isFormComplete ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors select-none`}
               disabled={!isFormComplete}
             >
               Next
@@ -385,20 +379,20 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
   const renderFanOptions = () => {
     return (
       <div className="bg-black p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-4 sm:mb-6">
+        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-4 sm:mb-6 select-none">
           How Bad Do You Want to Add the Podcast?
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
           <button
             onClick={() => handleFanOptionSelection('vote')}
-            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors select-none"
           >
             <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">🗳️</div>
             <span className="text-white text-sm sm:text-base font-medium text-center">I Just Want to Vote</span>
           </button>
           <button
             onClick={() => handleFanOptionSelection('pay')}
-            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 flex flex-col items-center hover:bg-gray-800 transition-colors select-none"
           >
             <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">💰</div>
             <span className="text-white text-sm sm:text-base font-medium text-center">Willing to Pay</span>
@@ -407,13 +401,13 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
         <div className="flex justify-between">
           <button
             onClick={() => setRequestFlowStep(RequestFlowStep.PODCAST_DETAILS)}
-            className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors"
+            className="bg-gray-900 text-white px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-800 transition-colors select-none"
           >
             Back
           </button>
           <button
             disabled={paymentOption === null}
-            className={`${paymentOption !== null ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors`}
+            className={`${paymentOption !== null ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'} px-4 sm:px-6 py-2 text-sm sm:text-base rounded-lg transition-colors select-none`}
           >
             Next
           </button>
@@ -426,8 +420,8 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
     return (
       <div className="bg-black p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md border border-green-500">
         {isPurchaseSuccess ? (
-          // Purchase success modal (right image in mockup)
-          <div className="text-center">
+          // Purchase success modal
+          <div className="text-center select-none">
             <h2 className="text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4">Success!</h2>
             <p className="text-gray-300 text-sm sm:text-base mb-4 sm:mb-6">
               Welcome Aboard! We will add your podcast to the search index shortly! One of our team members will be in touch within 1 business day.
@@ -445,8 +439,8 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
             </button>
           </div>
         ) : (
-          // Vote success modal (left image in mockup)
-          <div className="text-center">
+          // Vote success modal
+          <div className="text-center select-none">
             <h2 className="text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4">Your Vote is Cast!</h2>
             <p className="text-gray-300 text-sm sm:text-base mb-4 sm:mb-6">
               Our team will add the pod if there's enough interest! Tell your friends to get on PullThatUpJamie.ai and strengthen your case!
@@ -483,16 +477,33 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
     }
   };
 
-  return (
-    <div onClick={!isExpanded ? () => setIsExpanded(true) : undefined} className={`mx-auto max-w-4xl mt-4 pt-4 px-6 relative rounded-lg mb-2 select-none ${!isExpanded ? 'pb-1 hover:bg-gray-800' : ''}`}>
-      {isSendingFeedback && requestFlowStep !== RequestFlowStep.INITIAL && requestFlowStep !== RequestFlowStep.CHECKOUT && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4 sm:p-0">
-          <div className="bg-[#0A0A0A] rounded-lg shadow-lg max-w-lg w-full relative">
-            {getRenderRequestFlow()}
-          </div>
-        </div>
-      )}
+  if (!isOpen) return null;
 
+  // Custom scrollbar styles
+  const scrollbarStyles = `
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #000000;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #ffffff;
+      border-radius: 4px;
+      border: 2px solid #000000;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: #cccccc;
+    }
+  `;
+
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black bg-opacity-80 backdrop-blur-sm select-none">
+      <style>{scrollbarStyles}</style>
+      
       {isCheckoutOpen && (
         <CheckoutModal 
           isOpen={isCheckoutOpen} 
@@ -512,90 +523,104 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
         />
       )}
 
-      <button 
-        className="text-white text-xl font-medium mb-4 flex items-center gap-2 border-white-800 rounded-lg hover:border-gray-700 transition-colors select-none"
-        onClick={toggleExpanded}
-      >
-        <span className={`transform transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`}>
-          ▼
-        </span>
-        Podcast Feeds <Filter className='w-5 h-5' /> 
-        <p className="text-sm text-gray-400">
-          ({selectedSources.size > 0 
-            ? `${selectedSources.size} of ${sources.length}` 
-            : `${sources.length}`} Feeds)
-        </p>
-      </button>
+      {isRequestingPodcast && requestFlowStep !== RequestFlowStep.INITIAL ? (
+        <div className="bg-[#0A0A0A] rounded-lg shadow-lg max-w-lg w-full relative">
+          {getRenderRequestFlow()}
+        </div>
+      ) : (
+        <div className="bg-black border border-gray-800 rounded-lg shadow-lg w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="p-3 border-b border-gray-800 flex justify-between items-center">
+            <h2 className="text-white text-lg font-medium">Filter by Podcast Feed</h2>
+            <button 
+              onClick={onClose}
+              className="text-white hover:text-gray-300 transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-      {isExpanded && sources.length > 0 && (
-        <>
-          {/* Search Bar */}
-          <div className="relative mb-4 flex flex-col md:flex-row md:items-center md:space-x-4">
-            <div className="relative flex-1">
+          <div className="p-3">
+            <div className="relative mb-3">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search feeds..."
-                className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-gray-600"
+                className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-gray-600 text-sm"
               />
-              <Search className="absolute right-3 top-3 text-gray-400 w-5 h-5" />
+              <Search className="absolute right-3 top-2 text-gray-400 w-4 h-4" />
             </div>
+
             <button 
               onClick={startRequestFlow}
-              className="mt-2 md:mt-0 px-6 py-2 text-black font-medium bg-white rounded-lg hover:bg-gray-400 md:shrink-0 select-none"
+              className="w-full mb-3 px-4 py-2 text-black font-medium bg-white rounded-lg hover:bg-gray-200 flex justify-center items-center text-sm"
             >
               Request a Podcast
             </button>
           </div>
 
-          <div className="relative border border-gray-800 pt-4 pb-4 rounded-lg">
-            <div ref={sourcesContainerRef} className="overflow-x-auto px-4">
-              <div className="flex space-x-4">
-                {filteredSources.map((source, index) => (
+          <div ref={sourcesContainerRef} className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+            {error ? (
+              <div className="text-red-500 p-4">{error}</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {filteredSources.map((source) => (
                   <PodcastSourceItem
                     key={source.feedId}
                     source={source}
                     isSelected={selectedSources.has(source.feedId)}
                     onClick={toggleSource}
-                    sizeClass={`w-24 lg:w-${sizeOverride ?? '36'}`}
-                    customTitleClass="text-xs sm:text-sm md:text-base lg:text-lg"
+                    sizeClass="w-[70%] mx-auto"
+                    customImageClass="border-2"
+                    imageOnly={false}
+                    showCheckmark={true}
                   />
                 ))}
               </div>
-            </div>
+            )}
           </div>
 
-          <div className="text-sm flex justify-center mt-4 space-x-2 select-none">
-            <button
-              className="font-bold px-4 py-2 text-black bg-white border border-gray-800 rounded hover:bg-gray-200 select-none"
-              onClick={selectAll}
-            >
-              Select All
-            </button>
-            <button
-              className="font-bold px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800 select-none"
-              onClick={deselectAll}
-            >
-              Deselect All
-            </button>
-            <button
-              className="font-bold px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800 select-none"
-              onClick={saveFilter}
-            >
-              {isSavingDefault ? 'Saved!' : 'Save as Default'}
-            </button>
-            <button
-              className="font-bold px-4 py-2 text-white bg-black border border-white rounded hover:bg-gray-800 select-none"
-              onClick={resetToDefault}
-            >
-              Reset to Default
-            </button>
+          <div className="p-3 border-t border-gray-800">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <button
+                className="px-3 py-1.5 text-black bg-white rounded hover:bg-gray-200 text-xs font-medium"
+                onClick={selectAll}
+              >
+                Select All
+              </button>
+              <button
+                className="px-3 py-1.5 text-white bg-black border border-white rounded hover:bg-gray-800 text-xs font-medium"
+                onClick={deselectAll}
+              >
+                Deselect All
+              </button>
+              <button
+                className="px-3 py-1.5 text-white bg-black border border-white rounded hover:bg-gray-800 text-xs font-medium"
+                onClick={saveAsDefault}
+              >
+                <span>Save as Default {isSaving ? '✅' : '💾'}</span>
+              </button>
+              <button
+                className="px-3 py-1.5 text-white bg-black border border-white rounded hover:bg-gray-800 text-xs font-medium"
+                onClick={resetToDefault}
+              >
+                Reset to Default
+              </button>
+            </div>
+            <div className="mt-2 flex justify-center">
+              <button
+                className="px-3 py-1.5 text-black bg-white rounded hover:bg-gray-200 text-xs font-medium w-1/2"
+                onClick={handleDone}
+              >
+                Done
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
 };
 
-export default AvailableSourcesSection;
+export default PodcastSourceFilterModal; 

@@ -20,6 +20,8 @@ import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
+import { Filter } from 'lucide-react';
+import PodcastSourceFilterModal from './PodcastSourceFilterModal.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -170,6 +172,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [query, setQuery] = useState('');
   const [model, setModel] = useState('claude-3-sonnet' as ModelType);
   
+  // Update state for filter button
+  const [filterClicked, setFilterClicked] = useState(false);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  
   // Podcast stats - these will be updated from API later
   const [podcastStats, setPodcastStats] = useState<PodcastStats>({
     clipCount: 423587,
@@ -226,8 +232,26 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [authConfig, setAuthConfig] = useState<AuthConfig | null | undefined>(null);
   const [clipProgress, setClipProgress] = useState<ClipProgressData | undefined>(undefined);
   const pollIntervals = new Map<string, NodeJS.Timeout>();
+  const STORAGE_KEY = 'selectedPodcastSources';
   const [searchState, setSearchState] = useState<SearchState>(initialSearchState);
-  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  // Create a ref to store the last used selectedSources
+  const lastUsedSourcesRef = useRef<Set<string>>(new Set());
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(() => {
+    // Try to load saved selection from localStorage
+    const savedSelection = localStorage.getItem(STORAGE_KEY);
+    if (savedSelection) {
+      try {
+        const parsedSources = new Set<string>(JSON.parse(savedSelection));
+        // Initialize the ref with the default sources
+        lastUsedSourcesRef.current = parsedSources;
+        return parsedSources;
+      } catch (e) {
+        console.error('Error parsing saved podcast sources:', e);
+        return new Set<string>();
+      }
+    }
+    return new Set<string>();
+  });
   const [gridFadeOut, setGridFadeOut] = useState(false);
   const [searchHistory, setSearchHistory] = useState({
     'web-search': false,
@@ -649,43 +673,75 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   };
 
   const performQuoteSearch = async () => {  
-  setSearchHistory(prev => ({...prev, [searchMode]: true}));
-  const selectedFeedIds = Array.from(selectedSources) as string[]
-  printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
+    setSearchHistory(prev => ({...prev, [searchMode]: true}));
+    
+    printLog("Starting quote search...");
+    
+    // Capture the current selection at the moment of search to ensure it's used
+    // Create a deep copy to prevent any reference issues
+    const currentSelectedFeedIds = Array.from(selectedSources) as string[];
+    
+    // Store the current selection in localStorage as a backup
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSelectedFeedIds));
+    
+    printLog(`Using selected sources for search: ${JSON.stringify(currentSelectedFeedIds,null,2)}`);
 
-  const auth = await getAuth() as AuthConfig;
-  if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
-    setIsRegisterModalOpen(true);
-    setSearchState(prev => ({ ...prev, isLoading: false }));
-    return;
-  }
-  printLog(`Request auth method:${requestAuthMethod}`)
-  const quoteResults = await handleQuoteSearch(query, auth, selectedFeedIds);
-  setConversation(prev => [...prev, {
-    id: searchState.activeConversationId as number,
-    type: 'podcast-search' as const,
-    query: query,
-    timestamp: new Date(),
-    isStreaming: false,
-    data: {
-      quotes: quoteResults.results
+    const auth = await getAuth() as AuthConfig;
+    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+      setIsRegisterModalOpen(true);
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+      return;
     }
-  }]);
-  setQuery("");
-  // Only set loading to false at the very end
-  setSearchState(prev => ({ ...prev, isLoading: false }));
-}
+    printLog(`Request auth method:${requestAuthMethod}`)
+    
+    try {
+      const quoteResults = await handleQuoteSearch(query, auth, currentSelectedFeedIds);
+      setConversation(prev => [...prev, {
+        id: searchState.activeConversationId as number,
+        type: 'podcast-search' as const,
+        query: query,
+        timestamp: new Date(),
+        isStreaming: false,
+        data: {
+          quotes: quoteResults.results
+        }
+      }]);
+      setQuery("");
+      printLog("Quote search completed successfully");
+    } catch (error) {
+      console.error("Error during quote search:", error);
+      setSearchState(prev => ({
+        ...prev,
+        error: error as Error,
+        isLoading: false
+      }));
+      return;
+    } finally {
+      // Only set loading to false at the very end
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+    }
+  }
 
   const handleSearch = async (e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
     if (searchMode === 'podcast-search') {
       try {
         setGridFadeOut(true);
+        
+        // Log the selected sources before search starts
+        printLog(`Selected sources before search: ${JSON.stringify(Array.from(selectedSources))}`);
+        
+        // Before starting the search, ensure our selection is maintained
+        // This prevents any potential state update issues during async operations
+        const searchSelection = new Set(selectedSources);
+        
         setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
         await new Promise(resolve => {
           setSearchState(prev => ({ ...prev, isLoading: true }));
           setTimeout(resolve, 0);
         });
+        
+        // We'll use this function's closure to capture the current selection state
         await performQuoteSearch();
         return;
       } catch (error) {
@@ -944,8 +1000,46 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
   }, [isClipBatchPage, runId, feedId]);
 
+  // Function to handle filter button click
+  const handleFilterClick = (e: React.MouseEvent) => {
+    // Prevent event from bubbling up to parent form
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Log selected sources before opening modal
+    printLog(`Selected sources before filter modal: ${JSON.stringify(Array.from(selectedSources))}`);
+    
+    // Open the filter modal
+    setIsFilterModalOpen(true);
+    
+    // Just print the function name without triggering search
+    console.log("handleFilterClick");
+    printLog("handleFilterClick function called");
+  };
+
+  // Update the lastUsedSourcesRef whenever selectedSources changes
+  useEffect(() => {
+    // Create a deep copy of the selectedSources set to ensure it's not a reference
+    lastUsedSourcesRef.current = new Set(selectedSources);
+    printLog(`selectedSources updated: ${JSON.stringify(Array.from(selectedSources))}`);
+  }, [selectedSources]);
+
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
+      {/* Add the PodcastSourceFilterModal component */}
+      <PodcastSourceFilterModal 
+        isOpen={isFilterModalOpen}
+        onClose={() => {
+          // Ensure selection is properly updated after modal is closed
+          // This helps keep the selectedSources state in sync
+          const currentSources = new Set(selectedSources);
+          printLog(`Selection after modal close: ${JSON.stringify(Array.from(currentSources))}`);
+          setIsFilterModalOpen(false);
+        }}
+        selectedSources={selectedSources}
+        setSelectedSources={setSelectedSources}
+      />
+      
       {isClipBatchPage && (
         <div></div>
       )}
@@ -1103,12 +1197,36 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <div className="max-w-3xl mx-auto px-4">
           {!hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && (
             <form onSubmit={handleSearch} className="relative">
+            {/* Filter button - desktop version (outside search bar) */}
+            {searchMode === 'podcast-search' && (
+              <div className="absolute -right-14 top-0 z-10 hidden md:block">
+                <button
+                  onClick={handleFilterClick}
+                  className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
+                  aria-label="Filter"
+                >
+                  <Filter className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+            {/* Filter button - mobile version (inside search bar) */}
+            {searchMode === 'podcast-search' && (
+              <div className="absolute right-2 top-2 z-10 md:hidden">
+                <button
+                  onClick={handleFilterClick}
+                  className="flex items-center justify-center text-white hover:text-gray-300 transition-colors"
+                  aria-label="Filter"
+                >
+                  <Filter className="w-5 h-5" />
+                </button>
+              </div>
+            )}
             <textarea
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `How Can I Help You Today?`}
-              className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
+              className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-10 md:pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
               // disabled={searchMode !== "web-search"}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -1305,6 +1423,30 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
         <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-50">
           <form onSubmit={handleSearch} className="relative">
+            {/* Filter button - desktop version (outside search bar) */}
+            {searchMode === 'podcast-search' && (
+              <div className="absolute -right-20 top-0 z-10 hidden md:block">
+                <button
+                  onClick={handleFilterClick}
+                  className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
+                  aria-label="Filter"
+                >
+                  <Filter className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+            {/* Filter button - mobile version (inside search bar) */}
+            {searchMode === 'podcast-search' && (
+              <div className="absolute right-2 top-2 z-10 md:hidden">
+                <button
+                  onClick={handleFilterClick}
+                  className="flex items-center justify-center text-white hover:text-gray-300 transition-colors"
+                  aria-label="Filter"
+                >
+                  <Filter className="w-5 h-5" />
+                </button>
+              </div>
+            )}
             <textarea
               ref={searchInputRef}
               value={query}
