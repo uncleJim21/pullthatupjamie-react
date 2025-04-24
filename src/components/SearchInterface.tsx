@@ -1,7 +1,7 @@
 import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
-import { RequestAuthMethod, AuthConfig } from '../constants/constants.ts';
+import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef} from 'react';
@@ -15,7 +15,6 @@ import { useJamieAuth } from '../hooks/useJamieAuth.ts';
 import {AccountButton} from './AccountButton.tsx'
 import {CheckoutModal} from './CheckoutModal.tsx'
 import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
-import { DEBUG_MODE,printLog } from '../constants/constants.ts';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
 import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
@@ -174,27 +173,39 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Podcast stats - these will be updated from API later
   const [podcastStats, setPodcastStats] = useState<PodcastStats>({
     clipCount: 423587,
-    episodeCount: 394,
+    episodeCount: 601,
     feedCount: 51
   });
   
-  // Function to fetch podcast stats from API - will be implemented later
+  // Add a loading state for podcast stats
+  const [podcastStatsLoading, setPodcastStatsLoading] = useState(false);
+  
+  // Function to fetch podcast stats from API
   const fetchPodcastStats = async () => {
-    // This will be implemented in the future to fetch from API
-    // For now, we're using the default values
-    
-    // Example of future implementation:
-    // try {
-    //   const response = await fetch('/api/podcast-stats');
-    //   const data = await response.json();
-    //   setPodcastStats({
-    //     clipCount: data.clipCount,
-    //     episodeCount: data.episodeCount,
-    //     feedCount: data.feedCount
-    //   });
-    // } catch (error) {
-    //   console.error('Failed to fetch podcast stats:', error);
-    // }
+    setPodcastStatsLoading(true);
+    try {
+      // Use the API_URL from constants to respect debug mode
+      const response = await fetch(`${API_URL}/api/get-clip-count`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch podcast stats: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Update just the clipCount, keep the other stats the same for now
+      setPodcastStats(prevStats => ({
+        ...prevStats,
+        clipCount: data.clipCount
+      }));
+
+      printLog(`Fetched clip count: ${data.clipCount}`);
+    } catch (error) {
+      console.error('Failed to fetch podcast stats:', error);
+      // Keep using the default values in case of error
+    } finally {
+      setPodcastStatsLoading(false);
+    }
   };
   
   // Get the mode from URL parameters if available
@@ -720,11 +731,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   // Add useEffect for fetching podcast stats
   useEffect(() => {
-    // This is where we'll call fetchPodcastStats in the future
-    // For now, we're just using the default values
-
-    // Uncomment this line when ready to fetch from API:
-    // fetchPodcastStats();
+    // Fetch podcast stats on component mount
+    fetchPodcastStats();
   }, []);
 
   useEffect(() => {
@@ -1099,7 +1107,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={searchMode === 'podcast-search' ? `Search Thousands of Podcast Clips` : `How Can I Help You Today?`}
+              placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `How Can I Help You Today?`}
               className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
               // disabled={searchMode !== "web-search"}
               onKeyDown={(e) => {
@@ -1146,7 +1154,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           {/* Stats display for podcast search mode */}
           {!hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (
             <div className="text-center mt-8 text-gray-300">
-              <p>Search <span className="font-bold">{podcastStats.clipCount.toLocaleString()}</span> clips from <span className="font-bold">{podcastStats.episodeCount.toLocaleString()}</span> episodes on <span className="font-bold">{podcastStats.feedCount}</span> feeds</p>
+              <p>Search from over <span className="font-bold">{podcastStats.clipCount.toLocaleString()}</span> podcast moments</p>
             </div>
           )}
 
@@ -1301,7 +1309,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={searchMode === 'podcast-search' ? `Search Thousands of Podcast Clips` : `How Can I Help You Today?`}
+              placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `How Can I Help You Today?`}
               className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 pl-4 pr-32 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
               // disabled={searchMode === 'web-search'}
               onKeyDown={(e) => {
