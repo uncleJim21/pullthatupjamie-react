@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Check } from 'lucide-react';
 import { PodcastSource } from '../services/podcastSourceService.ts';
 
@@ -23,19 +23,26 @@ const PodcastSourceItem: React.FC<PodcastSourceItemProps> = ({
   customImageClass = '',
   customTitleClass = '',
 }) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+
   return (
     <div
       className={`flex-shrink-0 ${sizeClass} group cursor-pointer select-none`}
       onClick={() => onClick(source.feedId)}
     >
       <div className={`relative aspect-square rounded-lg overflow-hidden border group-hover:border-2 transition-colors ${isSelected ? 'border-gray-300' : 'border-gray-600'} ${customImageClass}`}>
+        {!imageLoaded && (
+          <div className="w-full h-full bg-gray-800 animate-pulse" />
+        )}
         <img
           src={source.feedImage}
           alt={source.title}
-          className="w-full h-full object-cover"
+          className={`w-full h-full object-cover ${imageLoaded ? 'block' : 'hidden'}`}
+          onLoad={() => setImageLoaded(true)}
           onError={(e) => {
             const target = e.target as HTMLImageElement;
             target.src = '/podcast-logo.png';
+            setImageLoaded(true);
           }}
         />
         {isSelected && showCheckmark && (
@@ -45,7 +52,7 @@ const PodcastSourceItem: React.FC<PodcastSourceItemProps> = ({
         )}
       </div>
       {!imageOnly && (
-        <p className="my-2 py-1 px-1 text-gray-100 text-center line-clamp-2 transition-colors text-md sm:text-base md:text-lg font-medium select-none">
+        <p className={`my-2 py-1 px-1 text-gray-100 text-center line-clamp-2 transition-colors font-medium select-none ${customTitleClass}`}>
           {source.title}
         </p>
       )}
