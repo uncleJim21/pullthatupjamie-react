@@ -19,6 +19,7 @@ import ShareModal from '../ShareModal.tsx';
 import SignInModal from '../SignInModal.tsx';
 import UploadService, { UploadItem, PaginationData } from '../../services/uploadService.ts';
 import { createFeedShareUrl } from '../../utils/urlUtils.ts';
+import PageBanner from '../PageBanner.tsx';
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history';
@@ -389,6 +390,9 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
   return (
     <div className="min-h-screen pb-12 bg-black text-white">
+      {/* Page Banner */}
+      <PageBanner logoText="Pull That Up Jamie!" />
+      
       {/* Header Section */}
       <div 
         className="w-full py-8 px-4"
