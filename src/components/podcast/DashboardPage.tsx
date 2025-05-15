@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { PodcastSearchResultItem, PresentationContext } from '../podcast/PodcastSearchResultItem.tsx';
 import { getRecommendedClips, ClipItem } from '../../services/dashboardService.ts';
+import { FRONTEND_URL } from '../../constants/constants.ts';
+import { createClipShareUrl } from '../../utils/urlUtils.ts';
 
 // Default podcast image to use when none is provided
 const DEFAULT_PODCAST_IMAGE = '/podcast-logo.png'; // Update with your default image path
@@ -110,7 +112,7 @@ const DashboardPage: React.FC = () => {
                   isPlaying={currentlyPlayingId === (clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`)}
                   onPlayPause={handlePlayPause}
                   onEnded={handleEnded}
-                  shareUrl={`${window.location.origin}/share?clip=${clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`}`}
+                  shareUrl={createClipShareUrl(clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`)}
                   shareLink={clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`}
                   presentationContext={PresentationContext.dashboard}
                 />

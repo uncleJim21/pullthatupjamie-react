@@ -1,7 +1,7 @@
 import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
-import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog } from '../constants/constants.ts';
+import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef} from 'react';
@@ -22,7 +22,7 @@ import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
 import { Filter } from 'lucide-react';
 import PodcastSourceFilterModal from './PodcastSourceFilterModal.tsx';
-
+import { createClipShareUrl } from '../utils/urlUtils.ts';
 
 export type SearchMode = 'web-search' | 'podcast-search';
 type ModelType = 'gpt-3.5-turbo' | 'claude-3-sonnet';
@@ -933,25 +933,37 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               timestamp: new Date(),
               isStreaming: false,
               data: {
-                quotes: response.data.recommendations.map(rec => ({
-                  id: rec.paragraph_ids[0],
-                  quote: rec.text,
-                  episode: rec.title,
-                  creator: `${rec.feed_title} - ${rec.episode_title}`,
-                  audioUrl: rec.audio_url,
-                  date: response.data.run_date,
-                  timeContext: {
-                    start_time: rec.start_time,
-                    end_time: rec.end_time
-                  },
-                  similarity: { 
-                    combined: rec.relevance_score / 100, 
-                    vector: rec.relevance_score / 100 
-                  },
-                  episodeImage: rec.episode_image,
-                  shareUrl: `${window.location.origin}/share?clip=${rec.paragraph_ids[0]}`,
-                  shareLink: rec.paragraph_ids[0]
-                }))
+                quotes: response.data.recommendations.map(rec => {
+                  const clipId = rec.paragraph_ids[0];
+                  
+                  // Generate the share URL using our utility
+                  let shareUrl = createClipShareUrl(clipId);
+                  
+                  // LAST RESORT OVERRIDE - Directly force localhost in development
+                  if (process.env.NODE_ENV === 'development' && !shareUrl.includes('localhost')) {
+                    shareUrl = `http://localhost:3000/app/share?clip=${clipId}`;
+                  }
+                  
+                  return ({
+                    id: clipId,
+                    quote: rec.text,
+                    episode: rec.title,
+                    creator: `${rec.feed_title} - ${rec.episode_title}`,
+                    audioUrl: rec.audio_url,
+                    date: response.data.run_date,
+                    timeContext: {
+                      start_time: rec.start_time,
+                      end_time: rec.end_time
+                    },
+                    similarity: { 
+                      combined: rec.relevance_score / 100, 
+                      vector: rec.relevance_score / 100 
+                    },
+                    episodeImage: rec.episode_image,
+                    shareUrl: shareUrl,
+                    shareLink: clipId
+                  })
+                })
               }
             }]);
           } catch (error) {
@@ -1114,7 +1126,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           <div className="relative w-full max-w-4xl mx-auto">
             <div className="flex justify-start md:block mb-4 md:mb-0">
               <button 
-                onClick={() => window.location.href = `/feed/${feedId}/jamieProHistory`} 
+                onClick={() => window.location.href = `/app/feed/${feedId}/jamieProHistory`} 
                 className="md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2 h-12 w-12 flex items-center justify-center bg-transparent text-white hover:text-gray-300 focus:outline-none z-10 ml-4 md:ml-0"
                 style={{
                   color: '#C0C0C0',

@@ -249,7 +249,18 @@ export const PodcastSearchResultItem = ({
 
   const handleShare = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      let finalShareUrl = shareUrl;
+      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+        // Force localhost in development AND ensure /app prefix is in the path
+        finalShareUrl = shareUrl.replace(/^https?:\/\/[^\/]+/, 'http://localhost:3000');
+        
+        // Fix missing /app prefix
+        if (finalShareUrl.includes('/share?') && !finalShareUrl.includes('/app/share?')) {
+          finalShareUrl = finalShareUrl.replace('/share?', '/app/share?');
+        }
+      }
+      
+      await navigator.clipboard.writeText(finalShareUrl);
       setShowCopied(true);
       setTimeout(() => setShowCopied(false), 2000);
     } catch (err) {
@@ -319,7 +330,7 @@ export const PodcastSearchResultItem = ({
         className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden cursor-pointer hover:border-gray-700 transition-colors"
         onClick={() => {
           if (runId) {
-            navigate(`/feed/${feedId}/clipBatch/${runId}`);
+            navigate(`/app/feed/${feedId}/clipBatch/${runId}`);
           }
         }}
       >

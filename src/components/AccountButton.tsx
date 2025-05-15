@@ -89,7 +89,7 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
 
   const handleMyFeedClick = () => {
     if (adminFeed && adminFeed.feedId) {
-      navigate(`/feed/${adminFeed.feedId}`);
+      navigate(`/app/feed/${adminFeed.feedId}`);
       setIsOpen(false);
     }
   };

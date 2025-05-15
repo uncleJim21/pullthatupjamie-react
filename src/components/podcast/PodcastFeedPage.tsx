@@ -18,6 +18,7 @@ import UploadModal from '../UploadModal.tsx';
 import ShareModal from '../ShareModal.tsx';
 import SignInModal from '../SignInModal.tsx';
 import UploadService, { UploadItem, PaginationData } from '../../services/uploadService.ts';
+import { createFeedShareUrl } from '../../utils/urlUtils.ts';
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history';
@@ -500,7 +501,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   isPlaying={currentlyPlayingId === featuredEpisode.id}
                   onPlayPause={handlePlayPause}
                   onEnded={handleEnded}
-                  shareUrl=""
+                  shareUrl={createFeedShareUrl(feedId || '')}
                   shareLink=""
                 />
               </div>
@@ -527,7 +528,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                     isPlaying={currentlyPlayingId === episode.id}
                     onPlayPause={handlePlayPause}
                     onEnded={handleEnded}
-                    shareUrl=""
+                    shareUrl={createFeedShareUrl(feedId || '')}
                     shareLink=""
                   />
                 ))}
@@ -559,7 +560,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       isPlaying={currentlyPlayingId === featuredEpisode.id}
                       onPlayPause={handlePlayPause}
                       onEnded={handleEnded}
-                      shareUrl=""
+                      shareUrl={createFeedShareUrl(feedId || '')}
                       shareLink=""
                     />
                   </div>
@@ -586,7 +587,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         isPlaying={currentlyPlayingId === episode.id}
                         onPlayPause={handlePlayPause}
                         onEnded={handleEnded}
-                        shareUrl=""
+                        shareUrl={createFeedShareUrl(feedId || '')}
                         shareLink=""
                       />
                     ))}
@@ -785,7 +786,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden hover:border-gray-700 transition-colors cursor-pointer"
                         onClick={() => {
                           if (run._id && feedId) {
-                            window.location.href = `/feed/${feedId}/clipBatch/${run._id}`;
+                            window.location.href = `/app/feed/${feedId}/clipBatch/${run._id}`;
                           }
                         }}
                       >
@@ -806,7 +807,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                             isPlaying={currentlyPlayingId === run.recommendations[0].paragraph_ids[0]}
                             onPlayPause={handlePlayPause}
                             onEnded={handleEnded}
-                            shareUrl={`${window.location.origin}/feed/${feedId}`}
+                            shareUrl={createFeedShareUrl(feedId || '')}
                             shareLink={run.recommendations[0].paragraph_ids[0]}
                             authConfig={null}
                             presentationContext={PresentationContext.runHistoryPreview}
