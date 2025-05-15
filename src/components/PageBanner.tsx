@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Headphones, Search, LayoutDashboard, Mail } from 'lucide-react';
+import { Headphones, Search, LayoutDashboard, Mail, Menu, X } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 
 interface PageBannerProps {
@@ -14,7 +14,25 @@ interface AdminFeed {
 
 const PageBanner: React.FC<PageBannerProps> = ({ logoText = "Pull That Up Jamie!" }) => {
   const [adminFeed, setAdminFeed] = useState<AdminFeed | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
+
+  // Check for screen size
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    // Initial check
+    checkIsMobile();
+    
+    // Add event listener
+    window.addEventListener('resize', checkIsMobile);
+    
+    // Clean up
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
 
   // Check for admin privileges
   useEffect(() => {
@@ -44,6 +62,21 @@ const PageBanner: React.FC<PageBannerProps> = ({ logoText = "Pull That Up Jamie!
     checkAdminPrivileges();
   }, []);
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (isMenuOpen && !target.closest('.mobile-menu') && !target.closest('.hamburger-button')) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMenuOpen]);
+
   const handleProDashboardClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (adminFeed && adminFeed.feedId) {
@@ -51,6 +84,21 @@ const PageBanner: React.FC<PageBannerProps> = ({ logoText = "Pull That Up Jamie!
     } else {
       navigate('/app/dashboard');
     }
+    setIsMenuOpen(false);
+  };
+
+  const navLinkStyle = {
+    textDecoration: 'none', 
+    color: 'white',
+    display: 'flex', 
+    alignItems: 'center', 
+    gap: '6px',
+  };
+
+  const iconStyle = {
+    width: '24px',
+    height: '24px',
+    flexShrink: 0
   };
 
   return (
@@ -62,7 +110,9 @@ const PageBanner: React.FC<PageBannerProps> = ({ logoText = "Pull That Up Jamie!
       backgroundColor: 'black',
       color: 'white',
       width: '100%',
-      borderBottom: '1px solid #333'
+      borderBottom: '1px solid #333',
+      position: 'relative',
+      zIndex: 10
     }}>
       <Link to="/" style={{ textDecoration: 'none', color: 'white', display: 'flex', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -75,28 +125,111 @@ const PageBanner: React.FC<PageBannerProps> = ({ logoText = "Pull That Up Jamie!
         </div>
       </Link>
       
-      <nav style={{ display: 'flex', gap: '24px' }}>
-        <Link to="/app" style={{ textDecoration: 'none', color: 'white', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Headphones size={18} />
-          <span>Search Podcasts</span>
-        </Link>
-        <Link to="/app/?mode=web-search" style={{ textDecoration: 'none', color: 'white', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Search size={18} />
-          <span>Search Web</span>
-        </Link>
-        <a 
-          href="#" 
-          onClick={handleProDashboardClick}
-          style={{ textDecoration: 'none', color: 'white', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+      {/* Hamburger Menu Button (Mobile) */}
+      {isMobile && (
+        <button 
+          className="hamburger-button"
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer',
+            padding: '5px',
+          }}
         >
-          <LayoutDashboard size={18} />
-          <span>Pro Dashboard</span>
-        </a>
-        <Link to="/contact" style={{ textDecoration: 'none', color: 'white', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Mail size={18} />
-          <span>Contact</span>
-        </Link>
-      </nav>
+          {isMenuOpen ? 
+            <X size={24} style={iconStyle} /> : 
+            <Menu size={24} style={iconStyle} />
+          }
+        </button>
+      )}
+      
+      {/* Desktop Navigation */}
+      {!isMobile && (
+        <nav 
+          style={{ 
+            display: 'flex', 
+            gap: '24px',
+          }}
+          className="desktop-nav"
+        >
+          <Link to="/app" style={navLinkStyle}>
+            <Headphones size={24} style={iconStyle} />
+            <span>Search Podcasts</span>
+          </Link>
+          <Link to="/app/?mode=web-search" style={navLinkStyle}>
+            <Search size={24} style={iconStyle} />
+            <span>Search Web</span>
+          </Link>
+          <a 
+            href="#" 
+            onClick={handleProDashboardClick}
+            style={{ ...navLinkStyle, cursor: 'pointer' }}
+          >
+            <LayoutDashboard size={24} style={iconStyle} />
+            <span>Pro Dashboard</span>
+          </a>
+          <Link to="/contact" style={navLinkStyle}>
+            <Mail size={24} style={iconStyle} />
+            <span>Contact</span>
+          </Link>
+        </nav>
+      )}
+      
+      {/* Mobile Menu */}
+      {isMobile && isMenuOpen && (
+        <div 
+          className="mobile-menu"
+          style={{
+            position: 'absolute',
+            top: '100%',
+            right: '0',
+            backgroundColor: '#111',
+            border: '1px solid #333',
+            borderRadius: '8px',
+            padding: '12px',
+            width: '200px',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            zIndex: 20
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <Link 
+              to="/app" 
+              style={{ ...navLinkStyle, padding: '8px 12px' }}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <Headphones size={24} style={iconStyle} />
+              <span>Search Podcasts</span>
+            </Link>
+            <Link 
+              to="/app/?mode=web-search" 
+              style={{ ...navLinkStyle, padding: '8px 12px' }}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <Search size={24} style={iconStyle} />
+              <span>Search Web</span>
+            </Link>
+            <a 
+              href="#" 
+              onClick={handleProDashboardClick}
+              style={{ ...navLinkStyle, cursor: 'pointer', padding: '8px 12px' }}
+            >
+              <LayoutDashboard size={24} style={iconStyle} />
+              <span>Pro Dashboard</span>
+            </a>
+            <Link 
+              to="/contact" 
+              style={{ ...navLinkStyle, padding: '8px 12px' }}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <Mail size={24} style={iconStyle} />
+              <span>Contact</span>
+            </Link>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

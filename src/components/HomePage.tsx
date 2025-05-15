@@ -19,7 +19,7 @@ const HomePage: React.FC = () => {
             Your Podcast is a Gold Mine.
           </h1>
           <p style={{ fontSize: '18px', maxWidth: '800px', margin: '0 auto 40px', lineHeight: '1.6' }}>
-            Find & Capitalize on Top Moments from with lightning fast 
+            Find & Capitalize on Top Moments with lightning fast 
             <br />search & tools - courtesy of your own personal Jamie.
           </p>
           
