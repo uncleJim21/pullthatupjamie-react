@@ -5,7 +5,7 @@ import './index.css';
 import SearchInterface from './components/SearchInterface.tsx';
 import PodcastFeedPage from './components/podcast/PodcastFeedPage.tsx';
 import DashboardPage from './components/podcast/DashboardPage.tsx';
-import MainPage from './components/MainPage.tsx';
+import HomePage from './components/HomePage.tsx';
 import { inject } from "@vercel/analytics"
 
 // Add clipboard monitor
@@ -38,7 +38,7 @@ if (typeof window !== 'undefined' && window.navigator) {
 const App = () => (
   <BrowserRouter>
     <Routes>
-      <Route path="/" element={<MainPage />} />
+      <Route path="/" element={<HomePage />} />
       <Route path="/app" element={<SearchInterface />} />
       <Route path="/app/share" element={<SearchInterface isSharePage={true} />} />
       <Route path="/app/feed/:feedId" element={<PodcastFeedPage />} />
