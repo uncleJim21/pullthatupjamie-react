@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageBanner from './PageBanner.tsx';
-import rssService, { PodcastFeed } from '../services/rssService.ts';
+import rssService, { PodcastFeed, PodcastEpisode, FeedInfo } from '../services/rssService.ts';
 
 // Step indicator interface
 interface StepIndicatorProps {
@@ -60,12 +60,10 @@ const TryJamieWizard: React.FC = () => {
   const [searchResults, setSearchResults] = useState<PodcastFeed[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFeed, setSelectedFeed] = useState<PodcastFeed | null>(null);
+  const [feedInfo, setFeedInfo] = useState<FeedInfo | null>(null);
+  const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
+  const [selectedEpisode, setSelectedEpisode] = useState<PodcastEpisode | null>(null);
   const navigate = useNavigate();
-
-  // Set a demo token for API access
-  useEffect(() => {
-    rssService.setToken('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImppbS5jYXJ1Y2NpK3RmdGNAcHJvdG9ubWFpbC5jb20iLCJpYXQiOjE3NDUyNTQ5NTAsImV4cCI6MTc3Njc5MDk1MH0.wlI2cQi9mjs2mt3oFinq8nkDUNvYUn9PePNCsJzp90A');
-  }, []);
 
   // Search for podcasts when the query changes (after 500ms debounce)
   useEffect(() => {
@@ -100,21 +98,71 @@ const TryJamieWizard: React.FC = () => {
   };
 
   // Handle feed selection
-  const handleSelectFeed = (feed: PodcastFeed) => {
+  const handleSelectFeed = async (feed: PodcastFeed) => {
     setSelectedFeed(feed);
-    setCurrentStep(2); // Move to the next step
+    setIsLoading(true);
+    
+    try {
+      const response = await rssService.getFeed(feed.url, feed.id);
+      console.log('Feed episodes response:', response);
+      if (response.episodes) {
+        setFeedInfo(response.episodes.feedInfo);
+        setEpisodes(response.episodes.episodes);
+        setCurrentStep(2); // Move to the next step
+      }
+    } catch (error) {
+      console.error('Error fetching feed episodes:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Page Banner */}
-      <PageBanner logoText="Pull That Up Jamie!" />
-      
-      {/* Step Indicator */}
-      <StepIndicator currentStep={currentStep} />
-      
-      {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 py-8">
+  // Handle episode selection
+  const handleSelectEpisode = (episode: PodcastEpisode) => {
+    setSelectedEpisode(episode);
+    setCurrentStep(3); // Move to the next step
+  };
+
+  // Format date
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp * 1000); // Convert Unix timestamp to milliseconds
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  // Format duration
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else {
+      return `${minutes}m`;
+    }
+  };
+
+  // Render appropriate content based on current step
+  const renderContent = () => {
+    switch (currentStep) {
+      case 1:
+        return renderFeedSelection();
+      case 2:
+        return renderEpisodeSelection();
+      case 3:
+        return renderConfirmation();
+      default:
+        return renderFeedSelection();
+    }
+  };
+
+  // Render feed selection step
+  const renderFeedSelection = () => {
+    return (
+      <>
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">Let's Get Started</h1>
           <p className="text-gray-400">
@@ -272,6 +320,186 @@ const TryJamieWizard: React.FC = () => {
               </button>
             </div>
           </div>
+        )}
+      </>
+    );
+  };
+
+  // Render episode selection step
+  const renderEpisodeSelection = () => {
+    if (!feedInfo || episodes.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-gray-400">No episodes found for this podcast.</p>
+          <button 
+            onClick={() => setCurrentStep(1)}
+            className="mt-4 bg-white text-black hover:bg-gray-200 py-2 px-4 rounded-lg text-sm"
+          >
+            Go Back
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-4">Select the Content to Process</h1>
+          <p className="text-gray-400">
+            Choose which podcasts to transcribe and add to the Jamie search index for easy access!
+          </p>
+        </div>
+
+        {/* Podcast Info */}
+        <div className="flex items-center mb-8">
+          <img 
+            src={feedInfo.podcastImage} 
+            alt={feedInfo.feedTitle} 
+            className="w-20 h-20 rounded-md mr-4"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg";
+            }}
+          />
+          <div>
+            <h2 className="text-2xl font-bold">{feedInfo.feedTitle}</h2>
+            <button
+              onClick={() => setCurrentStep(1)}
+              className="text-sm text-gray-400 hover:text-white"
+            >
+              ← Change Feed
+            </button>
+          </div>
+        </div>
+
+        {/* Episodes List */}
+        <div className="space-y-4">
+          {episodes.map((episode) => (
+            <div 
+              key={episode.episodeGUID}
+              className="bg-gray-800 rounded-lg p-4 flex items-center justify-between"
+            >
+              <div className="flex items-center flex-1">
+                <img 
+                  src={episode.episodeImage || feedInfo.podcastImage} 
+                  alt={episode.itemTitle} 
+                  className="w-16 h-16 rounded mr-4"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg";
+                  }}
+                />
+                <div className="flex-1 mr-4">
+                  <div className="flex items-center mb-1">
+                    <span className="text-gray-400 text-sm mr-2">#{episode.episodeNumber}</span>
+                    <span className="text-gray-400 text-sm">{formatDate(episode.publishedDate)}</span>
+                  </div>
+                  <h3 className="font-medium">{episode.itemTitle}</h3>
+                  <div className="flex items-center mt-1">
+                    <span className="text-gray-400 text-sm mr-2">Creator: {episode.creator}</span>
+                    <span className="text-gray-400 text-sm">{formatDuration(episode.length)}</span>
+                  </div>
+                </div>
+              </div>
+              <button 
+                onClick={() => handleSelectEpisode(episode)}
+                className="bg-black hover:bg-gray-900 text-white py-2 px-4 rounded-lg text-sm"
+              >
+                Select
+              </button>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  };
+
+  // Render confirmation step
+  const renderConfirmation = () => {
+    if (!selectedFeed || !selectedEpisode || !feedInfo) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-gray-400">Please select a feed and episode first.</p>
+          <button 
+            onClick={() => setCurrentStep(1)}
+            className="mt-4 bg-white text-black hover:bg-gray-200 py-2 px-4 rounded-lg text-sm"
+          >
+            Go Back
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-4">Confirm Your Selection</h1>
+          <p className="text-gray-400">
+            You've selected the following episode to process. Please confirm your selection.
+          </p>
+        </div>
+
+        <div className="bg-gray-800 rounded-lg p-6 mb-8">
+          <div className="flex items-center mb-6">
+            <img 
+              src={selectedEpisode.episodeImage || feedInfo.podcastImage} 
+              alt={selectedEpisode.itemTitle} 
+              className="w-24 h-24 rounded-md mr-6"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg";
+              }}
+            />
+            <div>
+              <h2 className="text-2xl font-bold mb-1">{selectedEpisode.itemTitle}</h2>
+              <p className="text-gray-400 mb-1">{feedInfo.feedTitle}</p>
+              <div className="flex items-center">
+                <span className="text-gray-400 text-sm mr-2">#{selectedEpisode.episodeNumber}</span>
+                <span className="text-gray-400 text-sm mr-2">•</span>
+                <span className="text-gray-400 text-sm mr-2">{formatDate(selectedEpisode.publishedDate)}</span>
+                <span className="text-gray-400 text-sm mr-2">•</span>
+                <span className="text-gray-400 text-sm">{formatDuration(selectedEpisode.length)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-900 rounded p-4 mb-4">
+            <h3 className="text-sm font-medium mb-2">Episode Description</h3>
+            <p className="text-gray-400 text-sm">{selectedEpisode.description}</p>
+          </div>
+
+          <div className="flex justify-between mt-6">
+            <button 
+              onClick={() => setCurrentStep(2)}
+              className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-6 rounded-lg"
+            >
+              Back
+            </button>
+            <button 
+              onClick={() => setCurrentStep(4)}
+              className="bg-white text-black hover:bg-gray-200 py-2 px-6 rounded-lg font-medium"
+            >
+              Process This Episode
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      {/* Page Banner */}
+      <PageBanner logoText="Pull That Up Jamie!" />
+      
+      {/* Step Indicator */}
+      <StepIndicator currentStep={currentStep} />
+      
+      {/* Main Content */}
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white"></div>
+          </div>
+        ) : (
+          renderContent()
         )}
       </div>
     </div>
