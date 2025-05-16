@@ -49,6 +49,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [currentShareUrl, setCurrentShareUrl] = useState<string | null>(null);
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
     const [error, setError] = useState<{ status: number; message: string } | null>(null);
+    const [isUserSignedIn, setIsUserSignedIn] = useState(false);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -366,6 +367,96 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     setCurrentShareUrl(null);
   };
 
+  // Load authentication state from localStorage
+  useEffect(() => {
+    const checkSignedIn = () => {
+      const hasToken = !!localStorage.getItem('auth_token');
+      const hasSquareId = !!localStorage.getItem('squareId');
+      setIsUserSignedIn(hasToken && hasSquareId);
+    };
+  
+    // Add a slight delay before checking localStorage
+    const timeout = setTimeout(checkSignedIn, 50); // 50ms delay
+  
+    return () => clearTimeout(timeout); // Cleanup timeout
+  }, []);
+
+  // Handle sign in modal open from PageBanner
+  const handleOpenSignInModal = () => {
+    setIsSignInModalOpen(true);
+  };
+  
+  // Handle sign in success
+  const handleSignInSuccess = () => {
+    setIsSignInModalOpen(false);
+    setIsUserSignedIn(true);
+    
+    // Check privileges after sign-in
+    if (feedId) {
+      checkPrivileges(feedId);
+    }
+    
+    // Refresh run history or uploads if needed
+    if (activeTab === 'Jamie Pro') {
+      fetchRunHistory();
+    } else if (activeTab === 'Uploads') {
+      fetchUploads();
+    }
+  };
+  
+  // Handle sign out
+  const handleSignOut = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('squareId');
+    localStorage.removeItem('isSubscribed');
+    setIsUserSignedIn(false);
+    setIsAdmin(false);
+    
+    // Reset any authenticated-only data
+    setRunHistory([]);
+    setUploads([]);
+  };
+
+  // Check admin privileges
+  const checkPrivileges = async (feedId: string) => {
+    try {
+      const token = localStorage.getItem("auth_token") as string;
+      if(!token){
+          setIsAdmin(false);
+          return;
+      }
+      const response = await AuthService.checkPrivs(token);
+      console.log(`checkPrivs response:${JSON.stringify(response,null,2)}`);
+      if (response && response.privs.privs && response.privs.privs.feedId === feedId) {
+          console.log(`Admin privileges granted`);
+          setIsAdmin(response.privs.privs.access === 'admin');
+      } else {
+          setIsAdmin(false);
+      }
+    } catch (error) {
+      console.error("Error checking privileges:", error);
+      setIsAdmin(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log(`feedId: ${feedId}`);
+    if (feedId && isUserSignedIn) {
+      if (DEBUG_MODE) {
+        console.log('Debug mode: Simulating admin privileges');
+        // Even in debug mode, still check real privileges but override in development
+        checkPrivileges(feedId).then(() => {
+          // After real check, override for development purposes
+          setIsAdmin(true);
+        });
+      } else {
+        checkPrivileges(feedId);
+      }
+    } else {
+      setIsAdmin(false);
+    }
+  }, [feedId, isUserSignedIn]); 
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -391,7 +482,13 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   return (
     <div className="min-h-screen pb-12 bg-black text-white">
       {/* Page Banner */}
-      <PageBanner logoText="Pull That Up Jamie!" />
+      <PageBanner 
+        logoText="Pull That Up Jamie!" 
+        onSignIn={handleOpenSignInModal}
+        onSignOut={handleSignOut}
+        isUserSignedIn={isUserSignedIn}
+        setIsUserSignedIn={setIsUserSignedIn}
+      />
       
       {/* Header Section */}
       <div 
@@ -865,13 +962,15 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       <SignInModal
         isOpen={isSignInModalOpen}
         onClose={() => setIsSignInModalOpen(false)}
-        onSignInSuccess={() => {
-          setIsSignInModalOpen(false);
-          window.location.reload(); // Reload the page after successful sign-in to retry access
-        }}
+        onSignInSuccess={handleSignInSuccess}
         onSignUpSuccess={() => {
           setIsSignInModalOpen(false);
-          window.location.reload(); // Reload the page after successful sign-up to retry access
+          setIsUserSignedIn(true);
+          
+          // Check privileges after sign-up
+          if (feedId) {
+            checkPrivileges(feedId);
+          }
         }}
       />
     </div>

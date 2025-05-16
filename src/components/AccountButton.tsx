@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, Radio } from 'lucide-react';
-import BitcoinConnectButton from './BitcoinConnectButton.tsx'; // Regular import
+import BitcoinConnectButton from './BitcoinConnectButton.tsx';
 import { useNavigate } from 'react-router-dom';
 import AuthService from '../services/authService.ts';
-import { DEBUG_MODE } from '../constants/constants.ts';
 
 interface AccountButtonProps {
   onConnect: () => void;
   onSignInClick: () => void;
   onUpgradeClick: () => void;
   onSignOut: () => void;
-  isSignedIn: boolean; // Prop passed from the parent component
+  isSignedIn: boolean;
 }
 
 interface AdminFeed {
@@ -29,73 +28,49 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
   const [nickname, setNickname] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [adminFeed, setAdminFeed] = useState<AdminFeed | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // Check for admin privileges
-  const checkAdminPrivileges = async () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) return;
-
-      const response = await AuthService.checkPrivs(token);
-      console.log('Admin privileges check:', response);
-      
-      if (response && response.privs && response.privs.privs) {
-        // If user has admin privileges for a feed, store it
-        setAdminFeed({
-          feedId: response.privs.privs.feedId,
-          access: response.privs.privs.access
-        });
-      } else {
-        setAdminFeed(null);
-      }
-    } catch (error) {
-      console.error('Error checking admin privileges:', error);
-      setAdminFeed(null);
-    }
-  };
-
-  useEffect(() => {
-    const email = localStorage.getItem('squareId') as string;
-    if (email) {
-      setNickname(email);
-    }
-  }, [isSignedIn]);
-
-  // Check admin privileges when signed in status changes
   useEffect(() => {
     if (isSignedIn) {
-      checkAdminPrivileges();
+      setNickname(localStorage.getItem('squareId'));
+      
+      // Check admin privileges
+      const checkAdmin = async () => {
+        try {
+          const token = localStorage.getItem('auth_token');
+          if (!token) return;
+          
+          const response = await AuthService.checkPrivs(token);
+          if (response?.privs?.privs) {
+            setAdminFeed({
+              feedId: response.privs.privs.feedId,
+              access: response.privs.privs.access
+            });
+          }
+        } catch (error) {
+          setAdminFeed(null);
+        }
+      };
+      
+      checkAdmin();
+      
+      // Check if user is subscribed
+      setTimeout(() => {
+        setShowUpgrade(localStorage.getItem('isSubscribed') !== 'true');
+      }, 1000);
     } else {
       setAdminFeed(null);
     }
   }, [isSignedIn]);
 
-  useEffect(() => {
-    async function checkUpgradePath(){
-      const isUpgraded = localStorage.getItem('isSubscribed') as string === 'true';
-      setShowUpgrade(!isUpgraded);
-    }
-    setTimeout(checkUpgradePath, 2000);
-  }, [isSignedIn]);
-
   const truncateMiddle = (str: string, maxLength: number) => {
     if (str.length <= maxLength) return str;
-    const start = str.slice(0, Math.floor(maxLength / 2));
-    const end = str.slice(-Math.floor(maxLength / 2));
-    return `${start}...${end}`;
-  };
-
-  const handleMyFeedClick = () => {
-    if (adminFeed && adminFeed.feedId) {
-      navigate(`/app/feed/${adminFeed.feedId}`);
-      setIsOpen(false);
-    }
+    const half = Math.floor(maxLength / 2);
+    return `${str.slice(0, half)}...${str.slice(-half)}`;
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       {/* Main Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -106,11 +81,7 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
           className="hidden sm:inline max-w-[200px] overflow-hidden text-ellipsis"
           title={nickname || "Account"}
         >
-          {isSignedIn
-            ? nickname
-              ? truncateMiddle(nickname, 20) // Adjust the max length as needed
-              : "Account"
-            : "Account"}
+          {isSignedIn && nickname ? truncateMiddle(nickname, 20) : "Account"}
         </span>
         {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
       </button>
@@ -124,10 +95,13 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
               <BitcoinConnectButton onConnect={onConnect} />
             </div>
 
-            {/* My Feed Button (Shown only when admin privileges exist) */}
-            {adminFeed && adminFeed.access === 'admin' && (
+            {/* My Feed Button (for admins) */}
+            {adminFeed?.access === 'admin' && (
               <button
-                onClick={handleMyFeedClick}
+                onClick={() => {
+                  navigate(`/app/feed/${adminFeed.feedId}`);
+                  setIsOpen(false);
+                }}
                 className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
               >
                 <Radio size={20} />
@@ -139,8 +113,8 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
             {showUpgrade && isSignedIn && (
               <button
                 onClick={() => {
-                  setIsOpen(false);
                   onUpgradeClick();
+                  setIsOpen(false);
                 }}
                 className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
               >
@@ -150,29 +124,25 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
             )}
 
             {/* Sign In/Out */}
-            {isSignedIn ? (
-              <button
-                onClick={() => {
-                  onSignOut();
-                  setIsOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
-              >
-                <LogOut size={20} />
-                <span>Sign Out</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  onSignInClick();
-                  setIsOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
-              >
-                <LogIn size={20} />
-                <span>Sign In</span>
-              </button>
-            )}
+            <button
+              onClick={() => {
+                isSignedIn ? onSignOut() : onSignInClick();
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
+            >
+              {isSignedIn ? (
+                <>
+                  <LogOut size={20} />
+                  <span>Sign Out</span>
+                </>
+              ) : (
+                <>
+                  <LogIn size={20} />
+                  <span>Sign In</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}

@@ -12,7 +12,6 @@ import LightningService from '../services/lightning.ts'
 import {ClipProgress, ClipStatus, ClipRequest} from '../types/clips.ts'
 import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
-import {AccountButton} from './AccountButton.tsx'
 import {CheckoutModal} from './CheckoutModal.tsx'
 import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
@@ -23,6 +22,7 @@ import PodcastFeedService from '../services/podcastFeedService.ts';
 import { Filter } from 'lucide-react';
 import PodcastSourceFilterModal from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
+import PageBanner from './PageBanner.tsx';
 
 export type SearchMode = 'web-search' | 'podcast-search';
 type ModelType = 'gpt-3.5-turbo' | 'claude-3-sonnet';
@@ -1038,6 +1038,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
+      {/* Page Banner */}
+      <PageBanner 
+        logoText="Pull That Up Jamie!" 
+        onConnect={() => initializeLightning()}
+        onSignIn={() => setIsSignInModalOpen(true)}
+        onUpgrade={handleUpgrade}
+        onSignOut={handleSignOut}
+      />
+      
       {/* Add the PodcastSourceFilterModal component */}
       <PodcastSourceFilterModal 
         isOpen={isFilterModalOpen}
@@ -1092,17 +1101,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {isUpgradeSuccessPopUpOpen && (
         <SubscriptionSuccessPopup onClose={() => setIsUpgradeSuccessPopUpOpen(false)} />
       )}
-      {!isAnyModalOpen() && (
-        <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
-          <AccountButton 
-            onConnect={() => initializeLightning()}
-            onSignInClick={() => setIsSignInModalOpen(true)}
-            onUpgradeClick={handleUpgrade}
-            onSignOut={handleSignOut}
-            isSignedIn={isUserSignedIn}
-          />
-        </div>
-      )}
+      
       { DEBUG_MODE &&
         (<button
         onClick={async () => {
