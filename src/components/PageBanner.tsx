@@ -269,14 +269,38 @@ const PageBanner: React.FC<PageBannerProps> = ({
             }}
             className="desktop-nav"
           >
-            <Link to="/app" style={navLinkStyle}>
+            <a 
+              href="/app"
+              style={navLinkStyle}
+              onClick={(e) => {
+                e.preventDefault();
+                // Check if we need to reload by comparing URLs
+                if (window.location.pathname === '/app' && !window.location.search.includes('mode=web-search')) {
+                  window.location.reload();
+                } else {
+                  window.location.href = '/app';
+                }
+              }}
+            >
               <Headphones size={24} style={iconStyle} />
               <span>Search Podcasts</span>
-            </Link>
-            <Link to="/app/?mode=web-search" style={navLinkStyle}>
+            </a>
+            <a 
+              href="/app/?mode=web-search"
+              style={navLinkStyle}
+              onClick={(e) => {
+                e.preventDefault();
+                // Check if we need to reload by comparing URLs
+                if (window.location.pathname === '/app' && window.location.search.includes('mode=web-search')) {
+                  window.location.reload();
+                } else {
+                  window.location.href = '/app/?mode=web-search';
+                }
+              }}
+            >
               <Search size={24} style={iconStyle} />
               <span>Search Web</span>
-            </Link>
+            </a>
             <a 
               href="#" 
               onClick={handleProDashboardClick}
@@ -313,22 +337,42 @@ const PageBanner: React.FC<PageBannerProps> = ({
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <Link 
-                to="/app" 
+              <a 
+                href="/app"
                 style={{ ...navLinkStyle, padding: '8px 12px' }}
-                onClick={() => setIsMenuOpen(false)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setIsMenuOpen(false);
+                  
+                  // Check if we need to reload by comparing URLs
+                  if (window.location.pathname === '/app' && !window.location.search.includes('mode=web-search')) {
+                    window.location.reload();
+                  } else {
+                    window.location.href = '/app';
+                  }
+                }}
               >
                 <Headphones size={24} style={iconStyle} />
                 <span>Search Podcasts</span>
-              </Link>
-              <Link 
-                to="/app/?mode=web-search" 
+              </a>
+              <a 
+                href="/app/?mode=web-search"
                 style={{ ...navLinkStyle, padding: '8px 12px' }}
-                onClick={() => setIsMenuOpen(false)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setIsMenuOpen(false);
+                  
+                  // Check if we need to reload by comparing URLs
+                  if (window.location.pathname === '/app' && window.location.search.includes('mode=web-search')) {
+                    window.location.reload();
+                  } else {
+                    window.location.href = '/app/?mode=web-search';
+                  }
+                }}
               >
                 <Search size={24} style={iconStyle} />
                 <span>Search Web</span>
-              </Link>
+              </a>
               <a 
                 href="#" 
                 onClick={handleProDashboardClick}

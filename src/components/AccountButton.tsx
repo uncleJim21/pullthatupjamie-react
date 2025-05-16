@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, Radio } from 'lucide-react';
 import BitcoinConnectButton from './BitcoinConnectButton.tsx';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +26,7 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
+  const [showNickname, setShowNickname] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [adminFeed, setAdminFeed] = useState<AdminFeed | null>(null);
   const navigate = useNavigate();
@@ -58,8 +59,14 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
       setTimeout(() => {
         setShowUpgrade(localStorage.getItem('isSubscribed') !== 'true');
       }, 1000);
+
+      // Add small delay before showing nickname to ensure smooth transition
+      setTimeout(() => {
+        setShowNickname(true);
+      }, 100);
     } else {
       setAdminFeed(null);
+      setShowNickname(false);
     }
   }, [isSignedIn]);
 
@@ -75,14 +82,33 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-4 py-2 bg-[#111111] text-white rounded-lg border border-gray-800 hover:border-gray-700 transition-all"
+        style={{ minWidth: '130px' }} // Slightly increased min-width to accommodate animation
       >
         <User size={20} />
-        <span
-          className="hidden sm:inline max-w-[200px] overflow-hidden text-ellipsis"
-          title={nickname || "Account"}
-        >
-          {isSignedIn && nickname ? truncateMiddle(nickname, 20) : "Account"}
-        </span>
+        <div className="hidden sm:block overflow-hidden" style={{ width: '100%', maxWidth: '180px' }}>
+          <span
+            className="inline-block whitespace-nowrap overflow-hidden text-ellipsis transition-all duration-500 ease-in-out"
+            title={nickname || "Account"}
+            style={{ 
+              opacity: isSignedIn && showNickname && nickname ? 1 : 0.7,
+              maxWidth: isSignedIn && showNickname && nickname ? '180px' : '0px',
+              transform: isSignedIn && showNickname && nickname ? 'translateX(0)' : 'translateX(-20px)',
+            }}
+          >
+            {isSignedIn && nickname ? truncateMiddle(nickname, 20) : ""}
+          </span>
+          <span
+            className="inline-block transition-all duration-500 ease-in-out"
+            style={{ 
+              opacity: isSignedIn && showNickname && nickname ? 0 : 1,
+              maxWidth: isSignedIn && showNickname && nickname ? '0px' : '180px',
+              transform: isSignedIn && showNickname && nickname ? 'translateX(20px)' : 'translateX(0)',
+              position: isSignedIn && showNickname && nickname ? 'absolute' : 'relative',
+            }}
+          >
+            Account
+          </span>
+        </div>
         {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
       </button>
 

@@ -1045,6 +1045,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onSignIn={() => setIsSignInModalOpen(true)}
         onUpgrade={handleUpgrade}
         onSignOut={handleSignOut}
+        isUserSignedIn={isUserSignedIn}
+        setIsUserSignedIn={setIsUserSignedIn}
       />
       
       {/* Add the PodcastSourceFilterModal component */}
@@ -1072,18 +1074,116 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
           
-          // For clipBatch pages, reload to retry access after authentication
-          if (isClipBatchPage) {
-            window.location.reload();
+          // For clipBatch pages, retry access after authentication without page reload
+          if (isClipBatchPage && runId && feedId) {
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+              // Explicitly fetch the clip batch data with the new token
+              PodcastFeedService.getClipBatchByRunId(feedId, runId, token)
+                .then(response => {
+                  if (response.success && response.data) {
+                    setConversation([{
+                      id: nextConversationId.current++,
+                      type: 'podcast-search' as const,
+                      query: '', 
+                      timestamp: new Date(),
+                      isStreaming: false,
+                      data: {
+                        quotes: response.data.recommendations.map(rec => {
+                          const clipId = rec.paragraph_ids[0];
+                          // Generate the share URL using our utility
+                          let shareUrl = createClipShareUrl(clipId);
+                          return ({
+                            id: clipId,
+                            quote: rec.text,
+                            episode: rec.title,
+                            creator: `${rec.feed_title} - ${rec.episode_title}`,
+                            audioUrl: rec.audio_url,
+                            date: response.data?.run_date || '',
+                            timeContext: {
+                              start_time: rec.start_time,
+                              end_time: rec.end_time
+                            },
+                            similarity: { 
+                              combined: rec.relevance_score / 100, 
+                              vector: rec.relevance_score / 100 
+                            },
+                            episodeImage: rec.episode_image,
+                            shareUrl: shareUrl,
+                            shareLink: clipId
+                          });
+                        })
+                      }
+                    }]);
+                  }
+                })
+                .catch(error => {
+                  console.error('Error loading clip batch after authentication:', error);
+                  setSearchState(prev => ({
+                    ...prev,
+                    error: error as Error,
+                    isLoading: false
+                  }));
+                });
+            }
           }
         }}
-        onSignUpSuccess={()=>{
+        onSignUpSuccess={() => {
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
           
-          // For clipBatch pages, reload to retry access after authentication
-          if (isClipBatchPage) {
-            window.location.reload();
+          // For clipBatch pages, retry access after authentication without page reload
+          if (isClipBatchPage && runId && feedId) {
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+              // Explicitly fetch the clip batch data with the new token
+              PodcastFeedService.getClipBatchByRunId(feedId, runId, token)
+                .then(response => {
+                  if (response.success && response.data) {
+                    setConversation([{
+                      id: nextConversationId.current++,
+                      type: 'podcast-search' as const,
+                      query: '', 
+                      timestamp: new Date(),
+                      isStreaming: false,
+                      data: {
+                        quotes: response.data.recommendations.map(rec => {
+                          const clipId = rec.paragraph_ids[0];
+                          // Generate the share URL using our utility
+                          let shareUrl = createClipShareUrl(clipId);
+                          return ({
+                            id: clipId,
+                            quote: rec.text,
+                            episode: rec.title,
+                            creator: `${rec.feed_title} - ${rec.episode_title}`,
+                            audioUrl: rec.audio_url,
+                            date: response.data?.run_date || '',
+                            timeContext: {
+                              start_time: rec.start_time,
+                              end_time: rec.end_time
+                            },
+                            similarity: { 
+                              combined: rec.relevance_score / 100, 
+                              vector: rec.relevance_score / 100 
+                            },
+                            episodeImage: rec.episode_image,
+                            shareUrl: shareUrl,
+                            shareLink: clipId
+                          });
+                        })
+                      }
+                    }]);
+                  }
+                })
+                .catch(error => {
+                  console.error('Error loading clip batch after authentication:', error);
+                  setSearchState(prev => ({
+                    ...prev,
+                    error: error as Error,
+                    isLoading: false
+                  }));
+                });
+            }
           } else {
             handleUpgrade();
           }
