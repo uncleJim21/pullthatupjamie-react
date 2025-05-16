@@ -86,8 +86,8 @@ const TryJamieWizard: React.FC = () => {
     try {
       const response = await rssService.searchFeeds(searchQuery);
       console.log('Search response:', response);
-      if (response.status === 'true' && response.feeds) {
-        setSearchResults(response.feeds);
+      if (response.data && response.data.status === 'true' && response.data.feeds) {
+        setSearchResults(response.data.feeds);
       } else {
         setSearchResults([]);
       }

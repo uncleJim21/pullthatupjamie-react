@@ -11,8 +11,13 @@ export interface PodcastFeed {
 
 // Interface for search response
 export interface SearchFeedsResponse {
-  status: string;  // Will be "true" or "false" as a string
-  feeds: PodcastFeed[];
+  data: {
+    status: string;  // Will be "true" or "false" as a string
+    feeds: PodcastFeed[];
+    count?: number;
+    query?: string;
+    description?: string;
+  }
 }
 
 // Default API endpoint
@@ -64,7 +69,7 @@ class RssService {
     } catch (error) {
       console.error('Failed to search feeds:', error);
       // Return empty result on error
-      return { status: 'false', feeds: [] };
+      return { data: { status: 'false', feeds: [] } };
     }
   }
   
