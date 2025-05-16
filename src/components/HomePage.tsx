@@ -24,7 +24,7 @@ const HomePage: React.FC = () => {
           </p>
           
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '60px' }}>
-            <Button to="/app" variant="primary">
+            <Button to="/try-jamie" variant="primary">
               Try on Your Pod for Free
             </Button>
             <Button to="/app" variant="secondary">
