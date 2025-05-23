@@ -51,13 +51,21 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {
   );
 };
 
+// Add SelectedPodcast type
+export interface SelectedPodcast {
+  feedId: number;
+  feedGuid: string;
+  feedTitle: string;
+  feedUrl: string;
+  podcastImage: string;
+}
+
 const TryJamieWizard: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PodcastFeed[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedFeed, setSelectedFeed] = useState<PodcastFeed | null>(null);
-  const [feedInfo, setFeedInfo] = useState<FeedInfo | null>(null);
+  const [selectedPodcast, setSelectedPodcast] = useState<SelectedPodcast | null>(null);
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [selectedEpisode, setSelectedEpisode] = useState<PodcastEpisode | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -98,14 +106,19 @@ const TryJamieWizard: React.FC = () => {
 
   // Handle feed selection
   const handleSelectFeed = async (feed: PodcastFeed) => {
-    setSelectedFeed(feed);
     setIsLoading(true);
-    
     try {
       const response = await rssService.getFeed(feed.url, feed.id);
       console.log('Feed episodes response:', response);
-      if (response.episodes) {
-        setFeedInfo(response.episodes.feedInfo);
+      if (response.episodes && response.episodes.feedInfo) {
+        const info = response.episodes.feedInfo;
+        setSelectedPodcast({
+          feedId: info.feedId,
+          feedGuid: info.feedGuid,
+          feedTitle: info.feedTitle,
+          feedUrl: info.feedUrl,
+          podcastImage: info.podcastImage,
+        });
         setEpisodes(response.episodes.episodes);
         setCurrentStep(2); // Move to the next step
       }
@@ -151,7 +164,7 @@ const TryJamieWizard: React.FC = () => {
     const maxPolls = 30; // 5 minutes at 10s intervals
 
     const startProcessing = async () => {
-      if (currentStep !== 4 || !selectedFeed || !selectedEpisode) return;
+      if (currentStep !== 4 || !selectedPodcast || !selectedEpisode) return;
       setProcessing(true);
       setJobId(null);
       try {
@@ -162,8 +175,8 @@ const TryJamieWizard: React.FC = () => {
           episodes: [
             {
               guid: selectedEpisode.episodeGUID,
-              feedGuid: selectedFeed.id,
-              feedId: Number(selectedFeed.id),
+              feedGuid: selectedPodcast.feedGuid,
+              feedId: selectedPodcast.feedId,
             },
           ],
         };
@@ -377,7 +390,7 @@ const TryJamieWizard: React.FC = () => {
 
   // Render episode selection step
   const renderEpisodeSelection = () => {
-    if (!feedInfo || episodes.length === 0) {
+    if (!selectedPodcast || episodes.length === 0) {
       return (
         <div className="text-center py-8">
           <p className="text-gray-400">No episodes found for this podcast.</p>
@@ -420,15 +433,15 @@ const TryJamieWizard: React.FC = () => {
             </svg>
           </button>
           <img 
-            src={feedInfo.podcastImage} 
-            alt={feedInfo.feedTitle} 
+            src={selectedPodcast.podcastImage} 
+            alt={selectedPodcast.feedTitle} 
             className="w-20 h-20 rounded-md mr-4"
             onError={(e) => {
               (e.target as HTMLImageElement).src = "https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg";
             }}
           />
           <div>
-            <h2 className="text-2xl font-bold">{feedInfo.feedTitle}</h2>
+            <h2 className="text-2xl font-bold">{selectedPodcast.feedTitle}</h2>
           </div>
         </div>
 
@@ -441,7 +454,7 @@ const TryJamieWizard: React.FC = () => {
             >
               <div className="flex items-center flex-1">
                 <img 
-                  src={episode.episodeImage || feedInfo.podcastImage} 
+                  src={episode.episodeImage || selectedPodcast.podcastImage} 
                   alt={episode.itemTitle} 
                   className="w-16 h-16 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
                   onError={(e) => {
@@ -475,7 +488,7 @@ const TryJamieWizard: React.FC = () => {
 
   // Render confirmation step
   const renderConfirmation = () => {
-    if (!selectedFeed || !selectedEpisode || !feedInfo) {
+    if (!selectedPodcast || !selectedEpisode) {
       return (
         <div className="text-center py-8">
           <p className="text-gray-400">Please select a feed and episode first.</p>
@@ -518,7 +531,7 @@ const TryJamieWizard: React.FC = () => {
               </svg>
             </button>
             <img 
-              src={selectedEpisode.episodeImage || feedInfo.podcastImage} 
+              src={selectedEpisode.episodeImage || selectedPodcast.podcastImage} 
               alt={selectedEpisode.itemTitle} 
               className="w-24 h-24 rounded-md mr-6"
               onError={(e) => {
@@ -527,7 +540,7 @@ const TryJamieWizard: React.FC = () => {
             />
             <div>
               <h2 className="text-2xl font-bold mb-1">{selectedEpisode.itemTitle}</h2>
-              <p className="text-gray-400 mb-1">{feedInfo.feedTitle}</p>
+              <p className="text-gray-400 mb-1">{selectedPodcast.feedTitle}</p>
               <div className="flex items-center">
                 <span className="text-gray-400 text-sm mr-2">#{selectedEpisode.episodeNumber}</span>
                 <span className="text-gray-400 text-sm mr-2">•</span>

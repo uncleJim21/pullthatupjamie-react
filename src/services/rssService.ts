@@ -35,6 +35,8 @@ export interface PodcastEpisode {
 
 // Interface for feed info details
 export interface FeedInfo {
+  feedId: number;
+  feedGuid: string;
   feedTitle: string;
   feedDescription: string;
   podcastImage: string;
