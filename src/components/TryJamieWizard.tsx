@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageBanner from './PageBanner.tsx';
 import rssService, { PodcastFeed, PodcastEpisode, FeedInfo } from '../services/rssService.ts';
+import TryJamieService, { OnDemandRunRequest } from '../services/tryJamieService.ts';
 
 // Step indicator interface
 interface StepIndicatorProps {
@@ -59,6 +60,8 @@ const TryJamieWizard: React.FC = () => {
   const [feedInfo, setFeedInfo] = useState<FeedInfo | null>(null);
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [selectedEpisode, setSelectedEpisode] = useState<PodcastEpisode | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
   const navigate = useNavigate();
 
   // Search for podcasts when the query changes (after 500ms debounce)
@@ -141,6 +144,60 @@ const TryJamieWizard: React.FC = () => {
     }
   };
 
+  // Step 4: Processing logic
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout;
+    let pollCount = 0;
+    const maxPolls = 30; // 5 minutes at 10s intervals
+
+    const startProcessing = async () => {
+      if (currentStep !== 4 || !selectedFeed || !selectedEpisode) return;
+      setProcessing(true);
+      setJobId(null);
+      try {
+        // Submit job
+        const req: OnDemandRunRequest = {
+          message: 'On-demand Jamie run',
+          parameters: {},
+          episodes: [
+            {
+              guid: selectedEpisode.episodeGUID,
+              feedGuid: selectedFeed.id,
+              feedId: Number(selectedFeed.id),
+            },
+          ],
+        };
+        const res = await TryJamieService.submitOnDemandRun(req);
+        setJobId(res.jobId);
+        // Start polling
+        pollInterval = setInterval(async () => {
+          pollCount++;
+          if (!res.jobId) return;
+          try {
+            const status = await TryJamieService.getOnDemandJobStatus(res.jobId);
+            if (status.status === 'complete' || status.status === 'failed' || pollCount >= maxPolls) {
+              clearInterval(pollInterval);
+              setProcessing(false);
+              setTimeout(() => setCurrentStep(5), 500); // Move to Enjoy step
+            }
+          } catch (e) {
+            // Ignore polling errors, keep polling
+          }
+        }, 10000);
+      } catch (e) {
+        setProcessing(false);
+        setTimeout(() => setCurrentStep(5), 500); // Move to Enjoy step
+      }
+    };
+    if (currentStep === 4) {
+      startProcessing();
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
+
   // Render appropriate content based on current step
   const renderContent = () => {
     switch (currentStep) {
@@ -150,6 +207,15 @@ const TryJamieWizard: React.FC = () => {
         return renderEpisodeSelection();
       case 3:
         return renderConfirmation();
+      case 4:
+        return renderProcessing();
+      case 5:
+        return (
+          <div className="flex flex-col items-center justify-center min-h-[300px] py-16">
+            <h1 className="text-3xl font-bold mb-8">Enjoy!</h1>
+            <p className="text-gray-400">Your Jamie job is complete. (Placeholder)</p>
+          </div>
+        );
       default:
         return renderFeedSelection();
     }
@@ -489,6 +555,14 @@ const TryJamieWizard: React.FC = () => {
       </>
     );
   };
+
+  // Render processing step (Step 4)
+  const renderProcessing = () => (
+    <div className="flex flex-col items-center justify-center min-h-[300px] py-16">
+      <h1 className="text-3xl font-bold mb-8">Processing</h1>
+      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-black text-white">
