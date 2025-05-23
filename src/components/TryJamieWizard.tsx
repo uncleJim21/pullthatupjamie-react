@@ -18,38 +18,34 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {
   ];
 
   return (
-    <div className="relative w-full max-w-3xl mx-auto mb-10 mt-8">
-      {/* Connecting Line */}
-      <div className="absolute top-7 left-0 w-full h-[2px] bg-gray-700"></div>
-      
-      {/* Steps */}
-      <div className="flex justify-between relative">
-        {steps.map((step) => (
-          <div key={step.number} className="flex flex-col items-center">
-            {/* Circle with number */}
-            <div 
-              className={`w-14 h-14 rounded-full flex items-center justify-center z-10 mb-2 ${
-                currentStep === step.number 
-                  ? 'bg-white text-black' 
-                  : currentStep > step.number 
-                    ? 'bg-white text-black' 
-                    : 'bg-gray-700 text-white'
-              }`}
+    <div className="w-full max-w-2xl mx-auto mb-8 mt-8 flex items-center">
+      {steps.map((step, idx) => (
+        <React.Fragment key={step.number}>
+          <div className="flex flex-col items-center">
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-200
+                ${currentStep === step.number
+                  ? 'bg-white text-black border-white shadow-lg'
+                  : 'bg-gray-700 text-white border-gray-700'}
+              `}
+              style={{ minWidth: 48, minHeight: 48 }}
             >
-              <span className="text-xl font-bold">{step.number}</span>
+              <span className="text-lg font-bold">{step.number}</span>
             </div>
-            
-            {/* Step Label */}
-            <span 
-              className={`text-sm ${
-                currentStep === step.number ? 'text-white font-medium' : 'text-gray-400'
+            <span
+              className={`text-xs mt-1 ${
+                currentStep === step.number ? 'text-white font-bold' : 'text-gray-400 font-normal'
               }`}
+              style={{ whiteSpace: 'nowrap' }}
             >
               {step.label}
             </span>
           </div>
-        ))}
-      </div>
+          {idx !== steps.length - 1 && (
+            <div className="flex-1 h-[1.5px] bg-gray-700 mx-1" />
+          )}
+        </React.Fragment>
+      ))}
     </div>
   );
 };
@@ -202,125 +198,113 @@ const TryJamieWizard: React.FC = () => {
           </div>
         </div>
         
-        {/* Loading State */}
-        {isLoading && (
-          <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
-          </div>
-        )}
-        
-        {/* Feed Results */}
-        {!isLoading && searchResults.length > 0 && (
-          <div className="space-y-4">
-            {searchResults.map((feed) => (
+        {/* Feed Results Area */}
+        <div className="space-y-4">
+          {isLoading ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
+            </div>
+          ) : searchResults.length > 0 ? (
+            searchResults.map((feed) => (
               <div 
                 key={feed.id}
-                className="bg-gray-800 rounded-lg p-4 flex items-center justify-between"
+                className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4"
               >
                 <div className="flex items-center">
                   <img 
                     src={feed.image} 
                     alt={feed.title} 
-                    className="w-12 h-12 rounded mr-4"
+                    className="w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = "https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg";
+                      (e.target as HTMLImageElement).src = 'https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg';
                     }}
                   />
                   <div>
-                    <h3 className="font-medium">{feed.title}</h3>
-                    <p className="text-gray-400 text-sm">{feed.author || feed.ownerName}</p>
+                    <h3 className="text-white font-medium text-base line-clamp-1">{feed.title}</h3>
+                    <p className="text-gray-400 text-sm line-clamp-1">{feed.author || feed.ownerName}</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => handleSelectFeed(feed)}
-                  className="bg-black hover:bg-gray-900 text-white py-2 px-4 rounded-lg text-sm"
+                  className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors"
                 >
                   Select
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-        
-        {/* No Results State */}
-        {!isLoading && searchQuery.length >= 2 && searchResults.length === 0 && (
-          <div className="text-center py-8">
-            <p className="text-gray-400">No podcasts found. Try a different search term.</p>
-          </div>
-        )}
-        
-        {/* Default/Sample Feed List */}
-        {!isLoading && searchQuery.length < 2 && (
-          <div className="space-y-4">
-            <div className="bg-gray-800 rounded-lg p-4 flex items-center justify-between">
-              <div className="flex items-center">
-                <img 
-                  src="https://storage.googleapis.com/jamie-casts/podcast-logos/jre.jpg" 
-                  alt="Joe Rogan Experience" 
-                  className="w-12 h-12 rounded mr-4"
-                />
-                <div>
-                  <h3 className="font-medium">The Joe Rogan Experience</h3>
-                  <p className="text-gray-400 text-sm">Joe Rogan</p>
-                </div>
-              </div>
-              <button className="bg-black hover:bg-gray-900 text-white py-2 px-4 rounded-lg text-sm">
-                Select
-              </button>
+            ))
+          ) : searchQuery.length >= 2 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-400">No podcasts found. Try a different search term.</p>
             </div>
-            
-            <div className="bg-gray-800 rounded-lg p-4 flex items-center justify-between">
-              <div className="flex items-center">
-                <img 
-                  src="https://storage.googleapis.com/jamie-casts/podcast-logos/green-candle.jpg" 
-                  alt="Green Candle Investments" 
-                  className="w-12 h-12 rounded mr-4"
-                />
-                <div>
-                  <h3 className="font-medium">Green Candle Investments Podcast with Brandon Keys</h3>
-                  <p className="text-gray-400 text-sm">Green Candle Investments</p>
+          ) : (
+            <>
+              <div className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4">
+                <div className="flex items-center">
+                  <img 
+                    src="https://storage.googleapis.com/jamie-casts/podcast-logos/jre.jpg" 
+                    alt="Joe Rogan Experience" 
+                    className="w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
+                  />
+                  <div>
+                    <h3 className="text-white font-medium text-base line-clamp-1">The Joe Rogan Experience</h3>
+                    <p className="text-gray-400 text-sm line-clamp-1">Joe Rogan</p>
+                  </div>
                 </div>
+                <button className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors">
+                  Select
+                </button>
               </div>
-              <button className="bg-black hover:bg-gray-900 text-white py-2 px-4 rounded-lg text-sm">
-                Select
-              </button>
-            </div>
-            
-            <div className="bg-gray-800 rounded-lg p-4 flex items-center justify-between">
-              <div className="flex items-center">
-                <img 
-                  src="https://storage.googleapis.com/jamie-casts/podcast-logos/thriller.jpg" 
-                  alt="Thriller - A Netflix Zone" 
-                  className="w-12 h-12 rounded mr-4"
-                />
-                <div>
-                  <h3 className="font-medium">Thriller "A Blizzic Zone"</h3>
-                  <p className="text-gray-400 text-sm">Thriller X Recordings</p>
+              <div className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4">
+                <div className="flex items-center">
+                  <img 
+                    src="https://storage.googleapis.com/jamie-casts/podcast-logos/green-candle.jpg" 
+                    alt="Green Candle Investments" 
+                    className="w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
+                  />
+                  <div>
+                    <h3 className="text-white font-medium text-base line-clamp-1">Green Candle Investments Podcast with Brandon Keys</h3>
+                    <p className="text-gray-400 text-sm line-clamp-1">Green Candle Investments</p>
+                  </div>
                 </div>
+                <button className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors">
+                  Select
+                </button>
               </div>
-              <button className="bg-black hover:bg-gray-900 text-white py-2 px-4 rounded-lg text-sm">
-                Select
-              </button>
-            </div>
-            
-            <div className="bg-gray-800 rounded-lg p-4 flex items-center justify-between">
-              <div className="flex items-center">
-                <img 
-                  src="https://storage.googleapis.com/jamie-casts/podcast-logos/blizzic.jpg" 
-                  alt="Blizzic Audible" 
-                  className="w-12 h-12 rounded mr-4"
-                />
-                <div>
-                  <h3 className="font-medium">Blizzic Audible</h3>
-                  <p className="text-gray-400 text-sm">Guy Sweeney</p>
+              <div className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4">
+                <div className="flex items-center">
+                  <img 
+                    src="https://storage.googleapis.com/jamie-casts/podcast-logos/thriller.jpg" 
+                    alt="Thriller - A Netflix Zone" 
+                    className="w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
+                  />
+                  <div>
+                    <h3 className="text-white font-medium text-base line-clamp-1">Thriller "A Blizzic Zone"</h3>
+                    <p className="text-gray-400 text-sm line-clamp-1">Thriller X Recordings</p>
+                  </div>
                 </div>
+                <button className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors">
+                  Select
+                </button>
               </div>
-              <button className="bg-black hover:bg-gray-900 text-white py-2 px-4 rounded-lg text-sm">
-                Select
-              </button>
-            </div>
-          </div>
-        )}
+              <div className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4">
+                <div className="flex items-center">
+                  <img 
+                    src="https://storage.googleapis.com/jamie-casts/podcast-logos/blizzic.jpg" 
+                    alt="Blizzic Audible" 
+                    className="w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
+                  />
+                  <div>
+                    <h3 className="text-white font-medium text-base line-clamp-1">Blizzic Audible</h3>
+                    <p className="text-gray-400 text-sm line-clamp-1">Guy Sweeney</p>
+                  </div>
+                </div>
+                <button className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors">
+                  Select
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </>
     );
   };
@@ -352,6 +336,23 @@ const TryJamieWizard: React.FC = () => {
 
         {/* Podcast Info */}
         <div className="flex items-center mb-8">
+          <button
+            onClick={() => setCurrentStep(1)}
+            className="mr-4 p-2 hover:bg-gray-800 rounded-full transition-colors"
+          >
+            <svg 
+              width="24" 
+              height="24" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+          </button>
           <img 
             src={feedInfo.podcastImage} 
             alt={feedInfo.feedTitle} 
@@ -362,12 +363,6 @@ const TryJamieWizard: React.FC = () => {
           />
           <div>
             <h2 className="text-2xl font-bold">{feedInfo.feedTitle}</h2>
-            <button
-              onClick={() => setCurrentStep(1)}
-              className="text-sm text-gray-400 hover:text-white"
-            >
-              ← Change Feed
-            </button>
           </div>
         </div>
 
@@ -376,23 +371,23 @@ const TryJamieWizard: React.FC = () => {
           {episodes.map((episode) => (
             <div 
               key={episode.episodeGUID}
-              className="bg-gray-800 rounded-lg p-4 flex items-center justify-between"
+              className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between hover:border-gray-700 transition-colors p-4"
             >
               <div className="flex items-center flex-1">
                 <img 
                   src={episode.episodeImage || feedInfo.podcastImage} 
                   alt={episode.itemTitle} 
-                  className="w-16 h-16 rounded mr-4"
+                  className="w-16 h-16 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = "https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg";
+                    (e.target as HTMLImageElement).src = 'https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg';
                   }}
                 />
-                <div className="flex-1 mr-4">
+                <div className="flex-1 mr-4 min-w-0">
                   <div className="flex items-center mb-1">
                     <span className="text-gray-400 text-sm mr-2">#{episode.episodeNumber}</span>
                     <span className="text-gray-400 text-sm">{formatDate(episode.publishedDate)}</span>
                   </div>
-                  <h3 className="font-medium">{episode.itemTitle}</h3>
+                  <h3 className="text-white font-medium text-base line-clamp-1">{episode.itemTitle}</h3>
                   <div className="flex items-center mt-1">
                     <span className="text-gray-400 text-sm mr-2">Creator: {episode.creator}</span>
                     <span className="text-gray-400 text-sm">{formatDuration(episode.length)}</span>
@@ -401,7 +396,7 @@ const TryJamieWizard: React.FC = () => {
               </div>
               <button 
                 onClick={() => handleSelectEpisode(episode)}
-                className="bg-black hover:bg-gray-900 text-white py-2 px-4 rounded-lg text-sm"
+                className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors"
               >
                 Select
               </button>
@@ -439,6 +434,23 @@ const TryJamieWizard: React.FC = () => {
 
         <div className="bg-gray-800 rounded-lg p-6 mb-8">
           <div className="flex items-center mb-6">
+            <button
+              onClick={() => setCurrentStep(2)}
+              className="mr-4 p-2 hover:bg-gray-700 rounded-full transition-colors"
+            >
+              <svg 
+                width="24" 
+                height="24" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+            </button>
             <img 
               src={selectedEpisode.episodeImage || feedInfo.podcastImage} 
               alt={selectedEpisode.itemTitle} 
@@ -465,13 +477,7 @@ const TryJamieWizard: React.FC = () => {
             <p className="text-gray-400 text-sm">{selectedEpisode.description}</p>
           </div>
 
-          <div className="flex justify-between mt-6">
-            <button 
-              onClick={() => setCurrentStep(2)}
-              className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-6 rounded-lg"
-            >
-              Back
-            </button>
+          <div className="flex justify-end mt-6">
             <button 
               onClick={() => setCurrentStep(4)}
               className="bg-white text-black hover:bg-gray-200 py-2 px-6 rounded-lg font-medium"
@@ -494,13 +500,7 @@ const TryJamieWizard: React.FC = () => {
       
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {isLoading ? (
-          <div className="flex justify-center items-center py-16">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white"></div>
-          </div>
-        ) : (
-          renderContent()
-        )}
+        {renderContent()}
       </div>
     </div>
   );

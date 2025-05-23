@@ -78,18 +78,22 @@ const PageBanner: React.FC<PageBannerProps> = ({
     const checkAdminPrivileges = async () => {
       try {
         const token = localStorage.getItem('auth_token');
+        console.log('Checking admin privileges, token exists:', !!token);
         if (!token) return;
 
         const response = await AuthService.checkPrivs(token);
-        console.log('Admin privileges check:', response);
+        console.log('Admin privileges check response:', response);
         
         if (response && response.privs && response.privs.privs) {
           // If user has admin privileges for a feed, store it
-          setAdminFeed({
+          const newAdminFeed = {
             feedId: response.privs.privs.feedId,
             access: response.privs.privs.access
-          });
+          };
+          console.log('Setting admin feed:', newAdminFeed);
+          setAdminFeed(newAdminFeed);
         } else {
+          console.log('No admin privileges found in response');
           setAdminFeed(null);
         }
       } catch (error) {
@@ -99,8 +103,10 @@ const PageBanner: React.FC<PageBannerProps> = ({
     };
 
     if (isUserSignedIn) {
+      console.log('User is signed in, checking admin privileges');
       checkAdminPrivileges();
     } else {
+      console.log('User is not signed in, clearing admin feed');
       setAdminFeed(null);
     }
   }, [isUserSignedIn]);
@@ -122,17 +128,18 @@ const PageBanner: React.FC<PageBannerProps> = ({
 
   const handleProDashboardClick = (e: React.MouseEvent) => {
     e.preventDefault();
+    console.log('Pro Dashboard clicked, adminFeed:', adminFeed);
     if (adminFeed && adminFeed.feedId) {
+      console.log('Navigating to:', `/app/feed/${adminFeed.feedId}`);
       navigate(`/app/feed/${adminFeed.feedId}`);
     } else {
-      navigate('/app/dashboard');
+      console.log('No admin feed found, closing menu');
+      setIsMenuOpen(false);
     }
-    setIsMenuOpen(false);
   };
 
   const navLinkStyle = {
     textDecoration: 'none', 
-    color: 'white',
     display: 'flex', 
     alignItems: 'center', 
     gap: '6px',
@@ -272,6 +279,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
             <a 
               href="/app"
               style={navLinkStyle}
+              className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
               onClick={(e) => {
                 e.preventDefault();
                 // Check if we need to reload by comparing URLs
@@ -288,6 +296,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
             <a 
               href="/app/?mode=web-search"
               style={navLinkStyle}
+              className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
               onClick={(e) => {
                 e.preventDefault();
                 // Check if we need to reload by comparing URLs
@@ -305,6 +314,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
               href="#" 
               onClick={handleProDashboardClick}
               style={{ ...navLinkStyle, cursor: 'pointer' }}
+              className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
             >
               <LayoutDashboard size={24} style={iconStyle} />
               <span>Pro Dashboard</span>
@@ -340,6 +350,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
               <a 
                 href="/app"
                 style={{ ...navLinkStyle, padding: '8px 12px' }}
+                className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
                 onClick={(e) => {
                   e.preventDefault();
                   setIsMenuOpen(false);
@@ -358,6 +369,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
               <a 
                 href="/app/?mode=web-search"
                 style={{ ...navLinkStyle, padding: '8px 12px' }}
+                className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
                 onClick={(e) => {
                   e.preventDefault();
                   setIsMenuOpen(false);
@@ -377,6 +389,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
                 href="#" 
                 onClick={handleProDashboardClick}
                 style={{ ...navLinkStyle, cursor: 'pointer', padding: '8px 12px' }}
+                className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
               >
                 <LayoutDashboard size={24} style={iconStyle} />
                 <span>Pro Dashboard</span>
