@@ -502,6 +502,16 @@ const TryJamieWizard: React.FC = () => {
       );
     }
 
+    // Utility to strip HTML and truncate to N words
+    function getShortDescription(html: string, wordLimit = 60): string {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const text = tmp.textContent || tmp.innerText || '';
+      const words = text.split(/\s+/);
+      if (words.length <= wordLimit) return text;
+      return words.slice(0, wordLimit).join(' ') + '...';
+    }
+
     return (
       <>
         <div className="text-center mb-8">
@@ -553,7 +563,9 @@ const TryJamieWizard: React.FC = () => {
 
           <div className="bg-gray-900 rounded p-4 mb-4">
             <h3 className="text-sm font-medium mb-2">Episode Description</h3>
-            <p className="text-gray-400 text-sm">{selectedEpisode.description}</p>
+            <div className="text-sm text-gray-400 break-words w-full max-w-xl">
+              {getShortDescription(selectedEpisode.description, 60)}
+            </div>
           </div>
 
           <div className="flex justify-end mt-6">
