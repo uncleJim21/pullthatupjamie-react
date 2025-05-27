@@ -22,14 +22,23 @@ export const twitterService = {
   // Post a tweet
   postTweet: async (text: string): Promise<TwitterTweetResponse> => {
     try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
+
       printLog(`Attempting to post tweet to: ${TWITTER_API_BASE}/tweet`);
       const response = await fetch(`${TWITTER_API_BASE}/tweet`, {
         method: 'POST',
         headers: {
+          'Accept': '*/*',
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin
         },
         body: JSON.stringify({ text }),
-        credentials: 'include'
+        credentials: 'include',
+        mode: 'cors'
       });
       const data = await response.json();
       printLog(`Tweet response: ${JSON.stringify(data)}`);

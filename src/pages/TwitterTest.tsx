@@ -30,9 +30,16 @@ const TwitterTest: React.FC = () => {
     checkAuth();
   }, []);
 
-  const startAuth = () => {
+  const startAuth = async () => {
     printLog('Start auth button clicked');
-    twitterService.startAuth();
+    try {
+      const authUrl = await AuthService.startTwitterAuth();
+      printLog(`Opening auth URL: ${authUrl}`);
+      window.open(authUrl, '_blank');
+    } catch (error) {
+      printLog(`Error starting Twitter auth: ${error}`);
+      setResult({ error: error instanceof Error ? error.message : 'Failed to start Twitter auth' });
+    }
   };
 
   const postTweet = async () => {

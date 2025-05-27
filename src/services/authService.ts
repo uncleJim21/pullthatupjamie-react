@@ -1,5 +1,5 @@
 // services/authService.ts
-import { API_URL } from "../constants/constants.ts";
+import { API_URL, printLog } from "../constants/constants.ts";
 interface SignInResponse {
     token: string;
     subscriptionValid: boolean;
@@ -83,8 +83,11 @@ class AuthService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Origin': window.location.origin
                 },
                 body: JSON.stringify({ token }),
+                credentials: 'include',
+                mode: 'cors'
             });
 
             if (!response.ok) {
@@ -109,23 +112,68 @@ class AuthService {
                 throw new Error('No auth token found');
             }
 
+            printLog(`Checking Twitter status at ${API_URL}/api/twitter/tokens`);
             const response = await fetch(`${API_URL}/api/twitter/tokens`, {
                 method: 'POST',
                 headers: {
+                    'Accept': '*/*',
+                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
+                    'Origin': window.location.origin
                 },
-                credentials: 'include'
+                credentials: 'include',
+                mode: 'cors'
             });
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.message || 'Failed to check Twitter status');
+                throw new Error(error.message || `Failed to check Twitter status: ${response.status}`);
             }
 
-            return await response.json();
+            const data = await response.json();
+            printLog(`Twitter status response: ${JSON.stringify(data)}`);
+            return data;
         } catch (error) {
-            console.error('Twitter status check error:', error);
+            printLog(`Twitter status check error: ${error}`);
+            if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                throw new Error(`Could not connect to server at ${API_URL}. Please ensure the server is running and CORS is enabled.`);
+            }
+            throw error;
+        }
+    }
+
+    static async startTwitterAuth(): Promise<string> {
+        try {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                throw new Error('No auth token found');
+            }
+
+            printLog(`Starting Twitter auth at ${API_URL}/api/twitter/x-oauth`);
+            const response = await fetch(`${API_URL}/api/twitter/x-oauth`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Origin': window.location.origin
+                },
+                body: JSON.stringify({ token }),
+                credentials: 'include',
+                mode: 'cors'
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || `Failed to start Twitter auth: ${response.status}`);
+            }
+
+            const data = await response.json();
+            printLog(`Twitter auth response: ${JSON.stringify(data)}`);
+            return data.authUrl;
+        } catch (error) {
+            printLog(`Twitter auth error: ${error}`);
+            if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                throw new Error(`Could not connect to server at ${API_URL}. Please ensure the server is running and CORS is enabled.`);
+            }
             throw error;
         }
     }
