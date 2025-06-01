@@ -8,6 +8,7 @@ const TwitterTest: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [twitterUsername, setTwitterUsername] = useState<string | null>(null);
   const [tweetText, setTweetText] = useState('Hello World!');
+  const [mediaUrl, setMediaUrl] = useState('');
   const [result, setResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -46,7 +47,7 @@ const TwitterTest: React.FC = () => {
     printLog('Post tweet button clicked');
     setIsLoading(true);
     try {
-      const response = await twitterService.postTweet(tweetText);
+      const response = await twitterService.postTweet(tweetText, mediaUrl || undefined);
       printLog(`Tweet response received: ${JSON.stringify(response)}`);
       setResult(response);
     } catch (error) {
@@ -88,6 +89,13 @@ const TwitterTest: React.FC = () => {
               className="w-full bg-gray-900 text-white border border-gray-700 rounded-lg p-3 mb-4 focus:border-blue-500 focus:outline-none"
               rows={3}
               placeholder="What's happening?"
+            />
+            <input
+              type="url"
+              value={mediaUrl}
+              onChange={(e) => setMediaUrl(e.target.value)}
+              className="w-full bg-gray-900 text-white border border-gray-700 rounded-lg p-3 mb-4 focus:border-blue-500 focus:outline-none"
+              placeholder="Media URL (optional) - e.g., https://example.com/image.jpg"
             />
             <button 
               onClick={postTweet}

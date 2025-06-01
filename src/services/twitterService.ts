@@ -20,14 +20,21 @@ export const twitterService = {
   },
 
   // Post a tweet
-  postTweet: async (text: string): Promise<TwitterTweetResponse> => {
+  postTweet: async (text: string, mediaUrl?: string): Promise<TwitterTweetResponse> => {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
         throw new Error('No auth token found');
       }
 
+      const requestBody: { text: string; mediaUrl?: string } = { text };
+      if (mediaUrl && mediaUrl.trim()) {
+        requestBody.mediaUrl = mediaUrl.trim();
+      }
+
       printLog(`Attempting to post tweet to: ${TWITTER_API_BASE}/tweet`);
+      printLog(`Request body: ${JSON.stringify(requestBody)}`);
+      
       const response = await fetch(`${TWITTER_API_BASE}/tweet`, {
         method: 'POST',
         headers: {
@@ -36,7 +43,7 @@ export const twitterService = {
           'Authorization': `Bearer ${token}`,
           'Origin': window.location.origin
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(requestBody),
         credentials: 'include',
         mode: 'cors'
       });
