@@ -5,6 +5,8 @@ import './index.css';
 import SearchInterface from './components/SearchInterface.tsx';
 import PodcastFeedPage from './components/podcast/PodcastFeedPage.tsx';
 import DashboardPage from './components/podcast/DashboardPage.tsx';
+import TwitterTest from './pages/TwitterTest.tsx';
+import { DEBUG_MODE } from './constants/constants.ts';
 import { inject } from "@vercel/analytics"
 
 const App = () => (
@@ -17,6 +19,7 @@ const App = () => (
       <Route path="/dashboard/:feedId" element={<DashboardPage />} />
       <Route path="/feed/:feedId/clipBatch/:runId" element={<SearchInterface isClipBatchPage={true} />} />
       <Route path="/feed/:feedId/jamieProHistory" element={<PodcastFeedPage initialView="jamiePro" defaultTab="history" />} />
+      {DEBUG_MODE && <Route path="/twitter-test" element={<TwitterTest />} />}
     </Routes>
   </BrowserRouter>
 );
