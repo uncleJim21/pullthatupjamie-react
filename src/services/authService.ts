@@ -22,6 +22,7 @@ interface TwitterStatusResponse {
 
 class AuthService {
     private static readonly AUTH_SERVER_URL = 'https://cascdr-auth-backend-cw4nk.ondigitalocean.app';
+    private static readonly ADMIN_PRIVS_KEY = 'admin_privs';
 
     static async signIn(email: string, password: string): Promise<SignInResponse> {
         try {
@@ -92,17 +93,33 @@ class AuthService {
 
             if (!response.ok) {
                 const error = await response.json();
+                // Clear admin privs on error
+                localStorage.removeItem(this.ADMIN_PRIVS_KEY);
                 throw new Error(error.message || 'Sign up failed');
             }
 
             const privs = await response.json() as CheckPrivsResponse;
+            
+            // Store admin status in local storage
+            if (privs.privs && privs.privs.access === 'admin') {
+                localStorage.setItem(this.ADMIN_PRIVS_KEY, 'true');
+            } else {
+                localStorage.removeItem(this.ADMIN_PRIVS_KEY);
+            }
+            
             return {
                 privs
             };
         } catch (error) {
             console.error('Sign up error:', error);
+            // Clear admin privs on error
+            localStorage.removeItem(this.ADMIN_PRIVS_KEY);
             throw error;
         }
+    }
+
+    static isAdmin(): boolean {
+        return localStorage.getItem(this.ADMIN_PRIVS_KEY) === 'true';
     }
 
     static async checkTwitterStatus(): Promise<TwitterStatusResponse> {
