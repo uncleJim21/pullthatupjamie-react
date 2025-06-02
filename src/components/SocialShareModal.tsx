@@ -678,50 +678,55 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   // Updated shareToTwitter function to use twitterService
   const shareToTwitter = async () => {
-    // Check if authenticated
-    if (!isTwitterAuthenticated) {
-      setJamieAssistError('Please connect your Twitter account first');
-      return;
-    }
-
     try {
       setIsPublishing(true);
       
       // For Twitter, use the actual CDN URL (fileUrl) since Twitter servers need to access it
       // Only fall back to renderUrl if fileUrl is not available
       const mediaUrl = fileUrl || renderUrl;
+      const isAdmin = AuthService.isAdmin();
       
-      printLog(`Posting tweet with content: "${content}" and mediaUrl: "${mediaUrl}"`);
-      printLog(`Available URLs - fileUrl: "${fileUrl}", renderUrl: "${renderUrl}"`);
-      
-      const response = await twitterService.postTweet(content, mediaUrl);
-      printLog(`Twitter post response: ${JSON.stringify(response)}`);
-      
-      // Handle auth expiration
-      if (response.error === 'TWITTER_AUTH_EXPIRED' && response.requiresReauth) {
-        printLog('Twitter auth expired detected in SocialShareModal');
-        setIsTwitterAuthenticated(false);
-        setTwitterUsername(null);
-        setNeedsTwitterReauth(true);
-        setJamieAssistError('Twitter authentication expired. Please reconnect your account.');
-        setIsPublishing(false);
-        return;
-      }
-      
-      if (response.success) {
-        printLog('Tweet posted successfully');
-        // Only show cross-posting option if this is the initial Twitter share
-        if (!showTwitterPrompt) {
-          printLog("Setting showNostrPrompt to true after successful Twitter post");
-          setShowNostrPrompt(true);
+      // If user is admin and authenticated with Twitter, use OAuth flow
+      if (isAdmin && isTwitterAuthenticated) {
+        printLog(`Posting tweet with content: "${content}" and mediaUrl: "${mediaUrl}"`);
+        printLog(`Available URLs - fileUrl: "${fileUrl}", renderUrl: "${renderUrl}"`);
+        
+        const response = await twitterService.postTweet(content, mediaUrl);
+        printLog(`Twitter post response: ${JSON.stringify(response)}`);
+        
+        // Handle auth expiration
+        if (response.error === 'TWITTER_AUTH_EXPIRED' && response.requiresReauth) {
+          printLog('Twitter auth expired detected in SocialShareModal');
+          setIsTwitterAuthenticated(false);
+          setTwitterUsername(null);
+          setNeedsTwitterReauth(true);
+          setJamieAssistError('Twitter authentication expired. Please reconnect your account.');
+          setIsPublishing(false);
+          return;
+        }
+        
+        if (response.success) {
+          printLog('Tweet posted successfully');
+          // Only show cross-posting option if this is the initial Twitter share
+          if (!showTwitterPrompt) {
+            printLog("Setting showNostrPrompt to true after successful Twitter post");
+            setShowNostrPrompt(true);
+          } else {
+            // If this is a cross-post from Nostr to Twitter, close the modal
+            printLog("This was a cross-post from Nostr to Twitter, closing modal");
+            onComplete(true, SocialPlatform.Twitter);
+            onClose();
+          }
         } else {
-          // If this is a cross-post from Nostr to Twitter, close the modal
-          printLog("This was a cross-post from Nostr to Twitter, closing modal");
-          onComplete(true, SocialPlatform.Twitter);
-          onClose();
+          setJamieAssistError(response.message || response.error || 'Failed to post tweet');
         }
       } else {
-        setJamieAssistError(response.message || response.error || 'Failed to post tweet');
+        // For non-admin users or unauthenticated admins, open Twitter web intent
+        const tweetText = `${content}\n${mediaUrl}\n\nShared via https://pullthatupjamie.ai`;
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+        window.open(twitterUrl, '_blank');
+        onComplete(true, SocialPlatform.Twitter);
+        onClose();
       }
     } catch (error) {
       printLog(`Error posting tweet: ${error}`);
@@ -888,49 +893,54 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   // Updated renderMainModalContent to include Twitter auth UI
   const renderMainModalContent = () => {
+    const isAdmin = AuthService.isAdmin();
+
     // Twitter platform with authentication handling
     if (platform === SocialPlatform.Twitter) {
-      // Show reauth needed state
-      if (needsTwitterReauth) {
-        return (
-          <div className="text-center py-4 sm:py-8 px-2 sm:px-4">
-            <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
-              <Twitter className="w-8 h-8 text-yellow-400" />
+      // Only show auth UI for admin users
+      if (isAdmin) {
+        // Show reauth needed state
+        if (needsTwitterReauth) {
+          return (
+            <div className="text-center py-4 sm:py-8 px-2 sm:px-4">
+              <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
+                <Twitter className="w-8 h-8 text-yellow-400" />
+              </div>
+              <h3 className="text-xl font-medium text-white mb-2">Authentication Expired</h3>
+              <p className="text-gray-300 mb-6">
+                Your Twitter authentication has expired. Please re-authenticate to continue posting tweets.
+              </p>
+              <button 
+                onClick={connectTwitter}
+                disabled={isTwitterConnecting}
+                className={`px-6 py-3 rounded-lg bg-blue-500 text-white font-medium transition-colors
+                  ${isTwitterConnecting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+              >
+                {isTwitterConnecting ? 'Connecting...' : 'Re-authenticate with Twitter'}
+              </button>
             </div>
-            <h3 className="text-xl font-medium text-white mb-2">Authentication Expired</h3>
-            <p className="text-gray-300 mb-6">
-              Your Twitter authentication has expired. Please re-authenticate to continue posting tweets.
-            </p>
-            <button 
-              onClick={connectTwitter}
-              disabled={isTwitterConnecting}
-              className={`px-6 py-3 rounded-lg bg-blue-500 text-white font-medium transition-colors
-                ${isTwitterConnecting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
-            >
-              {isTwitterConnecting ? 'Connecting...' : 'Re-authenticate with Twitter'}
-            </button>
-          </div>
-        );
-      }
-      
-      // Show connect prompt if not authenticated
-      if (!isTwitterAuthenticated) {
-        return (
-          <div className="text-center py-4 sm:py-8 px-2 sm:px-4">
-            <Twitter className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 text-blue-400" />
-            <p className="text-gray-300 mb-4 sm:mb-6 text-base sm:text-lg">
-              Connect your Twitter account to post tweets directly.
-            </p>
-            <button 
-              onClick={connectTwitter}
-              disabled={isTwitterConnecting}
-              className={`px-6 py-2 rounded-lg bg-blue-500 text-white transition-colors
-                ${isTwitterConnecting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
-            >
-              {isTwitterConnecting ? 'Connecting...' : 'Connect Twitter'}
-            </button>
-          </div>
-        );
+          );
+        }
+        
+        // Show connect prompt if not authenticated
+        if (!isTwitterAuthenticated) {
+          return (
+            <div className="text-center py-4 sm:py-8 px-2 sm:px-4">
+              <Twitter className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 text-blue-400" />
+              <p className="text-gray-300 mb-4 sm:mb-6 text-base sm:text-lg">
+                Connect your Twitter account to post tweets directly.
+              </p>
+              <button 
+                onClick={connectTwitter}
+                disabled={isTwitterConnecting}
+                className={`px-6 py-2 rounded-lg bg-blue-500 text-white transition-colors
+                  ${isTwitterConnecting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+              >
+                {isTwitterConnecting ? 'Connecting...' : 'Connect Twitter'}
+              </button>
+            </div>
+          );
+        }
       }
     }
     
@@ -979,7 +989,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       );
     }
     
-    // Main content area for authenticated users
+    // Main content area for authenticated users or non-admin Twitter users
     return (
       <>
         <div className="flex items-center mb-3 sm:mb-4 px-2">
@@ -998,7 +1008,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           <div className="text-left flex-1">
             <p className="text-white font-medium">
               {platform === SocialPlatform.Nostr ? 'Your Nostr Post' : 
-               `Your Tweet ${twitterUsername ? `(@${twitterUsername})` : ''}`}
+               isAdmin && twitterUsername ? `Your Tweet (@${twitterUsername})` : 'Share on Twitter'}
             </p>
           </div>
         </div>
@@ -1122,9 +1132,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           {platform === SocialPlatform.Twitter ? (
             <button
               onClick={shareToTwitter}
-              disabled={isPublishing || isGeneratingContent || content.trim().length === 0 || !isTwitterAuthenticated}
+              disabled={isPublishing || isGeneratingContent || content.trim().length === 0 || (isAdmin && !isTwitterAuthenticated)}
               className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-blue-600 text-white font-medium 
-                ${(isPublishing || isGeneratingContent || content.trim().length === 0 || !isTwitterAuthenticated) ? 
+                ${(isPublishing || isGeneratingContent || content.trim().length === 0 || (isAdmin && !isTwitterAuthenticated)) ? 
                   'opacity-50 cursor-not-allowed' : 'hover:bg-blue-500 transition-colors'}`}
             >
               {isPublishing ? (
@@ -1132,7 +1142,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
                   Posting...
                 </span>
-              ) : 'Post Tweet'}
+              ) : isAdmin ? 'Post Tweet' : 'Share on Twitter'}
             </button>
           ) : (
             <button
@@ -1152,8 +1162,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           )}
         </div>
         
-        {/* Twitter disconnect button */}
-        {platform === SocialPlatform.Twitter && isTwitterAuthenticated && (
+        {/* Twitter disconnect button - only show for admin users */}
+        {platform === SocialPlatform.Twitter && isAdmin && isTwitterAuthenticated && (
           <div className="flex justify-center mt-3">
             <button 
               onClick={disconnectTwitter}
