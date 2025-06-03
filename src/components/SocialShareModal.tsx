@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Twitter, Sparkles, ChevronDown, ChevronUp, ChevronRight, Info, Save } from 'lucide-react';
-import { printLog } from '../constants/constants.ts';
+import { printLog, API_URL } from '../constants/constants.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
 import AuthService from '../services/authService.ts';
@@ -76,6 +76,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [isTwitterDisconnecting, setIsTwitterDisconnecting] = useState(false);
   const [needsTwitterReauth, setNeedsTwitterReauth] = useState(false);
   
+  // Token checking and polling states
+  const [isCheckingTokens, setIsCheckingTokens] = useState(true);
+  const [hasValidTokens, setHasValidTokens] = useState(false);
+  const [isPollingTokens, setIsPollingTokens] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  
   // Jamie Assist states
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [showAdvancedPrefs, setShowAdvancedPrefs] = useState(false);
@@ -88,6 +94,143 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   
   // RegisterModal states
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
+
+  // Function to check tokens endpoint (for initial check)
+  const checkTokensEndpoint = async (): Promise<boolean> => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        printLog('No auth token found for tokens check');
+        return false;
+      }
+
+      printLog(`Checking tokens at ${API_URL}/api/twitter/tokens`);
+      const response = await fetch(`${API_URL}/api/twitter/tokens`, {
+        method: 'POST',
+        headers: {
+          'Accept': '*/*',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin
+        },
+        credentials: 'include',
+        mode: 'cors'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        printLog(`Tokens endpoint response: ${JSON.stringify(data)}`);
+        
+        // Show the main UI for any valid response from the endpoint
+        // The authenticated status will be handled by the existing Twitter auth flow
+        return true;
+      } else {
+        printLog(`Tokens endpoint returned ${response.status}`);
+        return false;
+      }
+    } catch (error) {
+      printLog(`Error checking tokens endpoint: ${error}`);
+      return false;
+    }
+  };
+
+  // Function to start polling tokens endpoint
+  const startTokenPolling = () => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+    }
+    
+    setIsPollingTokens(true);
+    printLog('Starting token polling...');
+    
+    const interval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          printLog('No auth token found during polling');
+          stopTokenPolling();
+          return;
+        }
+
+        printLog(`Polling tokens at ${API_URL}/api/twitter/tokens`);
+        const response = await fetch(`${API_URL}/api/twitter/tokens`, {
+          method: 'POST',
+          headers: {
+            'Accept': '*/*',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'Origin': window.location.origin
+          },
+          credentials: 'include',
+          mode: 'cors'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          printLog(`Polling response: ${JSON.stringify(data)}`);
+          
+          // Only stop polling when authenticated is true
+          if (data.authenticated === true) {
+            printLog('Authentication successful! Stopping polling.');
+            setHasValidTokens(true);
+            setIsPollingTokens(false);
+            clearInterval(interval);
+            setPollingInterval(null);
+            
+            // Update Twitter auth state if this was a Twitter auth flow
+            if (platform === SocialPlatform.Twitter) {
+              setIsTwitterAuthenticated(true);
+              if (data.twitterUsername) {
+                setTwitterUsername(data.twitterUsername);
+              }
+            }
+          } else {
+            printLog(`Still waiting for authentication. Current status: authenticated=${data.authenticated}`);
+          }
+        } else {
+          printLog(`Polling request failed with status ${response.status}`);
+        }
+      } catch (error) {
+        printLog(`Error during token polling: ${error}`);
+      }
+    }, 3000); // Poll every 3 seconds
+    
+    setPollingInterval(interval);
+  };
+
+  // Function to stop polling
+  const stopTokenPolling = () => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+    setIsPollingTokens(false);
+  };
+
+  // Initial token check when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const initialCheck = async () => {
+        setIsCheckingTokens(true);
+        try {
+          const hasTokens = await checkTokensEndpoint();
+          setHasValidTokens(hasTokens);
+        } catch (error) {
+          printLog(`Error during initial token check: ${error}`);
+          setHasValidTokens(false);
+        } finally {
+          setIsCheckingTokens(false);
+        }
+      };
+      
+      initialCheck();
+    }
+    
+    // Cleanup polling when modal closes
+    return () => {
+      stopTokenPolling();
+    };
+  }, [isOpen]);
 
   // Function to save preferences to localStorage
   const saveJamieAssistPreferences = () => {
@@ -390,7 +533,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
-  // Connect to Twitter
+  // Updated connectTwitter function to start polling
   const connectTwitter = async () => {
     printLog('Connect Twitter button clicked in SocialShareModal');
     setIsTwitterConnecting(true);
@@ -399,6 +542,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       printLog(`Opening Twitter auth URL: ${authUrl}`);
       window.open(authUrl, '_blank');
       setNeedsTwitterReauth(false);
+      
+      // Start polling for tokens after opening auth window
+      startTokenPolling();
     } catch (error) {
       printLog(`Error starting Twitter auth: ${error}`);
       setJamieAssistError(error instanceof Error ? error.message : 'Failed to start Twitter auth');
@@ -657,22 +803,26 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     );
   };
 
-  // Register Modal handlers
+  // Register Modal handlers with polling
   const handleCloseRegisterModal = () => {
     setIsRegisterModalOpen(false);
   };
 
   const handleLightningSelect = () => {
     setIsRegisterModalOpen(false);
-    // This would typically redirect to lightning flow or trigger parent callback
     printLog("Lightning wallet connection selected");
+    
+    // Start polling for tokens after Lightning selection
+    startTokenPolling();
     setJamieAssistError("Please complete the Lightning connection in the popup window.");
   };
 
   const handleSubscribeSelect = () => {
     setIsRegisterModalOpen(false);
-    // This would typically redirect to subscription flow or trigger parent callback
     printLog("Subscription selected");
+    
+    // Start polling for tokens after subscription selection
+    startTokenPolling();
     setJamieAssistError("Please complete the subscription process in the new window.");
   };
 
@@ -891,9 +1041,57 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     );
   }
 
-  // Updated renderMainModalContent to include Twitter auth UI
+  // Updated renderMainModalContent to show loading state
   const renderMainModalContent = () => {
     const isAdmin = AuthService.isAdmin();
+
+    // Show loading state while checking tokens initially
+    if (isCheckingTokens) {
+      return (
+        <div className="text-center py-8 px-4">
+          <Loader2 className="w-12 h-12 mx-auto mb-4 text-gray-400 animate-spin" />
+          <p className="text-gray-300 text-lg">Checking authentication...</p>
+        </div>
+      );
+    }
+
+    // Show polling state after user clicks connect
+    if (isPollingTokens) {
+      return (
+        <div className="text-center py-8 px-4">
+          <Loader2 className="w-12 h-12 mx-auto mb-4 text-blue-400 animate-spin" />
+          <p className="text-gray-300 text-lg mb-2">Waiting for authentication...</p>
+          <p className="text-gray-400 text-sm">Complete the authentication in the popup window</p>
+          <button
+            onClick={stopTokenPolling}
+            className="mt-4 px-4 py-2 rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      );
+    }
+
+    // Show register modal prompt if no valid tokens
+    if (!hasValidTokens && !auth) {
+      return (
+        <div className="text-center py-8 px-4">
+          <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
+            <Sparkles className="w-8 h-8 text-amber-400" />
+          </div>
+          <h3 className="text-xl font-medium text-white mb-2">Authentication Required</h3>
+          <p className="text-gray-300 mb-6">
+            You need to authenticate to use Jamie Assist and share content.
+          </p>
+          <button
+            onClick={() => setIsRegisterModalOpen(true)}
+            className="px-6 py-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium hover:from-amber-400 hover:to-amber-500 transition-colors"
+          >
+            Get Started
+          </button>
+        </div>
+      );
+    }
 
     // Twitter platform with authentication handling
     if (platform === SocialPlatform.Twitter) {
