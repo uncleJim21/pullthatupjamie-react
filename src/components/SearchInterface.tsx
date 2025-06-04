@@ -23,6 +23,9 @@ import { Filter } from 'lucide-react';
 import PodcastSourceFilterModal from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
 import PageBanner from './PageBanner.tsx';
+import ShareModal from './ShareModal.tsx';
+import SocialShareModal from './SocialShareModal.tsx';
+
 
 export type SearchMode = 'web-search' | 'podcast-search';
 type ModelType = 'gpt-3.5-turbo' | 'claude-3-sonnet';
@@ -262,13 +265,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     return searchHistory[mode];
   };
 
-  // Helper to check if any modal is currently open
+  // Add state to track if share modals are open
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
+
+  // Update the isAnyModalOpen function to include share modals
   const isAnyModalOpen = (): boolean => {
     return isRegisterModalOpen || 
            isSignInModalOpen || 
            isCheckoutModalOpen || 
            isUpgradeSuccessPopUpOpen || 
-           isSendingFeedback;
+           isSendingFeedback ||
+           isShareModalOpen ||
+           isSocialShareModalOpen;
   };
 
   //Modals
@@ -1412,21 +1421,22 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
       {/* Conversation History */}
       {conversation.length > 0 && (
-      <div
-        className={`max-w-4xl mx-auto px-4 space-y-8 ${
-          searchMode === 'podcast-search' && conversation.length > 0
-            ? 'mb-1 pb-1'
-            : 'mb-24 pb-24'
-        }`}
-      >
+      <div className={`max-w-4xl mx-auto px-4 space-y-8 ${
+        searchMode === 'podcast-search' && conversation.length > 0
+          ? 'mb-1 pb-1'
+          : 'mb-24 pb-24'
+      }`}>
         {conversation
           .filter(item => item.type === searchMode)
           .map((item) => (
             <ConversationRenderer 
+              key={item.id}
               item={item} 
               clipProgress={clipProgress}
               onClipProgress={handleClipProgress}
-              authConfig={authConfig} 
+              authConfig={authConfig}
+              onShareModalOpen={setIsShareModalOpen}
+              onSocialShareModalOpen={setIsSocialShareModalOpen}
             />
           ))}
       </div>
@@ -1530,9 +1540,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
 
 
-      {/* Floating Search Bar - Only show after first search */}
+      {/* Floating Search Bar */}
       {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
-        <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-50">
+        <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-40">
           <form onSubmit={handleSearch} className="relative">
             {/* Filter button - desktop version (outside search bar) */}
             {searchMode === 'podcast-search' && (
@@ -1626,6 +1636,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         </div>
       </div>
     )}
+
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        onOpenChange={setIsShareModalOpen}
+      />
+      <SocialShareModal
+        isOpen={isSocialShareModalOpen}
+        onClose={() => setIsSocialShareModalOpen(false)}
+        onOpenChange={setIsSocialShareModalOpen}
+      />
 
     </div>
   );

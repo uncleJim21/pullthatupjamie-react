@@ -428,7 +428,7 @@ export default function ClipTrackerModal({
 
                     <div className="flex-shrink-0">
                       {clipProgress?.cdnLink ? (
-                        <div className='pr-6 mt-4'>
+                        <div className='pr-6 mt-4 flex flex-col space-y-2'>
                         <div
                           onClick={() => clipProgress?.cdnLink && window.open(clipProgress?.cdnLink, '_blank')}
                           className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer opacity-80"
@@ -437,9 +437,9 @@ export default function ClipTrackerModal({
                         </div>
                         <div
                           onClick={() => handleShare(clipProgress.lookupHash)}
-                          className="w-8 h-8 mt-5 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
+                          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
                         >
-                          <Share className="w-4 h-4 text-white" />
+                          <Share className="w-3 h-3 text-white" />
                         </div>
                         </div>
                       ) : (
@@ -501,7 +501,7 @@ export default function ClipTrackerModal({
                 </p>
               </div>
               {item.cdnLink ? (
-                <div className='pr-4 mt-3 flex-shrink-0'>
+                <div className='pr-4 mt-3 flex-shrink-0 flex flex-col space-y-2'>
                   <div
                     onClick={() => item.cdnLink && window.open(item.cdnLink, '_blank')}
                     className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer opacity-80"
@@ -509,8 +509,8 @@ export default function ClipTrackerModal({
                     <Play className="w-3 h-3 text-green-500" />
                   </div>
                   <div
-                    onClick={() => (handleShare(item.lookupHash))}
-                    className="w-6 h-6 mt-3 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
+                    onClick={() => handleShare(item.lookupHash)}
+                    className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
                   >
                     <Share className="w-3 h-3 text-white" />
                   </div>

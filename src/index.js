@@ -7,6 +7,8 @@ import PodcastFeedPage from './components/podcast/PodcastFeedPage.tsx';
 import DashboardPage from './components/podcast/DashboardPage.tsx';
 import HomePage from './components/HomePage.tsx';
 import TryJamieWizard from './components/TryJamieWizard.tsx';
+import TwitterTest from './pages/TwitterTest.tsx';
+import { DEBUG_MODE } from './constants/constants.ts';
 import { inject } from "@vercel/analytics"
 
 // Add clipboard monitor
@@ -48,6 +50,7 @@ const App = () => (
       <Route path="/app/feed/:feedId/clipBatch/:runId" element={<SearchInterface isClipBatchPage={true} />} />
       <Route path="/app/feed/:feedId/jamieProHistory" element={<PodcastFeedPage initialView="jamiePro" defaultTab="history" />} />
       <Route path="/try-jamie" element={<TryJamieWizard />} />
+      {DEBUG_MODE && <Route path="/twitter-test" element={<TwitterTest />} />}
     </Routes>
   </BrowserRouter>
 );

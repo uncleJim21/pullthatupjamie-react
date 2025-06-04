@@ -165,7 +165,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
           {file ? (
             <div className="text-gray-400">
               <p className="font-medium text-white">Selected File:</p>
-              <p className="mt-1">{file.name}</p>
+              <p className="mt-1 break-all overflow-wrap-anywhere">{file.name}</p>
               <p className="text-sm mt-1">
                 {(file.size / (1024 * 1024)).toFixed(2)} MB
               </p>
