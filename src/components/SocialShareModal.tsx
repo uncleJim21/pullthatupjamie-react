@@ -5,6 +5,7 @@ import { generateAssistContent, JamieAssistError } from '../services/jamieAssist
 import { twitterService } from '../services/twitterService.ts';
 import AuthService from '../services/authService.ts';
 import RegisterModal from './RegisterModal.tsx';
+import SocialShareSuccessModal from './SocialShareSuccessModal.tsx';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -58,6 +59,111 @@ interface PlatformStatus {
   error: string | null;
   username?: string;
 }
+
+// Update the TwitterTweetResponse type
+interface TwitterTweetResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  requiresReauth?: boolean;
+  tweet?: {
+    text: string;
+    id: string;
+    edit_history_tweet_ids: string[];
+  };
+}
+
+// Bech32 helper function with proper checksum calculation
+const encodeBech32 = (prefix: string, data: string): string => {
+  const CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+  const GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+
+  const polymod = (values: number[]): number => {
+    let chk = 1;
+    for (let value of values) {
+      const top = chk >> 25;
+      chk = (chk & 0x1ffffff) << 5 ^ value;
+      for (let i = 0; i < 5; i++) {
+        if ((top >> i) & 1) {
+          chk ^= GENERATOR[i];
+        }
+      }
+    }
+    return chk;
+  };
+
+  const hrpExpand = (hrp: string): number[] => {
+    const result: number[] = [];
+    for (let i = 0; i < hrp.length; i++) {
+      result.push(hrp.charCodeAt(i) >> 5);
+    }
+    result.push(0);
+    for (let i = 0; i < hrp.length; i++) {
+      result.push(hrp.charCodeAt(i) & 31);
+    }
+    return result;
+  };
+
+  const hexToBytes = (hex: string): number[] => {
+    const result: number[] = [];
+    for (let i = 0; i < hex.length; i += 2) {
+      result.push(parseInt(hex.slice(i, i + 2), 16));
+    }
+    return result;
+  };
+
+  const convertBits = (data: number[], fromBits: number, toBits: number, pad: boolean): number[] => {
+    let acc = 0;
+    let bits = 0;
+    const result: number[] = [];
+    const maxv = (1 << toBits) - 1;
+
+    for (const value of data) {
+      if (value < 0 || (value >> fromBits) !== 0) {
+        throw new Error('Invalid value');
+      }
+      acc = (acc << fromBits) | value;
+      bits += fromBits;
+      while (bits >= toBits) {
+        bits -= toBits;
+        result.push((acc >> bits) & maxv);
+      }
+    }
+
+    if (pad) {
+      if (bits > 0) {
+        result.push((acc << (toBits - bits)) & maxv);
+      }
+    } else if (bits >= fromBits || ((acc << (toBits - bits)) & maxv) !== 0) {
+      throw new Error('Invalid padding');
+    }
+
+    return result;
+  };
+
+  // Convert event ID to bytes
+  const eventIdBytes = hexToBytes(data);
+
+  // Create TLV data
+  const tlv = [0, 32, ...eventIdBytes]; // type 0, length 32, followed by event ID
+
+  // Convert to 5-bit array
+  const words = convertBits(tlv, 8, 5, true);
+
+  // Calculate checksum
+  const hrpExpanded = hrpExpand(prefix);
+  const values = [...hrpExpanded, ...words];
+  const polymodValue = polymod([...values, 0, 0, 0, 0, 0, 0]) ^ 1;
+  const checksumWords: number[] = [];
+  for (let i = 0; i < 6; i++) {
+    checksumWords.push((polymodValue >> 5 * (5 - i)) & 31);
+  }
+
+  // Combine everything
+  return prefix + '1' + 
+         words.map(i => CHARSET.charAt(i)).join('') + 
+         checksumWords.map(i => CHARSET.charAt(i)).join('');
+};
 
 const SocialShareModal: React.FC<SocialShareModalProps> = ({
   isOpen,
@@ -116,6 +222,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // RegisterModal states
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
 
+  // Add state for successful post URLs
+  const [successUrls, setSuccessUrls] = useState<{[key: string]: string}>({});
+
+  // Add state for success modal
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
   // Add useEffect to notify parent of modal state changes
   useEffect(() => {
     onOpenChange?.(isOpen);
@@ -160,7 +272,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
-  // Function to start polling tokens endpoint
+  // Update the polling function to handle Twitter auth status
   const startTokenPolling = () => {
     if (pollingInterval) {
       clearInterval(pollingInterval);
@@ -203,13 +315,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             clearInterval(interval);
             setPollingInterval(null);
             
-            // Update Twitter auth state if this was a Twitter auth flow
-            if (platform === SocialPlatform.Twitter) {
-              setTwitterStatus({ ...twitterStatus, authenticated: true });
-              if (data.twitterUsername) {
-                setTwitterStatus({ ...twitterStatus, username: data.twitterUsername });
-              }
-            }
+            // Update Twitter auth state
+            setTwitterStatus(prev => ({ 
+              ...prev, 
+              authenticated: true,
+              username: data.twitterUsername
+            }));
           } else {
             printLog(`Still waiting for authentication. Current status: authenticated=${data.authenticated}`);
           }
@@ -530,10 +641,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     try {
       setNostrStatus(prev => ({ ...prev, publishing: true }));
       
-      // Add the URL and attribution to the content text before sending
       const finalContent = `${content}\n\n${fileUrl}\n\nShared via https://pullthatupjamie.ai`;
       
-      // Construct a new Nostr event (kind 1 - text note)
       const event = {
         kind: 1,
         content: finalContent,
@@ -542,19 +651,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         pubkey: await window.nostr.getPublicKey()
       };
 
-      // Sign the event using the extension
       const signedEvent = await window.nostr.signEvent(event);
       printLog(`Successfully signed Nostr event: ${JSON.stringify(signedEvent)}`);
       
-      // Publish to all relays in the pool
       const publishPromises = relayPool.map(relay => 
         publishEventToRelay(relay, signedEvent)
       );
       
-      // Wait for all publish attempts to complete
       const results = await Promise.allSettled(publishPromises);
       
-      // If at least one relay published successfully, consider it a success
       const successCount = results.filter(
         result => result.status === 'fulfilled' && result.value === true
       ).length;
@@ -562,6 +667,13 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       printLog(`Published to ${successCount}/${relayPool.length} relays`);
       
       const success = successCount > 0;
+      if (success) {
+        // Create Primal.net URL using proper bech32 encoding
+        const bech32EventId = encodeBech32('nevent', signedEvent.id);
+        const primalUrl = `https://primal.net/e/${bech32EventId}`;
+        setSuccessUrls(prev => ({ ...prev, nostr: primalUrl }));
+      }
+      
       setNostrStatus(prev => ({ ...prev, publishing: false, success }));
       return success;
     } catch (error) {
@@ -575,27 +687,25 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     try {
       setTwitterStatus(prev => ({ ...prev, publishing: true }));
       
-      // For Twitter, use the actual CDN URL (fileUrl) since Twitter servers need to access it
-      // Only fall back to renderUrl if fileUrl is not available
       const mediaUrl = fileUrl || renderUrl;
       const isAdmin = AuthService.isAdmin();
       
-      // If user is admin and authenticated with Twitter, use OAuth flow
       if (isAdmin && twitterStatus.authenticated) {
         printLog(`Posting tweet with content: "${content}" and mediaUrl: "${mediaUrl}"`);
         
         const response = await twitterService.postTweet(content, mediaUrl);
         printLog(`Twitter post response: ${JSON.stringify(response)}`);
         
-        // Handle auth expiration
         if (response.error === 'TWITTER_AUTH_EXPIRED' && response.requiresReauth) {
           printLog('Twitter auth expired detected in SocialShareModal');
           setTwitterStatus(prev => ({ ...prev, authenticated: false, publishing: false, error: 'Authentication expired' }));
           return false;
         }
         
-        if (response.success) {
+        if (response.success && response.tweet?.id) {
           printLog('Tweet posted successfully');
+          const tweetUrl = `https://x.com/RobinSeyr/status/${response.tweet.id}`;
+          setSuccessUrls(prev => ({ ...prev, twitter: tweetUrl }));
           setTwitterStatus(prev => ({ ...prev, publishing: false, success: true }));
           return true;
         } else {
@@ -649,10 +759,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       setIsPublishing(false);
       
       if (anySuccess) {
-        // Close modal after successful publishing
-        setTimeout(() => {
-          onClose();
-        }, 1500);
+        // Show success modal instead of closing
+        setShowSuccessModal(true);
       }
     } catch (error) {
       console.error('Error during publishing:', error);
@@ -846,54 +954,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setJamieAssistError("Please complete the subscription process in the new window.");
   };
 
-  // Updated shareToTwitter function to use twitterService
-  const shareToTwitter = async () => {
-    try {
-      setIsPublishing(true);
-      
-      // For Twitter, use the actual CDN URL (fileUrl) since Twitter servers need to access it
-      // Only fall back to renderUrl if fileUrl is not available
-      const mediaUrl = fileUrl || renderUrl;
-      const isAdmin = AuthService.isAdmin();
-      
-      // If user is admin and authenticated with Twitter, use OAuth flow
-      if (isAdmin && twitterStatus.authenticated) {
-        printLog(`Posting tweet with content: "${content}" and mediaUrl: "${mediaUrl}"`);
-        printLog(`Available URLs - fileUrl: "${fileUrl}", renderUrl: "${renderUrl}"`);
-        
-        const response = await twitterService.postTweet(content, mediaUrl);
-        printLog(`Twitter post response: ${JSON.stringify(response)}`);
-        
-        // Handle auth expiration
-        if (response.error === 'TWITTER_AUTH_EXPIRED' && response.requiresReauth) {
-          printLog('Twitter auth expired detected in SocialShareModal');
-          setTwitterStatus(prev => ({ ...prev, authenticated: false }));
-          setJamieAssistError('Twitter authentication expired. Please reconnect your account.');
-          setIsPublishing(false);
-          return;
-        }
-        
-        if (response.success) {
-          printLog('Tweet posted successfully');
-          onComplete(true, SocialPlatform.Twitter);
-          onClose();
-        } else {
-          setJamieAssistError(response.message || response.error || 'Failed to post tweet');
-        }
-      } else {
-        // For non-admin users or unauthenticated admins, open Twitter web intent
-        const tweetText = `${content}\n${mediaUrl}\n\nShared via https://pullthatupjamie.ai`;
-        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
-        window.open(twitterUrl, '_blank');
-        onComplete(true, SocialPlatform.Twitter);
-        onClose();
-      }
-    } catch (error) {
-      printLog(`Error posting tweet: ${error}`);
-      setJamieAssistError(error instanceof Error ? error.message : 'Failed to post tweet');
-    } finally {
-      setIsPublishing(false);
-    }
+  // Add success modal close handler
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    onClose(); // Close the main modal after success modal is dismissed
   };
 
   if (!isOpen || !fileUrl) return null;
@@ -987,7 +1051,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 <Twitter className="w-6 h-6 text-blue-400" />
                 <div className="flex-1">
                   {isAdmin && twitterStatus.authenticated ? (
-                    <p className="text-white text-sm">Signed in as @{twitterStatus.username}</p>
+                    successUrls.twitter ? (
+                      <a 
+                        href={successUrls.twitter} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-white text-sm hover:text-blue-400 transition-colors"
+                      >
+                        Post Successful - View on Twitter
+                      </a>
+                    ) : (
+                      <p className="text-white text-sm">Signed in as @{twitterStatus.username}</p>
+                    )
                   ) : (
                     <p className="text-white text-sm">
                       {isAdmin ? 'Connect to post directly' : 'Web sharing available'}
@@ -1040,7 +1115,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 />
                 <div className="flex-1">
                   {nostrStatus.available && nostrStatus.authenticated ? (
-                    <p className="text-white text-sm">Extension connected</p>
+                    successUrls.nostr ? (
+                      <a 
+                        href={successUrls.nostr} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-white text-sm hover:text-purple-400 transition-colors"
+                      >
+                        Post Successful - View on Primal
+                      </a>
+                    ) : (
+                      <p className="text-white text-sm">Extension connected</p>
+                    )
                   ) : nostrStatus.available ? (
                     <p className="text-white text-sm">Connect NIP07 Extension to Post on Nostr</p>
                   ) : (
@@ -1207,50 +1293,59 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-[100] p-2 sm:p-4 md:p-8">
-      <div className="bg-black border border-gray-800 rounded-xl md:rounded-xl p-4 sm:p-6 w-full sm:max-w-sm md:max-w-md lg:max-w-xl text-center relative shadow-xl sm:transform sm:-translate-y-12 h-[80vh] flex flex-col">
-        <button onClick={onClose} className="absolute top-4 right-6 text-gray-400 hover:text-white transition-colors z-10">
-          <X className="w-6 h-6" />
-        </button>
-        
-        <div className="overflow-y-auto flex-1 pr-2 mt-8" 
-          style={{ 
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#ffffff #374151',
-            msOverflowStyle: 'auto'
-          }}>
-          {renderMainModalContent()}
+    <>
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-[100] p-2 sm:p-4 md:p-8">
+        <div className="bg-black border border-gray-800 rounded-xl md:rounded-xl p-4 sm:p-6 w-full sm:max-w-sm md:max-w-md lg:max-w-xl text-center relative shadow-xl sm:transform sm:-translate-y-12 h-[80vh] flex flex-col">
+          <button onClick={onClose} className="absolute top-4 right-6 text-gray-400 hover:text-white transition-colors z-10">
+            <X className="w-6 h-6" />
+          </button>
+          
+          <div className="overflow-y-auto flex-1 pr-2 mt-8" 
+            style={{ 
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#ffffff #374151',
+              msOverflowStyle: 'auto'
+            }}>
+            {renderMainModalContent()}
+          </div>
         </div>
+        
+        {renderInfoModal()}
+        
+        {/* RegisterModal overlay */}
+        <RegisterModal 
+          isOpen={isRegisterModalOpen}
+          onClose={handleCloseRegisterModal}
+          onLightningSelect={handleLightningSelect}
+          onSubscribeSelect={handleSubscribeSelect}
+        />
+        
+        {/* Success Modal */}
+        <SocialShareSuccessModal
+          isOpen={showSuccessModal}
+          onClose={handleSuccessModalClose}
+          successUrls={successUrls}
+        />
+        
+        {/* Add global styles for the scrollbar */}
+        <style>{`
+          .overflow-y-auto::-webkit-scrollbar {
+            width: 8px;
+            background-color: #374151;
+          }
+          
+          .overflow-y-auto::-webkit-scrollbar-thumb {
+            background-color: #ffffff;
+            border-radius: 4px;
+          }
+          
+          .overflow-y-auto::-webkit-scrollbar-track {
+            background-color: #374151;
+            border-radius: 4px;
+          }
+        `}</style>
       </div>
-      
-      {renderInfoModal()}
-      
-      {/* RegisterModal overlay */}
-      <RegisterModal 
-        isOpen={isRegisterModalOpen}
-        onClose={handleCloseRegisterModal}
-        onLightningSelect={handleLightningSelect}
-        onSubscribeSelect={handleSubscribeSelect}
-      />
-      
-      {/* Add global styles for the scrollbar */}
-      <style>{`
-        .overflow-y-auto::-webkit-scrollbar {
-          width: 8px;
-          background-color: #374151;
-        }
-        
-        .overflow-y-auto::-webkit-scrollbar-thumb {
-          background-color: #ffffff;
-          border-radius: 4px;
-        }
-        
-        .overflow-y-auto::-webkit-scrollbar-track {
-          background-color: #374151;
-          border-radius: 4px;
-        }
-      `}</style>
-    </div>
+    </>
   );
 };
 
