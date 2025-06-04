@@ -343,7 +343,8 @@ const PageBanner: React.FC<PageBannerProps> = ({
               padding: '12px',
               width: '200px',
               boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-              zIndex: 20
+              zIndex: 20,
+              marginRight: '10px'
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -394,7 +395,13 @@ const PageBanner: React.FC<PageBannerProps> = ({
                 <LayoutDashboard size={24} style={iconStyle} />
                 <span>Pro Dashboard</span>
               </a>
-              <div style={{ padding: '8px 12px' }}>
+              <div style={{ 
+                padding: '8px 12px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: '100%'
+              }}>
                 <AccountButton 
                   onConnect={handleConnect}
                   onSignInClick={handleSignIn}
