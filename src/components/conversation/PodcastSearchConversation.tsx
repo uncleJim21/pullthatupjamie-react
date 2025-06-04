@@ -11,6 +11,8 @@ interface PodcastSearchConversationProps {
   clipProgress?: ClipProgress | null;
   onClipProgress: (progress: ClipProgress) => void;
   authConfig?: AuthConfig | null | undefined;
+  onShareModalOpen?: (isOpen: boolean) => void;
+  onSocialShareModalOpen?: (isOpen: boolean) => void;
 }
 
 // PodcastSearchConversation.tsx
@@ -18,7 +20,9 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
   item, 
   clipProgress,
   onClipProgress,
-  authConfig
+  authConfig,
+  onShareModalOpen,
+  onSocialShareModalOpen
 }) => {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
 
@@ -50,6 +54,8 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
             onEnded={handleEnded}
             onClipProgress={onClipProgress}
             authConfig={authConfig}
+            onShareModalOpen={onShareModalOpen}
+            onSocialShareModalOpen={onSocialShareModalOpen}
           />
         ))}
       </div>

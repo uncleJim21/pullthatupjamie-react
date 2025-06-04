@@ -20,6 +20,7 @@ declare global {
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenChange?: (isOpen: boolean) => void;
   fileUrl?: string;
   title?: string;
   showCopy?: boolean;
@@ -39,6 +40,7 @@ interface ShareModalProps {
 const ShareModal: React.FC<ShareModalProps> = ({
   isOpen,
   onClose,
+  onOpenChange,
   fileUrl,
   title = 'Share',
   showCopy = true,
@@ -57,6 +59,11 @@ const ShareModal: React.FC<ShareModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [activePlatform, setActivePlatform] = useState<SocialPlatform | null>(null);
   const [shareResult, setShareResult] = useState<string | null>(null);
+
+  // Add useEffect to notify parent of modal state changes
+  React.useEffect(() => {
+    onOpenChange?.(isOpen);
+  }, [isOpen, onOpenChange]);
 
   // Clear share result message after a timeout
   React.useEffect(() => {
@@ -239,27 +246,16 @@ const ShareModal: React.FC<ShareModalProps> = ({
               </button>
             )}
             
-            {showTwitter && (
+            {(showTwitter || showNostr) && (
               <button
-                onClick={() => setActivePlatform(SocialPlatform.Twitter)}
+                onClick={() => setActivePlatform(SocialPlatform.Twitter)} // Use Twitter as default but modal will handle both
                 className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
-                title={twitterButtonLabel || "Share on Twitter"}
-              >
-                <Twitter className="w-6 h-6 text-blue-400" />
-              </button>
-            )}
-
-            {showNostr && (
-              <button
-                onClick={() => setActivePlatform(SocialPlatform.Nostr)}
-                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
-                title={nostrButtonLabel || "Share on Nostr"}
+                title="Share on Twitter/Nostr"
               >
                 <img 
-                  src="/nostr-logo-square.png" 
-                  alt="Nostr" 
-                  className="w-6 h-6" 
-                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+                  src="/twitter-nostr-crosspost.png" 
+                  alt="Twitter/Nostr" 
+                  className="w-8 h-8"
                 />
               </button>
             )}

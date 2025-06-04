@@ -13,6 +13,11 @@ export interface TwitterTweetResponse {
   message?: string;
   requiresReauth?: boolean;
   details?: string;
+  tweet?: {
+    text: string;
+    id: string;
+    edit_history_tweet_ids: string[];
+  };
 }
 
 export interface TwitterRevokeResponse {

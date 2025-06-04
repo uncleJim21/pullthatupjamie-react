@@ -12,13 +12,17 @@ interface ConversationRendererProps {
   clipProgress?: ClipProgress | null;
   onClipProgress: (progress: ClipProgress) => void;
   authConfig?: AuthConfig | null | undefined;
+  onShareModalOpen?: (isOpen: boolean) => void;
+  onSocialShareModalOpen?: (isOpen: boolean) => void;
 }
 
 export const ConversationRenderer: React.FC<ConversationRendererProps> = ({ 
   item,
   clipProgress,
   onClipProgress,
-  authConfig
+  authConfig,
+  onShareModalOpen,
+  onSocialShareModalOpen
 }) => {
   switch (item.type) {
     case 'web-search':
@@ -32,6 +36,8 @@ export const ConversationRenderer: React.FC<ConversationRendererProps> = ({
           clipProgress={clipProgress}
           onClipProgress={onClipProgress}
           authConfig={authConfig}
+          onShareModalOpen={onShareModalOpen}
+          onSocialShareModalOpen={onSocialShareModalOpen}
         />
       );
     default:
