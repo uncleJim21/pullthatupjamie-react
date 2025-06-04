@@ -1201,12 +1201,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-50 p-2 sm:p-4 md:p-8">
-      <div className="bg-black border border-gray-800 rounded-xl md:rounded-xl p-4 sm:p-6 w-full sm:max-w-sm md:max-w-md lg:max-w-xl text-center relative shadow-xl sm:transform sm:-translate-y-12 max-h-[100vh] sm:max-h-[80vh] overflow-y-auto sm:overflow-visible">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-10">
+      <div className="bg-black border border-gray-800 rounded-xl md:rounded-xl p-4 sm:p-6 w-full sm:max-w-sm md:max-w-md lg:max-w-xl text-center relative shadow-xl sm:transform sm:-translate-y-12 h-[80vh] flex flex-col">
+        <button onClick={onClose} className="absolute top-4 right-6 text-gray-400 hover:text-white transition-colors z-10">
           <X className="w-6 h-6" />
         </button>
         
-        <div className="modal-content max-h-screen overflow-y-auto">
+        <div className="overflow-y-auto flex-1 pr-2 mt-8" 
+          style={{ 
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#ffffff #374151',
+            msOverflowStyle: 'auto'
+          }}>
           {renderMainModalContent()}
         </div>
       </div>
@@ -1220,6 +1225,24 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         onLightningSelect={handleLightningSelect}
         onSubscribeSelect={handleSubscribeSelect}
       />
+      
+      {/* Add global styles for the scrollbar */}
+      <style>{`
+        .overflow-y-auto::-webkit-scrollbar {
+          width: 8px;
+          background-color: #374151;
+        }
+        
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+          background-color: #ffffff;
+          border-radius: 4px;
+        }
+        
+        .overflow-y-auto::-webkit-scrollbar-track {
+          background-color: #374151;
+          border-radius: 4px;
+        }
+      `}</style>
     </div>
   );
 };
