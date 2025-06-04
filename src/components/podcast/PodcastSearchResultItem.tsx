@@ -45,6 +45,8 @@ interface PodcastSearchResultItemProps {
   feedId?: string;
   onSignInClick?: () => void;
   error?: { status: number; message: string } | undefined;
+  onShareModalOpen?: (isOpen: boolean) => void;
+  onSocialShareModalOpen?: (isOpen: boolean) => void;
 }
 
 export const PodcastSearchResultItem = ({
@@ -69,7 +71,9 @@ export const PodcastSearchResultItem = ({
   runId,
   feedId,
   onSignInClick,
-  error
+  error,
+  onShareModalOpen,
+  onSocialShareModalOpen
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);

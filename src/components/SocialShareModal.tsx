@@ -39,6 +39,7 @@ export enum SocialPlatform {
 interface SocialShareModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenChange?: (isOpen: boolean) => void;
   fileUrl: string;
   itemName?: string;
   onComplete: (success: boolean, platform: SocialPlatform) => void;
@@ -61,6 +62,7 @@ interface PlatformStatus {
 const SocialShareModal: React.FC<SocialShareModalProps> = ({
   isOpen,
   onClose,
+  onOpenChange,
   fileUrl,
   itemName = 'file',
   onComplete,
@@ -113,6 +115,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   
   // RegisterModal states
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
+
+  // Add useEffect to notify parent of modal state changes
+  useEffect(() => {
+    onOpenChange?.(isOpen);
+  }, [isOpen, onOpenChange]);
 
   // Function to check tokens endpoint (for initial check)
   const checkTokensEndpoint = async (): Promise<boolean> => {
@@ -1200,7 +1207,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-50 p-2 sm:p-4 md:p-8">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-[100] p-2 sm:p-4 md:p-8">
       <div className="bg-black border border-gray-800 rounded-xl md:rounded-xl p-4 sm:p-6 w-full sm:max-w-sm md:max-w-md lg:max-w-xl text-center relative shadow-xl sm:transform sm:-translate-y-12 h-[80vh] flex flex-col">
         <button onClick={onClose} className="absolute top-4 right-6 text-gray-400 hover:text-white transition-colors z-10">
           <X className="w-6 h-6" />

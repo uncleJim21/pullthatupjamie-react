@@ -20,6 +20,7 @@ declare global {
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenChange?: (isOpen: boolean) => void;
   fileUrl?: string;
   title?: string;
   showCopy?: boolean;
@@ -39,6 +40,7 @@ interface ShareModalProps {
 const ShareModal: React.FC<ShareModalProps> = ({
   isOpen,
   onClose,
+  onOpenChange,
   fileUrl,
   title = 'Share',
   showCopy = true,
@@ -57,6 +59,11 @@ const ShareModal: React.FC<ShareModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [activePlatform, setActivePlatform] = useState<SocialPlatform | null>(null);
   const [shareResult, setShareResult] = useState<string | null>(null);
+
+  // Add useEffect to notify parent of modal state changes
+  React.useEffect(() => {
+    onOpenChange?.(isOpen);
+  }, [isOpen, onOpenChange]);
 
   // Clear share result message after a timeout
   React.useEffect(() => {
