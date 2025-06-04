@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Twitter, Sparkles, ChevronDown, ChevronUp, ChevronRight, Info, Save } from 'lucide-react';
+import { X, Loader2, Twitter, Sparkles, ChevronDown, ChevronUp, ChevronRight, Info, Save, Check } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
@@ -42,10 +42,20 @@ interface SocialShareModalProps {
   fileUrl: string;
   itemName?: string;
   onComplete: (success: boolean, platform: SocialPlatform) => void;
-  platform: SocialPlatform;
+  platform: SocialPlatform; // Keep for backward compatibility but will be ignored
   renderUrl?: string; // URL to use in place of fileUrl for Twitter sharing
   lookupHash?: string; // Added lookupHash for Jamie Assist
   auth?: any; // Auth object for API calls
+}
+
+interface PlatformStatus {
+  enabled: boolean;
+  available: boolean;
+  authenticated: boolean;
+  publishing: boolean;
+  success: boolean | null;
+  error: string | null;
+  username?: string;
 }
 
 const SocialShareModal: React.FC<SocialShareModalProps> = ({
@@ -61,20 +71,29 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 }) => {
   const [content, setContent] = useState<string>('');
   const [isPublishing, setIsPublishing] = useState(false);
-  const [hasNostrExtension, setHasNostrExtension] = useState(false);
-  const [nostrPublicKey, setNostrPublicKey] = useState<string | null>(null);
-  const [publishStatus, setPublishStatus] = useState<{[key: string]: string}>({});
-  const [relayConnections, setRelayConnections] = useState<{[key: string]: WebSocket | null}>({});
-  const [showNostrPrompt, setShowNostrPrompt] = useState(false);
-  const [showTwitterPrompt, setShowTwitterPrompt] = useState(false);
-  const [activePlatform, setActivePlatform] = useState<SocialPlatform>(platform);
   
-  // Twitter authentication states
-  const [isTwitterAuthenticated, setIsTwitterAuthenticated] = useState(false);
-  const [twitterUsername, setTwitterUsername] = useState<string | null>(null);
-  const [isTwitterConnecting, setIsTwitterConnecting] = useState(false);
-  const [isTwitterDisconnecting, setIsTwitterDisconnecting] = useState(false);
-  const [needsTwitterReauth, setNeedsTwitterReauth] = useState(false);
+  // Platform status objects
+  const [twitterStatus, setTwitterStatus] = useState<PlatformStatus>({
+    enabled: true,
+    available: true,
+    authenticated: false,
+    publishing: false,
+    success: null,
+    error: null,
+    username: undefined
+  });
+  
+  const [nostrStatus, setNostrStatus] = useState<PlatformStatus>({
+    enabled: true,
+    available: false,
+    authenticated: false,
+    publishing: false,
+    success: null,
+    error: null
+  });
+
+  const [relayConnections, setRelayConnections] = useState<{[key: string]: WebSocket | null}>({});
+  const [publishStatus, setPublishStatus] = useState<{[key: string]: string}>({});
   
   // Token checking and polling states
   const [isCheckingTokens, setIsCheckingTokens] = useState(true);
@@ -179,9 +198,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             
             // Update Twitter auth state if this was a Twitter auth flow
             if (platform === SocialPlatform.Twitter) {
-              setIsTwitterAuthenticated(true);
+              setTwitterStatus({ ...twitterStatus, authenticated: true });
               if (data.twitterUsername) {
-                setTwitterUsername(data.twitterUsername);
+                setTwitterStatus({ ...twitterStatus, username: data.twitterUsername });
               }
             }
           } else {
@@ -262,92 +281,41 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
-  // Update activePlatform when platform prop changes
-  useEffect(() => {
-    setActivePlatform(platform);
-  }, [platform]);
-
-  // Update activePlatform when showing cross-posting prompts
-  useEffect(() => {
-    if (showNostrPrompt) {
-      printLog("Showing Nostr prompt after Twitter, setting activePlatform to Nostr");
-      setActivePlatform(SocialPlatform.Nostr);
-    } else if (showTwitterPrompt) {
-      printLog("Showing Twitter prompt after Nostr, setting activePlatform to Twitter");
-      setActivePlatform(SocialPlatform.Twitter);
-    }
-  }, [showNostrPrompt, showTwitterPrompt]);
-
-  // Effect to hide search bar when modal is open
-  useEffect(() => {
-    // Find all search forms - more reliable than class-based selector
-    const searchForms = document.querySelectorAll('form[class*="relative"]');
-    
-    if (isOpen && searchForms.length > 0) {
-      // Hide all search forms
-      searchForms.forEach(form => {
-        if (form instanceof HTMLElement) {
-          form.style.display = 'none';
-        }
-      });
-    }
-
-    return () => {
-      // Restore visibility of search forms when modal closes
-      searchForms.forEach(form => {
-        if (form instanceof HTMLElement) {
-          form.style.display = '';
-        }
-      });
-    };
-  }, [isOpen]);
-
   // Initialize content with default text and check for Nostr extension if needed
   useEffect(() => {
     // No default content, empty textarea with just placeholder
     setContent('');
     
-    // Check for Nostr extension only if platform is Nostr
-    if (platform === SocialPlatform.Nostr) {
-      checkNostrExtension();
+    // Check both platforms
+    checkNostrExtension();
+    checkTwitterAuth();
 
-      // Initialize relay status
-      const initialStatus: {[key: string]: string} = {};
-      relayPool.forEach(relay => {
-        initialStatus[relay] = 'idle';
-      });
-      setPublishStatus(initialStatus);
-    }
-
-    // Reset cross-posting prompts when platform changes
-    printLog(`Platform changed to: ${platform}`);
-    setShowNostrPrompt(false);
-    setShowTwitterPrompt(false);
+    // Initialize relay status
+    const initialStatus: {[key: string]: string} = {};
+    relayPool.forEach(relay => {
+      initialStatus[relay] = 'idle';
+    });
+    setPublishStatus(initialStatus);
 
     // Load any saved Jamie Assist preferences
     loadJamieAssistPreferences();
 
     return () => {
       // Clean up WebSocket connections when component unmounts
-      if (platform === SocialPlatform.Nostr) {
-        Object.values(relayConnections).forEach(conn => {
-          if (conn && conn.readyState === WebSocket.OPEN) {
-            conn.close();
-          }
-        });
-      }
-      // Reset prompts when unmounting
-      setShowNostrPrompt(false);
-      setShowTwitterPrompt(false);
+      Object.values(relayConnections).forEach(conn => {
+        if (conn && conn.readyState === WebSocket.OPEN) {
+          conn.close();
+        }
+      });
     };
-  }, [fileUrl, itemName, platform]);
+  }, [fileUrl, itemName, isOpen]);
 
-  // Effect to check for Nostr extension when showing the cross-posting prompt
+  // Effect to check for Nostr extension when modal opens
   useEffect(() => {
-    if (showNostrPrompt) {
+    if (isOpen) {
       checkNostrExtension();
     }
-  }, [showNostrPrompt]);
+  }, [isOpen]);
 
   // Effect to initialize and check lookupHash
   useEffect(() => {
@@ -365,22 +333,98 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const checkNostrExtension = async () => {
     try {
       if (window.nostr) {
-        setHasNostrExtension(true);
+        setNostrStatus(prev => ({ ...prev, available: true }));
         try {
           const pubKey = await window.nostr.getPublicKey();
-          setNostrPublicKey(pubKey);
+          setNostrStatus(prev => ({ ...prev, authenticated: true }));
           printLog(`Nostr extension found with public key: ${pubKey}`);
         } catch (keyError) {
           printLog("Nostr extension found but couldn't get public key");
+          setNostrStatus(prev => ({ ...prev, authenticated: false }));
         }
       } else {
-        setHasNostrExtension(false);
+        setNostrStatus(prev => ({ ...prev, available: false, authenticated: false }));
       }
     } catch (error) {
-      setHasNostrExtension(false);
+      setNostrStatus(prev => ({ ...prev, available: false, authenticated: false }));
       console.error("Error checking for Nostr extension:", error);
     }
   };
+
+  // Check Twitter authentication status
+  const checkTwitterAuth = async () => {
+    printLog('Checking Twitter auth status in SocialShareModal...');
+    try {
+      const status = await AuthService.checkTwitterStatus();
+      printLog(`Twitter auth status: ${status.authenticated}`);
+      setTwitterStatus(prev => ({ 
+        ...prev, 
+        authenticated: status.authenticated,
+        available: true, // Always available for admin users
+        username: status.authenticated ? status.twitterUsername : undefined
+      }));
+    } catch (error) {
+      printLog(`Error checking Twitter status: ${error}`);
+      setTwitterStatus(prev => ({ ...prev, authenticated: false }));
+    }
+  };
+
+  // Updated connectTwitter function to start polling
+  const connectTwitter = async () => {
+    printLog('Connect Twitter button clicked in SocialShareModal');
+    setTwitterStatus(prev => ({ ...prev, publishing: true }));
+    try {
+      const authUrl = await AuthService.startTwitterAuth();
+      printLog(`Opening Twitter auth URL: ${authUrl}`);
+      window.open(authUrl, '_blank');
+      
+      // Start polling for tokens after opening auth window
+      startTokenPolling();
+    } catch (error) {
+      printLog(`Error starting Twitter auth: ${error}`);
+      setJamieAssistError(error instanceof Error ? error.message : 'Failed to start Twitter auth');
+    } finally {
+      setTwitterStatus(prev => ({ ...prev, publishing: false }));
+    }
+  };
+
+  // Disconnect from Twitter
+  const disconnectTwitter = async () => {
+    const confirmed = window.confirm(
+      'Disconnect your Twitter account? You\'ll need to re-authorize to post tweets again.'
+    );
+    
+    if (!confirmed) {
+      return;
+    }
+
+    printLog('Disconnect Twitter button clicked in SocialShareModal');
+    setTwitterStatus(prev => ({ ...prev, publishing: true }));
+    try {
+      const response = await twitterService.revoke(true);
+      printLog(`Twitter disconnect response: ${JSON.stringify(response)}`);
+      
+      if (response.success) {
+        setTwitterStatus(prev => ({ ...prev, authenticated: false, username: undefined }));
+        setJamieAssistError(null);
+        printLog('Twitter account disconnected successfully');
+      } else {
+        setJamieAssistError(response.message || 'Failed to disconnect Twitter account');
+      }
+    } catch (error) {
+      printLog(`Error disconnecting Twitter: ${error}`);
+      setJamieAssistError(error instanceof Error ? error.message : 'Failed to disconnect Twitter account');
+    } finally {
+      setTwitterStatus(prev => ({ ...prev, publishing: false }));
+    }
+  };
+
+  // Initialize Twitter auth check when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      checkTwitterAuth();
+    }
+  }, [isOpen]);
 
   // Nostr-specific functions
   const connectToRelay = (relay: string): Promise<WebSocket> => {
@@ -470,13 +514,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     });
   };
 
-  const publishToNostr = async () => {
+  const publishToNostr = async (): Promise<boolean> => {
     if (!window.nostr) {
       console.error("No Nostr extension available");
       return false;
     }
 
     try {
+      setNostrStatus(prev => ({ ...prev, publishing: true }));
+      
       // Add the URL and attribution to the content text before sending
       const finalContent = `${content}\n\n${fileUrl}\n\nShared via https://pullthatupjamie.ai`;
       
@@ -486,7 +532,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         content: finalContent,
         tags: [],
         created_at: Math.floor(Date.now() / 1000),
-        pubkey: nostrPublicKey || ''
+        pubkey: await window.nostr.getPublicKey()
       };
 
       // Sign the event using the extension
@@ -508,89 +554,104 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       
       printLog(`Published to ${successCount}/${relayPool.length} relays`);
       
-      return successCount > 0;
+      const success = successCount > 0;
+      setNostrStatus(prev => ({ ...prev, publishing: false, success }));
+      return success;
     } catch (error) {
       console.error("Error publishing to Nostr:", error);
+      setNostrStatus(prev => ({ ...prev, publishing: false, success: false, error: error instanceof Error ? error.message : 'Failed to publish' }));
       return false;
     }
   };
 
-  // Check Twitter authentication status
-  const checkTwitterAuth = async () => {
-    if (platform !== SocialPlatform.Twitter) return;
-    
-    printLog('Checking Twitter auth status in SocialShareModal...');
+  const publishToTwitter = async (): Promise<boolean> => {
     try {
-      const status = await AuthService.checkTwitterStatus();
-      printLog(`Twitter auth status: ${status.authenticated}`);
-      setIsTwitterAuthenticated(status.authenticated);
-      if (status.authenticated && status.twitterUsername) {
-        setTwitterUsername(status.twitterUsername);
+      setTwitterStatus(prev => ({ ...prev, publishing: true }));
+      
+      // For Twitter, use the actual CDN URL (fileUrl) since Twitter servers need to access it
+      // Only fall back to renderUrl if fileUrl is not available
+      const mediaUrl = fileUrl || renderUrl;
+      const isAdmin = AuthService.isAdmin();
+      
+      // If user is admin and authenticated with Twitter, use OAuth flow
+      if (isAdmin && twitterStatus.authenticated) {
+        printLog(`Posting tweet with content: "${content}" and mediaUrl: "${mediaUrl}"`);
+        
+        const response = await twitterService.postTweet(content, mediaUrl);
+        printLog(`Twitter post response: ${JSON.stringify(response)}`);
+        
+        // Handle auth expiration
+        if (response.error === 'TWITTER_AUTH_EXPIRED' && response.requiresReauth) {
+          printLog('Twitter auth expired detected in SocialShareModal');
+          setTwitterStatus(prev => ({ ...prev, authenticated: false, publishing: false, error: 'Authentication expired' }));
+          return false;
+        }
+        
+        if (response.success) {
+          printLog('Tweet posted successfully');
+          setTwitterStatus(prev => ({ ...prev, publishing: false, success: true }));
+          return true;
+        } else {
+          setTwitterStatus(prev => ({ ...prev, publishing: false, success: false, error: response.message || response.error || 'Failed to post tweet' }));
+          return false;
+        }
+      } else {
+        // For non-admin users or unauthenticated admins, open Twitter web intent
+        const tweetText = `${content}\n${mediaUrl}\n\nShared via https://pullthatupjamie.ai`;
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+        window.open(twitterUrl, '_blank');
+        setTwitterStatus(prev => ({ ...prev, publishing: false, success: true }));
+        return true;
       }
     } catch (error) {
-      printLog(`Error checking Twitter status: ${error}`);
-      setIsTwitterAuthenticated(false);
+      printLog(`Error posting tweet: ${error}`);
+      setTwitterStatus(prev => ({ ...prev, publishing: false, success: false, error: error instanceof Error ? error.message : 'Failed to post tweet' }));
+      return false;
     }
   };
 
-  // Updated connectTwitter function to start polling
-  const connectTwitter = async () => {
-    printLog('Connect Twitter button clicked in SocialShareModal');
-    setIsTwitterConnecting(true);
-    try {
-      const authUrl = await AuthService.startTwitterAuth();
-      printLog(`Opening Twitter auth URL: ${authUrl}`);
-      window.open(authUrl, '_blank');
-      setNeedsTwitterReauth(false);
-      
-      // Start polling for tokens after opening auth window
-      startTokenPolling();
-    } catch (error) {
-      printLog(`Error starting Twitter auth: ${error}`);
-      setJamieAssistError(error instanceof Error ? error.message : 'Failed to start Twitter auth');
-    } finally {
-      setIsTwitterConnecting(false);
-    }
-  };
-
-  // Disconnect from Twitter
-  const disconnectTwitter = async () => {
-    const confirmed = window.confirm(
-      'Disconnect your Twitter account? You\'ll need to re-authorize to post tweets again.'
-    );
+  const handlePublish = async () => {
+    setIsPublishing(true);
     
-    if (!confirmed) {
+    const promises: Promise<boolean>[] = [];
+    
+    // Add Twitter publishing if enabled and available
+    if (twitterStatus.enabled && twitterStatus.available) {
+      promises.push(publishToTwitter());
+    }
+    
+    // Add Nostr publishing if enabled and available
+    if (nostrStatus.enabled && nostrStatus.available && nostrStatus.authenticated) {
+      promises.push(publishToNostr());
+    }
+    
+    if (promises.length === 0) {
+      setIsPublishing(false);
       return;
     }
-
-    printLog('Disconnect Twitter button clicked in SocialShareModal');
-    setIsTwitterDisconnecting(true);
+    
     try {
-      const response = await twitterService.revoke(true);
-      printLog(`Twitter disconnect response: ${JSON.stringify(response)}`);
+      // Publish to all enabled platforms in parallel
+      const results = await Promise.allSettled(promises);
       
-      if (response.success) {
-        setIsTwitterAuthenticated(false);
-        setTwitterUsername(null);
-        setJamieAssistError(null);
-        printLog('Twitter account disconnected successfully');
-      } else {
-        setJamieAssistError(response.message || 'Failed to disconnect Twitter account');
+      // Check if any succeeded
+      const anySuccess = results.some(result => 
+        result.status === 'fulfilled' && result.value === true
+      );
+      
+      setIsPublishing(false);
+      
+      if (anySuccess) {
+        // Close modal after successful publishing
+        setTimeout(() => {
+          onClose();
+        }, 1500);
       }
     } catch (error) {
-      printLog(`Error disconnecting Twitter: ${error}`);
-      setJamieAssistError(error instanceof Error ? error.message : 'Failed to disconnect Twitter account');
-    } finally {
-      setIsTwitterDisconnecting(false);
+      console.error('Error during publishing:', error);
+      setIsPublishing(false);
     }
   };
-
-  // Initialize Twitter auth check when platform is Twitter
-  useEffect(() => {
-    if (platform === SocialPlatform.Twitter) {
-      checkTwitterAuth();
-    }
-  }, [platform]);
 
   const handleJamieAssist = async () => {
     // Clear any previous errors
@@ -680,54 +741,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       }
     } finally {
       setIsGeneratingContent(false);
-    }
-  };
-
-  const handlePublish = async () => {
-    setIsPublishing(true);
-    
-    try {
-      // Add debugging for current state
-      printLog(`handlePublish called with activePlatform: ${activePlatform}, platform prop: ${platform}, showNostrPrompt: ${showNostrPrompt}, showTwitterPrompt: ${showTwitterPrompt}`);
-      
-      // Use platform to determine the correct publish method, not activePlatform
-      if (platform === SocialPlatform.Nostr) {
-        printLog("Publishing to Nostr");
-        if (!hasNostrExtension) {
-          onComplete(false, SocialPlatform.Nostr);
-          return;
-        }
-        
-        // Call the actual publishToNostr function
-        const success = await publishToNostr();
-        setIsPublishing(false);
-        
-        if (showNostrPrompt) {
-          // This is part of the cross-posting flow from Twitter
-          printLog(`Nostr cross-post ${success ? 'successful' : 'failed'}`);
-          onComplete(success, SocialPlatform.Nostr);
-          if (success) {
-            onClose();
-          }
-        } else if (success) {
-          // Show Twitter cross-posting prompt after successful Nostr publish
-          printLog("Nostr publish successful, showing Twitter prompt");
-          setShowTwitterPrompt(true);
-        } else {
-          // Only complete and close if not successful
-          printLog("Nostr publish failed");
-          onComplete(false, SocialPlatform.Nostr);
-        }
-      } 
-      // Twitter share
-      else if (platform === SocialPlatform.Twitter) {
-        printLog("Sharing to Twitter");
-        shareToTwitter();
-      }
-    } catch (error) {
-      console.error(`Error during ${platform} publishing:`, error);
-      setIsPublishing(false);
-      onComplete(false, platform);
     }
   };
 
@@ -837,7 +850,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       const isAdmin = AuthService.isAdmin();
       
       // If user is admin and authenticated with Twitter, use OAuth flow
-      if (isAdmin && isTwitterAuthenticated) {
+      if (isAdmin && twitterStatus.authenticated) {
         printLog(`Posting tweet with content: "${content}" and mediaUrl: "${mediaUrl}"`);
         printLog(`Available URLs - fileUrl: "${fileUrl}", renderUrl: "${renderUrl}"`);
         
@@ -847,9 +860,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         // Handle auth expiration
         if (response.error === 'TWITTER_AUTH_EXPIRED' && response.requiresReauth) {
           printLog('Twitter auth expired detected in SocialShareModal');
-          setIsTwitterAuthenticated(false);
-          setTwitterUsername(null);
-          setNeedsTwitterReauth(true);
+          setTwitterStatus(prev => ({ ...prev, authenticated: false }));
           setJamieAssistError('Twitter authentication expired. Please reconnect your account.');
           setIsPublishing(false);
           return;
@@ -857,16 +868,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         if (response.success) {
           printLog('Tweet posted successfully');
-          // Only show cross-posting option if this is the initial Twitter share
-          if (!showTwitterPrompt) {
-            printLog("Setting showNostrPrompt to true after successful Twitter post");
-            setShowNostrPrompt(true);
-          } else {
-            // If this is a cross-post from Nostr to Twitter, close the modal
-            printLog("This was a cross-post from Nostr to Twitter, closing modal");
-            onComplete(true, SocialPlatform.Twitter);
-            onClose();
-          }
+          onComplete(true, SocialPlatform.Twitter);
+          onClose();
         } else {
           setJamieAssistError(response.message || response.error || 'Failed to post tweet');
         }
@@ -888,160 +891,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   if (!isOpen || !fileUrl) return null;
 
-  // Show Twitter cross-posting prompt after successful Nostr publishing
-  if (showTwitterPrompt) {
-    return (
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
-        <div className="bg-black border border-gray-800 rounded-lg p-6 w-80 text-center relative">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden">
-              <Twitter className="w-6 h-6 text-blue-400" />
-            </div>
-          </div>
-          
-          <h2 className="text-lg font-semibold text-white mb-4">Share to Twitter Too?</h2>
-          
-          <div className="flex justify-center mt-4 gap-4">
-            <button
-              onClick={onClose}
-              className="px-5 py-2 rounded-lg bg-black text-white border border-white"
-            >
-              Skip
-            </button>
-            <button
-              onClick={() => {
-                shareToTwitter();
-                onComplete(true, SocialPlatform.Twitter);
-                onClose();
-              }}
-              className="px-5 py-2 rounded-lg bg-blue-500 text-white font-medium hover:bg-blue-600 transition-colors"
-            >
-              Tweet
-            </button>
-          </div>
-          
-          <div className="text-gray-500 text-xs mt-4">
-            <p className="mb-1">Character count: {content.length}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show the Nostr cross-posting prompt after Twitter sharing
-  if (showNostrPrompt) {
-    // If no Nostr extension, show extension installation prompt
-    if (!hasNostrExtension) {
-      return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 rounded-lg p-6 w-96 text-center relative">
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden">
-                <img 
-                  src="/nostr-logo-square.png" 
-                  alt="Nostr" 
-                  className="w-6 h-6"
-                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
-                />
-              </div>
-            </div>
-            
-            <h2 className="text-lg font-semibold text-white mb-4">Nostr Extension Required</h2>
-            
-            <p className="text-gray-300 mb-6">
-              You need a Nostr browser extension to publish this post.
-            </p>
-            
-            <div className="space-y-3 max-w-xs mx-auto mb-4">
-              <a 
-                href="https://getalby.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center"
-              >
-                <span className="font-bold">Alby</span>
-                <span className="ml-2 text-xs text-gray-400">(Recommended)</span>
-              </a>
-            </div>
-            
-            <button
-              onClick={onClose}
-              className="px-5 py-2 rounded-lg bg-black text-white border border-white"
-            >
-              Skip
-            </button>
-          </div>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
-        <div className="bg-black border border-gray-800 rounded-lg p-6 w-80 text-center relative">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden">
-              <img 
-                src="/nostr-logo-square.png" 
-                alt="Nostr" 
-                className="w-6 h-6"
-                style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
-              />
-            </div>
-          </div>
-          
-          <h2 className="text-lg font-semibold text-white mb-4">Share to Nostr Too?</h2>
-          
-          <div className="flex justify-center mt-4 gap-4">
-            <button
-              onClick={onClose}
-              className="px-5 py-2 rounded-lg bg-black text-white border border-white"
-            >
-              Skip
-            </button>
-            <button
-              onClick={async () => {
-                setIsPublishing(true);
-                // Call publishToNostr directly for cross-posting
-                const success = await publishToNostr();
-                setIsPublishing(false);
-                if (success) {
-                  onComplete(true, SocialPlatform.Nostr);
-                  onClose();
-                }
-              }}
-              disabled={isPublishing}
-              className={`px-5 py-2 rounded-lg bg-purple-600 text-white font-medium 
-                ${isPublishing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-500 transition-colors'}`}
-            >
-              {isPublishing ? (
-                <span className="flex items-center">
-                  <Loader2 className="animate-spin w-4 h-4 mr-2" />
-                  Publishing...
-                </span>
-              ) : 'Publish'}
-            </button>
-          </div>
-          
-          {/* Publishing status for Nostr */}
-          {isPublishing && (
-            <div className="mt-4 border border-gray-800 rounded-lg p-3 bg-gray-900">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-white font-medium text-sm">Publishing to relays...</h3>
-                <div className="flex items-center">
-                  <Loader2 className="animate-spin w-4 h-4 mr-2" />
-                  <span className="text-xs text-gray-400">
-                    {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Updated renderMainModalContent to show loading state
+  // Updated renderMainModalContent to show unified cross-posting interface
   const renderMainModalContent = () => {
     const isAdmin = AuthService.isAdmin();
 
@@ -1072,7 +922,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       );
     }
 
-    // Show register modal prompt if no valid tokens
+    // Show register modal prompt if no valid tokens and no auth
     if (!hasValidTokens && !auth) {
       return (
         <div className="text-center py-8 px-4">
@@ -1093,121 +943,19 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       );
     }
 
-    // Twitter platform with authentication handling
-    if (platform === SocialPlatform.Twitter) {
-      // Only show auth UI for admin users
-      if (isAdmin) {
-        // Show reauth needed state
-        if (needsTwitterReauth) {
-          return (
-            <div className="text-center py-4 sm:py-8 px-2 sm:px-4">
-              <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
-                <Twitter className="w-8 h-8 text-yellow-400" />
-              </div>
-              <h3 className="text-xl font-medium text-white mb-2">Authentication Expired</h3>
-              <p className="text-gray-300 mb-6">
-                Your Twitter authentication has expired. Please re-authenticate to continue posting tweets.
-              </p>
-              <button 
-                onClick={connectTwitter}
-                disabled={isTwitterConnecting}
-                className={`px-6 py-3 rounded-lg bg-blue-500 text-white font-medium transition-colors
-                  ${isTwitterConnecting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
-              >
-                {isTwitterConnecting ? 'Connecting...' : 'Re-authenticate with Twitter'}
-              </button>
-            </div>
-          );
-        }
-        
-        // Show connect prompt if not authenticated
-        if (!isTwitterAuthenticated) {
-          return (
-            <div className="text-center py-4 sm:py-8 px-2 sm:px-4">
-              <Twitter className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 text-blue-400" />
-              <p className="text-gray-300 mb-4 sm:mb-6 text-base sm:text-lg">
-                Connect your Twitter account to post tweets directly.
-              </p>
-              <button 
-                onClick={connectTwitter}
-                disabled={isTwitterConnecting}
-                className={`px-6 py-2 rounded-lg bg-blue-500 text-white transition-colors
-                  ${isTwitterConnecting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
-              >
-                {isTwitterConnecting ? 'Connecting...' : 'Connect Twitter'}
-              </button>
-            </div>
-          );
-        }
-      }
-    }
-    
-    // Nostr platform without extension
-    if (platform === SocialPlatform.Nostr && !hasNostrExtension) {
-      return (
-        <div className="text-center py-4 sm:py-8 px-2 sm:px-4">
-          <img 
-            src="/nostr-logo-square.png" 
-            alt="Nostr" 
-            className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6"
-            style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
-          />
-          <p className="text-gray-300 mb-4 sm:mb-6 text-base sm:text-lg">
-            You need a Nostr browser extension to publish this post.
-          </p>
-          <div className="space-y-2 sm:space-y-3 max-w-xs mx-auto">
-            <p className="text-gray-400 text-sm font-medium">Popular extensions:</p>
-            <a 
-              href="https://getalby.com" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center"
-            >
-              <span className="font-bold">Alby</span>
-              <span className="ml-2 text-xs text-gray-400">(Recommended)</span>
-            </a>
-            <a 
-              href="https://github.com/fiatjaf/nos2x" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
-            >
-              nos2x
-            </a>
-            <a 
-              href="https://www.getflamingo.org/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:underline block py-2 px-4 bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
-            >
-              Flamingo
-            </a>
-          </div>
-        </div>
-      );
-    }
-    
-    // Main content area for authenticated users or non-admin Twitter users
+    // Main unified interface
     return (
       <>
+        <h2 className="text-xl sm:text-2xl font-semibold text-white mb-4 sm:mb-6">
+          Share to Twitter/Nostr
+        </h2>
+        
         <div className="flex items-center mb-3 sm:mb-4 px-2">
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-800 mr-2 sm:mr-3 flex items-center justify-center overflow-hidden">
-            {platform === SocialPlatform.Nostr ? (
-              <img 
-                src="/nostr-logo-square.png" 
-                alt="Nostr" 
-                className="w-5 h-5 sm:w-6 sm:h-6"
-                style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
-              />
-            ) : (
-              <Twitter className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
-            )}
+            <img src="/twitter-nostr-crosspost.png" alt="Twitter and Nostr" className="w-8 h-8 object-cover" />
           </div>
           <div className="text-left flex-1">
-            <p className="text-white font-medium">
-              {platform === SocialPlatform.Nostr ? 'Your Nostr Post' : 
-               isAdmin && twitterUsername ? `Your Tweet (@${twitterUsername})` : 'Share on Twitter'}
-            </p>
+            <p className="text-white font-medium">Your Post</p>
           </div>
         </div>
         
@@ -1221,6 +969,106 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         <div className="text-gray-400 text-xs mb-2 sm:mb-3 text-left pl-1">
           The link to your {itemName} and attribution will be added automatically when you publish.
+        </div>
+        
+        {/* Platform Selection with Checkboxes */}
+        <div className="mb-6">
+          <div className="space-y-3">
+            {/* Twitter Platform */}
+            <div className="flex items-center justify-between p-3 bg-gray-900/60 border border-gray-700 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <Twitter className="w-6 h-6 text-blue-400" />
+                <div className="flex-1">
+                  {isAdmin && twitterStatus.authenticated ? (
+                    <p className="text-white text-sm">Signed in as @{twitterStatus.username}</p>
+                  ) : (
+                    <p className="text-white text-sm">
+                      {isAdmin ? 'Connect to post directly' : 'Web sharing available'}
+                    </p>
+                  )}
+                </div>
+                {isAdmin && (
+                  <div className="flex items-center space-x-2">
+                    {twitterStatus.authenticated ? (
+                      <button
+                        onClick={disconnectTwitter}
+                        disabled={twitterStatus.publishing}
+                        className="px-3 py-1 text-xs bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+                      >
+                        {twitterStatus.publishing ? 'Disconnecting...' : 'Disconnect'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={connectTwitter}
+                        disabled={twitterStatus.publishing}
+                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50"
+                      >
+                        {twitterStatus.publishing ? 'Connecting...' : 'Connect'}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center space-x-2 ml-2">
+                {twitterStatus.publishing && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
+                {twitterStatus.success === true && <Check className="w-4 h-4 text-green-500" />}
+                {twitterStatus.success === false && <X className="w-4 h-4 text-red-500" />}
+                <input
+                  type="checkbox"
+                  checked={twitterStatus.enabled}
+                  onChange={(e) => setTwitterStatus(prev => ({ ...prev, enabled: e.target.checked }))}
+                  className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Nostr Platform */}
+            <div className="flex items-center justify-between p-3 bg-gray-900/60 border border-gray-700 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <img 
+                  src="/nostr-logo-square.png" 
+                  alt="Nostr" 
+                  className="w-6 h-6"
+                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+                />
+                <div className="flex-1">
+                  {nostrStatus.available && nostrStatus.authenticated ? (
+                    <p className="text-white text-sm">Extension connected</p>
+                  ) : nostrStatus.available ? (
+                    <p className="text-white text-sm">Connect NIP07 Extension to Post on Nostr</p>
+                  ) : (
+                    <p className="text-white text-sm">Install Nostr Extension</p>
+                  )}
+                </div>
+                {nostrStatus.available && !nostrStatus.authenticated && (
+                  <button
+                    onClick={checkNostrExtension}
+                    disabled={nostrStatus.publishing}
+                    className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-500 disabled:opacity-50"
+                  >
+                    Connect
+                  </button>
+                )}
+                {!nostrStatus.available && (
+                  <div className="text-xs text-gray-400">
+                    <a href="https://getalby.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Get Alby</a>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center space-x-2 ml-2">
+                {nostrStatus.publishing && <Loader2 className="w-4 h-4 animate-spin text-purple-400" />}
+                {nostrStatus.success === true && <Check className="w-4 h-4 text-green-500" />}
+                {nostrStatus.success === false && <X className="w-4 h-4 text-red-500" />}
+                <input
+                  type="checkbox"
+                  checked={nostrStatus.enabled && nostrStatus.available && nostrStatus.authenticated}
+                  onChange={(e) => setNostrStatus(prev => ({ ...prev, enabled: e.target.checked }))}
+                  disabled={!nostrStatus.available || !nostrStatus.authenticated}
+                  className="w-4 h-4 text-purple-500 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </div>
         </div>
         
         {/* Jamie Assist Advanced Preferences */}
@@ -1257,17 +1105,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           )}
         </div>
         
-        {platform === SocialPlatform.Nostr && isPublishing && (
+        {/* Publishing status for enabled platforms */}
+        {isPublishing && (
           <div className="mb-4 sm:mb-6 border border-gray-800 rounded-lg p-2 sm:p-3 bg-gray-900">
             <div className="flex items-center justify-between mb-1 sm:mb-2">
-              <h3 className="text-white font-medium text-sm">Publishing to relays...</h3>
-              <div className="flex items-center">
-                <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                <span className="text-xs sm:text-sm text-gray-400">
-                  {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
-                </span>
-              </div>
+              <h3 className="text-white font-medium text-sm">Publishing...</h3>
+              <Loader2 className="animate-spin w-4 h-4" />
             </div>
+            {nostrStatus.enabled && nostrStatus.available && (
+              <div className="text-xs text-gray-400">
+                Nostr relays: {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
+              </div>
+            )}
           </div>
         )}
         
@@ -1327,55 +1176,24 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           >
             Cancel
           </button>
-          {platform === SocialPlatform.Twitter ? (
-            <button
-              onClick={shareToTwitter}
-              disabled={isPublishing || isGeneratingContent || content.trim().length === 0 || (isAdmin && !isTwitterAuthenticated)}
-              className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-blue-600 text-white font-medium 
-                ${(isPublishing || isGeneratingContent || content.trim().length === 0 || (isAdmin && !isTwitterAuthenticated)) ? 
-                  'opacity-50 cursor-not-allowed' : 'hover:bg-blue-500 transition-colors'}`}
-            >
-              {isPublishing ? (
-                <span className="flex items-center">
-                  <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                  Posting...
-                </span>
-              ) : isAdmin ? 'Post Tweet' : 'Share on Twitter'}
-            </button>
-          ) : (
-            <button
-              onClick={handlePublish}
-              disabled={isPublishing || isGeneratingContent || content.trim().length === 0}
-              className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-purple-600 text-white font-medium 
-                ${(isPublishing || isGeneratingContent || content.trim().length === 0) ? 
-                  'opacity-50 cursor-not-allowed' : 'hover:bg-purple-500 transition-colors'}`}
-            >
-              {isPublishing ? (
-                <span className="flex items-center">
-                  <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                  Publishing...
-                </span>
-              ) : 'Publish'}
-            </button>
-          )}
+          <button
+            onClick={handlePublish}
+            disabled={isPublishing || isGeneratingContent || content.trim().length === 0 || (!twitterStatus.enabled && !nostrStatus.enabled)}
+            className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-white text-black font-medium 
+              ${(isPublishing || isGeneratingContent || content.trim().length === 0 || (!twitterStatus.enabled && !nostrStatus.enabled)) ? 
+                'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 transition-colors'}`}
+          >
+            {isPublishing ? (
+              <span className="flex items-center">
+                <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                Publishing...
+              </span>
+            ) : 'Post'}
+          </button>
         </div>
         
-        {/* Twitter disconnect button - only show for admin users */}
-        {platform === SocialPlatform.Twitter && isAdmin && isTwitterAuthenticated && (
-          <div className="flex justify-center mt-3">
-            <button 
-              onClick={disconnectTwitter}
-              disabled={isTwitterDisconnecting}
-              className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-gray-700 text-gray-300 
-                ${isTwitterDisconnecting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
-            >
-              {isTwitterDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-            </button>
-          </div>
-        )}
-        
-        <div className="text-gray-500 text-xs mt-2 sm:mt-4">
-          <p className="sm:mb-1">Character count: {content.length}</p>
+        <div className="text-gray-500 text-xs mt-2 sm:mt-4 text-center">
+          <p>Character count: {content.length}</p>
         </div>
       </>
     );
@@ -1388,11 +1206,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           <X className="w-6 h-6" />
         </button>
         
-        <h2 className="text-xl sm:text-2xl font-semibold text-white mb-4 sm:mb-6">
-          {platform === SocialPlatform.Nostr ? 'Share to Nostr' : 'Share to Twitter'}
-        </h2>
-        
-        {renderMainModalContent()}
+        <div className="modal-content max-h-screen overflow-y-auto">
+          {renderMainModalContent()}
+        </div>
       </div>
       
       {renderInfoModal()}

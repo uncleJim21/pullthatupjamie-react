@@ -239,27 +239,16 @@ const ShareModal: React.FC<ShareModalProps> = ({
               </button>
             )}
             
-            {showTwitter && (
+            {(showTwitter || showNostr) && (
               <button
-                onClick={() => setActivePlatform(SocialPlatform.Twitter)}
+                onClick={() => setActivePlatform(SocialPlatform.Twitter)} // Use Twitter as default but modal will handle both
                 className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
-                title={twitterButtonLabel || "Share on Twitter"}
-              >
-                <Twitter className="w-6 h-6 text-blue-400" />
-              </button>
-            )}
-
-            {showNostr && (
-              <button
-                onClick={() => setActivePlatform(SocialPlatform.Nostr)}
-                className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-700 cursor-pointer"
-                title={nostrButtonLabel || "Share on Nostr"}
+                title="Share on Twitter/Nostr"
               >
                 <img 
-                  src="/nostr-logo-square.png" 
-                  alt="Nostr" 
-                  className="w-6 h-6" 
-                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+                  src="/twitter-nostr-crosspost.png" 
+                  alt="Twitter/Nostr" 
+                  className="w-8 h-8"
                 />
               </button>
             )}
