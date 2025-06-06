@@ -221,6 +221,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // This allows users to specify the search mode via URL parameter, e.g. ?mode=web-search or ?mode=podcast-search
   const [searchParams] = useSearchParams();
   const modeParam = searchParams.get('mode');
+  const queryParam = searchParams.get('q');
   
   const [searchMode, setSearchMode] = useState(
     // Only use the modeParam if it's a valid SearchMode
@@ -890,6 +891,64 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   useEffect(() => {
     printLog(`model:${model}`)
   }, [model]);
+
+  // Auto-search when 'q' parameter is present in URL (e.g., from TryJamieWizard)
+  useEffect(() => {
+    if (queryParam && !hasSearchedInMode(searchMode) && !searchState.isLoading) {
+      setQuery(queryParam);
+      // Small delay to ensure component is fully loaded and query state is set
+      const timer = setTimeout(() => {
+        // Use the queryParam directly instead of relying on state
+        if (searchMode === 'podcast-search') {
+          // Set the conversation first
+          setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
+          setSearchState(prev => ({ ...prev, isLoading: true }));
+          setSearchHistory(prev => ({...prev, [searchMode]: true}));
+          
+          // Call the search with the direct query parameter
+          const performSearchWithQuery = async () => {
+            try {
+              const auth = await getAuth() as AuthConfig;
+              if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+                setIsRegisterModalOpen(true);
+                setSearchState(prev => ({ ...prev, isLoading: false }));
+                return;
+              }
+              
+              const currentSelectedFeedIds = Array.from(selectedSources) as string[];
+              const quoteResults = await handleQuoteSearch(queryParam, auth, currentSelectedFeedIds);
+              
+              setConversation(prev => [...prev, {
+                id: nextConversationId.current++,
+                type: 'podcast-search' as const,
+                query: queryParam,
+                timestamp: new Date(),
+                isStreaming: false,
+                data: {
+                  quotes: quoteResults.results
+                }
+              }]);
+              setQuery("");
+            } catch (error) {
+              console.error("Error during auto quote search:", error);
+              setSearchState(prev => ({
+                ...prev,
+                error: error as Error,
+                isLoading: false
+              }));
+            } finally {
+              setSearchState(prev => ({ ...prev, isLoading: false }));
+            }
+          };
+          
+          performSearchWithQuery();
+        } else {
+          handleStreamingSearch(queryParam);
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [queryParam, searchMode, hasSearchedInMode(searchMode), searchState.isLoading]);
 
   useEffect(() => {
     if(searchMode === 'podcast-search' && searchState.isLoading === true){

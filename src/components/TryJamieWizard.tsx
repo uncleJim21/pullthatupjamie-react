@@ -61,16 +61,87 @@ export interface SelectedPodcast {
 }
 
 const TryJamieWizard: React.FC = () => {
-  const [currentStep, setCurrentStep] = useState(1);
+  const isDebug = false;
+  const debugFeed : SelectedPodcast = {
+    "feedUrl": "https://serve.podhome.fm/rss/a7d58130-6f1d-4ff3-9c5a-aee3b8cc07cc",
+    "feedTitle": "Trust Revolution",
+    "feedId": 7246395,
+    "podcastImage": "https://assets.podhome.fm/77ae8d2c-0dcb-407e-93e7-08dd5a75ee77/638769544435807117TrustRevolution_Cover.jpg",
+    "feedGuid": "a7d58130-6f1d-4ff3-9c5a-aee3b8cc07cc"
+  }
+  // const debugFeed : SelectedPodcast = {
+  //     feedId: 6786106,
+  //     feedTitle: "The Joe Rogan Experience",
+  //     feedUrl: "https://feeds.megaphone.fm/GLT1412515089",
+  //     podcastImage: "https://megaphone.imgix.net/podcasts/8e5bcebc-ca16-11ee-89f0-0fa0b9bdfc7c/image/c2c595e6e3c2a64e6ea18fb6c6da8860.jpg",
+  //     feedGuid: "a7d58130-6f1d-4ff3-9c5a-aee3b8cc07cc",
+  //   }
+  const [currentStep, setCurrentStep] = useState(isDebug ? 5 : 1);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PodcastFeed[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedPodcast, setSelectedPodcast] = useState<SelectedPodcast | null>(null);
+  const [selectedPodcast, setSelectedPodcast] = useState<SelectedPodcast | null>(isDebug ? debugFeed : null);
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [selectedEpisode, setSelectedEpisode] = useState<PodcastEpisode | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const navigate = useNavigate();
+
+  // Static feeds for default display
+  const staticFeeds = [
+    {
+      id: "6786106",
+      title: "The Joe Rogan Experience",
+      url: "https://feeds.megaphone.fm/GLT1412515089",
+      description: "The official podcast of comedian Joe Rogan.",
+      author: "Joe Rogan",
+      image: "https://megaphone.imgix.net/podcasts/8e5bcebc-ca16-11ee-89f0-0fa0b9bdfc7c/image/c2c595e6e3c2a64e6ea18fb6c6da8860.jpg"
+    },
+    {
+      id: "5015946",
+      title: "Green Candle Investments Podcast with Brandon Keys",
+      url: "https://anchor.fm/s/8168b150/podcast/rss",
+      originalUrl: "https://anchor.fm/s/8168b150/podcast/rss",
+      link: "https://podcasters.spotify.com/pod/show/greencandleit",
+      description: "I bring viewers easy-to-digest information about investing, both in traditional equities and in Bitcoin.\nTune in every Monday for new Macro Insights podcasts and Friday for new State of Bitcoin podcasts, offering deep dives into current developments, emerging trends, and expert analyses. Stay connected with us on Twitter and Instagram @GreenCandleit for real-time updates, and engage with host, Brandon, at @bkeys1010 on Twitter.\nDon't miss out – share, subscribe, and actively participate in the conversation! Spread the word about our podcast! Support this podcast: https://podcasters.spotify.com/pod/show/greencandleit/support",
+      author: "Green Candle Investments",
+      ownerName: "Green Candle Investments",
+      image: "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/21611220/21611220-1732893316589-fb33705d325d1.jpg"
+    },
+    {
+      id: "3955537",
+      title: "Thriller \"A Bitcoin Zine\"",
+      url: "https://feeds.transistor.fm/thriller-premium",
+      originalUrl: "https://api.substack.com/feed/podcast/9895.rss",
+      link: "https://www.thrillerbitcoin.com",
+      description: "Thriller is a local austin bitcoin zine. | Listen to the pod http://thriller.transistor.fm | ⚡️thriller@getalby.com",
+      author: "Thriller X Recordings",
+      ownerName: "Thriller X Recordings",
+      image: "https://img.transistor.fm/flZJC8zviqt7OAbY5RXG072wag-t6IvdBZKEzHUCfgI/rs:fill:3000:3000:1/q:60/aHR0cHM6Ly9pbWct/dXBsb2FkLXByb2R1/Y3Rpb24udHJhbnNp/c3Rvci5mbS9zaG93/LzIzMjQwLzE2NjQ1/NTE2NjItYXJ0d29y/ay5qcGc.jpg"
+    },
+    {
+      id: "1000839",
+      title: "Bitcoin Audible",
+      url: "https://feeds.castos.com/mj96z",
+      originalUrl: "https://anchor.fm/s/80d5cfc/podcast/rss",
+      link: "https://bitcoinaudible.com/",
+      description: "The Best in Bitcoin made Audible.",
+      author: "Guy Swann",
+      ownerName: "Guy Swann",
+      image: "https://episodes.castos.com/6626b866f2af87-36468692/images/podcast/covers/c1a-9mg94-o87n4gnwav1j-6d2xb6.jpg"
+    },
+    {
+      id: "7246395",
+      title: "Trust Revolution",  
+      url: "https://serve.podhome.fm/rss/a7d58130-6f1d-4ff3-9c5a-aee3b8cc07cc",
+      originalUrl: "https://serve.podhome.fm/rss/a7d58130-6f1d-4ff3-9c5a-aee3b8cc07cc",
+      link: "https://podcast.trustrevolution.co",
+      description: "Trust is unraveling—institutions falter, headlines deceive, and centralized power's grip is weakening. A new reality's emerging: decentralized protocols like Bitcoin and Nostr, along with privacy-preserving technologies, are rewriting the rules.",
+      author: "Shawn Yeager",
+      ownerName: "Shawn Yeager", 
+      image: "https://assets.podhome.fm/77ae8d2c-0dcb-407e-93e7-08dd5a75ee77/638769544435807117TrustRevolution_Cover.jpg"
+    }
+  ];
 
   // Search for podcasts when the query changes (after 500ms debounce)
   useEffect(() => {
@@ -112,6 +183,7 @@ const TryJamieWizard: React.FC = () => {
       console.log('Feed episodes response:', response);
       if (response.episodes && response.episodes.feedInfo) {
         const info = response.episodes.feedInfo;
+        console.log('Selected podcast:', JSON.stringify(info,null,2));
         setSelectedPodcast({
           feedId: info.feedId,
           feedGuid: info.feedGuid,
@@ -179,6 +251,7 @@ const TryJamieWizard: React.FC = () => {
               feedId: selectedPodcast.feedId,
             },
           ],
+          skipCleanGuid: true,
         };
         const res = await TryJamieService.submitOnDemandRun(req);
         setJobId(res.jobId);
@@ -225,8 +298,35 @@ const TryJamieWizard: React.FC = () => {
       case 5:
         return (
           <div className="flex flex-col items-center justify-center min-h-[300px] py-16">
-            <h1 className="text-3xl font-bold mb-8">Enjoy!</h1>
-            <p className="text-gray-400">Your Jamie job is complete. (Placeholder)</p>
+            <h1 className="text-3xl font-bold mb-8">Processing Complete!</h1>
+            <p className="text-gray-400 mb-8">Start searching, clipping and sharing your podcast now with Jamie!</p>
+            <button
+              onClick={() => {
+                // Store the selected feed as the default source for SearchInterface
+                if (selectedPodcast) {
+                  const feedId = selectedPodcast.feedId.toString();
+                  localStorage.setItem('selectedPodcastSources', JSON.stringify([String(feedId)]));
+                }
+                // Extract first 12 words from episode description
+                const getQueryFromDescription = (description: string): string => {
+                  // Strip HTML tags and clean up the text
+                  const tempDiv = document.createElement('div');
+                  tempDiv.innerHTML = description;
+                  const cleanText = tempDiv.textContent || tempDiv.innerText || '';
+                  
+                  // Split into words and take first 12
+                  const words = cleanText.trim().split(/\s+/).filter(word => word.length > 0);
+                  return words.slice(0, 12).join(' ');
+                };
+                
+                const query = selectedEpisode ? getQueryFromDescription(selectedEpisode.description) : "artificial intelligence";
+                // Navigate to SearchInterface with auto-search parameters
+                navigate(`/app?mode=podcast-search&q=${encodeURIComponent(query)}`);
+              }}
+              className="bg-white text-black hover:bg-gray-200 py-3 px-6 rounded-lg font-medium text-lg transition-colors"
+            >
+              See Results
+            </button>
           </div>
         );
       default:
@@ -316,72 +416,33 @@ const TryJamieWizard: React.FC = () => {
               <p className="text-gray-400">No podcasts found. Try a different search term.</p>
             </div>
           ) : (
-            <>
-              <div className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4">
+            staticFeeds.map((feed) => (
+              <div 
+                key={feed.id}
+                className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4"
+              >
                 <div className="flex items-center">
                   <img 
-                    src="https://storage.googleapis.com/jamie-casts/podcast-logos/jre.jpg" 
-                    alt="Joe Rogan Experience" 
+                    src={feed.image} 
+                    alt={feed.title} 
                     className="w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg';
+                    }}
                   />
                   <div>
-                    <h3 className="text-white font-medium text-base line-clamp-1">The Joe Rogan Experience</h3>
-                    <p className="text-gray-400 text-sm line-clamp-1">Joe Rogan</p>
+                    <h3 className="text-white font-medium text-base line-clamp-1">{feed.title}</h3>
+                    <p className="text-gray-400 text-sm line-clamp-1">{feed.author || feed.ownerName}</p>
                   </div>
                 </div>
-                <button className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors">
+                <button 
+                  onClick={() => handleSelectFeed(feed)}
+                  className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors"
+                >
                   Select
                 </button>
               </div>
-              <div className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4">
-                <div className="flex items-center">
-                  <img 
-                    src="https://storage.googleapis.com/jamie-casts/podcast-logos/green-candle.jpg" 
-                    alt="Green Candle Investments" 
-                    className="w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
-                  />
-                  <div>
-                    <h3 className="text-white font-medium text-base line-clamp-1">Green Candle Investments Podcast with Brandon Keys</h3>
-                    <p className="text-gray-400 text-sm line-clamp-1">Green Candle Investments</p>
-                  </div>
-                </div>
-                <button className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors">
-                  Select
-                </button>
-              </div>
-              <div className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4">
-                <div className="flex items-center">
-                  <img 
-                    src="https://storage.googleapis.com/jamie-casts/podcast-logos/thriller.jpg" 
-                    alt="Thriller - A Netflix Zone" 
-                    className="w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
-                  />
-                  <div>
-                    <h3 className="text-white font-medium text-base line-clamp-1">Thriller "A Blizzic Zone"</h3>
-                    <p className="text-gray-400 text-sm line-clamp-1">Thriller X Recordings</p>
-                  </div>
-                </div>
-                <button className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors">
-                  Select
-                </button>
-              </div>
-              <div className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4">
-                <div className="flex items-center">
-                  <img 
-                    src="https://storage.googleapis.com/jamie-casts/podcast-logos/blizzic.jpg" 
-                    alt="Blizzic Audible" 
-                    className="w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
-                  />
-                  <div>
-                    <h3 className="text-white font-medium text-base line-clamp-1">Blizzic Audible</h3>
-                    <p className="text-gray-400 text-sm line-clamp-1">Guy Sweeney</p>
-                  </div>
-                </div>
-                <button className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors">
-                  Select
-                </button>
-              </div>
-            </>
+            ))
           )}
         </div>
       </>
@@ -521,11 +582,11 @@ const TryJamieWizard: React.FC = () => {
           </p>
         </div>
 
-        <div className="bg-gray-800 rounded-lg p-6 mb-8">
+        <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 mb-8">
           <div className="flex items-center mb-6">
             <button
               onClick={() => setCurrentStep(2)}
-              className="mr-4 p-2 hover:bg-gray-700 rounded-full transition-colors"
+              className="mr-4 p-2 hover:bg-gray-800 rounded-full transition-colors"
             >
               <svg 
                 width="24" 

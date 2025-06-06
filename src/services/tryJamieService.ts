@@ -8,6 +8,7 @@ export interface OnDemandRunRequest {
     feedGuid: string;
     feedId: number;
   }>;
+  skipCleanGuid?: boolean;
 }
 
 export interface OnDemandRunResponse {
