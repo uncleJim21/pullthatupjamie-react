@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import PageBanner from './PageBanner.tsx';
 import rssService, { PodcastFeed, PodcastEpisode, FeedInfo } from '../services/rssService.ts';
 import TryJamieService, { OnDemandRunRequest } from '../services/tryJamieService.ts';
+import SignInModal from './SignInModal.tsx';
+import CheckoutModal from './CheckoutModal.tsx';
 
 // Step indicator interface
 interface StepIndicatorProps {
@@ -19,19 +21,19 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {
   ];
 
   return (
-    <div className="w-full max-w-2xl mx-auto mb-8 mt-8 flex items-center">
+    <div className="w-full max-w-2xl mx-auto mb-8 mt-16 flex items-center px-8">
       {steps.map((step, idx) => (
         <React.Fragment key={step.number}>
           <div className="flex flex-col items-center">
             <div
-              className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-200
+              className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full flex items-center justify-center border-2 transition-all duration-200
                 ${currentStep === step.number
                   ? 'bg-white text-black border-white shadow-lg'
                   : 'bg-gray-700 text-white border-gray-700'}
               `}
-              style={{ minWidth: 48, minHeight: 48 }}
+              style={{ minWidth: 32, minHeight: 32 }}
             >
-              <span className="text-lg font-bold">{step.number}</span>
+              <span className="text-sm sm:text-lg font-bold">{step.number}</span>
             </div>
             <span
               className={`text-xs mt-1 ${
@@ -85,7 +87,78 @@ const TryJamieWizard: React.FC = () => {
   const [selectedEpisode, setSelectedEpisode] = useState<PodcastEpisode | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
+  const [isUserSignedIn, setIsUserSignedIn] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isQuotaExceededModalOpen, setIsQuotaExceededModalOpen] = useState(false);
+  const [quotaInfo, setQuotaInfo] = useState<{
+    eligible: boolean;
+    remainingRuns: number;
+    totalLimit: number;
+    usedThisPeriod: number;
+    periodStart: string;
+    nextResetDate: string;
+    daysUntilReset: number;
+  } | null>(null);
   const navigate = useNavigate();
+
+  // Check if user is signed in
+  useEffect(() => {
+    const checkSignedIn = () => {
+      const hasToken = !!localStorage.getItem('auth_token');
+      const hasSquareId = !!localStorage.getItem('squareId');
+      setIsUserSignedIn(hasToken && hasSquareId);
+      
+      // If user is signed in, check their quota
+      if (hasToken && hasSquareId) {
+        checkQuotaEligibility();
+      }
+    };
+    
+    checkSignedIn();
+  }, []);
+
+  // Function to check on-demand run eligibility
+  const checkQuotaEligibility = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.log('No auth token found');
+        return;
+      }
+
+      console.log('Checking quota eligibility...');
+      const response = await fetch(`${process.env.REACT_APP_JAMIE_API_URL || 'http://localhost:4111'}/api/check-ondemand-eligibility`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Quota response:', data);
+        if (data.success && data.eligibility) {
+          console.log('Setting quota info:', data.eligibility);
+          setQuotaInfo(data.eligibility);
+        }
+      } else {
+        console.error('Quota check failed:', response.status);
+      }
+    } catch (error) {
+      console.error('Error checking quota eligibility:', error);
+    }
+  };
+
+  // Handle upgrade functions
+  const handleUpgrade = () => {
+    setIsCheckoutModalOpen(true);
+  };
+
+  const handleUpgradeSuccess = () => {
+    setIsCheckoutModalOpen(false);
+    // Refresh quota after successful upgrade
+    checkQuotaEligibility();
+  };
 
   // Static feeds for default display
   const staticFeeds = [
@@ -255,6 +328,8 @@ const TryJamieWizard: React.FC = () => {
         };
         const res = await TryJamieService.submitOnDemandRun(req);
         setJobId(res.jobId);
+        // Refresh quota after successful submission
+        checkQuotaEligibility();
         // Start polling
         pollInterval = setInterval(async () => {
           pollCount++;
@@ -271,8 +346,30 @@ const TryJamieWizard: React.FC = () => {
           }
         }, 10000);
       } catch (e) {
+        console.error('Job submission error:', e);
         setProcessing(false);
-        setTimeout(() => setCurrentStep(5), 500); // Move to Enjoy step
+        
+        // Check if the error is due to quota exceeded or authentication
+        if (e instanceof Error) {
+          if (e.message.includes('limit exceeded') || e.message.includes('quota')) {
+            // Show notification modal first for quota exceeded
+            setIsQuotaExceededModalOpen(true);
+            // Go back to step 3 so user can try again after upgrade
+            setCurrentStep(3);
+          } else if (e.message.includes('Authentication failed')) {
+            // Handle authentication failure
+            setIsUserSignedIn(false);
+            setIsSignInModalOpen(true);
+            // Go back to step 3 so user can try again after sign in
+            setCurrentStep(3);
+          } else {
+            // For other errors, proceed to end step
+            setTimeout(() => setCurrentStep(5), 500);
+          }
+        } else {
+          // For unknown errors, proceed to end step
+          setTimeout(() => setCurrentStep(5), 500);
+        }
       }
     };
     if (currentStep === 4) {
@@ -283,6 +380,22 @@ const TryJamieWizard: React.FC = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
+
+  // Debug state changes
+  useEffect(() => {
+    console.log('State update:', {
+      isUserSignedIn,
+      quotaInfo,
+      isQuotaExceededModalOpen,
+      currentStep
+    });
+    
+    // Auto-show quota exceeded modal if user loads page and is over quota
+    if (isUserSignedIn && quotaInfo && !quotaInfo.eligible && currentStep === 1 && !isQuotaExceededModalOpen) {
+      console.log('Auto-showing quota exceeded modal on page load');
+      setIsQuotaExceededModalOpen(true);
+    }
+  }, [isUserSignedIn, quotaInfo, isQuotaExceededModalOpen, currentStep]);
 
   // Render appropriate content based on current step
   const renderContent = () => {
@@ -631,7 +744,23 @@ const TryJamieWizard: React.FC = () => {
 
           <div className="flex justify-end mt-6">
             <button 
-              onClick={() => setCurrentStep(4)}
+              onClick={() => {
+                console.log('Process button clicked');
+                console.log('isUserSignedIn:', isUserSignedIn);
+                console.log('quotaInfo:', quotaInfo);
+                
+                if (!isUserSignedIn) {
+                  console.log('Showing sign in modal');
+                  setIsSignInModalOpen(true);
+                } else if (quotaInfo && !quotaInfo.eligible) {
+                  console.log('Quota exceeded, showing notification modal');
+                  // User is out of runs, show notification modal first
+                  setIsQuotaExceededModalOpen(true);
+                } else {
+                  console.log('Proceeding to step 4');
+                  setCurrentStep(4);
+                }
+              }}
               className="bg-white text-black hover:bg-gray-200 py-2 px-6 rounded-lg font-medium"
             >
               Process This Episode
@@ -655,6 +784,13 @@ const TryJamieWizard: React.FC = () => {
       {/* Page Banner */}
       <PageBanner logoText="Pull That Up Jamie!" />
       
+      {/* Quota Display */}
+      {isUserSignedIn && quotaInfo && (
+        <div className="absolute top-24 right-6 text-white text-sm bg-black/50 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-700 shadow-lg">
+          <div>{quotaInfo.usedThisPeriod}/{quotaInfo.totalLimit} Episodes for this {quotaInfo.daysUntilReset} Day Period</div>
+        </div>
+      )}
+      
       {/* Step Indicator */}
       <StepIndicator currentStep={currentStep} />
       
@@ -662,6 +798,64 @@ const TryJamieWizard: React.FC = () => {
       <div className="max-w-3xl mx-auto px-4 py-8">
         {renderContent()}
       </div>
+
+      {/* Sign In Modal */}
+      <SignInModal 
+        isOpen={isSignInModalOpen} 
+        onClose={() => setIsSignInModalOpen(false)}
+        onSignInSuccess={() => {
+          setIsUserSignedIn(true);
+          setIsSignInModalOpen(false);
+          checkQuotaEligibility(); // Refresh quota after sign in
+          setCurrentStep(4); // Proceed to processing step after sign in
+        }}
+        onSignUpSuccess={() => {
+          setIsUserSignedIn(true);
+          setIsSignInModalOpen(false);
+          checkQuotaEligibility(); // Refresh quota after sign up
+          setCurrentStep(4); // Proceed to processing step after sign up
+        }}
+        customTitle="Let's get a good email for ya"
+        initialMode="signup"
+      />
+
+      {/* Quota Exceeded Notification Modal */}
+      {isQuotaExceededModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+          <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+            <h2 className="text-white text-xl font-bold mb-4">
+              Free Tier Limit Reached
+            </h2>
+            <p className="text-gray-400 mb-6">
+              You've used all your free on-demand runs for this period. Upgrade to Jamie Pro to get unlimited runs and access to all features.
+            </p>
+            <button
+              onClick={() => {
+                setIsQuotaExceededModalOpen(false);
+                setIsCheckoutModalOpen(true);
+              }}
+              className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Modal */}
+      <CheckoutModal 
+        isOpen={isCheckoutModalOpen} 
+        onClose={() => setIsCheckoutModalOpen(false)} 
+        onSuccess={handleUpgradeSuccess}
+        productName="jamie-pro"
+        customDescription="Unlock unlimited on-demand runs and access to all Jamie features"
+        customFeatures={[
+          "Pods Transcribed & Searchable",
+          "AI Curated Clips & Email Alerts",
+          "AI Assist for Social Media"
+        ]}
+        customPrice="49.99"
+      />
     </div>
   );
 };
