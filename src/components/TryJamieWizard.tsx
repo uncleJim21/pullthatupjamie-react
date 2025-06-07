@@ -102,7 +102,7 @@ const TryJamieWizard: React.FC = () => {
   } | null>(null);
   const navigate = useNavigate();
 
-  // Check if user is signed in
+  // Check if user is signed in and auto-show quota modal
   useEffect(() => {
     const checkSignedIn = () => {
       const hasToken = !!localStorage.getItem('auth_token');
@@ -118,16 +118,22 @@ const TryJamieWizard: React.FC = () => {
     checkSignedIn();
   }, []);
 
+  // Auto-show quota exceeded modal when user is over quota
+  useEffect(() => {
+    // Auto-show quota exceeded modal if user loads page and is over quota
+    if (isUserSignedIn && quotaInfo && !quotaInfo.eligible && currentStep === 1 && !isQuotaExceededModalOpen) {
+      setIsQuotaExceededModalOpen(true);
+    }
+  }, [isUserSignedIn, quotaInfo, isQuotaExceededModalOpen, currentStep]);
+
   // Function to check on-demand run eligibility
   const checkQuotaEligibility = async () => {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        console.log('No auth token found');
         return;
       }
 
-      console.log('Checking quota eligibility...');
       const response = await fetch(`${process.env.REACT_APP_JAMIE_API_URL || 'http://localhost:4111'}/api/check-ondemand-eligibility`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -136,13 +142,9 @@ const TryJamieWizard: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Quota response:', data);
         if (data.success && data.eligibility) {
-          console.log('Setting quota info:', data.eligibility);
           setQuotaInfo(data.eligibility);
         }
-      } else {
-        console.error('Quota check failed:', response.status);
       }
     } catch (error) {
       console.error('Error checking quota eligibility:', error);
@@ -380,22 +382,6 @@ const TryJamieWizard: React.FC = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
-
-  // Debug state changes
-  useEffect(() => {
-    console.log('State update:', {
-      isUserSignedIn,
-      quotaInfo,
-      isQuotaExceededModalOpen,
-      currentStep
-    });
-    
-    // Auto-show quota exceeded modal if user loads page and is over quota
-    if (isUserSignedIn && quotaInfo && !quotaInfo.eligible && currentStep === 1 && !isQuotaExceededModalOpen) {
-      console.log('Auto-showing quota exceeded modal on page load');
-      setIsQuotaExceededModalOpen(true);
-    }
-  }, [isUserSignedIn, quotaInfo, isQuotaExceededModalOpen, currentStep]);
 
   // Render appropriate content based on current step
   const renderContent = () => {
@@ -745,19 +731,12 @@ const TryJamieWizard: React.FC = () => {
           <div className="flex justify-end mt-6">
             <button 
               onClick={() => {
-                console.log('Process button clicked');
-                console.log('isUserSignedIn:', isUserSignedIn);
-                console.log('quotaInfo:', quotaInfo);
-                
                 if (!isUserSignedIn) {
-                  console.log('Showing sign in modal');
                   setIsSignInModalOpen(true);
                 } else if (quotaInfo && !quotaInfo.eligible) {
-                  console.log('Quota exceeded, showing notification modal');
                   // User is out of runs, show notification modal first
                   setIsQuotaExceededModalOpen(true);
                 } else {
-                  console.log('Proceeding to step 4');
                   setCurrentStep(4);
                 }
               }}
@@ -787,7 +766,7 @@ const TryJamieWizard: React.FC = () => {
       {/* Quota Display */}
       {isUserSignedIn && quotaInfo && (
         <div className="absolute top-24 right-6 text-white text-sm bg-black/50 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-700 shadow-lg">
-          <div>{quotaInfo.usedThisPeriod}/{quotaInfo.totalLimit} Episodes for this {quotaInfo.daysUntilReset} Day Period</div>
+          <div>{quotaInfo.totalLimit - quotaInfo.usedThisPeriod}/{quotaInfo.totalLimit} Free Runs left for this {quotaInfo.daysUntilReset} Day Period</div>
         </div>
       )}
       
@@ -824,10 +803,11 @@ const TryJamieWizard: React.FC = () => {
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
           <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
             <h2 className="text-white text-xl font-bold mb-4">
-              Free Tier Limit Reached
+              You've Used Your Free Episodes!
             </h2>
             <p className="text-gray-400 mb-6">
-              You've used all your free on-demand runs for this period. Upgrade to Jamie Pro to get unlimited runs and access to all features.
+              You've processed {quotaInfo?.usedThisPeriod || 2} out of {quotaInfo?.totalLimit || 2} free episodes this month. 
+              Upgrade to Jamie Pro for unlimited episode processing and instant access to all your favorite podcasts.
             </p>
             <button
               onClick={() => {
@@ -836,7 +816,7 @@ const TryJamieWizard: React.FC = () => {
               }}
               className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
             >
-              OK
+              Upgrade Now
             </button>
           </div>
         </div>

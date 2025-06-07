@@ -7,7 +7,7 @@ import PaymentFormComponent from './PaymentFormComponent.tsx';
 import { MONTHLY_PRICE_STRING, DEBUG_MODE, printLog } from '../constants/constants.ts';
 
 const steps = ['Sign In', 'Billing', 'Card'];
-const paymentServerUrl = DEBUG_MODE === false ? "https://cascdr-auth-backend-cw4nk.ondigitalocean.app" : "http://localhost:4020";
+const paymentServerUrl = DEBUG_MODE ? "http://localhost:4020" : "https://cascdr-auth-backend-cw4nk.ondigitalocean.app";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -171,8 +171,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
       <div className="bg-black w-[95%] sm:w-[90%] max-h-[90vh] overflow-auto shadow-[0_0_15px_rgba(255,255,255,0.4)] rounded-lg">
         <div className="flex flex-col lg:flex-row h-full">
+          {/* Desktop benefits section - unchanged */}
           <div className="w-full lg:w-1/3 p-4 hidden lg:flex items-center justify-center">
-          <PricingCard 
+            <PricingCard 
               plan={displayPlan}
               price={displayPrice}
               description={displayDescription}
@@ -181,6 +182,24 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
 
           <div className="w-full lg:w-2/3">
+            {/* Mobile benefits section - only on step 1 */}
+            {activeStep === 1 && (
+              <div className="lg:hidden bg-gray-900 p-3 border-b border-gray-700">
+                <div className="text-center">
+                  <h3 className="text-white text-sm font-bold mb-1">{displayPlan}</h3>
+                  <p className="text-white text-lg font-bold mb-2">${displayPrice}/mo</p>
+                  <div className="text-xs text-gray-300 space-y-1">
+                    {displayFeatures.map((feature, index) => (
+                      <div key={index} className="flex items-center justify-center">
+                        <span className="mr-1">✓</span>
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <Paper
               sx={{
                 padding: { xs: '0.75rem', sm: '1rem' },
@@ -209,20 +228,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 {activeStep === 0 ? 'Subscribe' : 'Checkout'}
               </Typography>
 
-              <div className="lg:hidden">
-                <Typography 
-                  variant="subtitle2" 
-                  align="center" 
-                  sx={{ 
-                    color: 'rgba(255,255,255,0.8)', 
-                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                    mb: 1,
-                    fontWeight: 'normal'
-                  }}
-                >
-                  {displayPlan}: ${displayPrice}/mo
-                </Typography>
-              </div>
+              {/* Show price on mobile when benefits not visible */}
+              {activeStep !== 1 && (
+                <div className="lg:hidden">
+                  <Typography 
+                    variant="subtitle2" 
+                    align="center" 
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.8)', 
+                      fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                      mb: 1,
+                      fontWeight: 'normal'
+                    }}
+                  >
+                    {displayPlan}: ${displayPrice}/mo
+                  </Typography>
+                </div>
+              )}
 
               <Stepper
                 activeStep={activeStep}
@@ -253,7 +275,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 ))}
               </Stepper>
 
-              <div className={activeStep === 2 ? 'max-h-[200px] overflow-visible' : ''}>{getStepContent(activeStep)}</div>
+              {/* Form content with mobile scrolling for billing step */}
+              <div className={`${activeStep === 1 ? 'max-h-[250px] lg:max-h-none overflow-y-auto lg:overflow-visible' : activeStep === 2 ? 'max-h-[200px] overflow-visible' : ''}`}>
+                {getStepContent(activeStep)}
+              </div>
 
               {activeStep === 2 && (
                 <FormControlLabel
