@@ -35,7 +35,7 @@ const HomePage: React.FC = () => {
     }
 
     .tron-background-desktop {
-      animation: tronBreathing 4s ease-in-out infinite;
+      animation: tronBreathing 8s ease-in-out infinite;
     }
 
     @media (max-width: 768px) {
@@ -44,7 +44,7 @@ const HomePage: React.FC = () => {
         background-position: center center !important;
         opacity: 0.6 !important;
         background-attachment: fixed !important;
-        animation: tronBreathingMobile 4s ease-in-out infinite !important;
+        animation: tronBreathingMobile 8s ease-in-out infinite !important;
       }
       
       .hero-title-mobile {
@@ -101,7 +101,7 @@ const HomePage: React.FC = () => {
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
-            opacity: 0.5,
+            opacity: 0.4,
             zIndex: 1,
             pointerEvents: 'none'
           }} 
@@ -127,7 +127,7 @@ const HomePage: React.FC = () => {
                 style={{ fontSize: '18px', maxWidth: '800px', margin: '0 auto 40px', lineHeight: '1.6' }}
               >
                 Find & Capitalize on Top Moments with lightning fast 
-                <br />search & tools - courtesy of your own personal Jamie.
+                <br />search & AI tools - courtesy of your own personal Young Jamie.
               </p>
               
               <div 

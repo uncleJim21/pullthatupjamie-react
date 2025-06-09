@@ -100,6 +100,7 @@ const TryJamieWizard: React.FC = () => {
     nextResetDate: string;
     daysUntilReset: number;
   } | null>(null);
+  const [imageLoadedStates, setImageLoadedStates] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
   // Check if user is signed in and auto-show quota modal
@@ -489,13 +490,15 @@ const TryJamieWizard: React.FC = () => {
                 className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4"
               >
                 <div className="flex items-center">
+                  {!imageLoadedStates[`search-${feed.id}`] && (
+                    <div className="w-14 h-14 rounded-md border border-gray-700 mr-4 bg-gray-800 animate-pulse flex-shrink-0" />
+                  )}
                   <img 
                     src={feed.image} 
-                    alt={feed.title} 
-                    className="w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg';
-                    }}
+                    alt="" 
+                    className={`w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800 ${imageLoadedStates[`search-${feed.id}`] ? 'block' : 'hidden'}`}
+                    onLoad={() => setImageLoadedStates(prev => ({...prev, [`search-${feed.id}`]: true}))}
+                    onError={() => setImageLoadedStates(prev => ({...prev, [`search-${feed.id}`]: false}))}
                   />
                   <div>
                     <h3 className="text-white font-medium text-base line-clamp-1">{feed.title}</h3>
@@ -521,13 +524,15 @@ const TryJamieWizard: React.FC = () => {
                 className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4"
               >
                 <div className="flex items-center">
+                  {!imageLoadedStates[`static-${feed.id}`] && (
+                    <div className="w-14 h-14 rounded-md border border-gray-700 mr-4 bg-gray-800 animate-pulse flex-shrink-0" />
+                  )}
                   <img 
                     src={feed.image} 
-                    alt={feed.title} 
-                    className="w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg';
-                    }}
+                    alt="" 
+                    className={`w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800 ${imageLoadedStates[`static-${feed.id}`] ? 'block' : 'hidden'}`}
+                    onLoad={() => setImageLoadedStates(prev => ({...prev, [`static-${feed.id}`]: true}))}
+                    onError={() => setImageLoadedStates(prev => ({...prev, [`static-${feed.id}`]: false}))}
                   />
                   <div>
                     <h3 className="text-white font-medium text-base line-clamp-1">{feed.title}</h3>
@@ -592,13 +597,15 @@ const TryJamieWizard: React.FC = () => {
               <path d="M19 12H5M12 19l-7-7 7-7"/>
             </svg>
           </button>
+          {!imageLoadedStates['podcast-main'] && (
+            <div className="w-20 h-20 rounded-md mr-4 bg-gray-800 animate-pulse flex-shrink-0" />
+          )}
           <img 
             src={selectedPodcast.podcastImage} 
-            alt={selectedPodcast.feedTitle} 
-            className="w-20 h-20 rounded-md mr-4"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = "https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg";
-            }}
+            alt="" 
+            className={`w-20 h-20 rounded-md mr-4 ${imageLoadedStates['podcast-main'] ? 'block' : 'hidden'}`}
+            onLoad={() => setImageLoadedStates(prev => ({...prev, 'podcast-main': true}))}
+            onError={() => setImageLoadedStates(prev => ({...prev, 'podcast-main': false}))}
           />
           <div>
             <h2 className="text-2xl font-bold">{selectedPodcast.feedTitle}</h2>
@@ -613,13 +620,15 @@ const TryJamieWizard: React.FC = () => {
               className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between hover:border-gray-700 transition-colors p-4"
             >
               <div className="flex items-center flex-1">
+                {!imageLoadedStates[`episode-${episode.episodeGUID}`] && (
+                  <div className="w-16 h-16 rounded-md border border-gray-700 mr-4 bg-gray-800 animate-pulse flex-shrink-0" />
+                )}
                 <img 
                   src={episode.episodeImage || selectedPodcast.podcastImage} 
-                  alt={episode.itemTitle} 
-                  className="w-16 h-16 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg';
-                  }}
+                  alt="" 
+                  className={`w-16 h-16 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800 flex-shrink-0 ${imageLoadedStates[`episode-${episode.episodeGUID}`] ? 'block' : 'hidden'}`}
+                  onLoad={() => setImageLoadedStates(prev => ({...prev, [`episode-${episode.episodeGUID}`]: true}))}
+                  onError={() => setImageLoadedStates(prev => ({...prev, [`episode-${episode.episodeGUID}`]: false}))}
                 />
                 <div className="flex-1 mr-4 min-w-0">
                   <div className="flex items-center mb-1">
@@ -700,13 +709,15 @@ const TryJamieWizard: React.FC = () => {
                 <path d="M19 12H5M12 19l-7-7 7-7"/>
               </svg>
             </button>
+            {!imageLoadedStates['confirm-episode'] && (
+              <div className="w-24 h-24 rounded-md mr-6 bg-gray-800 animate-pulse flex-shrink-0" />
+            )}
             <img 
               src={selectedEpisode.episodeImage || selectedPodcast.podcastImage} 
-              alt={selectedEpisode.itemTitle} 
-              className="w-24 h-24 rounded-md mr-6"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = "https://storage.googleapis.com/jamie-casts/podcast-logos/default.jpg";
-              }}
+              alt="" 
+              className={`w-24 h-24 rounded-md mr-6 ${imageLoadedStates['confirm-episode'] ? 'block' : 'hidden'}`}
+              onLoad={() => setImageLoadedStates(prev => ({...prev, 'confirm-episode': true}))}
+              onError={() => setImageLoadedStates(prev => ({...prev, 'confirm-episode': false}))}
             />
             <div>
               <h2 className="text-2xl font-bold mb-1">{selectedEpisode.itemTitle}</h2>
@@ -766,7 +777,7 @@ const TryJamieWizard: React.FC = () => {
       {/* Quota Display */}
       {isUserSignedIn && quotaInfo && (
         <div className="absolute top-24 right-6 text-white text-sm bg-black/50 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-700 shadow-lg">
-          <div>{quotaInfo.totalLimit - quotaInfo.usedThisPeriod}/{quotaInfo.totalLimit} Free Runs left for this {quotaInfo.daysUntilReset} Day Period</div>
+          <div>{quotaInfo.totalLimit - quotaInfo.usedThisPeriod}/{quotaInfo.totalLimit} Free Runs left.  {quotaInfo.daysUntilReset} Days Until Reset.</div>
         </div>
       )}
       
