@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
@@ -17,6 +17,7 @@ import { JamieChat } from './JamieChat.tsx';
 import UploadModal from '../UploadModal.tsx';
 import ShareModal from '../ShareModal.tsx';
 import SignInModal from '../SignInModal.tsx';
+import CheckoutModal from '../CheckoutModal.tsx';
 import UploadService, { UploadItem, PaginationData } from '../../services/uploadService.ts';
 import { createFeedShareUrl } from '../../utils/urlUtils.ts';
 import PageBanner from '../PageBanner.tsx';
@@ -26,6 +27,7 @@ type JamieProView = 'chat' | 'history';
 
 const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> = ({ initialView, defaultTab }) => {
     const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [feedData, setFeedData] = useState<PodcastFeedData | null>(null);
     const [featuredEpisode, setFeaturedEpisode] = useState<Episode | null>(null);
     const [activeTab, setActiveTab] = useState<TabType>('Episodes');
@@ -50,6 +52,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
     const [error, setError] = useState<{ status: number; message: string } | null>(null);
     const [isUserSignedIn, setIsUserSignedIn] = useState(false);
+    const [isProDashboardModalOpen, setIsProDashboardModalOpen] = useState(false);
+    const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -206,42 +210,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     }
   }, [activeTab]);
 
-  useEffect(() => {
-      console.log(`feedId: ${feedId}`);
-      const checkPrivileges = async () => {
-          try {
-              const token = localStorage.getItem("auth_token") as string;
-              if(!token){
-                  setIsAdmin(false);
-                  return;
-              }
-              const response = await AuthService.checkPrivs(token);
-              console.log(`checkPrivs response:${JSON.stringify(response,null,2)}`)
-              if (response && response.privs.privs && response.privs.privs.feedId === feedId) {
-                  console.log(`Admin privileges granted`);
-                  setIsAdmin(response.privs.privs.access === 'admin');
-              } else {
-                  setIsAdmin(false);
-              }
-          } catch (error) {
-              console.error("Error checking privileges:", error);
-              setIsAdmin(false);
-          }
-      };
-
-      if (feedId) {
-          if (DEBUG_MODE) {
-              console.log('Debug mode: Simulating admin privileges');
-              // Even in debug mode, still check real privileges but override in development
-              checkPrivileges().then(() => {
-                  // After real check, override for development purposes
-                  setIsAdmin(true);
-              });
-          } else {
-              checkPrivileges();
-          }
-      }
-  }, [feedId]); 
+  // This useEffect is removed - using the one below that properly checks isUserSignedIn dependency 
 
   useEffect(() => {
     const fetchFeedData = async () => {
@@ -442,20 +411,36 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   useEffect(() => {
     console.log(`feedId: ${feedId}`);
     if (feedId && isUserSignedIn) {
-      if (DEBUG_MODE) {
-        console.log('Debug mode: Simulating admin privileges');
-        // Even in debug mode, still check real privileges but override in development
-        checkPrivileges(feedId).then(() => {
-          // After real check, override for development purposes
-          setIsAdmin(true);
-        });
-      } else {
-        checkPrivileges(feedId);
-      }
+      checkPrivileges(feedId);
     } else {
       setIsAdmin(false);
     }
   }, [feedId, isUserSignedIn]); 
+
+  // Handle URL parameter for showing Pro Dashboard modal
+  useEffect(() => {
+    const showProModal = searchParams.get('showProModal');
+    if (showProModal === 'true' && !isAdmin) {
+      setIsProDashboardModalOpen(true);
+      // Clean up URL parameter
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('showProModal');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [searchParams, isAdmin, setSearchParams]);
+
+  const handleProDashboardUpgrade = () => {
+    setIsProDashboardModalOpen(false);
+    setIsCheckoutModalOpen(true);
+  };
+
+  const handleUpgradeSuccess = () => {
+    setIsCheckoutModalOpen(false);
+    // Optionally refresh admin privileges after successful upgrade
+    if (feedId) {
+      checkPrivileges(feedId);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -972,6 +957,50 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
             checkPrivileges(feedId);
           }
         }}
+      />
+
+      {/* Pro Dashboard Modal */}
+      {isProDashboardModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+          <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+            <h2 className="text-white text-xl font-bold mb-4">
+              Pro Dashboard Access Required
+            </h2>
+            <p className="text-gray-400 mb-6">
+              The Pro Dashboard is exclusively for Jamie Pro subscribers. Upgrade now to access advanced podcast management features, analytics, and premium tools.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setIsProDashboardModalOpen(false)}
+                className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleProDashboardUpgrade}
+                className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              >
+                Upgrade to Pro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Modal */}
+      <CheckoutModal 
+        isOpen={isCheckoutModalOpen} 
+        onClose={() => setIsCheckoutModalOpen(false)} 
+        onSuccess={handleUpgradeSuccess}
+        productName="jamie-pro"
+        customDescription="Unlock advanced podcast management features and the Pro Dashboard"
+        customFeatures={[
+          "Pro Dashboard Access",
+          "Advanced Analytics",
+          "Premium Podcast Tools",
+          "Priority Support"
+        ]}
+        customPrice="49.99"
       />
     </div>
   );

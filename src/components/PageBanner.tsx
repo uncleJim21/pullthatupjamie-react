@@ -4,6 +4,7 @@ import { Headphones, Search, LayoutDashboard } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import AccountButton from './AccountButton.tsx';
 import SignInModal from './SignInModal.tsx';
+import CheckoutModal from './CheckoutModal.tsx';
 
 interface PageBannerProps {
   logoText?: string;
@@ -34,6 +35,8 @@ const PageBanner: React.FC<PageBannerProps> = ({
   const [isMobile, setIsMobile] = useState(false);
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
+  const [isProDashboardModalOpen, setIsProDashboardModalOpen] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const navigate = useNavigate();
 
   // Check for screen size
@@ -128,13 +131,19 @@ const PageBanner: React.FC<PageBannerProps> = ({
 
   const handleProDashboardClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    console.log('Pro Dashboard clicked, adminFeed:', adminFeed);
+    console.log('Pro Dashboard clicked, adminFeed:', adminFeed, 'isUserSignedIn:', isUserSignedIn);
+    
+    // Close mobile menu if open
+    setIsMenuOpen(false);
+    
     if (adminFeed && adminFeed.feedId) {
+      // If user has admin privileges, navigate to their feed
       console.log('Navigating to:', `/app/feed/${adminFeed.feedId}`);
       navigate(`/app/feed/${adminFeed.feedId}`);
     } else {
-      console.log('No admin feed found, closing menu');
-      setIsMenuOpen(false);
+      // If user doesn't have admin privileges, show Pro Dashboard modal immediately
+      console.log('No admin feed found, showing Pro Dashboard modal');
+      setIsProDashboardModalOpen(true);
     }
   };
 
@@ -178,6 +187,9 @@ const PageBanner: React.FC<PageBannerProps> = ({
     if (propsSetIsUserSignedIn) {
       propsSetIsUserSignedIn(true);
     }
+    
+    // Continue Pro Dashboard flow - show checkout modal
+    setIsCheckoutModalOpen(true);
   };
 
   const handleSignUpSuccess = () => {
@@ -190,6 +202,9 @@ const PageBanner: React.FC<PageBannerProps> = ({
       propsSetIsUserSignedIn(true);
     }
     
+    // Continue Pro Dashboard flow - show checkout modal
+    setIsCheckoutModalOpen(true);
+    
     if (onUpgrade) {
       onUpgrade();
     }
@@ -201,6 +216,24 @@ const PageBanner: React.FC<PageBannerProps> = ({
     } else {
       console.log("Upgrade clicked - no handler provided");
     }
+  };
+
+  const handleProDashboardUpgrade = () => {
+    setIsProDashboardModalOpen(false);
+    
+    if (!isUserSignedIn) {
+      // If not signed in, show sign in modal
+      setIsSignInModalOpen(true);
+    } else {
+      // If signed in, go directly to checkout
+      setIsCheckoutModalOpen(true);
+    }
+  };
+
+  const handleUpgradeSuccess = () => {
+    setIsCheckoutModalOpen(false);
+    // Optionally refresh admin privileges after successful upgrade
+    // The useEffect will automatically re-check when isUserSignedIn changes
   };
 
   const handleSignOut = () => {
@@ -421,6 +454,50 @@ const PageBanner: React.FC<PageBannerProps> = ({
         onClose={() => setIsSignInModalOpen(false)}
         onSignInSuccess={handleSignInSuccess}
         onSignUpSuccess={handleSignUpSuccess}
+      />
+
+      {/* Pro Dashboard Modal */}
+      {isProDashboardModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+          <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+            <h2 className="text-white text-xl font-bold mb-4">
+              Pro Dashboard Access Required
+            </h2>
+            <p className="text-gray-400 mb-6">
+              The Pro Dashboard is exclusively for Jamie Pro subscribers. Upgrade now to access advanced podcast management features, analytics, and premium tools.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setIsProDashboardModalOpen(false)}
+                className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleProDashboardUpgrade}
+                className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              >
+                Upgrade to Pro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Modal */}
+      <CheckoutModal 
+        isOpen={isCheckoutModalOpen} 
+        onClose={() => setIsCheckoutModalOpen(false)} 
+        onSuccess={handleUpgradeSuccess}
+        productName="jamie-pro"
+        customDescription="Unlock advanced podcast management features and the Pro Dashboard"
+        customFeatures={[
+          "Pro Dashboard Access",
+          "Advanced Analytics",
+          "Premium Podcast Tools",
+          "Priority Support"
+        ]}
+        customPrice="49.99"
       />
     </>
   );

@@ -1270,7 +1270,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <SubscriptionSuccessPopup onClose={() => setIsUpgradeSuccessPopUpOpen(false)} />
       )}
       
-      { DEBUG_MODE &&
+      {/* { DEBUG_MODE &&
         (<button
         onClick={async () => {
           const email = localStorage.getItem('squareId');
@@ -1285,7 +1285,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       >
         Test Registration
       </button>)
-      }
+      } */}
       <br></br>
       <div className={`${hasSearchedInMode(searchMode) ? 'mb-8' : ''} ml-4 mr-4`}>
         {/* Header with Logo */}
