@@ -12,36 +12,36 @@ const HomePage: React.FC = () => {
   const mobileStyles = `
     @keyframes tronPan {
       0% {
-        background-position: 0% center;
+        background-position: 0px top;
       }
       100% {
-        background-position: 100% center;
+        background-position: -100vw top;
       }
     }
 
     @keyframes tronPanMobile {
       0% {
-        background-position: 0% center;
+        background-position: 0px top;
       }
       100% {
-        background-position: 100% center;
+        background-position: -100vw top;
       }
     }
 
     .tron-background-desktop {
       background-repeat: repeat-x !important;
-      background-size: auto 100% !important;
-      animation: tronPan 20s linear infinite;
+      background-size: 100vw 120vh !important;
+      animation: tronPan 15s linear infinite;
     }
 
     @media (max-width: 768px) {
       .tron-background-mobile {
         background-repeat: repeat-x !important;
-        background-size: auto 100% !important;
-        background-position: 0% center !important;
+        background-size: 100vw 130vh !important;
+        background-position: 0px top !important;
         opacity: 0.6 !important;
         background-attachment: fixed !important;
-        animation: tronPanMobile 15s linear infinite !important;
+        animation: tronPanMobile 12s linear infinite !important;
       }
       
       .hero-title-mobile {
