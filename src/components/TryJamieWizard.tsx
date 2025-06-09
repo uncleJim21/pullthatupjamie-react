@@ -21,7 +21,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {
   ];
 
   return (
-    <div className="w-full max-w-2xl mx-auto mb-8 mt-16 flex items-center px-8">
+    <div className="w-full max-w-2xl mx-auto mb-8 mt-20 flex items-center px-8">
       {steps.map((step, idx) => (
         <React.Fragment key={step.number}>
           <div className="flex flex-col items-center">
@@ -174,48 +174,50 @@ const TryJamieWizard: React.FC = () => {
       image: "https://megaphone.imgix.net/podcasts/8e5bcebc-ca16-11ee-89f0-0fa0b9bdfc7c/image/c2c595e6e3c2a64e6ea18fb6c6da8860.jpg"
     },
     {
-      id: "5015946",
-      title: "Green Candle Investments Podcast with Brandon Keys",
-      url: "https://anchor.fm/s/8168b150/podcast/rss",
-      originalUrl: "https://anchor.fm/s/8168b150/podcast/rss",
-      link: "https://podcasters.spotify.com/pod/show/greencandleit",
-      description: "I bring viewers easy-to-digest information about investing, both in traditional equities and in Bitcoin.\nTune in every Monday for new Macro Insights podcasts and Friday for new State of Bitcoin podcasts, offering deep dives into current developments, emerging trends, and expert analyses. Stay connected with us on Twitter and Instagram @GreenCandleit for real-time updates, and engage with host, Brandon, at @bkeys1010 on Twitter.\nDon't miss out – share, subscribe, and actively participate in the conversation! Spread the word about our podcast! Support this podcast: https://podcasters.spotify.com/pod/show/greencandleit/support",
-      author: "Green Candle Investments",
-      ownerName: "Green Candle Investments",
-      image: "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/21611220/21611220-1732893316589-fb33705d325d1.jpg"
+      id: "4117651",
+      title: "Modern Wisdom",
+      url: "https://feeds.megaphone.fm/modernwisdom",
+      description: "Conversations with the world's most interesting thinkers about philosophy, psychology, and human optimization.",
+      author: "Chris Williamson",
+      ownerName: "Chris Williamson",
+      image: "https://megaphone.imgix.net/podcasts/a62f84c0-f8b6-11ed-a4fc-fb9e7841d45b/image/76ed638554a4be965517200d1cd5f30d.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress"
     },
     {
-      id: "3955537",
-      title: "Thriller \"A Bitcoin Zine\"",
-      url: "https://feeds.transistor.fm/thriller-premium",
-      originalUrl: "https://api.substack.com/feed/podcast/9895.rss",
-      link: "https://www.thrillerbitcoin.com",
-      description: "Thriller is a local austin bitcoin zine. | Listen to the pod http://thriller.transistor.fm | ⚡️thriller@getalby.com",
-      author: "Thriller X Recordings",
-      ownerName: "Thriller X Recordings",
-      image: "https://img.transistor.fm/flZJC8zviqt7OAbY5RXG072wag-t6IvdBZKEzHUCfgI/rs:fill:3000:3000:1/q:60/aHR0cHM6Ly9pbWct/dXBsb2FkLXByb2R1/Y3Rpb24udHJhbnNp/c3Rvci5mbS9zaG93/LzIzMjQwLzE2NjQ1/NTE2NjItYXJ0d29y/ay5qcGc.jpg"
+      id: "226249",
+      title: "TFTC: A Bitcoin Podcast",
+      url: "https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9",
+      description: "A Bitcoin podcast exploring the future of money and freedom.",
+      author: "Marty Bent",
+      ownerName: "TFTC",
+      image: "https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9/files/COVER_ART---DEFAULT---e571338c-758b-45db-b083-0a16c49169b1.jpg"
     },
     {
-      id: "1000839",
-      title: "Bitcoin Audible",
-      url: "https://feeds.castos.com/mj96z",
-      originalUrl: "https://anchor.fm/s/80d5cfc/podcast/rss",
-      link: "https://bitcoinaudible.com/",
-      description: "The Best in Bitcoin made Audible.",
-      author: "Guy Swann",
-      ownerName: "Guy Swann",
-      image: "https://episodes.castos.com/6626b866f2af87-36468692/images/podcast/covers/c1a-9mg94-o87n4gnwav1j-6d2xb6.jpg"
+      id: "1365694",
+      title: "The \"What is Money?\" Show",
+      url: "https://feeds.simplecast.com/MLdpYXYI",
+      link: "https://whatismoneypodcast.com",
+      description: "\"What is Money?\" is the rabbit that leads us down the proverbial rabbit hole. It is the most important question for finding truth in the world.",
+      author: "Robert Breedlove",
+      ownerName: "Robert Breedlove",
+      image: "https://image.simplecastcdn.com/images/8862bce3-8814-46a6-9b72-a533960bbd50/fc74b5de-5bf7-4b92-8bab-4c8eb0ed805e/3000x3000/wim-podcast-profile-6.jpg?aid=rss_feed"
     },
     {
-      id: "7246395",
-      title: "Trust Revolution",  
-      url: "https://serve.podhome.fm/rss/a7d58130-6f1d-4ff3-9c5a-aee3b8cc07cc",
-      originalUrl: "https://serve.podhome.fm/rss/a7d58130-6f1d-4ff3-9c5a-aee3b8cc07cc",
-      link: "https://podcast.trustrevolution.co",
-      description: "Trust is unraveling—institutions falter, headlines deceive, and centralized power's grip is weakening. A new reality's emerging: decentralized protocols like Bitcoin and Nostr, along with privacy-preserving technologies, are rewriting the rules.",
-      author: "Shawn Yeager",
-      ownerName: "Shawn Yeager", 
-      image: "https://assets.podhome.fm/77ae8d2c-0dcb-407e-93e7-08dd5a75ee77/638769544435807117TrustRevolution_Cover.jpg"
+      id: "7181269",
+      title: "Early Days",
+      url: "https://anchor.fm/s/100230220/podcast/rss",
+      description: "Exploring the early days of Bitcoin and the builders creating the future.",
+      author: "Car",
+      ownerName: "PlebLab",
+      image: "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/42872616/42872616-1737246678005-991fe8ccc838e.jpg"
+    },
+    {
+      id: "3498055",
+      title: "Convos On The Pedicab",
+      url: "https://anchor.fm/s/3dc3ba58/podcast/rss",
+      description: "Conversations about culture, politics, and society from a unique perspective.",
+      author: "Alex Strenger",
+      ownerName: "Alex Strenger",
+      image: "https://d3t3ozftmdmh3i.cloudfront.net/production/podcast_uploaded_nologo/10262374/10262374-1603995280202-46e057c35b6d3.jpg"
     }
   ];
 
@@ -260,12 +262,17 @@ const TryJamieWizard: React.FC = () => {
       if (response.episodes && response.episodes.feedInfo) {
         const info = response.episodes.feedInfo;
         console.log('Selected podcast:', JSON.stringify(info,null,2));
+        
+        // Prioritize image from search results over feed info
+        // Use feed.image first, then feed.artwork, then fallback to info.podcastImage
+        const podcastImage = feed.image || (feed as any).artwork || info.podcastImage;
+        
         setSelectedPodcast({
           feedId: info.feedId,
           feedGuid: info.feedGuid,
           feedTitle: info.feedTitle,
           feedUrl: info.feedUrl,
-          podcastImage: info.podcastImage,
+          podcastImage: podcastImage,
         });
         setEpisodes(response.episodes.episodes);
         setCurrentStep(2); // Move to the next step
@@ -438,11 +445,27 @@ const TryJamieWizard: React.FC = () => {
   const renderFeedSelection = () => {
     return (
       <>
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Let's Get Started</h1>
-          <p className="text-gray-400">
-            Select your podcast feed so we can get it ready for searches, shares and clips!
-          </p>
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-4">Transform Any Podcast Into Searchable, Shareable Clips</h1>
+          <div className="max-w-2xl mx-auto space-y-3">
+            <p className="text-gray-300 text-lg">
+              Get instant semantic search through full episodes, clips for social sharing, and timestamped links for relevant content.
+            </p>
+            <div className="flex items-center justify-center space-x-6 text-sm text-gray-400">
+              <div className="flex items-center">
+                <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                Instant Search
+              </div>
+              <div className="flex items-center">
+                <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                Clips Studio
+              </div>
+              <div className="flex items-center">
+                <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
+                Nostr/Twitter Cross Posting
+              </div>
+            </div>
+          </div>
         </div>
         
         {/* Search Input */}
@@ -452,16 +475,16 @@ const TryJamieWizard: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search 100k+ Podcast Feeds"
-              className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg"
+              placeholder="Search 100k+ podcasts..."
+              className="w-full bg-[#111111] border border-gray-800 rounded-xl px-4 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 shadow-lg text-lg"
             />
             <button 
-              className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              className="absolute right-4 top-1/2 transform -translate-y-1/2"
               aria-label="Search"
               onClick={searchFeeds}
             >
               <svg
-                className="w-5 h-5 text-gray-400"
+                className="w-6 h-6 text-gray-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -476,18 +499,19 @@ const TryJamieWizard: React.FC = () => {
             </button>
           </div>
         </div>
-        
-        {/* Feed Results Area */}
-        <div className="space-y-4">
-          {isLoading ? (
-            <div className="flex justify-center items-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
-            </div>
-          ) : searchResults.length > 0 ? (
-            searchResults.map((feed) => (
+
+        {/* Content Area */}
+        {isLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
+          </div>
+        ) : searchResults.length > 0 ? (
+          /* Search Results */
+          <div className="space-y-4">
+            {searchResults.map((feed) => (
               <div 
                 key={feed.id}
-                className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4"
+                className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4 hover:border-gray-700 transition-colors"
               >
                 <div className="flex items-center">
                   {!imageLoadedStates[`search-${feed.id}`] && (
@@ -507,48 +531,48 @@ const TryJamieWizard: React.FC = () => {
                 </div>
                 <button 
                   onClick={() => handleSelectFeed(feed)}
-                  className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors"
+                  className="bg-white text-black hover:bg-gray-200 py-2 px-4 rounded-lg text-sm font-medium transition-colors"
                 >
                   Select
                 </button>
               </div>
-            ))
-          ) : searchQuery.length >= 2 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-400">No podcasts found. Try a different search term.</p>
+            ))}
+          </div>
+        ) : searchQuery.length >= 2 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-400">No podcasts found. Try a different search term.</p>
+          </div>
+        ) : (
+          /* Default State with Example Pills */
+          <div>
+            <p className="text-center text-gray-400 mb-6">Recently Searched Podcasts:</p>
+                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+               {staticFeeds.map((feed) => (
+                 <div
+                   key={feed.id}
+                   className="bg-[#111111] border border-gray-800 rounded-xl p-6 flex items-center"
+                 >
+                   <div className="flex-shrink-0 mr-6">
+                     {!imageLoadedStates[`static-${feed.id}`] && (
+                       <div className="w-16 h-16 rounded-lg bg-gray-800 animate-pulse flex-shrink-0" />
+                     )}
+                     <img 
+                       src={feed.image} 
+                       alt="" 
+                       className={`w-16 h-16 rounded-lg object-cover bg-gray-800 ${imageLoadedStates[`static-${feed.id}`] ? 'block' : 'hidden'}`}
+                       onLoad={() => setImageLoadedStates(prev => ({...prev, [`static-${feed.id}`]: true}))}
+                       onError={() => setImageLoadedStates(prev => ({...prev, [`static-${feed.id}`]: false}))}
+                     />
+                   </div>
+                   <div className="flex-1 min-w-0">
+                     <h3 className="text-white font-medium text-base line-clamp-1">{feed.title}</h3>
+                     <p className="text-gray-400 text-sm line-clamp-1 mt-1">{feed.author || feed.ownerName}</p>
+                   </div>
+                 </div>
+               ))}
             </div>
-          ) : (
-            staticFeeds.map((feed) => (
-              <div 
-                key={feed.id}
-                className="bg-[#111111] border border-gray-800 rounded-lg flex items-center justify-between p-4"
-              >
-                <div className="flex items-center">
-                  {!imageLoadedStates[`static-${feed.id}`] && (
-                    <div className="w-14 h-14 rounded-md border border-gray-700 mr-4 bg-gray-800 animate-pulse flex-shrink-0" />
-                  )}
-                  <img 
-                    src={feed.image} 
-                    alt="" 
-                    className={`w-14 h-14 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800 ${imageLoadedStates[`static-${feed.id}`] ? 'block' : 'hidden'}`}
-                    onLoad={() => setImageLoadedStates(prev => ({...prev, [`static-${feed.id}`]: true}))}
-                    onError={() => setImageLoadedStates(prev => ({...prev, [`static-${feed.id}`]: false}))}
-                  />
-                  <div>
-                    <h3 className="text-white font-medium text-base line-clamp-1">{feed.title}</h3>
-                    <p className="text-gray-400 text-sm line-clamp-1">{feed.author || feed.ownerName}</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => handleSelectFeed(feed)}
-                  className="bg-black hover:border-white text-white py-2 px-4 rounded-lg text-sm border border-gray-700 font-medium transition-colors"
-                >
-                  Select
-                </button>
-              </div>
-            ))
-          )}
-        </div>
+          </div>
+        )}
       </>
     );
   };
@@ -574,7 +598,7 @@ const TryJamieWizard: React.FC = () => {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-4">Select the Content to Process</h1>
           <p className="text-gray-400">
-            Choose which podcasts to transcribe and add to the Jamie search index for easy access!
+            Choose which episodes to transcribe and add to the Jamie search index for easy access!
           </p>
         </div>
 
@@ -598,12 +622,12 @@ const TryJamieWizard: React.FC = () => {
             </svg>
           </button>
           {!imageLoadedStates['podcast-main'] && (
-            <div className="w-20 h-20 rounded-md mr-4 bg-gray-800 animate-pulse flex-shrink-0" />
+            <div className="w-20 h-20 rounded-md border border-gray-700 mr-4 bg-gray-800 animate-pulse flex-shrink-0" />
           )}
           <img 
             src={selectedPodcast.podcastImage} 
             alt="" 
-            className={`w-20 h-20 rounded-md mr-4 ${imageLoadedStates['podcast-main'] ? 'block' : 'hidden'}`}
+            className={`w-20 h-20 rounded-md border border-gray-700 mr-4 object-cover bg-gray-800 flex-shrink-0 ${imageLoadedStates['podcast-main'] ? 'block' : 'hidden'}`}
             onLoad={() => setImageLoadedStates(prev => ({...prev, 'podcast-main': true}))}
             onError={() => setImageLoadedStates(prev => ({...prev, 'podcast-main': false}))}
           />
@@ -710,12 +734,12 @@ const TryJamieWizard: React.FC = () => {
               </svg>
             </button>
             {!imageLoadedStates['confirm-episode'] && (
-              <div className="w-24 h-24 rounded-md mr-6 bg-gray-800 animate-pulse flex-shrink-0" />
+              <div className="w-24 h-24 rounded-md border border-gray-700 mr-6 bg-gray-800 animate-pulse flex-shrink-0" />
             )}
             <img 
               src={selectedEpisode.episodeImage || selectedPodcast.podcastImage} 
               alt="" 
-              className={`w-24 h-24 rounded-md mr-6 ${imageLoadedStates['confirm-episode'] ? 'block' : 'hidden'}`}
+              className={`w-24 h-24 rounded-md border border-gray-700 mr-6 object-cover bg-gray-800 flex-shrink-0 ${imageLoadedStates['confirm-episode'] ? 'block' : 'hidden'}`}
               onLoad={() => setImageLoadedStates(prev => ({...prev, 'confirm-episode': true}))}
               onError={() => setImageLoadedStates(prev => ({...prev, 'confirm-episode': false}))}
             />
