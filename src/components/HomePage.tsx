@@ -10,41 +10,38 @@ const HomePage: React.FC = () => {
   
   // Mobile styles using CSS-in-JS with media queries
   const mobileStyles = `
-    @keyframes tronBreathing {
+    @keyframes tronPan {
       0% {
-        filter: brightness(0.7) contrast(1);
-      }
-      50% {
-        filter: brightness(1.15) contrast(1.1);
+        background-position: 0% center;
       }
       100% {
-        filter: brightness(0.7) contrast(1);
+        background-position: 100% center;
       }
     }
 
-    @keyframes tronBreathingMobile {
+    @keyframes tronPanMobile {
       0% {
-        filter: brightness(0.65) contrast(1);
-      }
-      50% {
-        filter: brightness(1.25) contrast(1.15);
+        background-position: 0% center;
       }
       100% {
-        filter: brightness(0.65) contrast(1);
+        background-position: 100% center;
       }
     }
 
     .tron-background-desktop {
-      animation: tronBreathing 8s ease-in-out infinite;
+      background-repeat: repeat-x !important;
+      background-size: auto 100% !important;
+      animation: tronPan 20s linear infinite;
     }
 
     @media (max-width: 768px) {
       .tron-background-mobile {
-        background-size: cover !important;
-        background-position: center center !important;
+        background-repeat: repeat-x !important;
+        background-size: auto 100% !important;
+        background-position: 0% center !important;
         opacity: 0.6 !important;
         background-attachment: fixed !important;
-        animation: tronBreathingMobile 8s ease-in-out infinite !important;
+        animation: tronPanMobile 15s linear infinite !important;
       }
       
       .hero-title-mobile {
@@ -114,7 +111,7 @@ const HomePage: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundImage: 'url("./tron-background.png")',
+            backgroundImage: 'url("./tron-background2.png")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
