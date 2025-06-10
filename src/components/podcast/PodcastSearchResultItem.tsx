@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ExternalLink, Share, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2, ChevronRight } from 'lucide-react';
 import { formatTime } from '../../utils/time.ts';
-import { makeClip } from '../../services/clipService.ts';
+import { makeClip, fetchClipById } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
 import EditTimestampsModal from "./EditTimestampsModal.tsx";
+import SocialShareModal from "../SocialShareModal.tsx";
+import ShareModal from "../ShareModal.tsx";
 import { AuthConfig } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
@@ -85,6 +87,11 @@ export const PodcastSearchResultItem = ({
   const [isClipModalOpen, setIsClipModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editTimestampsError,setEditTimestampsError] = useState<string|undefined>(undefined);
+  const [isShareProcessing, setIsShareProcessing] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
+  const [shareClipUrl, setShareClipUrl] = useState<string>('');
+  const [shareClipLookupHash, setShareClipLookupHash] = useState<string>('');
   const CLIP_LENGTH_LIMIT_SECONDS = 60 * 10;
   const navigate = useNavigate();
 
@@ -250,6 +257,84 @@ export const PodcastSearchResultItem = ({
     
     setIsEditModalOpen(false);
     handleClipConfirm(newStart,newEnd);
+  };
+
+  const handleShareClip = async () => {
+    console.log("Starting share clip process");
+    
+    // Check for authentication
+    if (!authConfig || !authConfig.credentials) {
+      console.error('No valid auth credentials available');
+      if (onSignInClick) {
+        onSignInClick();
+        return;
+      }
+    }
+
+    setIsShareProcessing(true);
+    
+    try {
+      // Step 1: Create clip using makeClip
+      printLog(`Creating clip for share: ${shareLink}, start: ${timeContext.start_time}, end: ${timeContext.end_time}`);
+      const response = await makeClip(shareLink, authConfig!, timeContext.start_time, timeContext.end_time);
+      
+              if (response.status === "completed" && response.url) {
+          // Clip is ready immediately
+          printLog(`Clip ready immediately: ${response.url}`);
+          setShareClipUrl(response.url);
+          setShareClipLookupHash(response.lookupHash);
+          setIsShareProcessing(false);
+          setIsShareModalOpen(true);
+        } else {
+          // Need to poll for completion
+          printLog(`Polling for clip completion with lookupHash: ${response.lookupHash}`);
+          setShareClipLookupHash(response.lookupHash);
+          await pollForClipCompletion(response.lookupHash);
+        }
+    } catch (error) {
+      console.error("Failed to create clip for sharing:", error);
+      setIsShareProcessing(false);
+    }
+  };
+
+  const pollForClipCompletion = async (lookupHash: string) => {
+    const maxAttempts = 60; // 5 minutes max (5 second intervals)
+    let attempts = 0;
+    
+    const poll = async () => {
+      try {
+        attempts++;
+        printLog(`Polling attempt ${attempts}/${maxAttempts} for clip: ${lookupHash}`);
+        
+        const clipData = await fetchClipById(lookupHash);
+        
+        if (clipData && clipData.audio_url) {
+          // Clip is ready
+          printLog(`Clip completed: ${clipData.audio_url}`);
+          setShareClipUrl(clipData.audio_url);
+          setIsShareProcessing(false);
+          setIsShareModalOpen(true);
+          return;
+        }
+        
+        // Continue polling if not ready and haven't exceeded max attempts
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 5000); // Poll every 5 seconds
+        } else {
+          console.error("Polling timeout: Clip creation took too long");
+          setIsShareProcessing(false);
+        }
+      } catch (error) {
+        console.error(`Error polling for clip completion:`, error);
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 5000); // Continue polling on error
+        } else {
+          setIsShareProcessing(false);
+        }
+      }
+    };
+    
+    poll();
   };
 
   const handleShare = async () => {
@@ -466,12 +551,17 @@ export const PodcastSearchResultItem = ({
                 {presentationContext === PresentationContext.clipBatch && (
                   <button
                     className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
-                    onClick={() => {
-                      console.log("Test share");
-                    }}
+                    onClick={handleShareClip}
+                    disabled={isShareProcessing}
                   >
-                    <Share className="h-4 w-4 mr-2 flex-shrink-0" />
-                    <span className="truncate">Share</span>
+                    {isShareProcessing ? (
+                      <Loader className="h-4 w-4 mr-2 flex-shrink-0 animate-spin" />
+                    ) : (
+                      <Share className="h-4 w-4 mr-2 flex-shrink-0" />
+                    )}
+                    <span className="truncate">
+                      {isShareProcessing ? '' : 'Share'}
+                    </span>
                   </button>
                 )}
               </div>
@@ -614,6 +704,58 @@ export const PodcastSearchResultItem = ({
           </div>
         )}
       </div>
+
+      {/* Share Modal (Link, Download, etc.) */}
+      {isShareModalOpen && shareClipUrl && (
+        <ShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => {
+            setIsShareModalOpen(false);
+            setShareClipUrl('');
+            setShareClipLookupHash('');
+          }}
+          fileUrl={shareClipUrl}
+          title="Share This Clip"
+          itemName="clip"
+          showCopy={true}
+          showDownload={true}
+          showTwitter={true}
+          showNostr={true}
+          copySuccessMessage="Clip link copied!"
+          downloadButtonLabel="Download Clip"
+          twitterButtonLabel="Share on Social Media"
+          nostrButtonLabel="Share on Nostr"
+          lookupHash={shareClipLookupHash}
+          auth={authConfig}
+          onSocialShareModalOpen={() => {
+            setIsShareModalOpen(false);
+            setIsSocialShareModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* Social Share Modal (Twitter/Nostr Cross-posting) */}
+      {isSocialShareModalOpen && shareClipUrl && (
+        <SocialShareModal
+          isOpen={isSocialShareModalOpen}
+          onClose={() => {
+            setIsSocialShareModalOpen(false);
+            setShareClipUrl('');
+            setShareClipLookupHash('');
+          }}
+          fileUrl={shareClipUrl}
+          itemName="clip"
+          onComplete={(success, platform) => {
+            printLog(`Share completed: ${success} on ${platform}`);
+            setIsSocialShareModalOpen(false);
+            setShareClipUrl('');
+            setShareClipLookupHash('');
+          }}
+          platform="twitter" // This is ignored in the current implementation
+          lookupHash={shareClipLookupHash}
+          auth={authConfig}
+        />
+      )}
     </div>
   );
   
