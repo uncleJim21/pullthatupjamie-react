@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Share2, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2, ChevronRight } from 'lucide-react';
+import { ExternalLink, Share, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2, ChevronRight } from 'lucide-react';
 import { formatTime } from '../../utils/time.ts';
 import { makeClip } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
@@ -12,7 +12,8 @@ export enum PresentationContext {
   search = 'search',
   landingPage = 'landingPage',
   dashboard = 'dashboard',
-  runHistoryPreview = 'runHistoryPreview'
+  runHistoryPreview = 'runHistoryPreview',
+  clipBatch = 'clipBatch'
 }
 
 interface PodcastSearchResultItemProps {
@@ -434,7 +435,7 @@ export const PodcastSearchResultItem = ({
               </div>
   
               {/* Action Buttons */}
-              <div className="mt-4 sm:mt-0 sm:w-[200px] sm:min-w-[200px] sm:flex-shrink-0 grid grid-rows-1 grid-flow-col sm:grid-cols-2 sm:grid-flow-row gap-2">
+              <div className={`mt-4 sm:mt-0 sm:w-[200px] sm:min-w-[200px] sm:flex-shrink-0 grid ${presentationContext === PresentationContext.clipBatch ? 'grid-cols-2 sm:grid-cols-2 grid-rows-2' : 'grid-rows-1 grid-flow-col sm:grid-cols-2 sm:grid-flow-row'} gap-2`}>
                 <button
                   className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                   onClick={handleShare}
@@ -461,6 +462,17 @@ export const PodcastSearchResultItem = ({
                   <Scissors className="h-4 w-4 mr-2 flex-shrink-0" />
                   <span className="truncate">Clip</span>
                 </button>
+                )}
+                {presentationContext === PresentationContext.clipBatch && (
+                  <button
+                    className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                    onClick={() => {
+                      console.log("Test share");
+                    }}
+                  >
+                    <Share className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="truncate">Share</span>
+                  </button>
                 )}
               </div>
             </div>
