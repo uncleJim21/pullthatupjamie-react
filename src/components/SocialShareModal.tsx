@@ -432,6 +432,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       checkNostrExtension();
+      // Auto-authenticate if extension is available
+      if (window.nostr) {
+        connectNostrExtension();
+      }
     }
   }, [isOpen]);
 
@@ -452,20 +456,30 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     try {
       if (window.nostr) {
         setNostrStatus(prev => ({ ...prev, available: true }));
-        try {
-          const pubKey = await window.nostr.getPublicKey();
-          setNostrStatus(prev => ({ ...prev, authenticated: true }));
-          printLog(`Nostr extension found with public key: ${pubKey}`);
-        } catch (keyError) {
-          printLog("Nostr extension found but couldn't get public key");
-          setNostrStatus(prev => ({ ...prev, authenticated: false }));
-        }
+        printLog("Nostr extension detected but not authenticated yet");
+        // Don't automatically request public key - only check availability
       } else {
         setNostrStatus(prev => ({ ...prev, available: false, authenticated: false }));
       }
     } catch (error) {
       setNostrStatus(prev => ({ ...prev, available: false, authenticated: false }));
       console.error("Error checking for Nostr extension:", error);
+    }
+  };
+
+  const connectNostrExtension = async () => {
+    try {
+      if (window.nostr) {
+        const pubKey = await window.nostr.getPublicKey();
+        setNostrStatus(prev => ({ ...prev, authenticated: true }));
+        printLog(`Nostr extension connected with public key: ${pubKey}`);
+      } else {
+        setNostrStatus(prev => ({ ...prev, available: false, authenticated: false }));
+      }
+    } catch (error) {
+      printLog("Failed to connect to Nostr extension");
+      setNostrStatus(prev => ({ ...prev, authenticated: false }));
+      console.error("Error connecting to Nostr extension:", error);
     }
   };
 
@@ -640,6 +654,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
     try {
       setNostrStatus(prev => ({ ...prev, publishing: true }));
+      
+      // If not authenticated, try to authenticate first
+      if (!nostrStatus.authenticated) {
+        try {
+          await connectNostrExtension();
+        } catch (error) {
+          console.error("Failed to authenticate with Nostr extension before publishing");
+          setNostrStatus(prev => ({ ...prev, publishing: false }));
+          return false;
+        }
+      }
       
       const finalContent = `${content}\n\n${fileUrl}\n\nShared via https://pullthatupjamie.ai`;
       
@@ -1135,7 +1160,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 </div>
                 {nostrStatus.available && !nostrStatus.authenticated && (
                   <button
-                    onClick={checkNostrExtension}
+                    onClick={connectNostrExtension}
                     disabled={nostrStatus.publishing}
                     className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-500 disabled:opacity-50"
                   >
