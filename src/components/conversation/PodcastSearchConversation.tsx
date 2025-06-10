@@ -1,7 +1,7 @@
 // PodcastSearchConversation.tsx
 import React, { useState, useRef } from 'react';
 import type { PodcastSearchItem } from '../../types/conversation';
-import { PodcastSearchResultItem } from '../podcast/PodcastSearchResultItem.tsx';
+import { PodcastSearchResultItem, PresentationContext } from '../podcast/PodcastSearchResultItem.tsx';
 import { BaseConversationLayout } from './BaseConversationLayout.tsx';
 import { ClipProgress } from '../../types/clips.ts';
 import { AuthConfig } from '../../constants/constants.ts';
@@ -13,6 +13,7 @@ interface PodcastSearchConversationProps {
   authConfig?: AuthConfig | null | undefined;
   onShareModalOpen?: (isOpen: boolean) => void;
   onSocialShareModalOpen?: (isOpen: boolean) => void;
+  isClipBatchPage?: boolean;
 }
 
 // PodcastSearchConversation.tsx
@@ -22,7 +23,8 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
   onClipProgress,
   authConfig,
   onShareModalOpen,
-  onSocialShareModalOpen
+  onSocialShareModalOpen,
+  isClipBatchPage
 }) => {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
 
@@ -56,6 +58,7 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
             authConfig={authConfig}
             onShareModalOpen={onShareModalOpen}
             onSocialShareModalOpen={onSocialShareModalOpen}
+            presentationContext={isClipBatchPage ? PresentationContext.clipBatch : PresentationContext.search}
           />
         ))}
       </div>
