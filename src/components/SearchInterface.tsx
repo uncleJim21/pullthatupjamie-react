@@ -1496,6 +1496,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               authConfig={authConfig}
               onShareModalOpen={setIsShareModalOpen}
               onSocialShareModalOpen={setIsSocialShareModalOpen}
+              isClipBatchPage={isClipBatchPage}
             />
           ))}
       </div>

@@ -14,6 +14,7 @@ interface ConversationRendererProps {
   authConfig?: AuthConfig | null | undefined;
   onShareModalOpen?: (isOpen: boolean) => void;
   onSocialShareModalOpen?: (isOpen: boolean) => void;
+  isClipBatchPage?: boolean;
 }
 
 export const ConversationRenderer: React.FC<ConversationRendererProps> = ({ 
@@ -22,7 +23,8 @@ export const ConversationRenderer: React.FC<ConversationRendererProps> = ({
   onClipProgress,
   authConfig,
   onShareModalOpen,
-  onSocialShareModalOpen
+  onSocialShareModalOpen,
+  isClipBatchPage
 }) => {
   switch (item.type) {
     case 'web-search':
@@ -38,6 +40,7 @@ export const ConversationRenderer: React.FC<ConversationRendererProps> = ({
           authConfig={authConfig}
           onShareModalOpen={onShareModalOpen}
           onSocialShareModalOpen={onSocialShareModalOpen}
+          isClipBatchPage={isClipBatchPage}
         />
       );
     default:
