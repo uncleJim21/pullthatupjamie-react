@@ -228,6 +228,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Add state for success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Helper to determine if file is video
+  const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
+  const isImage = fileUrl && (fileUrl.endsWith('.png') || fileUrl.endsWith('.jpg') || fileUrl.endsWith('.jpeg') || fileUrl.endsWith('.gif'));
+
+  // Twitter recommended aspect ratio is 2:1 (e.g., 600x300), but we'll use a max height of 150px
+  const previewMaxHeight = 150;
+  const previewWidth = 600;
+
+  // For video, try to use a thumbnail if CDN supports it
+  const videoThumbnailUrl = isVideo ? `${fileUrl}?thumbnail=1` : undefined;
+
   // Add useEffect to notify parent of modal state changes
   useEffect(() => {
     onOpenChange?.(isOpen);
@@ -1042,10 +1053,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     // Main unified interface
     return (
       <>
-        <h2 className="text-xl sm:text-2xl font-semibold text-white mb-4 sm:mb-6">
-          Share to Twitter/Nostr
-        </h2>
-        
         <div className="flex items-center mb-3 sm:mb-4 px-2">
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-800 mr-2 sm:mr-3 flex items-center justify-center overflow-hidden">
             <img src="/twitter-nostr-crosspost.png" alt="Twitter and Nostr" className="w-8 h-8 object-cover" />
@@ -1054,6 +1061,72 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             <p className="text-white font-medium">Your Post</p>
           </div>
         </div>
+        
+        {/* Preview Section (between label and textarea) */}
+        {fileUrl && (isVideo || isImage) && (
+          <div className="flex flex-col items-center mb-3">
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: 300,
+              margin: '0 auto',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              background: '#222',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              {isVideo ? (
+                <>
+                  <img
+                    src={videoThumbnailUrl}
+                    alt="Video thumbnail"
+                    style={{ width: '100%', height: 'auto', maxWidth: '100%', maxHeight: 200, objectFit: 'contain', display: 'block' }}
+                    onError={e => {
+                      e.currentTarget.style.display = 'none';
+                      const video = document.getElementById('video-preview') as HTMLVideoElement;
+                      if (video) video.style.display = 'block';
+                    }}
+                  />
+                  <video
+                    id="video-preview"
+                    src={fileUrl}
+                    style={{ width: '100%', height: 'auto', maxWidth: '100%', maxHeight: 200, objectFit: 'contain', display: 'none', background: '#222' }}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    onLoadedData={e => { (e.target as HTMLVideoElement).currentTime = 0; }}
+                  />
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    background: 'rgba(0,0,0,0.5)',
+                    borderRadius: '50%',
+                    width: 40,
+                    height: 40,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <svg width="24" height="24" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="18" cy="18" r="18" fill="rgba(0,0,0,0.6)"/>
+                      <polygon points="14,11 27,18 14,25" fill="#fff" />
+                    </svg>
+                  </div>
+                </>
+              ) : (
+                <img
+                  src={fileUrl}
+                  alt="Preview"
+                  style={{ width: '100%', height: 'auto', maxWidth: '100%', maxHeight: 200, objectFit: 'contain', display: 'block' }}
+                />
+              )}
+            </div>
+          </div>
+        )}
         
         <textarea
           value={content}
