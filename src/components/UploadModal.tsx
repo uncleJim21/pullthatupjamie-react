@@ -1,15 +1,16 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Loader2, AlertCircle, Copy, Check } from 'lucide-react';
+import { Loader2, AlertCircle, Copy, Check, Share } from 'lucide-react';
 import UploadService, { ProcessingStatus, processingState } from '../services/uploadService.ts';
 
 interface UploadModalProps {
   onClose: () => void;
+  onShareRequest?: (fileUrl: string) => void;
 }
 
 // Upload states
 type UploadState = 'idle' | 'uploading' | 'success' | 'error';
 
-const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
+const UploadModal: React.FC<UploadModalProps> = ({ onClose, onShareRequest }) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -19,6 +20,10 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
   const [xhr, setXhr] = useState<XMLHttpRequest | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [autoShare, setAutoShare] = useState(() => {
+    const settings = localStorage.getItem('userSettings');
+    return settings ? JSON.parse(settings).autoStartCrosspost : false;
+  });
   const fileUrlInputRef = useRef<HTMLInputElement>(null);
 
   // Listen for status updates from the upload service
@@ -42,6 +47,10 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
         // Store the file URL if available
         if (status.data && status.data.fileUrl) {
           setFileUrl(status.data.fileUrl);
+          if (autoShare && onShareRequest) {
+            onShareRequest(status.data.fileUrl);
+            onClose();
+          }
         }
       } else if (status.status === ProcessingStatus.ERROR) {
         setUploadState('error');
@@ -53,7 +62,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
     return () => {
       unsubscribe();
     };
-  }, [uploadId]);
+  }, [uploadId, autoShare, onShareRequest]);
 
   const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -144,6 +153,18 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
     }
   };
 
+  const handleAutoShareChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.checked;
+    setAutoShare(newValue);
+    // Update localStorage
+    const settings = localStorage.getItem('userSettings');
+    const currentSettings = settings ? JSON.parse(settings) : {};
+    localStorage.setItem('userSettings', JSON.stringify({
+      ...currentSettings,
+      autoStartCrosspost: newValue
+    }));
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-50">
       <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 w-96 text-center relative">
@@ -207,22 +228,52 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
             </div>
             
             {fileUrl && (
-              <div className="flex items-center">
-                <input
-                  ref={fileUrlInputRef}
-                  type="text"
-                  value={fileUrl}
-                  readOnly
-                  className="flex-1 bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded-l-md text-sm overflow-hidden"
-                />
-                <button
-                  onClick={handleCopyUrl}
-                  className="bg-white hover:bg-gray-200 text-black px-3 py-2 rounded-r-md transition-colors font-medium"
-                  title="Copy URL"
-                >
-                  {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
-                </button>
-              </div>
+              <>
+                <div className="flex items-center mb-4">
+                  <input
+                    ref={fileUrlInputRef}
+                    type="text"
+                    value={fileUrl}
+                    readOnly
+                    className="flex-1 bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded-l-md text-sm overflow-hidden"
+                  />
+                  <button
+                    onClick={handleCopyUrl}
+                    className="bg-white hover:bg-gray-200 text-black px-3 py-2 rounded-r-md transition-colors font-medium"
+                    title="Copy URL"
+                  >
+                    {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={onClose}
+                    className="w-full bg-[#1A1A1A] hover:bg-[#252525] text-white px-4 py-2 rounded-md border border-gray-700 transition-colors flex items-center justify-center font-medium"
+                  >
+                    Done
+                  </button>
+
+                  <button
+                    onClick={() => onShareRequest?.(fileUrl)}
+                    className="w-full bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors flex items-center justify-center font-medium"
+                  >
+                    <Share className="w-4 h-4 mr-2" />
+                    Share
+                  </button>
+                  
+                  <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                    <input
+                      type="checkbox"
+                      id="autoShare"
+                      checked={autoShare}
+                      onChange={handleAutoShareChange}
+                      className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white"
+                    />
+                    <label htmlFor="autoShare">Always share after upload</label>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -265,16 +316,6 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
             >
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Cancel Upload
-            </button>
-          )}
-
-          {/* Success state */}
-          {uploadState === 'success' && (
-            <button
-              onClick={onClose}
-              className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors font-medium"
-            >
-              Done
             </button>
           )}
         </div>
