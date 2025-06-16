@@ -165,6 +165,10 @@ const encodeBech32 = (prefix: string, data: string): string => {
          checksumWords.map(i => CHARSET.charAt(i)).join('');
 };
 
+const ASPECT_RATIO = 16 / 9;
+const PREVIEW_WIDTH = 240; // px, adjust as needed
+const PREVIEW_HEIGHT = PREVIEW_WIDTH / ASPECT_RATIO;
+
 const SocialShareModal: React.FC<SocialShareModalProps> = ({
   isOpen,
   onClose,
@@ -233,6 +237,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   // Add state to track retrying the thumbnail
   const [thumbnailRetry, setThumbnailRetry] = useState(false);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
@@ -348,7 +353,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       } catch (error) {
         printLog(`Error during token polling: ${error}`);
       }
-    }, 3000); // Poll every 3 seconds
+    }, 1800); // Poll every 3 seconds
     
     setPollingInterval(interval);
   };
@@ -439,8 +444,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     return () => {
       // Clean up WebSocket connections when component unmounts
       Object.values(relayConnections).forEach(conn => {
-        if (conn && conn.readyState === WebSocket.OPEN) {
-          conn.close();
+        const ws = conn as WebSocket | null;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.close();
         }
       });
     };
@@ -1070,85 +1076,125 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         </div>
         
         {/* Preview Section (between label and textarea) */}
-        {fileUrl && (isVideo || isImage) && (
-          <div className="flex flex-col items-center mb-3">
+        <div
+          style={{
+            width: PREVIEW_WIDTH,
+            height: PREVIEW_HEIGHT,
+            position: 'relative',
+            background: '#222',
+            borderRadius: 8,
+            overflow: 'hidden',
+            margin: '0 auto 16px auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Shimmer while loading */}
+          {!previewLoaded && !thumbnailFailed && (
+            <div
+              style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(90deg, #222 25%, #333 50%, #222 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+                zIndex: 1,
+              }}
+            />
+          )}
+          {/* Image preview if loaded and not failed */}
+          {isVideo && !thumbnailFailed && (
+            <img
+              src={videoThumbnailUrl + (thumbnailRetry ? `&retry=1` : '')}
+              alt=""
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                display: previewLoaded ? 'block' : 'none',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                zIndex: 2,
+              }}
+              onLoad={() => setPreviewLoaded(true)}
+              onError={e => {
+                if (!thumbnailRetry) {
+                  setTimeout(() => setThumbnailRetry(true), 3000);
+                } else {
+                  setThumbnailFailed(true);
+                }
+              }}
+            />
+          )}
+          {/* Video fallback if thumbnail failed */}
+          {isVideo && thumbnailFailed && (
+            <video
+              id="video-preview"
+              src={fileUrl}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                zIndex: 2,
+                background: '#222',
+              }}
+              muted
+              playsInline
+              preload="metadata"
+              onLoadedData={e => {
+                (e.target as HTMLVideoElement).currentTime = 0;
+                setPreviewLoaded(true);
+              }}
+            />
+          )}
+          {/* Image for non-video */}
+          {!isVideo && (
+            <img
+              src={fileUrl}
+              alt=""
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                display: previewLoaded ? 'block' : 'none',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                zIndex: 2,
+              }}
+              onLoad={() => setPreviewLoaded(true)}
+            />
+          )}
+          {/* Play icon overlay for video */}
+          {isVideo && (
             <div style={{
-              position: 'relative',
-              width: '100%',
-              maxWidth: previewMaxWidth,
-              height: previewHeight,
-              minHeight: previewHeight,
-              maxHeight: previewHeight,
-              margin: '0 auto',
-              borderRadius: '12px',
-              overflow: 'hidden',
-              background: '#222',
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: 'rgba(0,0,0,0.5)',
+              borderRadius: '50%',
+              width: playIconSize,
+              height: playIconSize,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              pointerEvents: 'none',
+              zIndex: 3,
             }}>
-              {/* Shimmer placeholder */}
-              {!previewLoaded && (
-                <div className="w-full h-full animate-pulse bg-gradient-to-r from-gray-700 via-gray-800 to-gray-700" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
-              )}
-              {isVideo ? (
-                <>
-                  <img
-                    src={videoThumbnailUrl + (thumbnailRetry ? `&retry=1` : '')}
-                    alt=""
-                    style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: previewLoaded ? 'block' : 'none', margin: '0 auto' }}
-                    onLoad={() => setPreviewLoaded(true)}
-                    onError={e => {
-                      if (!thumbnailRetry) {
-                        setTimeout(() => setThumbnailRetry(true), 3000);
-                      } else {
-                        e.currentTarget.style.display = 'none';
-                        const video = document.getElementById('video-preview') as HTMLVideoElement;
-                        if (video) video.style.display = 'block';
-                        setPreviewLoaded(true);
-                      }
-                    }}
-                  />
-                  <video
-                    id="video-preview"
-                    src={fileUrl}
-                    style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: previewLoaded ? 'none' : 'block', background: '#222', margin: '0 auto' }}
-                    muted
-                    playsInline
-                    preload="metadata"
-                    onLoadedData={e => { (e.target as HTMLVideoElement).currentTime = 0; setPreviewLoaded(true); }}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    background: 'rgba(0,0,0,0.5)',
-                    borderRadius: '50%',
-                    width: playIconSize,
-                    height: playIconSize,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    pointerEvents: 'none',
-                  }}>
-                    <svg width={playIconSize - 8} height={playIconSize - 8} viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="18" cy="18" r="18" fill="rgba(0,0,0,0.6)"/>
-                      <polygon points="14,11 27,18 14,25" fill="#fff" />
-                    </svg>
-                  </div>
-                </>
-              ) : (
-                <img
-                  src={fileUrl}
-                  alt=""
-                  style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: previewLoaded ? 'block' : 'none', margin: '0 auto' }}
-                  onLoad={() => setPreviewLoaded(true)}
-                />
-              )}
+              <svg width={playIconSize - 8} height={playIconSize - 8} viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="18" cy="18" r="18" fill="rgba(0,0,0,0.6)"/>
+                <polygon points="14,11 27,18 14,25" fill="#fff" />
+              </svg>
             </div>
-          </div>
-        )}
+          )}
+        </div>
         
         <textarea
           value={content}
