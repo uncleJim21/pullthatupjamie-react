@@ -228,13 +228,20 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Add state for success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Add state to track image/video loading
+  const [previewLoaded, setPreviewLoaded] = useState(false);
+
+  // Add state to track retrying the thumbnail
+  const [thumbnailRetry, setThumbnailRetry] = useState(false);
+
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
   const isImage = fileUrl && (fileUrl.endsWith('.png') || fileUrl.endsWith('.jpg') || fileUrl.endsWith('.jpeg') || fileUrl.endsWith('.gif'));
 
-  // Twitter recommended aspect ratio is 2:1 (e.g., 600x300), but we'll use a max height of 150px
-  const previewMaxHeight = 150;
-  const previewWidth = 600;
+  // Set preview sizing constants for consistency
+  const previewMaxWidth = 300;
+  const previewHeight = 150; // fixed height for all states
+  const playIconSize = 32;
 
   // For video, try to use a thumbnail if CDN supports it
   const videoThumbnailUrl = isVideo ? `${fileUrl}?thumbnail=1` : undefined;
@@ -1068,7 +1075,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             <div style={{
               position: 'relative',
               width: '100%',
-              maxWidth: 300,
+              maxWidth: previewMaxWidth,
+              height: previewHeight,
+              minHeight: previewHeight,
+              maxHeight: previewHeight,
               margin: '0 auto',
               borderRadius: '12px',
               overflow: 'hidden',
@@ -1077,26 +1087,36 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
             }}>
+              {/* Shimmer placeholder */}
+              {!previewLoaded && (
+                <div className="w-full h-full animate-pulse bg-gradient-to-r from-gray-700 via-gray-800 to-gray-700" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+              )}
               {isVideo ? (
                 <>
                   <img
-                    src={videoThumbnailUrl}
-                    alt="Video thumbnail"
-                    style={{ width: '100%', height: 'auto', maxWidth: '100%', maxHeight: 200, objectFit: 'contain', display: 'block' }}
+                    src={videoThumbnailUrl + (thumbnailRetry ? `&retry=1` : '')}
+                    alt=""
+                    style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: previewLoaded ? 'block' : 'none', margin: '0 auto' }}
+                    onLoad={() => setPreviewLoaded(true)}
                     onError={e => {
-                      e.currentTarget.style.display = 'none';
-                      const video = document.getElementById('video-preview') as HTMLVideoElement;
-                      if (video) video.style.display = 'block';
+                      if (!thumbnailRetry) {
+                        setTimeout(() => setThumbnailRetry(true), 3000);
+                      } else {
+                        e.currentTarget.style.display = 'none';
+                        const video = document.getElementById('video-preview') as HTMLVideoElement;
+                        if (video) video.style.display = 'block';
+                        setPreviewLoaded(true);
+                      }
                     }}
                   />
                   <video
                     id="video-preview"
                     src={fileUrl}
-                    style={{ width: '100%', height: 'auto', maxWidth: '100%', maxHeight: 200, objectFit: 'contain', display: 'none', background: '#222' }}
+                    style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: previewLoaded ? 'none' : 'block', background: '#222', margin: '0 auto' }}
                     muted
                     playsInline
                     preload="metadata"
-                    onLoadedData={e => { (e.target as HTMLVideoElement).currentTime = 0; }}
+                    onLoadedData={e => { (e.target as HTMLVideoElement).currentTime = 0; setPreviewLoaded(true); }}
                   />
                   <div style={{
                     position: 'absolute',
@@ -1105,13 +1125,14 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                     transform: 'translate(-50%, -50%)',
                     background: 'rgba(0,0,0,0.5)',
                     borderRadius: '50%',
-                    width: 40,
-                    height: 40,
+                    width: playIconSize,
+                    height: playIconSize,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    pointerEvents: 'none',
                   }}>
-                    <svg width="24" height="24" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <svg width={playIconSize - 8} height={playIconSize - 8} viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <circle cx="18" cy="18" r="18" fill="rgba(0,0,0,0.6)"/>
                       <polygon points="14,11 27,18 14,25" fill="#fff" />
                     </svg>
@@ -1120,8 +1141,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               ) : (
                 <img
                   src={fileUrl}
-                  alt="Preview"
-                  style={{ width: '100%', height: 'auto', maxWidth: '100%', maxHeight: 200, objectFit: 'contain', display: 'block' }}
+                  alt=""
+                  style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: previewLoaded ? 'block' : 'none', margin: '0 auto' }}
+                  onLoad={() => setPreviewLoaded(true)}
                 />
               )}
             </div>
