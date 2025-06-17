@@ -5,6 +5,7 @@ import rssService, { PodcastFeed, PodcastEpisode, FeedInfo } from '../services/r
 import TryJamieService, { OnDemandRunRequest } from '../services/tryJamieService.ts';
 import SignInModal from './SignInModal.tsx';
 import CheckoutModal from './CheckoutModal.tsx';
+import JamieLoadingScreen from './JamieLoadingScreen.tsx';
 
 // Step indicator interface
 interface StepIndicatorProps {
@@ -78,7 +79,7 @@ const TryJamieWizard: React.FC = () => {
   //     podcastImage: "https://megaphone.imgix.net/podcasts/8e5bcebc-ca16-11ee-89f0-0fa0b9bdfc7c/image/c2c595e6e3c2a64e6ea18fb6c6da8860.jpg",
   //     feedGuid: "a7d58130-6f1d-4ff3-9c5a-aee3b8cc07cc",
   //   }
-  const [currentStep, setCurrentStep] = useState(isDebug ? 5 : 1);
+  const [currentStep, setCurrentStep] = useState(isDebug ? 5 : 4);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PodcastFeed[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -787,10 +788,7 @@ const TryJamieWizard: React.FC = () => {
 
   // Render processing step (Step 4)
   const renderProcessing = () => (
-    <div className="flex flex-col items-center justify-center min-h-[300px] py-16">
-      <h1 className="text-3xl font-bold mb-8">Processing</h1>
-      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
-    </div>
+    <JamieLoadingScreen defaultInterval={5000} />
   );
 
   return (
@@ -809,7 +807,7 @@ const TryJamieWizard: React.FC = () => {
       <StepIndicator currentStep={currentStep} />
       
       {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="max-w-3xl mx-auto px-4 py-2">
         {renderContent()}
       </div>
 
