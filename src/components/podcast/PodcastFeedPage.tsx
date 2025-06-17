@@ -21,6 +21,7 @@ import CheckoutModal from '../CheckoutModal.tsx';
 import UploadService, { UploadItem, PaginationData } from '../../services/uploadService.ts';
 import { createFeedShareUrl } from '../../utils/urlUtils.ts';
 import PageBanner from '../PageBanner.tsx';
+import SocialShareModal from '../SocialShareModal.tsx';
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history';
@@ -54,6 +55,11 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isUserSignedIn, setIsUserSignedIn] = useState(false);
     const [isProDashboardModalOpen, setIsProDashboardModalOpen] = useState(false);
     const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+    const [autoShare, setAutoShare] = useState(() => {
+        const settings = localStorage.getItem('userSettings');
+        return settings ? JSON.parse(settings).autoStartCrosspost : false;
+    });
+    const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -442,6 +448,31 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     }
   };
 
+  const handleAutoShareChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.checked;
+    setAutoShare(newValue);
+    // Update localStorage
+    const settings = localStorage.getItem('userSettings');
+    const currentSettings = settings ? JSON.parse(settings) : {};
+    localStorage.setItem('userSettings', JSON.stringify({
+      ...currentSettings,
+      autoStartCrosspost: newValue
+    }));
+  };
+
+  const handleUploadShare = (fileUrl: string) => {
+    const settings = localStorage.getItem('userSettings');
+    const autoCrosspost = settings ? JSON.parse(settings).autoStartCrosspost : false;
+    setCurrentShareUrl(fileUrl);
+    if (autoCrosspost) {
+      setIsSocialShareModalOpen(true);
+      setIsShareModalOpen(false);
+    } else {
+      setIsShareModalOpen(true);
+      setIsSocialShareModalOpen(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -570,7 +601,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
               <div className="py-8">
                 <h2 className="text-xl font-bold mb-6">Featured Episode</h2>
                 <PodcastSearchResultItem
-                  key={featuredEpisode.id}
                   id={featuredEpisode.id}
                   quote={featuredEpisode.description || ''}
                   episode={featuredEpisode.title}
@@ -597,7 +627,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
               <div className="space-y-6">
                 {feedData.episodes.map(episode => (
                   <PodcastSearchResultItem
-                    key={episode.id}
                     id={episode.id}
                     quote={episode.description || ''}
                     episode={episode.title}
@@ -629,7 +658,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   <div className="py-8">
                     <h2 className="text-xl font-bold mb-6">Featured Episode</h2>
                     <PodcastSearchResultItem
-                      key={featuredEpisode.id}
                       id={featuredEpisode.id}
                       quote={featuredEpisode.description || ''}
                       episode={featuredEpisode.title}
@@ -656,7 +684,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   <div className="space-y-6">
                     {feedData.episodes.map(episode => (
                       <PodcastSearchResultItem
-                        key={episode.id}
                         id={episode.id}
                         quote={episode.description || ''}
                         episode={episode.title}
@@ -695,7 +722,19 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
             {activeTab === 'Uploads' && (
               <div className="py-8">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold">Your Uploads</h2>
+                  <div className="space-y-2">
+                    <h2 className="text-xl font-bold">Your Uploads</h2>
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <input
+                        type="checkbox"
+                        id="globalAutoShare"
+                        checked={autoShare}
+                        onChange={handleAutoShareChange}
+                        className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white"
+                      />
+                      <label htmlFor="globalAutoShare">Start Auto Share after Upload</label>
+                    </div>
+                  </div>
                   <button
                     onClick={openUploadModal}
                     className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors flex items-center font-medium"
@@ -923,7 +962,10 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       )}
 
       {uploadModalOpen && (
-        <UploadModal onClose={closeUploadModal} />
+        <UploadModal 
+          onClose={closeUploadModal} 
+          onShareRequest={handleUploadShare}
+        />
       )}
 
       {isShareModalOpen && currentShareUrl && (
@@ -931,16 +973,25 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           isOpen={isShareModalOpen}
           onClose={closeShareModal}
           fileUrl={currentShareUrl}
-          title="Share Your Upload"
           itemName="upload"
           showCopy={true}
           showDownload={true}
           showTwitter={true}
           showNostr={true}
-          copySuccessMessage="Link copied!"
-          downloadButtonLabel="Download File"
-          twitterButtonLabel="Share on Twitter"
-          nostrButtonLabel="Share on Nostr"
+          onOpenChange={(open) => { if (!open) setIsShareModalOpen(false); }}
+        />
+      )}
+
+      {isSocialShareModalOpen && currentShareUrl && (
+        <SocialShareModal
+          isOpen={isSocialShareModalOpen}
+          onClose={() => setIsSocialShareModalOpen(false)}
+          fileUrl={currentShareUrl}
+          itemName="upload"
+          onComplete={() => setIsSocialShareModalOpen(false)}
+          platform="twitter"
+          showCopy={true}
+          showDownload={true}
         />
       )}
 
