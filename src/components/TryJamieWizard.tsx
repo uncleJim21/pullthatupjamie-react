@@ -807,7 +807,7 @@ const TryJamieWizard: React.FC = () => {
       <StepIndicator currentStep={currentStep} />
       
       {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 py-2">
+      <div className="max-w-3xl mx-auto px-4 py-4">
         {renderContent()}
       </div>
 
