@@ -79,7 +79,7 @@ const TryJamieWizard: React.FC = () => {
   //     podcastImage: "https://megaphone.imgix.net/podcasts/8e5bcebc-ca16-11ee-89f0-0fa0b9bdfc7c/image/c2c595e6e3c2a64e6ea18fb6c6da8860.jpg",
   //     feedGuid: "a7d58130-6f1d-4ff3-9c5a-aee3b8cc07cc",
   //   }
-  const [currentStep, setCurrentStep] = useState(isDebug ? 5 : 4);
+  const [currentStep, setCurrentStep] = useState(isDebug ? 5 : 1);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PodcastFeed[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -167,7 +167,7 @@ const TryJamieWizard: React.FC = () => {
   // Static feeds for default display
   const staticFeeds = [
     {
-      id: "6786106",
+      id: "550168",
       title: "The Joe Rogan Experience",
       url: "https://feeds.megaphone.fm/GLT1412515089",
       description: "The official podcast of comedian Joe Rogan.",
@@ -175,7 +175,7 @@ const TryJamieWizard: React.FC = () => {
       image: "https://megaphone.imgix.net/podcasts/8e5bcebc-ca16-11ee-89f0-0fa0b9bdfc7c/image/c2c595e6e3c2a64e6ea18fb6c6da8860.jpg"
     },
     {
-      id: "4117651",
+      id: "229239",
       title: "Modern Wisdom",
       url: "https://feeds.megaphone.fm/modernwisdom",
       description: "Conversations with the world's most interesting thinkers about philosophy, psychology, and human optimization.",
@@ -551,7 +551,8 @@ const TryJamieWizard: React.FC = () => {
                {staticFeeds.map((feed) => (
                  <div
                    key={feed.id}
-                   className="bg-[#111111] border border-gray-800 rounded-xl p-6 flex items-center"
+                   className="bg-[#111111] border border-gray-800 rounded-xl p-6 flex items-center cursor-pointer hover:border-gray-700 transition-colors"
+                   onClick={() => window.open(`/app/feed/${feed.id}`, '_blank')}
                  >
                    <div className="flex-shrink-0 mr-6">
                      {!imageLoadedStates[`static-${feed.id}`] && (
