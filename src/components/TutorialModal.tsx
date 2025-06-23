@@ -69,9 +69,16 @@ const TUTORIAL_SLIDES: TutorialSlide[] = [
     slideTitle: 'Adjusting Agent Preferences',
     subtitle: `The Agent selects topics and themes you're likely to find interesting. You can adjust them with prompts.
 
+**Steps:**
+    1. Go to the Pro Dashboard.
+    2. Go to Jamie Pro tab from the top
+    3. Go to Chat with Jamie
+    4. Prompt Jamie to include/exclude certain topics or themes.
+
 **Examples:**
 
 - "Highlight stories about personal growth"
+- "Remove the topic of macroeconomics"
 - "Disregard statements that are likely to be ads"
 `,
     imagePath: '/tutorial/jamie-pro-prefs-change.gif',
@@ -81,21 +88,46 @@ const TUTORIAL_SLIDES: TutorialSlide[] = [
   {
     menuTitle: 'Accessing AI Curated Clips',
     slideTitle: 'Accessing AI Curated Clips',
-    subtitle: `See your past Jamie Pro runs and curated podcast moments instantly.`,
+    subtitle: `See previous Jamie Pro Agent curated clips. Typically each episode has 1 run with 3-5 clips each.
+
+**Steps:**
+    1. Go to the Pro Dashboard.
+    2. Go to Jamie Pro tab from the top
+    3. Go to Run History
+    4. Click on the run of interest (typically 1 per episode)
+    5. Peruse the curated clips (typically 3-5 per run)
+    `,
     imagePath: '/tutorial/jamie-pro-run-history.gif',
     section: 'Jamie Pro (Premium)',
   },
   {
     menuTitle: 'Crosspost to Nostr/Twitter',
     slideTitle: 'Crosspost to Nostr/Twitter',
-    subtitle: `Share your favorite moments to Nostr or Twitter with a single click.`,
+    subtitle: `Share your favorite moments to Nostr or Twitter in two clicks.
+
+**Steps:**
+    1. Choose the clip of interest in Run History
+    2. Click "Share" to tee up the AI generated clip
+    3. (Optional) Click "Clip" to edit a clip to your liking.
+    4. Type out the accompanying text OR
+    5. (Optional) Click "Jamie Assist" to have Jamie AI write text
+    6. Click "Post" to post to Twitter via OAuth & Nostr via extension of your choice.
+    `,
     imagePath: '/tutorial/jamie-pro-instant-share-jamie-assist.gif',
     section: 'Jamie Pro (Premium)',
   },
   {
     menuTitle: 'Upload & Crosspost Arbitrary Media',
     slideTitle: 'Upload & Crosspost Arbitrary Media',
-    subtitle: `Upload your own media and crosspost it anywhere you like.`,
+    subtitle: `Cross post any media of your choosing using the Jamie Pro Upload/Storage tab.
+
+**Steps:**
+    1. Go to the Pro Dashboard.
+    2. Click "Upload" button on the top right.
+    3. Choose the media & await upload.
+    4. Type out the accompanying text
+    5. Click "Post" to post to Twitter via OAuth & Nostr via extension of your choice.
+    `,
     imagePath: '/tutorial/jamie-upload-and-share.gif',
     section: 'Jamie Pro (Premium)',
   },
@@ -270,6 +302,7 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose }) => {
               >
                 {TUTORIAL_SLIDES[currentSlide].subtitle || 'Content coming soon.'}
               </ReactMarkdown>
+              <br></br>
             </div>
           </div>
           {/* Navigation Arrows in lower right corner */}

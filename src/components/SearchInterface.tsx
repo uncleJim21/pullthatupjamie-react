@@ -279,6 +279,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
            isUpgradeSuccessPopUpOpen || 
            isSendingFeedback ||
            isShareModalOpen ||
+           isTutorialOpen ||
            isSocialShareModalOpen;
   };
 
