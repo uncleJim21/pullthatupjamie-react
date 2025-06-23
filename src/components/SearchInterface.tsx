@@ -1107,32 +1107,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   // Tutorial modal state
   const [isTutorialOpen, setIsTutorialOpen] = useState(true);
-  const tutorialSlides = [
-    {
-      menuTitle: 'Adjusting Preferences',
-      slideTitle: 'Adjusting Agent Preferences',
-      subtitle: 'The Agent selects topics and themes you\'re likely to find interesting. You can adjust them with prompts. Example: "Highlight stories about personal growth" or "Disregard statements that are likely to be ads"',
-      imagePath: '/tutorial/jamie-pro-prefs-change.gif',
-    },
-    {
-      menuTitle: 'Run History',
-      slideTitle: 'Accessing AI Curated Clips',
-      subtitle: 'See your past Jamie Pro runs and curated podcast moments instantly.',
-      imagePath: '/tutorial/jamie-pro-run-history.gif',
-    },
-    {
-      menuTitle: 'Instant Share',
-      slideTitle: 'Share Clips Instantly',
-      subtitle: 'Quickly share your favorite moments to friends or social media.',
-      imagePath: '/tutorial/jamie-pro-instant-share-jamie-assist.gif',
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
       {/* Tutorial Modal */}
       <TutorialModal
-        slides={tutorialSlides}
         isOpen={isTutorialOpen}
         onClose={() => setIsTutorialOpen(false)}
       />
