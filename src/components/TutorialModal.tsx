@@ -21,13 +21,18 @@ const SIDEBAR_SECTIONS = [
   {
     title: 'Podcast Search',
     items: [
-      'Podcast Search Overview',
+      'Podcast Search Basics',
+      'Podcast Search Filters',
+      'Instant Podcast Clip Share',
+      'Create Clip Videos',
+      'Cross Post Clips to Twitter/Nostr'
     ],
   },
   {
     title: 'Web Search',
     items: [
-      'Web Search Overview',
+        'Private Web Search',
+      'How It Works',
     ],
   },
   {
@@ -44,17 +49,68 @@ const SIDEBAR_SECTIONS = [
 
 const TUTORIAL_SLIDES: TutorialSlide[] = [
   {
-    menuTitle: 'Podcast Search Overview',
-    slideTitle: 'Podcast Search Overview',
-    subtitle: `Learn how to search thousands of podcast moments instantly.`,
-    imagePath: null,
+    menuTitle: 'Podcast Search Basics',
+    slideTitle: 'Skip Keyword Engineering with Jamie',
+    subtitle: `Fastest podcast search in the West. Use Jamie's semantic search to turn vague queries into the precise moment you were looking for.`,
+    imagePath: '/tutorial/jamie-pod-search.gif',
     section: 'Podcast Search',
   },
   {
-    menuTitle: 'Web Search Overview',
-    slideTitle: 'Web Search Overview',
-    subtitle: `Use Jamie to search the web privately and efficiently.`,
-    imagePath: null,
+    menuTitle: 'Podcast Search Filters',
+    slideTitle: 'Choose Which Podcasts to Search',
+    subtitle: `Simply tap the podcast filter button to launch the menu. Then select/search for the podcast(s) you want and click them. Optionally save as default to make this selection permanent.`,
+    imagePath: '/tutorial/jamie-pod-filter.gif',
+    section: 'Podcast Search',
+  },
+  {
+    menuTitle: 'Instant Podcast Clip Share',
+    slideTitle: 'Send a Precise Clip to a Friend in 1 Click',
+    subtitle: `Simply search and locate the clip you're looking for. 
+    
+Then click the "Share" button to copy a timestamped link to your clipboard. 
+
+Send to a friend and instantly dump them straight to the part you want to share.`,
+    imagePath: '/tutorial/jamie-pod-quick-share.gif',
+    section: 'Podcast Search',
+  },
+  {
+    menuTitle: 'Create Clip Videos',
+    slideTitle: 'Search & Edit Clips in No Time',
+    subtitle: `Simply search and locate the segment you're looking for.
+    
+Hit the clip button. 
+
+Edit the clip to your liking or clip as is.
+
+Wait a few seconds and your clip video is ready to watch & share!`,
+    imagePath: '/tutorial/jamie-pod-make-clip.gif',
+    section: 'Podcast Search',
+  },
+  {
+    menuTitle: 'Cross Post Clips to Twitter/Nostr',
+    slideTitle: 'In One Click Share Your Clip on Twitter & Nostr.',
+    subtitle: `Click the "Share" button on the clip of interest.
+    
+Hit the nostr/twitter cross post button. 
+
+Write the accompanying text to your liking (or have Jamie Assist write it for you).
+
+Click Post and get links to your cross posted content!`,
+    imagePath: '/tutorial/jamie-pod-cross-post-clip.gif',
+    section: 'Podcast Search',
+  },
+  {
+    menuTitle: 'Private Web Search',
+    slideTitle: 'Search Privately and Efficiently',
+    subtitle: `Type a query to have Jamie compile search results and run them through an LLM summary with reference links at your fingertips.`,
+    imagePath: '/tutorial/jamie-web-search.gif',
+    section: 'Web Search',
+  },
+  {
+    menuTitle: 'How It Works',
+    slideTitle: 'Search Privately and Efficiently',
+    subtitle: `Jamie Web Search is open source and shields you from big tech surveillance. By cloaking your IP from LLM providers and search engines, you get the benefits of high tech without giving up your privacy.`,
+    imagePath: '/tutorial/jamie-web-explainer.png',
     section: 'Web Search',
   },
   {
