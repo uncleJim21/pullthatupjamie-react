@@ -26,6 +26,7 @@ import PageBanner from './PageBanner.tsx';
 import ShareModal from './ShareModal.tsx';
 import SocialShareModal from './SocialShareModal.tsx';
 import TutorialModal from './TutorialModal.tsx';
+import WelcomeModal from './WelcomeModal.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -280,6 +281,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
            isSendingFeedback ||
            isShareModalOpen ||
            isTutorialOpen ||
+           isWelcomeOpen ||
            isSocialShareModalOpen;
   };
 
@@ -1106,15 +1108,68 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     printLog(`selectedSources updated: ${JSON.stringify(Array.from(selectedSources))}`);
   }, [selectedSources]);
 
+  // Welcome modal state for first-time visitors
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(() => {
+    // Check if this is the user's first visit
+    const settings = localStorage.getItem('userSettings');
+    const userSettings = settings ? JSON.parse(settings) : {};
+    return userSettings.isFirstVisit !== false; // Default to true if not set
+  });
+
   // Tutorial modal state
-  const [isTutorialOpen, setIsTutorialOpen] = useState(true);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+
+  // Determine which tutorial section to show based on search mode
+  const getDefaultTutorialSection = () => {
+    switch (searchMode) {
+      case 'podcast-search':
+        return 0; // Podcast Search section
+      case 'web-search':
+        return 1; // Web Search section
+      default:
+        return 2; // Jamie Pro section
+    }
+  };
+
+  const handleWelcomeQuickTour = () => {
+    setIsWelcomeOpen(false);
+    setIsTutorialOpen(true);
+  };
+
+  const handleWelcomeGetStarted = () => {
+    // Mark that the user has visited before
+    const settings = localStorage.getItem('userSettings');
+    const userSettings = settings ? JSON.parse(settings) : {};
+    userSettings.isFirstVisit = false;
+    localStorage.setItem('userSettings', JSON.stringify(userSettings));
+    
+    setIsWelcomeOpen(false);
+  };
+
+  const handleTutorialClose = () => {
+    // Mark that the user has visited before
+    const settings = localStorage.getItem('userSettings');
+    const userSettings = settings ? JSON.parse(settings) : {};
+    userSettings.isFirstVisit = false;
+    localStorage.setItem('userSettings', JSON.stringify(userSettings));
+    
+    setIsTutorialOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
+      {/* Welcome Modal */}
+      <WelcomeModal
+        isOpen={isWelcomeOpen}
+        onQuickTour={handleWelcomeQuickTour}
+        onGetStarted={handleWelcomeGetStarted}
+      />
+
       {/* Tutorial Modal */}
       <TutorialModal
         isOpen={isTutorialOpen}
-        onClose={() => setIsTutorialOpen(false)}
+        onClose={handleTutorialClose}
+        defaultSection={getDefaultTutorialSection()}
       />
       {/* Page Banner */}
       <PageBanner 

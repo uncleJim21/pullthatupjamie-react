@@ -14,6 +14,7 @@ interface TutorialSlide {
 interface TutorialModalProps {
   isOpen: boolean;
   onClose: () => void;
+  defaultSection?: number;
 }
 
 // Define the sidebar sections in the order shown in the screenshot
@@ -189,9 +190,18 @@ Click Post and get links to your cross posted content!`,
   },
 ];
 
-const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose }) => {
-  const [currentSlide, setCurrentSlide] = useState(2); // Default to Dashboard
-  const [openSection, setOpenSection] = useState(2); // Default to Jamie Pro open
+const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, defaultSection = 2 }) => {
+  // Find the first slide for the default section
+  const getFirstSlideForSection = (sectionIdx: number) => {
+    if (sectionIdx >= 0 && sectionIdx < SIDEBAR_SECTIONS.length) {
+      const sectionTitle = SIDEBAR_SECTIONS[sectionIdx].title;
+      return TUTORIAL_SLIDES.findIndex(slide => slide.section === sectionTitle);
+    }
+    return 2; // Default to Dashboard if section not found
+  };
+
+  const [currentSlide, setCurrentSlide] = useState(() => getFirstSlideForSection(defaultSection));
+  const [openSection, setOpenSection] = useState(defaultSection); // Use defaultSection prop
   const [fullscreenImg, setFullscreenImg] = useState<string | null>(null);
   const markdownRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
