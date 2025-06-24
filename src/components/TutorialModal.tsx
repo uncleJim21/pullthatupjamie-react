@@ -281,13 +281,13 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, defaultS
           </button>
         </div>
       )}
-      <div className="relative flex w-full max-w-5xl h-[600px] rounded-2xl bg-[#111] border border-gray-800 shadow-2xl overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-72 bg-black/80 border-r border-white flex flex-col py-8 px-6 min-h-full max-h-full overflow-y-auto tutorial-scrollbar">
+      <div className="relative flex flex-col lg:flex-row w-full max-w-5xl h-[90vh] lg:h-[600px] rounded-2xl bg-[#111] border border-gray-800 shadow-2xl overflow-hidden m-4">
+        {/* Sidebar - stacked on top for mobile */}
+        <div className="w-full lg:w-72 bg-black/80 border-b lg:border-b-0 lg:border-r border-white flex flex-col py-4 lg:py-8 px-4 lg:px-6 max-h-48 lg:max-h-full overflow-y-auto tutorial-scrollbar">
           {SIDEBAR_SECTIONS.map((section, sectionIdx) => (
-            <div key={section.title} className="mb-4">
+            <div key={section.title} className="mb-2 lg:mb-4">
               <button
-                className="w-full flex items-center justify-between text-white font-bold text-lg mb-2 focus:outline-none"
+                className="w-full flex items-center justify-between text-white font-bold text-base lg:text-lg mb-1 lg:mb-2 focus:outline-none"
                 onClick={() => setOpenSection(sectionIdx)}
                 aria-expanded={openSection === sectionIdx}
               >
@@ -295,11 +295,11 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, defaultS
                 <span className="ml-2 text-white">{openSection === sectionIdx ? '▼' : '▶'}</span>
               </button>
               {openSection === sectionIdx && (
-                <ul className="space-y-2 ml-2">
+                <ul className="space-y-1 lg:space-y-2 ml-2">
                   {section.items.map((item) => (
                     <li
                       key={item}
-                      className={`cursor-pointer px-2 py-1 rounded transition-colors flex items-center gap-2 ${
+                      className={`cursor-pointer px-2 py-1 rounded transition-colors flex items-center gap-2 text-sm lg:text-base ${
                         TUTORIAL_SLIDES[currentSlide]?.menuTitle === item && getSectionIdxForSlide(currentSlide) === sectionIdx
                           ? 'text-white font-bold' : 'text-gray-300 hover:text-white'
                       }`}
@@ -327,41 +327,41 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, defaultS
         <div className="flex-1 flex flex-col relative h-full">
           {/* Close Button */}
           <button
-            className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold focus:outline-none"
+            className="absolute top-2 lg:top-4 right-2 lg:right-4 text-gray-400 hover:text-white text-xl lg:text-2xl font-bold focus:outline-none z-10"
             onClick={onClose}
             aria-label="Close Tutorial"
           >
             ×
           </button>
           {/* Title always at the top with fixed padding */}
-          <h2 className="text-3xl font-bold text-white text-left w-full pt-12 px-10 mb-4">
+          <h2 className="text-xl lg:text-3xl font-bold text-white text-left w-full pt-8 lg:pt-12 px-4 lg:px-10 mb-2 lg:mb-4">
             {TUTORIAL_SLIDES[currentSlide].slideTitle}
           </h2>
           {/* Scrollable content area below title */}
-          <div className="flex-1 flex flex-col items-center min-w-0 overflow-y-auto tutorial-scrollbar">
+          <div className="flex-1 flex flex-col items-center min-w-0 overflow-y-auto tutorial-scrollbar px-4 lg:px-0">
             {TUTORIAL_SLIDES[currentSlide].imagePath ? (
               <img
                 src={TUTORIAL_SLIDES[currentSlide].imagePath!}
                 alt={TUTORIAL_SLIDES[currentSlide].slideTitle}
-                className="rounded-lg border border-gray-700 2 shadow-lg cursor-zoom-in max-w-full object-contain"
-                style={{ maxHeight: '400px', background: '#000' }}
+                className="rounded-lg border border-gray-700 shadow-lg cursor-zoom-in max-w-full object-contain"
+                style={{ maxHeight: '300px', background: '#000' }}
                 onClick={() => setFullscreenImg(TUTORIAL_SLIDES[currentSlide].imagePath!)}
                 tabIndex={0}
                 role="button"
                 aria-label="View image fullscreen"
               />
             ) : (
-              <div className="w-full h-72 flex items-center justify-center bg-gray-900 border border-gray-700 rounded-lg mb-2 text-gray-500">
+              <div className="w-full h-48 lg:h-72 flex items-center justify-center bg-gray-900 border border-gray-700 rounded-lg mb-2 text-gray-500">
                 Image coming soon
               </div>
             )}
-            <div ref={markdownRef} className="max-w-xl w-full text-gray-300 text-lg text-left mt-6 px-12 pb-12" style={{maxHeight: '220px'}}>
+            <div ref={markdownRef} className="max-w-xl w-full text-gray-300 text-base lg:text-lg text-left mt-4 lg:mt-6 px-4 lg:px-12 pb-12" style={{maxHeight: '220px'}}>
               <ReactMarkdown
                 remarkPlugins={[remarkBreaks]}
                 components={{
-                  h1: ({node, ...props}) => <h1 className="text-3xl font-bold text-white mb-4" {...props} />,
-                  h2: ({node, ...props}) => <h2 className="text-2xl font-bold text-white mb-3" {...props} />,
-                  h3: ({node, ...props}) => <h3 className="text-xl font-bold text-white mb-2" {...props} />,
+                  h1: ({node, ...props}) => <h1 className="text-2xl lg:text-3xl font-bold text-white mb-4" {...props} />,
+                  h2: ({node, ...props}) => <h2 className="text-xl lg:text-2xl font-bold text-white mb-3" {...props} />,
+                  h3: ({node, ...props}) => <h3 className="text-lg lg:text-xl font-bold text-white mb-2" {...props} />,
                   p: ({node, ...props}) => <p className="mb-2" {...props} />,
                   li: ({node, ...props}) => <li className="ml-6 list-disc" {...props} />,
                 }}
@@ -372,7 +372,7 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, defaultS
             </div>
           </div>
           {/* Navigation Arrows in lower right corner */}
-          <div className="absolute bottom-8 right-8 flex flex-row gap-3 z-10">
+          <div className="absolute bottom-4 lg:bottom-8 right-4 lg:right-8 flex flex-row gap-2 lg:gap-3 z-10">
             <ArrowButton
               direction="left"
               onClick={() => setCurrentSlide((prev) => Math.max(prev - 1, 0))}
