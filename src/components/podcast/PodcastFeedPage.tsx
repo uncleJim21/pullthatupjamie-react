@@ -22,6 +22,8 @@ import UploadService, { UploadItem, PaginationData } from '../../services/upload
 import { createFeedShareUrl } from '../../utils/urlUtils.ts';
 import PageBanner from '../PageBanner.tsx';
 import SocialShareModal from '../SocialShareModal.tsx';
+import TutorialModal from '../TutorialModal.tsx';
+import WelcomeModal from '../WelcomeModal.tsx';
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history';
@@ -55,6 +57,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isUserSignedIn, setIsUserSignedIn] = useState(false);
     const [isProDashboardModalOpen, setIsProDashboardModalOpen] = useState(false);
     const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+    const [isTutorialOpen, setIsTutorialOpen] = useState(false);
     const [autoShare, setAutoShare] = useState(() => {
         const settings = localStorage.getItem('userSettings');
         return settings ? JSON.parse(settings).autoStartCrosspost : false;
@@ -473,6 +476,14 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     }
   };
 
+  const handleTutorialClick = () => {
+    setIsTutorialOpen(true);
+  };
+
+  const handleTutorialClose = () => {
+    setIsTutorialOpen(false);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -502,6 +513,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         logoText="Pull That Up Jamie!" 
         onSignIn={handleOpenSignInModal}
         onSignOut={handleSignOut}
+        onTutorialClick={handleTutorialClick}
         isUserSignedIn={isUserSignedIn}
         setIsUserSignedIn={setIsUserSignedIn}
       />
@@ -1052,6 +1064,13 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           "Priority Support"
         ]}
         customPrice="49.99"
+      />
+
+      {/* Tutorial Modal */}
+      <TutorialModal
+        isOpen={isTutorialOpen}
+        onClose={handleTutorialClose}
+        defaultSection={2} // Jamie Pro section for dashboard pages
       />
     </div>
   );

@@ -12,6 +12,7 @@ interface PageBannerProps {
   onSignIn?: () => void;
   onUpgrade?: () => void;
   onSignOut?: () => void;
+  onTutorialClick?: () => void;
   isUserSignedIn?: boolean;
   setIsUserSignedIn?: (value: boolean) => void;
 }
@@ -27,6 +28,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
   onSignIn,
   onUpgrade,
   onSignOut,
+  onTutorialClick,
   isUserSignedIn: propsIsUserSignedIn,
   setIsUserSignedIn: propsSetIsUserSignedIn
 }) => {
@@ -357,6 +359,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
               onSignInClick={handleSignIn}
               onUpgradeClick={handleUpgrade}
               onSignOut={handleSignOut}
+              onTutorialClick={onTutorialClick || (() => {})}
               isSignedIn={isUserSignedIn}
             />
           </nav>
@@ -440,6 +443,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
                   onSignInClick={handleSignIn}
                   onUpgradeClick={handleUpgrade}
                   onSignOut={handleSignOut}
+                  onTutorialClick={onTutorialClick || (() => {})}
                   isSignedIn={isUserSignedIn}
                 />
               </div>

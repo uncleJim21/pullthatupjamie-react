@@ -27,6 +27,7 @@ import ShareModal from './ShareModal.tsx';
 import SocialShareModal from './SocialShareModal.tsx';
 import TutorialModal from './TutorialModal.tsx';
 import WelcomeModal from './WelcomeModal.tsx';
+import AccountButton from './AccountButton.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -1156,6 +1157,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     setIsTutorialOpen(false);
   };
 
+  const handleTutorialClick = () => {
+    setIsTutorialOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
       {/* Welcome Modal */}
@@ -1178,6 +1183,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onSignIn={() => setIsSignInModalOpen(true)}
         onUpgrade={handleUpgrade}
         onSignOut={handleSignOut}
+        onTutorialClick={handleTutorialClick}
         isUserSignedIn={isUserSignedIn}
         setIsUserSignedIn={setIsUserSignedIn}
       />
@@ -1771,7 +1777,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         isOpen={isSocialShareModalOpen}
         onClose={() => setIsSocialShareModalOpen(false)}
         onOpenChange={setIsSocialShareModalOpen}
-      />
+              />
 
     </div>
   );
