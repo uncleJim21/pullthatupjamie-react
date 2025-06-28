@@ -316,8 +316,9 @@ const TryJamieWizard: React.FC = () => {
   // Step 4: Processing logic
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
+    const pollIntervalTime = 15000;
     let pollCount = 0;
-    const maxPolls = 30; // 5 minutes at 10s intervals
+    const maxPolls = 100; // 5 minutes at 10s intervals
 
     const startProcessing = async () => {
       if (currentStep !== 4 || !selectedPodcast || !selectedEpisode) return;
@@ -355,7 +356,7 @@ const TryJamieWizard: React.FC = () => {
           } catch (e) {
             // Ignore polling errors, keep polling
           }
-        }, 10000);
+        }, pollIntervalTime);
       } catch (e) {
         console.error('Job submission error:', e);
         setProcessing(false);
