@@ -377,10 +377,11 @@ const PageBanner: React.FC<PageBannerProps> = ({
               border: '1px solid #333',
               borderRadius: '8px',
               padding: '12px',
-              width: '200px',
+              width: '220px',
               boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
               zIndex: 20,
-              marginRight: '10px'
+              marginRight: '10px',
+              overflow: 'visible'
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -432,11 +433,10 @@ const PageBanner: React.FC<PageBannerProps> = ({
                 <span>Pro Dashboard</span>
               </a>
               <div style={{ 
-                padding: '8px 12px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                maxWidth: '100%'
+                padding: '4px 8px', // Reduced padding to give more space
+                overflow: 'visible', // Changed from hidden to visible
+                maxWidth: '100%',
+                width: '196px' // Updated to match new mobile menu width (220px - 24px padding)
               }}>
                 <AccountButton 
                   onConnect={handleConnect}
@@ -445,6 +445,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
                   onSignOut={handleSignOut}
                   onTutorialClick={onTutorialClick || (() => {})}
                   isSignedIn={isUserSignedIn}
+                  isInMobileMenu={true}
                 />
               </div>
             </div>

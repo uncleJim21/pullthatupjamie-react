@@ -11,6 +11,7 @@ interface AccountButtonProps {
   onSignOut: () => void;
   onTutorialClick: () => void;
   isSignedIn: boolean;
+  isInMobileMenu?: boolean; // New prop to detect if we're in mobile menu
 }
 
 interface AdminFeed {
@@ -25,13 +26,27 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
   onUpgradeClick,
   onTutorialClick,
   isSignedIn,
+  isInMobileMenu = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
   const [showNickname, setShowNickname] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [adminFeed, setAdminFeed] = useState<AdminFeed | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
+
+  // Check for mobile screen size
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
 
   useEffect(() => {
     if (isSignedIn) {
@@ -78,32 +93,62 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
     return `${str.slice(0, half)}...${str.slice(-half)}`;
   };
 
+  // Determine dropdown positioning based on screen size and mobile menu context
+  const getDropdownPositioning = () => {
+    if (isInMobileMenu) {
+      // When in mobile menu, position relative to the button but stay within bounds
+      return {
+        left: '0',
+        right: 'auto',
+        transform: 'translateX(-50%)', // Center the dropdown relative to button
+        marginTop: '8px'
+      };
+    } else if (isMobile) {
+      // On mobile but not in mobile menu, position to the left to avoid overflow
+      return {
+        left: '0',
+        right: 'auto',
+        transform: 'translateX(-80%)',
+        marginLeft: '-8px'
+      };
+    }
+    // Desktop positioning - align to right as before
+    return {
+      right: '0',
+      left: 'auto'
+    };
+  };
+
+  const buttonStyle = isInMobileMenu 
+    ? { width: '100%', maxWidth: '180px' } // Constrain width in mobile menu
+    : { minWidth: '130px' }; // Original desktop behavior
+
   return (
     <div className="relative">
       {/* Main Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-4 py-2 bg-[#111111] text-white rounded-lg border border-gray-800 hover:border-gray-700 transition-all"
-        style={{ minWidth: '130px' }} // Slightly increased min-width to accommodate animation
+        style={buttonStyle}
       >
         <User size={20} />
-        <div className="hidden sm:block overflow-hidden" style={{ width: '100%', maxWidth: '180px' }}>
+        <div className="hidden sm:block overflow-hidden" style={{ width: '100%', maxWidth: isInMobileMenu ? '120px' : '180px' }}>
           <span
             className="inline-block whitespace-nowrap overflow-hidden text-ellipsis transition-all duration-500 ease-in-out"
             title={nickname || "Account"}
             style={{ 
               opacity: isSignedIn && showNickname && nickname ? 1 : 0.7,
-              maxWidth: isSignedIn && showNickname && nickname ? '180px' : '0px',
+              maxWidth: isSignedIn && showNickname && nickname ? (isInMobileMenu ? '120px' : '180px') : '0px',
               transform: isSignedIn && showNickname && nickname ? 'translateX(0)' : 'translateX(-20px)',
             }}
           >
-            {isSignedIn && nickname ? truncateMiddle(nickname, 20) : ""}
+            {isSignedIn && nickname ? truncateMiddle(nickname, isInMobileMenu ? 15 : 20) : ""}
           </span>
           <span
             className="inline-block transition-all duration-500 ease-in-out"
             style={{ 
               opacity: isSignedIn && showNickname && nickname ? 0 : 1,
-              maxWidth: isSignedIn && showNickname && nickname ? '0px' : '180px',
+              maxWidth: isSignedIn && showNickname && nickname ? '0px' : (isInMobileMenu ? '120px' : '180px'),
               transform: isSignedIn && showNickname && nickname ? 'translateX(20px)' : 'translateX(0)',
               position: isSignedIn && showNickname && nickname ? 'absolute' : 'relative',
             }}
@@ -116,7 +161,14 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-60 bg-[#111111] border border-gray-800 rounded-lg shadow-xl overflow-hidden z-50">
+        <div 
+          className="absolute mt-2 bg-[#111111] border border-gray-800 rounded-lg shadow-xl overflow-hidden"
+          style={{
+            ...getDropdownPositioning(),
+            width: isInMobileMenu ? '190px' : '240px', // Increased mobile width to match new container
+            zIndex: isInMobileMenu ? '60' : '50' // Higher z-index in mobile menu
+          }}
+        >
           <div className="p-2 space-y-1">
             {/* Bitcoin Connect */}
             <div className="p-2">
