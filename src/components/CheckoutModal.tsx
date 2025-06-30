@@ -38,6 +38,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   const [activeStep, setActiveStep] = useState(1);
   const [consent, setConsent] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro'>(productName === 'jamie-pro' ? 'pro' : 'basic');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -53,14 +54,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [card, setCard] = useState<SquareCard | null>(null);
 
   // Determine the plan display information
-  const displayPrice = customPrice || MONTHLY_PRICE_STRING.replace('$', '');
-  const displayDescription = customDescription || "Productivity and Privacy at your fingertips with Jamie & other CASCDR apps.";
-  const displayFeatures = customFeatures || [
+  const displayPrice = selectedPlan === 'basic' ? (customPrice || MONTHLY_PRICE_STRING.replace('$', '')) : "49.99";
+  const displayDescription = selectedPlan === 'basic' ? (customDescription || "Productivity and Privacy at your fingertips with Jamie & other CASCDR apps.") : "Unlock unlimited podcast processing and access to all Jamie features";
+  const displayFeatures = selectedPlan === 'basic' ? (customFeatures || [
     "Unlimited web & podcast searches",
     "Access 20+ CASCDR Apps",
     "Early previews of new features"
+  ]) : [
+    "Your Pod Feed Transcribed & Searchable",
+    "AI Curated Clips & Email Alerts",
+    "AI Assist for Social Media",
+    "Easy Nostr/Twitter Crossposting"
   ];
-  const displayPlan = productName === "jamie-pro" ? "Jamie Pro Plan" : "Basic Plan";
+  const displayPlan = selectedPlan === 'basic' ? "Basic Plan" : "Jamie Pro Plan";
+  const currentProductName = selectedPlan === 'basic' ? "amber" : "jamie-pro";
 
   const handleNext = () => setActiveStep(activeStep + 1);
   const handleBack = () => setActiveStep(activeStep - 1);
@@ -107,7 +114,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 body: JSON.stringify({
                   email: userEmail,
                   paymentToken,
-                  productName: productName,
+                  productName: currentProductName,
                   cardholderName,
                   card
                 })
@@ -171,8 +178,34 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
       <div className="bg-black w-[95%] sm:w-[90%] max-h-[90vh] overflow-auto shadow-[0_0_15px_rgba(255,255,255,0.4)] rounded-lg">
         <div className="flex flex-col lg:flex-row h-full">
-          {/* Desktop benefits section - unchanged */}
-          <div className="w-full lg:w-1/3 p-4 hidden lg:flex items-center justify-center">
+          {/* Desktop benefits section */}
+          <div className="w-full lg:w-1/3 p-4 hidden lg:flex flex-col items-center justify-center">
+            {/* Plan Selector */}
+            <div className="w-full max-w-sm mb-4">
+              <div className="flex rounded-lg border border-gray-800 p-1 bg-black">
+                <button
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                    selectedPlan === 'basic'
+                      ? 'bg-white text-black'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                  onClick={() => setSelectedPlan('basic')}
+                >
+                  Basic
+                </button>
+                <button
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                    selectedPlan === 'pro'
+                      ? 'bg-white text-black'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                  onClick={() => setSelectedPlan('pro')}
+                >
+                  Pro
+                </button>
+              </div>
+            </div>
+            
             <PricingCard 
               plan={displayPlan}
               price={displayPrice}
@@ -182,6 +215,34 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
 
           <div className="w-full lg:w-2/3">
+            {/* Mobile plan selector - only on step 1 */}
+            {activeStep === 1 && (
+              <div className="lg:hidden p-3 border-b border-gray-700">
+                <div className="flex rounded-lg border border-gray-800 p-1 bg-black mb-3 max-w-xs mx-auto">
+                  <button
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                      selectedPlan === 'basic'
+                        ? 'bg-white text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                    onClick={() => setSelectedPlan('basic')}
+                  >
+                    Basic
+                  </button>
+                  <button
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                      selectedPlan === 'pro'
+                        ? 'bg-white text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                    onClick={() => setSelectedPlan('pro')}
+                  >
+                    Pro
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {/* Mobile benefits section - only on step 1 */}
             {activeStep === 1 && (
               <div className="lg:hidden bg-gray-900 p-3 border-b border-gray-700">
