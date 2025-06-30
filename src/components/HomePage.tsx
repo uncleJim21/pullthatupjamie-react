@@ -5,10 +5,12 @@ import Button from './Button.tsx';
 import SymbolTile from './SymbolTile.tsx';
 import { SearchIcon, ShareIcon, ClipIcon } from './Icons.tsx';
 import TutorialModal from './TutorialModal.tsx';
+import CheckoutModal from './CheckoutModal.tsx';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 
   const handleTutorialClick = () => {
     setIsTutorialOpen(true);
@@ -16,6 +18,14 @@ const HomePage: React.FC = () => {
 
   const handleTutorialClose = () => {
     setIsTutorialOpen(false);
+  };
+
+  const handleUpgrade = () => {
+    setIsCheckoutModalOpen(true);
+  };
+
+  const handleUpgradeSuccess = () => {
+    setIsCheckoutModalOpen(false);
   };
   
   // Mobile styles using CSS-in-JS with media queries
@@ -132,13 +142,20 @@ const HomePage: React.FC = () => {
         />
         
         <div style={{ position: 'relative', zIndex: 2 }}>
-          <PageBanner onTutorialClick={handleTutorialClick} />
+          <PageBanner onTutorialClick={handleTutorialClick} onUpgrade={handleUpgrade} />
           
           {/* Tutorial Modal */}
           <TutorialModal
             isOpen={isTutorialOpen}
             onClose={handleTutorialClose}
             defaultSection={0} // Start with Podcast Search section
+          />
+
+          {/* Checkout Modal */}
+          <CheckoutModal 
+            isOpen={isCheckoutModalOpen} 
+            onClose={() => setIsCheckoutModalOpen(false)} 
+            onSuccess={handleUpgradeSuccess}
           />
           
           <main>

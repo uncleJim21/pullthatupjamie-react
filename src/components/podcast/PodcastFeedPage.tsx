@@ -7,6 +7,7 @@ import { SubscribeLinks } from './SubscribeSection.tsx';
 import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share, Shield } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
+import { SocialPlatform } from '../SocialShareModal.tsx';
 import PodcastFeedService, { 
   Episode, 
   PodcastFeedData, 
@@ -443,6 +444,10 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     setIsCheckoutModalOpen(true);
   };
 
+  const handleUpgrade = () => {
+    setIsCheckoutModalOpen(true);
+  };
+
   const handleUpgradeSuccess = () => {
     setIsCheckoutModalOpen(false);
     // Optionally refresh admin privileges after successful upgrade
@@ -513,6 +518,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         logoText="Pull That Up Jamie!" 
         onSignIn={handleOpenSignInModal}
         onSignOut={handleSignOut}
+        onUpgrade={handleUpgrade}
         onTutorialClick={handleTutorialClick}
         isUserSignedIn={isUserSignedIn}
         setIsUserSignedIn={setIsUserSignedIn}
@@ -1001,9 +1007,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           fileUrl={currentShareUrl}
           itemName="upload"
           onComplete={() => setIsSocialShareModalOpen(false)}
-          platform="twitter"
-          showCopy={true}
-          showDownload={true}
+          platform={SocialPlatform.Twitter}
         />
       )}
 

@@ -817,7 +817,7 @@ const TryJamieWizard: React.FC = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Page Banner */}
-      <PageBanner logoText="Pull That Up Jamie!" onTutorialClick={handleTutorialClick} />
+      <PageBanner logoText="Pull That Up Jamie!" onTutorialClick={handleTutorialClick} onUpgrade={handleUpgrade} />
       
       {/* Quota Display */}
       {isUserSignedIn && quotaInfo && (
