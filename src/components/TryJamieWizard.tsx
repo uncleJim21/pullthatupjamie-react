@@ -83,6 +83,7 @@ const TryJamieWizard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PodcastFeed[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [selectedPodcast, setSelectedPodcast] = useState<SelectedPodcast | null>(isDebug ? debugFeed : null);
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [selectedEpisode, setSelectedEpisode] = useState<PodcastEpisode | null>(null);
@@ -224,6 +225,14 @@ const TryJamieWizard: React.FC = () => {
 
   // Search for podcasts when the query changes (after 500ms debounce)
   useEffect(() => {
+    // Reset hasSearched when query changes
+    setHasSearched(false);
+    
+    // Clear search results if query is too short
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+    }
+    
     const timer = setTimeout(() => {
       if (searchQuery.length >= 2) {
         searchFeeds();
@@ -238,6 +247,7 @@ const TryJamieWizard: React.FC = () => {
     if (!searchQuery.trim()) return;
     
     setIsLoading(true);
+    setHasSearched(true);
     try {
       const response = await rssService.searchFeeds(searchQuery);
       console.log('Search response:', response);
@@ -540,7 +550,7 @@ const TryJamieWizard: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : searchQuery.length >= 2 ? (
+        ) : searchQuery.length >= 2 && hasSearched && !isLoading ? (
           <div className="text-center py-12">
             <p className="text-gray-400">No podcasts found. Try a different search term.</p>
           </div>
