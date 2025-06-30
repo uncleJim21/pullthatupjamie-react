@@ -26,6 +26,38 @@ import SocialShareModal from '../SocialShareModal.tsx';
 import TutorialModal from '../TutorialModal.tsx';
 import WelcomeModal from '../WelcomeModal.tsx';
 
+interface SubscriptionSuccessPopupProps {
+  onClose: () => void;
+}
+
+const SubscriptionSuccessPopup = ({ onClose }: SubscriptionSuccessPopupProps) => (
+  <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
+    <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+      <h2 className="text-white text-lg font-bold mb-4">
+        Your subscription was successful!
+      </h2>
+      <p className="text-gray-400 mb-4">
+        Enjoy unlimited access to Jamie and other{' '}
+        <a
+          href="https://cascdr.xyz"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-400 hover:text-blue-300 underline"
+        >
+          CASCDR apps
+        </a>
+        .
+      </p>
+      <button
+        onClick={onClose}
+        className="mt-4 px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+);
+
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history';
 
@@ -64,6 +96,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         return settings ? JSON.parse(settings).autoStartCrosspost : false;
     });
     const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
+    const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -450,6 +483,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
   const handleUpgradeSuccess = () => {
     setIsCheckoutModalOpen(false);
+    setIsUpgradeSuccessPopUpOpen(true); // Show the popup
+    // Optionally refresh admin privileges after successful upgrade
+    if (feedId) {
+      checkPrivileges(feedId);
+    }
+  };
+
+  // Handle PageBanner upgrade success (from AccountButton)
+  const handlePageBannerUpgradeSuccess = () => {
+    setIsUpgradeSuccessPopUpOpen(true); // Show the popup
     // Optionally refresh admin privileges after successful upgrade
     if (feedId) {
       checkPrivileges(feedId);
@@ -518,7 +561,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         logoText="Pull That Up Jamie!" 
         onSignIn={handleOpenSignInModal}
         onSignOut={handleSignOut}
-        onUpgrade={handleUpgrade}
+        onUpgrade={handlePageBannerUpgradeSuccess}
         onTutorialClick={handleTutorialClick}
         isUserSignedIn={isUserSignedIn}
         setIsUserSignedIn={setIsUserSignedIn}
@@ -1054,7 +1097,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         </div>
       )}
 
-      {/* Checkout Modal */}
+      {/* Checkout Modal for internal upgrade buttons */}
       <CheckoutModal 
         isOpen={isCheckoutModalOpen} 
         onClose={() => setIsCheckoutModalOpen(false)} 
@@ -1069,6 +1112,14 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         ]}
         customPrice="49.99"
       />
+
+      {/* Subscription Success Popup */}
+      {isUpgradeSuccessPopUpOpen && (
+        <SubscriptionSuccessPopup onClose={() => {
+          setIsUpgradeSuccessPopUpOpen(false);
+          setIsCheckoutModalOpen(false);
+        }} />
+      )}
 
       {/* Tutorial Modal */}
       <TutorialModal

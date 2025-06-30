@@ -8,6 +8,38 @@ import CheckoutModal from './CheckoutModal.tsx';
 import JamieLoadingScreen from './JamieLoadingScreen.tsx';
 import TutorialModal from './TutorialModal.tsx';
 
+interface SubscriptionSuccessPopupProps {
+  onClose: () => void;
+}
+
+const SubscriptionSuccessPopup = ({ onClose }: SubscriptionSuccessPopupProps) => (
+  <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
+    <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+      <h2 className="text-white text-lg font-bold mb-4">
+        Your subscription was successful!
+      </h2>
+      <p className="text-gray-400 mb-4">
+        Enjoy unlimited access to Jamie and other{' '}
+        <a
+          href="https://cascdr.xyz"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-400 hover:text-blue-300 underline"
+        >
+          CASCDR apps
+        </a>
+        .
+      </p>
+      <button
+        onClick={onClose}
+        className="mt-4 px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+);
+
 // Step indicator interface
 interface StepIndicatorProps {
   currentStep: number;
@@ -95,6 +127,7 @@ const TryJamieWizard: React.FC = () => {
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isQuotaExceededModalOpen, setIsQuotaExceededModalOpen] = useState(false);
+  const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
   const [quotaInfo, setQuotaInfo] = useState<{
     eligible: boolean;
     remainingRuns: number;
@@ -172,6 +205,14 @@ const TryJamieWizard: React.FC = () => {
 
   const handleUpgradeSuccess = () => {
     setIsCheckoutModalOpen(false);
+    setIsUpgradeSuccessPopUpOpen(true); // Show the popup
+    // Refresh quota after successful upgrade
+    checkQuotaEligibility();
+  };
+
+  // Handle PageBanner upgrade success (from AccountButton)
+  const handlePageBannerUpgradeSuccess = () => {
+    setIsUpgradeSuccessPopUpOpen(true); // Show the popup
     // Refresh quota after successful upgrade
     checkQuotaEligibility();
   };
@@ -817,7 +858,7 @@ const TryJamieWizard: React.FC = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Page Banner */}
-      <PageBanner logoText="Pull That Up Jamie!" onTutorialClick={handleTutorialClick} onUpgrade={handleUpgrade} />
+      <PageBanner logoText="Pull That Up Jamie!" onTutorialClick={handleTutorialClick} onUpgrade={handlePageBannerUpgradeSuccess} />
       
       {/* Quota Display */}
       {isUserSignedIn && quotaInfo && (
@@ -862,31 +903,7 @@ const TryJamieWizard: React.FC = () => {
         initialMode="signup"
       />
 
-      {/* Quota Exceeded Notification Modal */}
-      {isQuotaExceededModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-          <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
-            <h2 className="text-white text-xl font-bold mb-4">
-              You've Used Your Free Episodes!
-            </h2>
-            <p className="text-gray-400 mb-6">
-              You've processed {quotaInfo?.usedThisPeriod || 2} out of {quotaInfo?.totalLimit || 2} free episodes this month. 
-              Upgrade to Jamie Pro for unlimited episode processing and instant access to all your favorite podcasts.
-            </p>
-            <button
-              onClick={() => {
-                setIsQuotaExceededModalOpen(false);
-                setIsCheckoutModalOpen(true);
-              }}
-              className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
-            >
-              Upgrade Now
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Checkout Modal */}
+      {/* Checkout Modal for internal upgrade buttons */}
       <CheckoutModal 
         isOpen={isCheckoutModalOpen} 
         onClose={() => setIsCheckoutModalOpen(false)} 
@@ -901,6 +918,38 @@ const TryJamieWizard: React.FC = () => {
         ]}
         customPrice="49.99"
       />
+
+      {/* Quota Exceeded Notification Modal */}
+      {isQuotaExceededModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+          <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+            <h2 className="text-white text-xl font-bold mb-4">
+              You've Used Your Free Episodes!
+            </h2>
+            <p className="text-gray-400 mb-6">
+              You've processed {quotaInfo?.usedThisPeriod || 2} out of {quotaInfo?.totalLimit || 2} free episodes this month. 
+              Upgrade to Jamie Pro for unlimited episode processing and instant access to all your favorite podcasts.
+            </p>
+            <button
+              onClick={() => {
+                setIsQuotaExceededModalOpen(false);
+                handleUpgrade();
+              }}
+              className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
+            >
+              Upgrade Now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Subscription Success Popup */}
+      {isUpgradeSuccessPopUpOpen && (
+        <SubscriptionSuccessPopup onClose={() => {
+          setIsUpgradeSuccessPopUpOpen(false);
+          setIsCheckoutModalOpen(false);
+        }} />
+      )}
 
       {/* Tutorial Modal */}
       <TutorialModal
