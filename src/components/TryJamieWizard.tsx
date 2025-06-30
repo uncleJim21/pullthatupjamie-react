@@ -10,9 +10,10 @@ import JamieLoadingScreen from './JamieLoadingScreen.tsx';
 // Step indicator interface
 interface StepIndicatorProps {
   currentStep: number;
+  hasQuotaInfo?: boolean;
 }
 
-const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {
+const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, hasQuotaInfo = false }) => {
   const steps = [
     { number: 1, label: 'Select Feed' },
     { number: 2, label: 'Select Episode' },
@@ -22,7 +23,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {
   ];
 
   return (
-    <div className="w-full max-w-2xl mx-auto mb-8 mt-20 flex items-center px-8">
+    <div className={`w-full max-w-2xl mx-auto mb-8 ${hasQuotaInfo ? 'mt-44 sm:mt-20' : 'mt-20'} flex items-center px-8`}>
       {steps.map((step, idx) => (
         <React.Fragment key={step.number}>
           <div className="flex flex-col items-center">
@@ -810,13 +811,21 @@ const TryJamieWizard: React.FC = () => {
       
       {/* Quota Display */}
       {isUserSignedIn && quotaInfo && (
-        <div className="absolute top-24 right-6 text-white text-sm bg-black/50 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-700 shadow-lg">
-          <div>{quotaInfo.totalLimit - quotaInfo.usedThisPeriod}/{quotaInfo.totalLimit} Free Runs left.  {quotaInfo.daysUntilReset} Days Until Reset.</div>
+        <div className="absolute top-24 left-1/2 transform -translate-x-1/2 sm:left-auto sm:right-6 sm:transform-none flex flex-col items-center sm:items-end space-y-2 mb-8">
+          <div className="text-white text-sm bg-black/50 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-700 shadow-lg">
+            <div>{quotaInfo.totalLimit - quotaInfo.usedThisPeriod}/{quotaInfo.totalLimit} Free Runs left.  {quotaInfo.daysUntilReset} Days Until Reset.</div>
+          </div>
+          <button
+            onClick={handleUpgrade}
+            className="bg-white text-black hover:bg-gray-200 px-2 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg"
+          >
+            Upgrade for Full Pro Experience
+          </button>
         </div>
       )}
       
       {/* Step Indicator */}
-      <StepIndicator currentStep={currentStep} />
+      <StepIndicator currentStep={currentStep} hasQuotaInfo={isUserSignedIn && !!quotaInfo} />
       
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 py-4">
@@ -877,7 +886,8 @@ const TryJamieWizard: React.FC = () => {
         customFeatures={[
           "Pods Transcribed & Searchable",
           "AI Curated Clips & Email Alerts",
-          "AI Assist for Social Media"
+          "AI Assist for Social Media",
+          "Easy Nostr/Twitter Crossposting"
         ]}
         customPrice="49.99"
       />

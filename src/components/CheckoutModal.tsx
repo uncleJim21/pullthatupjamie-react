@@ -56,11 +56,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const displayPrice = customPrice || MONTHLY_PRICE_STRING.replace('$', '');
   const displayDescription = customDescription || "Productivity and Privacy at your fingertips with Jamie & other CASCDR apps.";
   const displayFeatures = customFeatures || [
-    "Unlimited usage",
+    "Unlimited web & podcast searches",
     "Access 20+ CASCDR Apps",
     "Early previews of new features"
   ];
-  const displayPlan = productName === "jamie-pro" ? "Jamie Pro Plan" : "Jamie Plan Selected";
+  const displayPlan = productName === "jamie-pro" ? "Jamie Pro Plan" : "Basic Plan";
 
   const handleNext = () => setActiveStep(activeStep + 1);
   const handleBack = () => setActiveStep(activeStep - 1);

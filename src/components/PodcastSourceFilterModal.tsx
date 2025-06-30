@@ -521,7 +521,8 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
           customFeatures={isJamiePro ? [
             "Pods Transcribed & Searchable",
             "AI Curated Clips & Email Alerts",
-            "AI Assist for Social Media"
+            "AI Assist for Social Media",
+            "Easy Nostr/Twitter Crossposting"
           ] : undefined}
           customPrice={isJamiePro ? "49.99" : undefined}
         />
