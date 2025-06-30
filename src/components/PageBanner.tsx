@@ -4,7 +4,6 @@ import { Headphones, Search, LayoutDashboard } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import AccountButton from './AccountButton.tsx';
 import SignInModal from './SignInModal.tsx';
-import CheckoutModal from './CheckoutModal.tsx';
 
 interface PageBannerProps {
   logoText?: string;
@@ -38,7 +37,6 @@ const PageBanner: React.FC<PageBannerProps> = ({
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isProDashboardModalOpen, setIsProDashboardModalOpen] = useState(false);
-  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const navigate = useNavigate();
 
   // Check for screen size
@@ -189,9 +187,6 @@ const PageBanner: React.FC<PageBannerProps> = ({
     if (propsSetIsUserSignedIn) {
       propsSetIsUserSignedIn(true);
     }
-    
-    // Continue Pro Dashboard flow - show checkout modal
-    setIsCheckoutModalOpen(true);
   };
 
   const handleSignUpSuccess = () => {
@@ -204,12 +199,8 @@ const PageBanner: React.FC<PageBannerProps> = ({
       propsSetIsUserSignedIn(true);
     }
     
-    // Continue Pro Dashboard flow - show checkout modal
-    setIsCheckoutModalOpen(true);
-    
-    if (onUpgrade) {
-      onUpgrade();
-    }
+    // For sign up success, we just close the modal and sign in the user
+    // No need to trigger upgrade flow or pro dashboard modal
   };
 
   const handleUpgrade = () => {
@@ -227,15 +218,11 @@ const PageBanner: React.FC<PageBannerProps> = ({
       // If not signed in, show sign in modal
       setIsSignInModalOpen(true);
     } else {
-      // If signed in, go directly to checkout
-      setIsCheckoutModalOpen(true);
+      // If signed in, call parent upgrade handler
+      if (onUpgrade) {
+        onUpgrade();
+      }
     }
-  };
-
-  const handleUpgradeSuccess = () => {
-    setIsCheckoutModalOpen(false);
-    // Optionally refresh admin privileges after successful upgrade
-    // The useEffect will automatically re-check when isUserSignedIn changes
   };
 
   const handleSignOut = () => {
@@ -488,22 +475,6 @@ const PageBanner: React.FC<PageBannerProps> = ({
           </div>
         </div>
       )}
-
-      {/* Checkout Modal */}
-      <CheckoutModal 
-        isOpen={isCheckoutModalOpen} 
-        onClose={() => setIsCheckoutModalOpen(false)} 
-        onSuccess={handleUpgradeSuccess}
-        productName="jamie-pro"
-        customDescription="Unlock advanced podcast management features and the Pro Dashboard"
-        customFeatures={[
-          "Pro Dashboard Access",
-          "Advanced Analytics",
-          "Premium Podcast Tools",
-          "Priority Support"
-        ]}
-        customPrice="49.99"
-      />
     </>
   );
 };

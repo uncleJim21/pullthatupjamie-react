@@ -7,10 +7,43 @@ import { SearchIcon, ShareIcon, ClipIcon } from './Icons.tsx';
 import TutorialModal from './TutorialModal.tsx';
 import CheckoutModal from './CheckoutModal.tsx';
 
+interface SubscriptionSuccessPopupProps {
+  onClose: () => void;
+}
+
+const SubscriptionSuccessPopup = ({ onClose }: SubscriptionSuccessPopupProps) => (
+  <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
+    <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+      <h2 className="text-white text-lg font-bold mb-4">
+        Your subscription was successful!
+      </h2>
+      <p className="text-gray-400 mb-4">
+        Enjoy unlimited access to Jamie and other{' '}
+        <a
+          href="https://cascdr.xyz"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-400 hover:text-blue-300 underline"
+        >
+          CASCDR apps
+        </a>
+        .
+      </p>
+      <button
+        onClick={onClose}
+        className="mt-4 px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+);
+
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
 
   const handleTutorialClick = () => {
     setIsTutorialOpen(true);
@@ -26,6 +59,7 @@ const HomePage: React.FC = () => {
 
   const handleUpgradeSuccess = () => {
     setIsCheckoutModalOpen(false);
+    setIsUpgradeSuccessPopUpOpen(true);
   };
   
   // Mobile styles using CSS-in-JS with media queries
@@ -294,6 +328,12 @@ const HomePage: React.FC = () => {
           </main>
         </div>
       </div>
+             {isUpgradeSuccessPopUpOpen && (
+         <SubscriptionSuccessPopup onClose={() => {
+           setIsUpgradeSuccessPopUpOpen(false);
+           setIsCheckoutModalOpen(false);
+         }} />
+       )}
     </>
   );
 };

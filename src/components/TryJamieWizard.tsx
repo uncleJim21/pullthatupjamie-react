@@ -210,12 +210,7 @@ const TryJamieWizard: React.FC = () => {
     checkQuotaEligibility();
   };
 
-  // Handle PageBanner upgrade success (from AccountButton)
-  const handlePageBannerUpgradeSuccess = () => {
-    setIsUpgradeSuccessPopUpOpen(true); // Show the popup
-    // Refresh quota after successful upgrade
-    checkQuotaEligibility();
-  };
+
 
   // Static feeds for default display
   const staticFeeds = [
@@ -858,7 +853,7 @@ const TryJamieWizard: React.FC = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Page Banner */}
-      <PageBanner logoText="Pull That Up Jamie!" onTutorialClick={handleTutorialClick} onUpgrade={handlePageBannerUpgradeSuccess} />
+      <PageBanner logoText="Pull That Up Jamie!" onTutorialClick={handleTutorialClick} onUpgrade={handleUpgrade} />
       
       {/* Quota Display */}
       {isUserSignedIn && quotaInfo && (
