@@ -903,15 +903,6 @@ const TryJamieWizard: React.FC = () => {
         isOpen={isCheckoutModalOpen} 
         onClose={() => setIsCheckoutModalOpen(false)} 
         onSuccess={handleUpgradeSuccess}
-        productName="jamie-pro"
-        customDescription="Unlock unlimited on-demand runs and access to all Jamie features"
-        customFeatures={[
-          "Pods Transcribed & Searchable",
-          "AI Curated Clips & Email Alerts",
-          "AI Assist for Social Media",
-          "Easy Nostr/Twitter Crossposting"
-        ]}
-        customPrice="49.99"
       />
 
       {/* Quota Exceeded Notification Modal */}
