@@ -1,12 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageBanner from './PageBanner.tsx';
 import Button from './Button.tsx';
 import SymbolTile from './SymbolTile.tsx';
 import { SearchIcon, ShareIcon, ClipIcon } from './Icons.tsx';
+import TutorialModal from './TutorialModal.tsx';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+
+  const handleTutorialClick = () => {
+    setIsTutorialOpen(true);
+  };
+
+  const handleTutorialClose = () => {
+    setIsTutorialOpen(false);
+  };
   
   // Mobile styles using CSS-in-JS with media queries
   const mobileStyles = `
@@ -122,7 +132,14 @@ const HomePage: React.FC = () => {
         />
         
         <div style={{ position: 'relative', zIndex: 2 }}>
-          <PageBanner />
+          <PageBanner onTutorialClick={handleTutorialClick} />
+          
+          {/* Tutorial Modal */}
+          <TutorialModal
+            isOpen={isTutorialOpen}
+            onClose={handleTutorialClose}
+            defaultSection={0} // Start with Podcast Search section
+          />
           
           <main>
             {/* Hero Section */}

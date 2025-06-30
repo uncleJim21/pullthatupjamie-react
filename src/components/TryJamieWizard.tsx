@@ -6,6 +6,7 @@ import TryJamieService, { OnDemandRunRequest } from '../services/tryJamieService
 import SignInModal from './SignInModal.tsx';
 import CheckoutModal from './CheckoutModal.tsx';
 import JamieLoadingScreen from './JamieLoadingScreen.tsx';
+import TutorialModal from './TutorialModal.tsx';
 
 // Step indicator interface
 interface StepIndicatorProps {
@@ -104,7 +105,16 @@ const TryJamieWizard: React.FC = () => {
     daysUntilReset: number;
   } | null>(null);
   const [imageLoadedStates, setImageLoadedStates] = useState<Record<string, boolean>>({});
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const navigate = useNavigate();
+
+  const handleTutorialClick = () => {
+    setIsTutorialOpen(true);
+  };
+
+  const handleTutorialClose = () => {
+    setIsTutorialOpen(false);
+  };
 
   // Check if user is signed in and auto-show quota modal
   useEffect(() => {
@@ -807,7 +817,7 @@ const TryJamieWizard: React.FC = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Page Banner */}
-      <PageBanner logoText="Pull That Up Jamie!" />
+      <PageBanner logoText="Pull That Up Jamie!" onTutorialClick={handleTutorialClick} />
       
       {/* Quota Display */}
       {isUserSignedIn && quotaInfo && (
@@ -890,6 +900,13 @@ const TryJamieWizard: React.FC = () => {
           "Easy Nostr/Twitter Crossposting"
         ]}
         customPrice="49.99"
+      />
+
+      {/* Tutorial Modal */}
+      <TutorialModal
+        isOpen={isTutorialOpen}
+        onClose={handleTutorialClose}
+        defaultSection={0} // Start with Podcast Search section
       />
     </div>
   );

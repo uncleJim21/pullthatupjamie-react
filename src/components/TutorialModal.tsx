@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface TutorialSlide {
   menuTitle: string;
@@ -51,8 +52,8 @@ const SIDEBAR_SECTIONS = [
 const TUTORIAL_SLIDES: TutorialSlide[] = [
   {
     menuTitle: 'Podcast Search Basics',
-    slideTitle: 'Skip Keyword Engineering with Jamie',
-    subtitle: `Fastest podcast search in the West. Use Jamie's semantic search to turn vague queries into the precise moment you were looking for.`,
+    slideTitle: 'Search with Just a Vibe',
+    subtitle: `Can't think of the perfect keywords? No problem. Jamie uses semantic search to turn vague queries into the precise moment you were looking for.`,
     imagePath: '/tutorial/jamie-pod-search.gif',
     section: 'Podcast Search',
   },
@@ -203,12 +204,31 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, defaultS
   const [currentSlide, setCurrentSlide] = useState(() => getFirstSlideForSection(defaultSection));
   const [openSection, setOpenSection] = useState(defaultSection); // Use defaultSection prop
   const [fullscreenImg, setFullscreenImg] = useState<string | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
   const markdownRef = useRef<HTMLDivElement>(null);
+
+  // Find the section index for the current slide
+  const getSectionIdxForSlide = (slideIdx: number) => {
+    const slide = TUTORIAL_SLIDES[slideIdx];
+    return SIDEBAR_SECTIONS.findIndex(section => section.title === slide.section);
+  };
+
   useEffect(() => {
     if (markdownRef.current) {
       markdownRef.current.scrollTop = 0;
     }
   }, [currentSlide]);
+
+  // Update open section when current slide changes (for navigation arrows)
+  useEffect(() => {
+    if (isNavigating) {
+      const sectionIdx = getSectionIdxForSlide(currentSlide);
+      if (sectionIdx !== -1) {
+        setOpenSection(sectionIdx);
+      }
+      setIsNavigating(false);
+    }
+  }, [currentSlide, isNavigating]);
 
   if (!isOpen) return null;
 
@@ -217,12 +237,6 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, defaultS
   TUTORIAL_SLIDES.forEach((slide, idx) => {
     menuItemToSlideIdx[slide.menuTitle] = idx;
   });
-
-  // Find the section index for the current slide
-  const getSectionIdxForSlide = (slideIdx: number) => {
-    const slide = TUTORIAL_SLIDES[slideIdx];
-    return SIDEBAR_SECTIONS.findIndex(section => section.title === slide.section);
-  };
 
   // Navigation arrow button component
   const ArrowButton = ({ direction, onClick, disabled }: { direction: 'left' | 'right'; onClick: () => void; disabled: boolean }) => (
@@ -292,7 +306,11 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, defaultS
                 aria-expanded={openSection === sectionIdx}
               >
                 <span>{section.title}</span>
-                <span className="ml-2 text-white">{openSection === sectionIdx ? '▼' : '▶'}</span>
+                {openSection === sectionIdx ? (
+                  <ChevronDown className="ml-2 w-4 h-4 text-gray-400" />
+                ) : (
+                  <ChevronRight className="ml-2 w-4 h-4 text-gray-400" />
+                )}
               </button>
               {openSection === sectionIdx && (
                 <ul className="space-y-1 lg:space-y-2 ml-2">
@@ -375,12 +393,18 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, defaultS
           <div className="absolute bottom-4 lg:bottom-8 right-4 lg:right-8 flex flex-row gap-2 lg:gap-3 z-10">
             <ArrowButton
               direction="left"
-              onClick={() => setCurrentSlide((prev) => Math.max(prev - 1, 0))}
+              onClick={() => {
+                setIsNavigating(true);
+                setCurrentSlide((prev) => Math.max(prev - 1, 0));
+              }}
               disabled={currentSlide === 0}
             />
             <ArrowButton
               direction="right"
-              onClick={() => setCurrentSlide((prev) => Math.min(prev + 1, TUTORIAL_SLIDES.length - 1))}
+              onClick={() => {
+                setIsNavigating(true);
+                setCurrentSlide((prev) => Math.min(prev + 1, TUTORIAL_SLIDES.length - 1));
+              }}
               disabled={currentSlide === TUTORIAL_SLIDES.length - 1}
             />
           </div>
