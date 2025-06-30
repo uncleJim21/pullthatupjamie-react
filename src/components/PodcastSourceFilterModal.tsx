@@ -35,6 +35,7 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const sourcesContainerRef = useRef<HTMLDivElement>(null);
   
@@ -72,6 +73,7 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
         try {
           // Only fetch sources if they haven't been loaded yet
           if (!hasSourcesLoaded.current || sources.length === 0) {
+            setIsLoading(true);
             const results = await fetchAvailableSources();
             setSources(results);
             hasSourcesLoaded.current = true;
@@ -84,6 +86,8 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
         } catch (err) {
           setError('Failed to load podcast sources');
           console.error('Error fetching podcast sources:', err);
+        } finally {
+          setIsLoading(false);
         }
       };
 
@@ -563,6 +567,10 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
           <div ref={sourcesContainerRef} className="flex-1 overflow-y-auto p-2 custom-scrollbar">
             {error ? (
               <div className="text-red-500 p-4">{error}</div>
+            ) : isLoading ? (
+              <div className="text-white p-4 text-center">Loading...</div>
+            ) : filteredSources.length === 0 && searchQuery.trim() !== '' ? (
+              <div className="text-white p-4 text-center">No podcast feeds matched your search</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 {filteredSources.map((source) => (
