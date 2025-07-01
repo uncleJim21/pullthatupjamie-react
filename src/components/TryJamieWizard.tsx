@@ -56,7 +56,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, hasQuotaInfo
   ];
 
   return (
-    <div className={`w-full max-w-2xl mx-auto mb-8 ${hasQuotaInfo ? 'mt-44 sm:mt-20' : 'mt-20'} flex items-center px-8`}>
+    <div className={`w-full max-w-2xl mx-auto mb-8 ${hasQuotaInfo ? 'mt-44 sm:mt-32' : 'mt-20'} flex items-center px-8`}>
       {steps.map((step, idx) => (
         <React.Fragment key={step.number}>
           <div className="flex flex-col items-center">
