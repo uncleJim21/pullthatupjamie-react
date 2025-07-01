@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import './index.css';
 import SearchInterface from './components/SearchInterface.tsx';
 import PodcastFeedPage from './components/podcast/PodcastFeedPage.tsx';
@@ -38,6 +38,56 @@ if (typeof window !== 'undefined' && window.navigator) {
   };
 }
 
+// Component to handle old URL redirects
+const OldFeedRedirect = () => {
+  const { feedId } = useParams();
+  return <Navigate to={`/app/feed/${feedId}`} replace />;
+};
+
+// 404 Component that redirects to home after a brief delay
+const NotFound = () => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.location.href = '/';
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div style={{ 
+      background: 'black', 
+      color: 'white', 
+      minHeight: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column',
+      alignItems: 'center', 
+      justifyContent: 'center',
+      textAlign: 'center',
+      padding: '20px'
+    }}>
+      <h1 style={{ fontSize: '48px', marginBottom: '20px' }}>404</h1>
+      <p style={{ fontSize: '18px', marginBottom: '20px' }}>
+        This page could not be found.
+      </p>
+      <p style={{ fontSize: '16px', color: '#ccc' }}>
+        Redirecting to homepage in 3 seconds...
+      </p>
+      <div style={{ marginTop: '20px' }}>
+        <a 
+          href="/" 
+          style={{ 
+            color: 'white', 
+            textDecoration: 'underline',
+            fontSize: '16px'
+          }}
+        >
+          Go to homepage now
+        </a>
+      </div>
+    </div>
+  );
+};
+
 const App = () => (
   <BrowserRouter>
     <Routes>
@@ -51,6 +101,14 @@ const App = () => (
       <Route path="/app/feed/:feedId/jamieProHistory" element={<PodcastFeedPage initialView="jamiePro" defaultTab="history" />} />
       <Route path="/try-jamie" element={<TryJamieWizard />} />
       {DEBUG_MODE && <Route path="/twitter-test" element={<TwitterTest />} />}
+      
+      {/* Redirect old URLs to new structure */}
+      <Route path="/feed/:feedId" element={<OldFeedRedirect />} />
+      <Route path="/share" element={<Navigate to="/app/share" replace />} />
+      <Route path="/dashboard/:feedId" element={<Navigate to="/app/dashboard" replace />} />
+      
+      {/* Catch-all route for 404s */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   </BrowserRouter>
 );

@@ -216,7 +216,7 @@ const HomePage: React.FC = () => {
                 style={{ fontSize: '18px', maxWidth: '800px', margin: '0 auto 40px', lineHeight: '1.6' }}
               >
                 Find & Capitalize on Top Moments with lightning fast 
-                <br />search & AI tools - courtesy of your own personal Young Jamie.
+                <br />search, clip, & AI tools - courtesy of your own personal Young Jamie.
               </p>
               
               <div 

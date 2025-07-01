@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 import { useState, useEffect } from "react"
 
 interface WelcomeModalProps {
@@ -255,7 +255,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onQuickTour, onGetS
           )}
         </div>
 
-        <style jsx>{`
+        <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap');
   
           @keyframes logoEntrance {
