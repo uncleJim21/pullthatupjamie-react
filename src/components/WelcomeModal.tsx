@@ -91,9 +91,9 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onQuickTour, onGetS
               const delay = Math.random() * 2
               const duration = 0.8 + Math.random() * 0.4
               const startX = 40 + Math.random() * 20
-              const startY = 40 + Math.random() * 20
+              const startY = 20 + Math.random() * 20
               const angle = -60 + Math.random() * 120
-              const thickness = 0.5 + Math.random() * 1.5
+              const thickness = 0.75 + Math.random() * 1.5
 
               return (
                 <div

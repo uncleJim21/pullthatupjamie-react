@@ -53,72 +53,94 @@ const TUTORIAL_SLIDES: TutorialSlide[] = [
   {
     menuTitle: 'Podcast Search Basics',
     slideTitle: 'Search with Just a Vibe',
-    subtitle: `Can't think of the perfect keywords? No problem. Jamie uses semantic search to turn vague queries into the precise moment you were looking for.`,
+    subtitle: `Can't think of the perfect keywords? No problem. Jamie's semantic search to turn vague queries into the precise moment you were looking for.
+    
+  **Steps:**
+    1. Type in your query.
+    2. (Optional) Click the "Filter" button and adjust as needed (see Filters section below)
+    3. Click the search button or press enter.
+    4. Peruse, play back, clip or share the clip results.
+    `,
     imagePath: '/tutorial/jamie-pod-search.gif',
     section: 'Podcast Search',
   },
   {
     menuTitle: 'Podcast Search Filters',
     slideTitle: 'Choose Which Podcasts to Search',
-    subtitle: `Simply tap the podcast filter button to launch the menu. Then select/search for the podcast(s) you want and click them. Optionally save as default to make this selection permanent.`,
+    subtitle: `Adjust which podcasts you want to search in 3 simple steps.
+    
+  **Steps:**
+    1. Click the "Podcast Filter" toward top right of the search bar button.
+    2. Click on the logos to select the podcast(s) you want to search clips from. You can search the list to narrow down the feed you want.
+    3. (Optional) Click Save as Default to remember these settings for future sessions on PullThatUpJamie.ai.`,
     imagePath: '/tutorial/jamie-pod-filter.gif',
     section: 'Podcast Search',
   },
   {
     menuTitle: 'Instant Podcast Clip Share',
     slideTitle: 'Send a Precise Clip to a Friend in 1 Click',
-    subtitle: `Simply search and locate the clip you're looking for. 
-    
-Then click the "Share" button to copy a timestamped link to your clipboard. 
-
-Send to a friend and instantly dump them straight to the part you want to share.`,
+    subtitle: `
+  **Steps:**
+    1. Find the clip you want to share.
+    2. Then click the "Link" button to copy a timestamped link to your clipboard. 
+    3. Send the link to a friend. When they click Jamie will instantly jump them straight to the part you want to share.`,
     imagePath: '/tutorial/jamie-pod-quick-share.gif',
     section: 'Podcast Search',
   },
   {
     menuTitle: 'Create Clip Videos',
     slideTitle: 'Search & Edit Clips in No Time',
-    subtitle: `Simply search and locate the segment you're looking for.
-    
-Hit the clip button. 
+    subtitle: `Share insightful moments from a podcast in a few simple steps.
 
-Edit the clip to your liking or clip as is.
-
-Wait a few seconds and your clip video is ready to watch & share!`,
+  **Steps:**
+    1. Find the approximate timestamp of the clip you want to share with semantic search.
+    2. Click the "Clip" button
+    3. Either choose Clip This to clip the existing clips or edit timestamps to your liking.
+    4. Wait a few seconds for the clip to be created.
+    5. Watch, download and share your clip!
+  `,
     imagePath: '/tutorial/jamie-pod-make-clip.gif',
     section: 'Podcast Search',
   },
   {
     menuTitle: 'Cross Post Clips to Twitter/Nostr',
-    slideTitle: 'In One Click Share Your Clip on Twitter & Nostr.',
-    subtitle: `Click the "Share" button on the clip of interest.
-    
-Hit the nostr/twitter cross post button. 
+    slideTitle: 'In One Click Share Your Clip on Twitter & Nostr:',
+    subtitle: `Reach your audience on Nostr & Twitter with ease.
 
-Write the accompanying text to your liking (or have Jamie Assist write it for you).
-
-Click Post and get links to your cross posted content!`,
+  **Steps:**
+    1. Identify the clip of interest.
+    2. Click the "Share" button on the clip of interest.
+    3. Hit the nostr/twitter cross post button.
+    4. Write the accompanying text to your liking (or have Jamie Assist write it for you).
+    5. Click post and your clip will crosspost. Click the links to view your crossposted content.`,
     imagePath: '/tutorial/jamie-pod-cross-post-clip.gif',
     section: 'Podcast Search',
   },
   {
     menuTitle: 'Private Web Search',
     slideTitle: 'Search Privately and Efficiently',
-    subtitle: `Type a query to have Jamie compile search results and run them through an LLM summary with reference links at your fingertips.`,
+    subtitle: `Jamie gives the convenience of AI web search with robust privacy guarantees.
+
+
+  **Steps:**
+    1. Type a search query.
+    2. Click the "Search" button or press enter.
+    3. Jamie will compile and summarize the search results with inline reference links.
+    `,
     imagePath: '/tutorial/jamie-web-search.gif',
     section: 'Web Search',
   },
   {
     menuTitle: 'How It Works',
     slideTitle: 'Search Privately and Efficiently',
-    subtitle: `Jamie Web Search is open source and shields you from big tech surveillance. By cloaking your IP from LLM providers and search engines, you get the benefits of high tech without giving up your privacy.`,
+    subtitle: `Jamie Web Search is open source and shields you from big tech surveillance. By cloaking your identity from LLM providers and search engines, you get the benefits of high tech without giving up your privacy.`,
     imagePath: '/tutorial/jamie-web-explainer.png',
     section: 'Web Search',
   },
   {
     menuTitle: 'Dashboard',
     slideTitle: 'Jamie Pro Dashboard',
-    subtitle: `Your home for all Jamie Pro features and quick access to your curated content.`,
+    subtitle: `The Pro Dashboard is your home for all Jamie Pro features and quick access to your curated content. To reach it, click the "Pro Dashboard" button in the banner from any page.`,
     imagePath: '/tutorial/jamie-pro-go-to-home.gif',
     section: 'Jamie Pro (Premium)',
   },
@@ -127,7 +149,7 @@ Click Post and get links to your cross posted content!`,
     slideTitle: 'Adjusting Agent Preferences',
     subtitle: `The Agent selects topics and themes you're likely to find interesting. You can adjust them with prompts.
 
-**Steps:**
+  **Steps:**
     1. Go to the Pro Dashboard.
     2. Go to Jamie Pro tab from the top
     3. Go to Chat with Jamie
@@ -230,6 +252,22 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, defaultS
     }
   }, [currentSlide, isNavigating]);
 
+  // Add escape key handler for fullscreen image
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && fullscreenImg) {
+        setFullscreenImg(null);
+      }
+    };
+
+    if (fullscreenImg) {
+      document.addEventListener('keydown', handleEscapeKey);
+      return () => {
+        document.removeEventListener('keydown', handleEscapeKey);
+      };
+    }
+  }, [fullscreenImg]);
+
   if (!isOpen) return null;
 
   // Map menu items to slide indices for navigation, grouped by section
@@ -283,7 +321,7 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, defaultS
           <img
             src={fullscreenImg}
             alt="Full screen preview"
-            className="max-w-full max-h-full rounded-lg shadow-2xl border border-gray-700"
+            className="max-w-[90%] max-h-[90%] rounded-lg shadow-2xl border border-gray-700"
             style={{ background: '#000', objectFit: 'contain' }}
           />
           <button
