@@ -458,6 +458,9 @@ const PageBanner: React.FC<PageBannerProps> = ({
             <p className="text-gray-400 mb-6">
               The Pro Dashboard is exclusively for Jamie Pro subscribers. Upgrade now to access advanced podcast management features, analytics, and premium tools.
             </p>
+            <p className="text-gray-400 mb-6">
+              If you just recently purchased Jamie Pro, please wait 1 business day for our representative to fully onboard you.
+            </p>
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => setIsProDashboardModalOpen(false)}
