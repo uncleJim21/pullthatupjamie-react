@@ -107,9 +107,10 @@ class RssService {
    * @param feedUrl URL of the RSS feed
    * @param feedId ID of the feed
    * @param limit Max number of episodes to retrieve
+   * @param skipCleanGuid Whether to preserve original GUID format
    * @returns Promise with feed details and episodes
    */
-  async getFeed(feedUrl: string, feedId: string, limit: number = 50): Promise<GetFeedResponse> {
+  async getFeed(feedUrl: string, feedId: string, limit: number = 50, skipCleanGuid: boolean = true): Promise<GetFeedResponse> {
     try {
       const response = await fetch(`${API_URL}/getFeed`, {
         method: 'POST',
@@ -119,7 +120,8 @@ class RssService {
         body: JSON.stringify({
           feedUrl,
           feedId,
-          limit
+          limit,
+          skipCleanGuid
         })
       });
       

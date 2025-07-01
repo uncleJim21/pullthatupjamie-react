@@ -130,6 +130,7 @@ const TryJamieWizard: React.FC = () => {
   const [selectedEpisode, setSelectedEpisode] = useState<PodcastEpisode | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [processingFailed, setProcessingFailed] = useState(false);
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -415,7 +416,19 @@ const TryJamieWizard: React.FC = () => {
             if (status.status === 'complete' || status.status === 'failed' || pollCount >= maxPolls) {
               clearInterval(pollInterval);
               setProcessing(false);
-              setTimeout(() => setCurrentStep(5), 500); // Move to Enjoy step
+              
+              // Check if processing completed but all episodes failed
+              const allEpisodesFailed = status.status === 'complete' && 
+                status.stats && 
+                status.stats.episodesProcessed === 0 && 
+                status.stats.episodesFailed > 0;
+              
+              if (allEpisodesFailed) {
+                setProcessingFailed(true);
+                setTimeout(() => setCurrentStep(5), 500); // Move to step 5 but show failure UI
+              } else {
+                setTimeout(() => setCurrentStep(5), 500); // Move to Enjoy step
+              }
             }
           } catch (e) {
             // Ignore polling errors, keep polling
@@ -457,6 +470,74 @@ const TryJamieWizard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
 
+  // Render processing success
+  const renderProcessingSuccess = () => (
+    <div className="flex flex-col items-center justify-center min-h-[300px] py-16">
+      <h1 className="text-3xl font-bold mb-8">Processing Complete!</h1>
+      <p className="text-gray-400 mb-8">Start searching, clipping and sharing your podcast now with Jamie!</p>
+      <button
+        onClick={() => {
+          // Store the selected feed as the default source for SearchInterface
+          if (selectedPodcast) {
+            const feedId = selectedPodcast.feedId.toString();
+            localStorage.setItem('selectedPodcastSources', JSON.stringify([String(feedId)]));
+          }
+          // Extract first 12 words from episode description
+          const getQueryFromDescription = (description: string): string => {
+            // Strip HTML tags and clean up the text
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = description;
+            const cleanText = tempDiv.textContent || tempDiv.innerText || '';
+            
+            // Split into words and take first 12
+            const words = cleanText.trim().split(/\s+/).filter(word => word.length > 0);
+            return words.slice(0, 12).join(' ');
+          };
+          
+          const query = selectedEpisode ? getQueryFromDescription(selectedEpisode.description) : "artificial intelligence";
+          // Navigate to SearchInterface with auto-search parameters
+          navigate(`/app?mode=podcast-search&q=${encodeURIComponent(query)}`);
+        }}
+        className="bg-white text-black hover:bg-gray-200 py-3 px-6 rounded-lg font-medium text-lg transition-colors"
+      >
+        See Results
+      </button>
+    </div>
+  );
+
+  // Render processing failure
+  const renderProcessingFailure = () => (
+    <div className="flex flex-col items-center justify-center min-h-[300px] py-16">
+      <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-6">
+        <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        </svg>
+      </div>
+      <h1 className="text-3xl font-bold mb-4 text-red-400">Processing Failed</h1>
+      <p className="text-gray-400 mb-8 text-center max-w-md">
+        We weren't able to process this episode. This could be due to audio quality issues, 
+        unavailable audio files, or technical difficulties with the podcast feed.
+      </p>
+      <div className="flex space-x-4">
+        <button
+          onClick={() => {
+            setProcessingFailed(false);
+            setCurrentStep(1);
+          }}
+          className="bg-gray-800 text-white hover:bg-gray-700 py-3 px-6 rounded-lg font-medium text-lg transition-colors border border-gray-600"
+        >
+          Try Another Episode
+        </button>
+        <button
+          onClick={() => navigate('/app')}
+          className="bg-white text-black hover:bg-gray-200 py-3 px-6 rounded-lg font-medium text-lg transition-colors"
+        >
+          Go to Jamie Search
+        </button>
+      </div>
+    </div>
+  );
+
   // Render appropriate content based on current step
   const renderContent = () => {
     switch (currentStep) {
@@ -469,39 +550,7 @@ const TryJamieWizard: React.FC = () => {
       case 4:
         return renderProcessing();
       case 5:
-        return (
-          <div className="flex flex-col items-center justify-center min-h-[300px] py-16">
-            <h1 className="text-3xl font-bold mb-8">Processing Complete!</h1>
-            <p className="text-gray-400 mb-8">Start searching, clipping and sharing your podcast now with Jamie!</p>
-            <button
-              onClick={() => {
-                // Store the selected feed as the default source for SearchInterface
-                if (selectedPodcast) {
-                  const feedId = selectedPodcast.feedId.toString();
-                  localStorage.setItem('selectedPodcastSources', JSON.stringify([String(feedId)]));
-                }
-                // Extract first 12 words from episode description
-                const getQueryFromDescription = (description: string): string => {
-                  // Strip HTML tags and clean up the text
-                  const tempDiv = document.createElement('div');
-                  tempDiv.innerHTML = description;
-                  const cleanText = tempDiv.textContent || tempDiv.innerText || '';
-                  
-                  // Split into words and take first 12
-                  const words = cleanText.trim().split(/\s+/).filter(word => word.length > 0);
-                  return words.slice(0, 12).join(' ');
-                };
-                
-                const query = selectedEpisode ? getQueryFromDescription(selectedEpisode.description) : "artificial intelligence";
-                // Navigate to SearchInterface with auto-search parameters
-                navigate(`/app?mode=podcast-search&q=${encodeURIComponent(query)}`);
-              }}
-              className="bg-white text-black hover:bg-gray-200 py-3 px-6 rounded-lg font-medium text-lg transition-colors"
-            >
-              See Results
-            </button>
-          </div>
-        );
+        return processingFailed ? renderProcessingFailure() : renderProcessingSuccess();
       default:
         return renderFeedSelection();
     }
@@ -839,6 +888,7 @@ const TryJamieWizard: React.FC = () => {
                   // User is out of runs, show notification modal first
                   setIsQuotaExceededModalOpen(true);
                 } else {
+                  setProcessingFailed(false); // Reset failure state
                   setCurrentStep(4);
                 }
               }}
@@ -893,12 +943,14 @@ const TryJamieWizard: React.FC = () => {
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
           checkQuotaEligibility(); // Refresh quota after sign in
+          setProcessingFailed(false); // Reset failure state
           setCurrentStep(4); // Proceed to processing step after sign in
         }}
         onSignUpSuccess={() => {
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
           checkQuotaEligibility(); // Refresh quota after sign up
+          setProcessingFailed(false); // Reset failure state
           setCurrentStep(4); // Proceed to processing step after sign up
         }}
         customTitle="Let's get a good email for ya"
