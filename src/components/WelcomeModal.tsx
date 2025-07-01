@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import type React from "react"
 import { useState, useEffect } from "react"
 
 interface WelcomeModalProps {
@@ -52,100 +52,113 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onQuickTour, onGetS
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 p-4">
       <div className="relative flex flex-col items-center justify-between w-full max-w-sm sm:max-w-md h-auto max-h-[90vh] rounded-2xl bg-[#111] border border-gray-800 shadow-2xl px-6 sm:px-8 py-8 sm:py-12 overflow-hidden">
-        {/* Star Trek Warp Speed Background INSIDE Modal */}
-        <div className="absolute inset-0 overflow-hidden rounded-2xl">
-          {/* Warp speed streaking lines */}
+        {/* Star Trek Warp Speed Background - TOP PORTION ONLY */}
+        <div className="absolute top-0 left-0 right-0 h-[60%] overflow-hidden rounded-t-2xl">
+          {/* Warp speed streaking lines - coming from center going outward/backward */}
           <div className="absolute inset-0">
-            {[...Array(30)].map((_, i) => {
+            {[...Array(25)].map((_, i) => {
               const delay = Math.random() * 3
-              const duration = 0.8 + Math.random() * 0.4
-              const startY = Math.random() * 100
-              const angle = 45 + Math.random() * 15 // Steeper angle for backward travel effect (45-60 degrees)
-              const opacity = 0.5 // Consistent 50% opacity
+              const duration = 1.2 + Math.random() * 0.8
+              const startX = 45 + Math.random() * 10 // Start near center
+              const startY = 45 + Math.random() * 10
+              const angle = -45 + Math.random() * 90 // Varied angles radiating outward
+              const opacity = 0.4 + Math.random() * 0.3
               const thickness = 1 + Math.random() * 2
 
               return (
                 <div
                   key={`warp-${i}`}
-                  className="absolute bg-gradient-to-r from-transparent via-white to-transparent"
+                  className="absolute bg-gradient-to-l from-transparent via-white to-white"
                   style={{
-                    width: "200%",
+                    width: "150%",
                     height: `${thickness}px`,
                     top: `${startY}%`,
-                    left: "-100%",
+                    left: `${startX}%`,
                     opacity: 0,
+                    transformOrigin: "left center",
                     transform: `rotate(${angle}deg)`,
-                    animation: `warpSpeed ${duration}s linear ${delay}s infinite`,
-                    boxShadow: `0 0 ${thickness * 2}px rgba(255, 255, 255, ${opacity})`,
+                    animation: `warpSpeedBackward ${duration}s linear ${delay}s infinite`,
+                    boxShadow: `0 0 ${thickness * 3}px rgba(255, 255, 255, ${opacity})`,
                   }}
                 />
               )
             })}
           </div>
 
-          {/* Additional faster streaks for more intensity */}
+          {/* Additional faster backward streaks */}
           <div className="absolute inset-0">
             {[...Array(15)].map((_, i) => {
               const delay = Math.random() * 2
-              const duration = 0.4 + Math.random() * 0.3
-              const startY = Math.random() * 100
-              const angle = 50 + Math.random() * 10 // Steeper angle for backward travel (50-60 degrees)
-              const thickness = 0.5 + Math.random() * 1
+              const duration = 0.8 + Math.random() * 0.4
+              const startX = 40 + Math.random() * 20
+              const startY = 40 + Math.random() * 20
+              const angle = -60 + Math.random() * 120
+              const thickness = 0.5 + Math.random() * 1.5
 
               return (
                 <div
                   key={`fast-warp-${i}`}
-                  className="absolute bg-gradient-to-r from-transparent via-blue-200 to-transparent"
+                  className="absolute bg-gradient-to-l from-transparent via-blue-200 to-blue-300"
                   style={{
-                    width: "250%",
+                    width: "200%",
                     height: `${thickness}px`,
                     top: `${startY}%`,
-                    left: "-125%",
+                    left: `${startX}%`,
                     opacity: 0,
+                    transformOrigin: "left center",
                     transform: `rotate(${angle}deg)`,
-                    animation: `warpSpeedFast ${duration}s linear ${delay}s infinite`,
-                    boxShadow: `0 0 ${thickness * 3}px rgba(147, 197, 253, 0.5)`, // 50% opacity
+                    animation: `warpSpeedFastBackward ${duration}s linear ${delay}s infinite`,
+                    boxShadow: `0 0 ${thickness * 4}px rgba(147, 197, 253, 0.7)`,
                   }}
                 />
               )
             })}
           </div>
 
-          {/* Occasional bright flashes */}
+          {/* Bright flashes radiating from center */}
           <div className="absolute inset-0">
-            {[...Array(8)].map((_, i) => {
+            {[...Array(6)].map((_, i) => {
               const delay = Math.random() * 4 + 1
-              const duration = 0.3 + Math.random() * 0.2
-              const startY = Math.random() * 100
-              const angle = 55 + Math.random() * 5 // Steeper, more consistent angle (55-60 degrees)
+              const duration = 0.4 + Math.random() * 0.3
+              const startX = 48 + Math.random() * 4
+              const startY = 48 + Math.random() * 4
+              const angle = -30 + Math.random() * 60
 
               return (
                 <div
                   key={`flash-${i}`}
-                  className="absolute bg-gradient-to-r from-transparent via-cyan-300 to-transparent"
+                  className="absolute bg-gradient-to-l from-transparent via-cyan-300 to-cyan-400"
                   style={{
-                    width: "300%",
+                    width: "250%",
                     height: "3px",
                     top: `${startY}%`,
-                    left: "-150%",
+                    left: `${startX}%`,
                     opacity: 0,
+                    transformOrigin: "left center",
                     transform: `rotate(${angle}deg)`,
-                    animation: `warpFlash ${duration}s linear ${delay}s infinite`,
-                    boxShadow: "0 0 10px rgba(103, 232, 249, 0.5)", // 50% opacity
+                    animation: `warpFlashBackward ${duration}s linear ${delay}s infinite`,
+                    boxShadow: "0 0 12px rgba(103, 232, 249, 0.9)",
                   }}
                 />
               )
             })}
           </div>
 
-          {/* Subtle background glow */}
+          {/* Semi-transparent overlay for text contrast - TOP PORTION ONLY */}
           <div
-            className="absolute inset-0 opacity-20"
+            className="absolute inset-0 bg-black bg-opacity-40 backdrop-blur-[1px]"
             style={{
               background: `
-                radial-gradient(ellipse at center, rgba(59, 130, 246, 0.1) 0%, transparent 70%),
-                linear-gradient(45deg, rgba(6, 182, 212, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)
+                radial-gradient(ellipse at center, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.3) 70%, rgba(0, 0, 0, 0.5) 100%)
               `,
+            }}
+          />
+
+          {/* Gradient fade to blend with bottom section */}
+          <div
+            className="absolute bottom-0 left-0 right-0 h-16"
+            style={{
+              background: `linear-gradient(to bottom, transparent 0%, rgba(17, 17, 17, 1) 100%)`,
             }}
           />
         </div>
@@ -242,7 +255,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onQuickTour, onGetS
           )}
         </div>
 
-        <style>{`
+        <style jsx>{`
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap');
   
           @keyframes logoEntrance {
@@ -275,26 +288,26 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onQuickTour, onGetS
             51%, 100% { opacity: 0; }
           }
 
-          /* Star Trek Warp Speed Animations */
-          @keyframes warpSpeed {
-            0% { opacity: 0; transform: translateX(-100%) rotate(var(--angle, 0deg)); }
-            5% { opacity: 0.5; }
-            95% { opacity: 0.5; }
-            100% { opacity: 0; transform: translateX(100%) rotate(var(--angle, 0deg)); }
+          /* Star Trek Warp Speed Backward Animations */
+          @keyframes warpSpeedBackward {
+            0% { opacity: 0; transform: scale(0.1) rotate(var(--angle, 0deg)) translateX(0); }
+            10% { opacity: 1; }
+            90% { opacity: 0.8; }
+            100% { opacity: 0; transform: scale(1) rotate(var(--angle, 0deg)) translateX(-200%); }
           }
 
-          @keyframes warpSpeedFast {
-            0% { opacity: 0; transform: translateX(-125%) rotate(var(--angle, 0deg)); }
-            10% { opacity: 0.5; }
-            90% { opacity: 0.5; }
-            100% { opacity: 0; transform: translateX(125%) rotate(var(--angle, 0deg)); }
+          @keyframes warpSpeedFastBackward {
+            0% { opacity: 0; transform: scale(0.2) rotate(var(--angle, 0deg)) translateX(0); }
+            15% { opacity: 0.9; }
+            85% { opacity: 0.7; }
+            100% { opacity: 0; transform: scale(1) rotate(var(--angle, 0deg)) translateX(-250%); }
           }
 
-          @keyframes warpFlash {
-            0% { opacity: 0; transform: translateX(-150%) rotate(var(--angle, 0deg)); }
-            20% { opacity: 0.5; }
-            80% { opacity: 0.5; }
-            100% { opacity: 0; transform: translateX(150%) rotate(var(--angle, 0deg)); }
+          @keyframes warpFlashBackward {
+            0% { opacity: 0; transform: scale(0.1) rotate(var(--angle, 0deg)) translateX(0); }
+            25% { opacity: 1; }
+            75% { opacity: 1; }
+            100% { opacity: 0; transform: scale(1) rotate(var(--angle, 0deg)) translateX(-300%); }
           }
         `}</style>
       </div>
