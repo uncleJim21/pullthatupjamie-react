@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Twitter, Sparkles, ChevronDown, ChevronUp, ChevronRight, Info, Save, Check } from 'lucide-react';
+import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
 import AuthService from '../services/authService.ts';
 import RegisterModal from './RegisterModal.tsx';
 import SocialShareSuccessModal from './SocialShareSuccessModal.tsx';
+import MentionsLookupView from './MentionsLookupView.tsx';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -238,6 +239,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Add state to track retrying the thumbnail
   const [thumbnailRetry, setThumbnailRetry] = useState(false);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
+
+  // Add state for mentions lookup
+  const [showMentionsLookup, setShowMentionsLookup] = useState(false);
+  const [mentionSearchQuery, setMentionSearchQuery] = useState('');
+  const [mentionStartIndex, setMentionStartIndex] = useState(-1);
 
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
@@ -582,6 +588,23 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   }, [isOpen]);
 
+  // Handle escape key to close mentions
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showMentionsLookup) {
+        handleCloseMentions();
+      }
+    };
+
+    if (showMentionsLookup) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showMentionsLookup]);
+
   // Nostr-specific functions
   const connectToRelay = (relay: string): Promise<WebSocket> => {
     return new Promise((resolve, reject) => {
@@ -911,6 +934,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Function to handle content changes and track user edits
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
+    const cursorPosition = e.target.selectionStart;
+    
     setContent(newContent);
     
     // Only mark as edited if there's actual content
@@ -918,6 +943,30 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       // Mark that user has edited content since last Jamie Assist call
       setUserEditedSinceLastAssist(true);
     }
+    
+    // Check for @ mention detection
+    const textBeforeCursor = newContent.substring(0, cursorPosition);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (lastAtIndex !== -1) {
+      // Check if @ is at start or preceded by whitespace
+      const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
+      if (charBeforeAt === ' ' || charBeforeAt === '\n' || lastAtIndex === 0) {
+        const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+        // Check if there's no space after @ (still typing the mention)
+        if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
+          setMentionSearchQuery(textAfterAt);
+          setMentionStartIndex(lastAtIndex);
+          setShowMentionsLookup(true);
+          return;
+        }
+      }
+    }
+    
+    // Hide mentions if no valid @ pattern found
+    setShowMentionsLookup(false);
+    setMentionSearchQuery('');
+    setMentionStartIndex(-1);
   };
 
   // Render the Jamie Assist info modal
@@ -1007,6 +1056,37 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
     onClose(); // Close the main modal after success modal is dismissed
+  };
+
+  // Handler for mention selection
+  const handleMentionSelect = (mention: any, platform: string) => {
+    if (mentionStartIndex === -1) return;
+    
+    const mentionText = `@${mention.username}`;
+    
+    // Replace the @ and search text with the selected mention
+    const beforeMention = content.substring(0, mentionStartIndex);
+    const afterMention = content.substring(mentionStartIndex + 1 + mentionSearchQuery.length);
+    const newContent = beforeMention + mentionText + afterMention;
+    
+    setContent(newContent);
+    
+    // Hide mentions popup
+    setShowMentionsLookup(false);
+    setMentionSearchQuery('');
+    setMentionStartIndex(-1);
+    
+    // Mark as user edited
+    setUserEditedSinceLastAssist(true);
+    
+    printLog(`Selected mention: @${mention.username} on ${platform}`);
+  };
+
+  // Handler to close mentions popup
+  const handleCloseMentions = () => {
+    setShowMentionsLookup(false);
+    setMentionSearchQuery('');
+    setMentionStartIndex(-1);
   };
 
   if (!isOpen || !fileUrl) return null;
@@ -1196,13 +1276,26 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           )}
         </div>
         
-        <textarea
-          value={content}
-          onChange={handleContentChange}
-          className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
-          placeholder={`Write about this ${itemName}...`}
-          style={{ resize: "none", height: "120px", minHeight: "100px" }}
-        />
+        <div className="relative">
+          <textarea
+            value={content}
+            onChange={handleContentChange}
+            className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
+            placeholder={`Write about this ${itemName}...`}
+            style={{ resize: "none", height: "120px", minHeight: "100px" }}
+          />
+          
+          {/* Mentions Lookup Overlay */}
+          {showMentionsLookup && (
+            <div className="absolute top-full left-0 right-0 z-50 mt-1 flex justify-center">
+              <MentionsLookupView 
+                onMentionSelect={handleMentionSelect}
+                searchQuery={mentionSearchQuery}
+                onClose={handleCloseMentions}
+              />
+            </div>
+          )}
+        </div>
         
         <div className="text-gray-400 text-xs mb-2 sm:mb-3 text-left pl-1">
           The link to your {itemName} and attribution will be added automatically when you publish.
