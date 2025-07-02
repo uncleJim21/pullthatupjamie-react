@@ -11,12 +11,14 @@ interface MentionsLookupViewProps {
   onMentionSelect?: (mention: TwitterUser, platform: Platform) => void;
   searchQuery?: string;
   onClose?: () => void;
+  onFirstMentionChange?: (mention: TwitterUser | null) => void;
 }
 
 const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   onMentionSelect,
   searchQuery = '',
-  onClose
+  onClose,
+  onFirstMentionChange
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(Platform.Twitter);
   const [twitterUsers, setTwitterUsers] = useState<TwitterUser[]>([]);
@@ -55,6 +57,12 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
     const debounceTimer = setTimeout(fetchUsers, 300); // Debounce API calls
     return () => clearTimeout(debounceTimer);
   }, [searchQuery, selectedPlatform]);
+
+  // Notify parent of first mention changes for Tab key functionality
+  useEffect(() => {
+    const firstMention = twitterUsers.length > 0 ? twitterUsers[0] : null;
+    onFirstMentionChange?.(firstMention);
+  }, [twitterUsers, onFirstMentionChange]);
 
   const handleMentionClick = (mention: TwitterUser) => {
     onMentionSelect?.(mention, selectedPlatform);

@@ -244,6 +244,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [showMentionsLookup, setShowMentionsLookup] = useState(false);
   const [mentionSearchQuery, setMentionSearchQuery] = useState('');
   const [mentionStartIndex, setMentionStartIndex] = useState(-1);
+  const [firstMention, setFirstMention] = useState<any>(null);
 
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
@@ -969,6 +970,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setMentionStartIndex(-1);
   };
 
+  // Handle keyboard events for textarea
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle Tab key to select first mention
+    if (e.key === 'Tab' && showMentionsLookup && firstMention) {
+      e.preventDefault();
+      handleMentionSelect(firstMention, 'twitter');
+    }
+  };
+
   // Render the Jamie Assist info modal
   const renderInfoModal = () => {
     if (!showInfoModal) return null;
@@ -1062,7 +1072,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const handleMentionSelect = (mention: any, platform: string) => {
     if (mentionStartIndex === -1) return;
     
-    const mentionText = `@${mention.username}`;
+    const mentionText = `@${mention.username} `; // Add space after username
     
     // Replace the @ and search text with the selected mention
     const beforeMention = content.substring(0, mentionStartIndex);
@@ -1280,6 +1290,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           <textarea
             value={content}
             onChange={handleContentChange}
+            onKeyDown={handleTextareaKeyDown}
             className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
             placeholder={`Write about this ${itemName}...`}
             style={{ resize: "none", height: "120px", minHeight: "100px" }}
@@ -1292,6 +1303,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 onMentionSelect={handleMentionSelect}
                 searchQuery={mentionSearchQuery}
                 onClose={handleCloseMentions}
+                onFirstMentionChange={setFirstMention}
               />
             </div>
           )}
