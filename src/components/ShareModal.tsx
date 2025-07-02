@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Check, Link, Twitter, X } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
@@ -35,6 +35,7 @@ interface ShareModalProps {
   nostrButtonLabel?: string;
   lookupHash?: string;
   auth?: any;
+  onSocialShareModalOpen?: (isOpen: boolean) => void;
 }
 
 const ShareModal: React.FC<ShareModalProps> = ({
@@ -54,7 +55,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
   copyButtonLabel,
   nostrButtonLabel,
   lookupHash,
-  auth
+  auth,
+  onSocialShareModalOpen
 }) => {
   const [copied, setCopied] = useState(false);
   const [activePlatform, setActivePlatform] = useState<SocialPlatform | null>(null);
@@ -64,6 +66,11 @@ const ShareModal: React.FC<ShareModalProps> = ({
   React.useEffect(() => {
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
+
+  // Notify parent when social share modal opens/closes
+  useEffect(() => {
+    onSocialShareModalOpen?.(activePlatform !== null);
+  }, [activePlatform, onSocialShareModalOpen]);
 
   // Clear share result message after a timeout
   React.useEffect(() => {

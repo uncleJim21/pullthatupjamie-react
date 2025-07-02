@@ -24,10 +24,10 @@ import PodcastSourceFilterModal from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
 import PageBanner from './PageBanner.tsx';
 import ShareModal from './ShareModal.tsx';
-import SocialShareModal from './SocialShareModal.tsx';
 import TutorialModal from './TutorialModal.tsx';
 import WelcomeModal from './WelcomeModal.tsx';
 import AccountButton from './AccountButton.tsx';
+import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -279,6 +279,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Add state to track if share modals are open
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
+
+  // Add state for ShareModal data
+  const [shareModalData, setShareModalData] = useState<{
+    fileUrl: string;
+    lookupHash: string;
+  } | null>(null);
 
   // Update the isAnyModalOpen function to include share modals
   const isAnyModalOpen = (): boolean => {
@@ -1030,15 +1036,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     episode: rec.title,
                     creator: `${rec.feed_title} - ${rec.episode_title}`,
                     audioUrl: rec.audio_url,
-                    date: response.data.run_date,
+                    date: response.data?.run_date || '',
                     timeContext: {
                       start_time: rec.start_time,
                       end_time: rec.end_time
                     },
-                    similarity: { 
-                      combined: rec.relevance_score / 100, 
-                      vector: rec.relevance_score / 100 
-                    },
+                    similarity: rec.relevance_score / 100,
                     episodeImage: rec.episode_image,
                     shareUrl: shareUrl,
                     shareLink: clipId
@@ -1168,6 +1171,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     setIsTutorialOpen(true);
   };
 
+  // Add handler for ClipTrackerModal share clicks
+  const handleClipShare = (lookupHash: string, cdnLink: string) => {
+    setShareModalData({
+      fileUrl: cdnLink,
+      lookupHash: lookupHash
+    });
+    setIsShareModalOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
       {/* Welcome Modal */}
@@ -1250,10 +1262,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                               start_time: rec.start_time,
                               end_time: rec.end_time
                             },
-                            similarity: { 
-                              combined: rec.relevance_score / 100, 
-                              vector: rec.relevance_score / 100 
-                            },
+                            similarity: rec.relevance_score / 100,
                             episodeImage: rec.episode_image,
                             shareUrl: shareUrl,
                             shareLink: clipId
@@ -1308,10 +1317,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                               start_time: rec.start_time,
                               end_time: rec.end_time
                             },
-                            similarity: { 
-                              combined: rec.relevance_score / 100, 
-                              vector: rec.relevance_score / 100 
-                            },
+                            similarity: rec.relevance_score / 100,
                             episodeImage: rec.episode_image,
                             shareUrl: shareUrl,
                             shareLink: clipId
@@ -1660,7 +1666,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <PodcastLoadingPlaceholder />
       )}
 
-      {searchMode === 'podcast-search' && !isAnyModalOpen() && (
+      {searchMode === 'podcast-search' && !isAnyModalOpen() && !isClipBatchPage && (
         <div
           className={`fixed w-full z-50 transition-all duration-300 ${
             hasSearchedInMode('podcast-search') ? 'bottom-24' : 'bottom-0'
@@ -1672,6 +1678,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             isCollapsed={isClipTrackerCollapsed}
             onCollapsedChange={setIsClipTrackerCollapsed}
             auth={authConfig || undefined}
+            onShareClick={handleClipShare}
           />
         </div>
       )}
@@ -1777,14 +1784,33 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
       <ShareModal
         isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
+        onClose={() => {
+          setIsShareModalOpen(false);
+          setShareModalData(null);
+        }}
         onOpenChange={setIsShareModalOpen}
+        fileUrl={shareModalData?.fileUrl || ''}
+        title="Share This Clip"
+        itemName="clip"
+        showCopy={true}
+        showDownload={true}
+        showTwitter={true}
+        showNostr={true}
+        copySuccessMessage="Clip link copied!"
+        downloadButtonLabel="Download Clip"
+        twitterButtonLabel="Tweet Clip"
+        nostrButtonLabel="Share on Nostr"
+        lookupHash={shareModalData?.lookupHash || ''}
+        auth={authConfig}
       />
       <SocialShareModal
         isOpen={isSocialShareModalOpen}
         onClose={() => setIsSocialShareModalOpen(false)}
         onOpenChange={setIsSocialShareModalOpen}
-              />
+        fileUrl=""
+        onComplete={() => {}}
+        platform={SocialPlatform.Twitter}
+      />
 
     </div>
   );
