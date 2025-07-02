@@ -4,7 +4,7 @@ import { formatTime } from '../../utils/time.ts';
 import { makeClip, fetchClipById } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
 import EditTimestampsModal from "./EditTimestampsModal.tsx";
-import SocialShareModal from "../SocialShareModal.tsx";
+import SocialShareModal, { SocialPlatform } from "../SocialShareModal.tsx";
 import ShareModal from "../ShareModal.tsx";
 import { AuthConfig } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
@@ -727,10 +727,7 @@ export const PodcastSearchResultItem = ({
           nostrButtonLabel="Share on Nostr"
           lookupHash={shareClipLookupHash}
           auth={authConfig}
-          onSocialShareModalOpen={() => {
-            setIsShareModalOpen(false);
-            setIsSocialShareModalOpen(true);
-          }}
+          onSocialShareModalOpen={onSocialShareModalOpen}
         />
       )}
 
@@ -742,6 +739,7 @@ export const PodcastSearchResultItem = ({
             setIsSocialShareModalOpen(false);
             setShareClipUrl('');
             setShareClipLookupHash('');
+            onSocialShareModalOpen?.(false);
           }}
           fileUrl={shareClipUrl}
           itemName="clip"
@@ -750,8 +748,9 @@ export const PodcastSearchResultItem = ({
             setIsSocialShareModalOpen(false);
             setShareClipUrl('');
             setShareClipLookupHash('');
+            onSocialShareModalOpen?.(false);
           }}
-          platform="twitter" // This is ignored in the current implementation
+          platform={SocialPlatform.Twitter}
           lookupHash={shareClipLookupHash}
           auth={authConfig}
         />

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {Download, Play, Share, Check, Loader2, ChevronDown, ChevronUp, Clock, Scissors, Link, Twitter, X } from 'lucide-react';
 import { API_URL, printLog, AuthConfig } from '../constants/constants.ts';
 import { checkClipStatus } from '../services/clipService.ts';
-import ShareModal from './ShareModal.tsx';
 
 interface ClipHistoryItem {
   creator: string;
@@ -31,6 +30,7 @@ interface ClipTrackerModalProps {
   isCollapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
   auth?: AuthConfig;
+  onShareClick?: (lookupHash: string, cdnLink: string) => void;
 }
 
 export default function ClipTrackerModal({
@@ -38,14 +38,13 @@ export default function ClipTrackerModal({
   isCollapsed,
   hasSearched,
   onCollapsedChange,
-  auth
+  auth,
+  onShareClick
 }: ClipTrackerModalProps) {
   const [clipHistory, setClipHistory] = useState<ClipHistoryItem[]>([]);
   const [isHistoryShown, setIsHistoryShown] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [lookupHash, setLookupHash] = useState<string | null | undefined>(null);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -200,8 +199,10 @@ export default function ClipTrackerModal({
     const cdnLink = getCdnLink(lookupHash);
     printLog(`CDN link for sharing: ${cdnLink}`);
     
-    setLookupHash(effectiveLookupHash);
-    setShowShareModal(true);
+    // Only call the callback if we have valid values
+    if (effectiveLookupHash && cdnLink) {
+      onShareClick?.(effectiveLookupHash, cdnLink);
+    }
   };
 
   const updateOldPendingItems = async (historyJSON: ClipHistoryItem[]) => {
@@ -359,28 +360,6 @@ export default function ClipTrackerModal({
       left-1/2 -translate-x-1/2 mx-auto w-full max-w-[40rem] sm:px-4
       ${bottomConstraint(isCollapsed,hasSearched)}`}
     >
-      {showShareModal && lookupHash && (
-        <ShareModal 
-          isOpen={showShareModal}
-          onClose={() => {
-            printLog(`Closing ShareModal with lookupHash: ${lookupHash}`);
-            setShowShareModal(false);
-          }}
-          fileUrl={getCdnLink(lookupHash)}
-          title="Share This Clip"
-          itemName="clip"
-          showCopy={true}
-          showDownload={true}
-          showTwitter={true}
-          showNostr={true}
-          copySuccessMessage="Clip link copied!"
-          downloadButtonLabel="Download Clip"
-          twitterButtonLabel="Tweet Clip"
-          nostrButtonLabel="Share on Nostr"
-          lookupHash={lookupHash}
-          auth={auth}
-        />
-      )}
       {/* Current Clip */}
       <div className="bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow">
       <button
