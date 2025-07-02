@@ -1,15 +1,6 @@
-import React, { useState } from 'react';
-import { Twitter } from 'lucide-react';
-
-interface TwitterMention {
-  id: string;
-  username: string;
-  displayName: string;
-  verified: boolean;
-  profileImageUrl: string;
-  bio: string;
-  followerCount: string;
-}
+import React, { useState, useEffect } from 'react';
+import { Twitter, Loader2 } from 'lucide-react';
+import { twitterService, TwitterUser } from '../services/twitterService.ts';
 
 enum Platform {
   Twitter = 'twitter',
@@ -17,7 +8,7 @@ enum Platform {
 }
 
 interface MentionsLookupViewProps {
-  onMentionSelect?: (mention: TwitterMention, platform: Platform) => void;
+  onMentionSelect?: (mention: TwitterUser, platform: Platform) => void;
   searchQuery?: string;
   onClose?: () => void;
 }
@@ -28,62 +19,44 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   onClose
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(Platform.Twitter);
+  const [twitterUsers, setTwitterUsers] = useState<TwitterUser[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock Twitter data
-  const mockTwitterMentions: TwitterMention[] = [
-    {
-      id: '1',
-      username: 'elonmuskschmerschemrschemr',
-      displayName: 'Elon Muskavadilidadadabad',
-      verified: true,
-      profileImageUrl: '/public/icons/tech.png', // placeholder
-      bio: 'CEO of Tesla, SpaceX, and owner of X',
-      followerCount: '158M'
-    },
-    {
-      id: '2', 
-      username: 'elonmusk2',
-      displayName: 'Elon Musk2',
-      verified: false,
-      profileImageUrl: '/public/icons/tech.png', // placeholder
-      bio: 'Not the real Elon',
-      followerCount: '1.2K'
-    },
-    {
-      id: '3',
-      username: 'joerogan',
-      displayName: 'Joe Rogan',
-      verified: true,
-      profileImageUrl: '/public/icons/podcast.png', // placeholder
-      bio: 'Host of The Joe Rogan Experience',
-      followerCount: '18.2M'
-    },
-    {
-        id: '4',
-        username: 'joerogan',
-        displayName: 'Joe Rogan',
-        verified: true,
-        profileImageUrl: '/public/icons/podcast.png', // placeholder
-        bio: 'Host of The Joe Rogan Experience',
-        followerCount: '18.2M'
-      },
-      {
-        id: '5',
-        username: 'joerogan',
-        displayName: 'Joe Rogan',
-        verified: true,
-        profileImageUrl: '/public/icons/podcast.png', // placeholder
-        bio: 'Host of The Joe Rogan Experience',
-        followerCount: '18.2M'
+  // Fetch Twitter users when searchQuery changes
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!searchQuery || searchQuery.length < 2 || selectedPlatform !== Platform.Twitter) {
+        setTwitterUsers([]);
+        return;
       }
-  ];
 
-  const filteredMentions = mockTwitterMentions.filter(mention =>
-    mention.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    mention.displayName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      setIsLoading(true);
+      setError(null);
 
-  const handleMentionClick = (mention: TwitterMention) => {
+      try {
+        // Use the actual search query to find matching usernames
+        const result = await twitterService.lookupUsers([searchQuery]);
+        
+        if (result.success && result.data) {
+          setTwitterUsers(result.data);
+        } else {
+          setError(result.error || 'Failed to fetch users');
+          setTwitterUsers([]);
+        }
+      } catch (err) {
+        setError('Network error occurred');
+        setTwitterUsers([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(fetchUsers, 300); // Debounce API calls
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery, selectedPlatform]);
+
+  const handleMentionClick = (mention: TwitterUser) => {
     onMentionSelect?.(mention, selectedPlatform);
     onClose?.();
   };
@@ -138,43 +111,60 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
 
       {/* Content */}
       <div className="max-h-48 overflow-y-auto">
-        {selectedPlatform === Platform.Twitter ? (
+                {selectedPlatform === Platform.Twitter ? (
           <div className="divide-y divide-gray-800">
-                         {filteredMentions.length > 0 ? (
-               filteredMentions.map((mention) => (
-                 <div
-                   key={mention.id}
-                   onClick={() => handleMentionClick(mention)}
-                   className="px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors group grid grid-cols-[32px_1fr] gap-3 items-center"
-                 >
-                   {/* Profile Image */}
-                   <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
-                     <Twitter className="w-4 h-4 text-blue-400" />
-                   </div>
-                   
-                   {/* User Info */}
-                   <div className="min-w-0 flex items-center space-x-2">
-                     <div className="flex items-center space-x-1">
-                       <span className="text-white font-medium text-xs">
-                         {truncateMiddle(mention.displayName)}
-                       </span>
-                       {mention.verified && (
-                         <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                           <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
-                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                           </svg>
-                         </div>
-                       )}
-                     </div>
-                     <div className="text-gray-400 text-xs">@{truncateMiddle(mention.username)}</div>
-                   </div>
-                 </div>
-               ))
-             ) : (
-               <div className="px-3 py-4 text-center text-gray-400">
-                 <p className="text-xs">No results found</p>
-               </div>
-             )}
+            {isLoading ? (
+              <div className="px-3 py-4 text-center text-gray-400">
+                <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
+                <p className="text-xs">Loading...</p>
+              </div>
+            ) : error ? (
+              <div className="px-3 py-4 text-center text-gray-400">
+                <p className="text-xs text-red-400">{error}</p>
+              </div>
+            ) : twitterUsers.length > 0 ? (
+              twitterUsers.map((user) => (
+                <div
+                  key={user.id}
+                  onClick={() => handleMentionClick(user)}
+                  className="px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors group grid grid-cols-[32px_1fr] gap-3 items-center"
+                >
+                  {/* Profile Image */}
+                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
+                    {user.profile_image_url ? (
+                      <img 
+                        src={user.profile_image_url} 
+                        alt={user.name}
+                        className="w-8 h-8 object-cover"
+                      />
+                    ) : (
+                      <Twitter className="w-4 h-4 text-blue-400" />
+                    )}
+                  </div>
+                  
+                  {/* User Info */}
+                  <div className="min-w-0 flex items-center space-x-2">
+                    <div className="flex items-center space-x-1">
+                      <span className="text-white font-medium text-xs">
+                        {truncateMiddle(user.name)}
+                      </span>
+                      {user.verified && (
+                        <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-gray-400 text-xs">@{truncateMiddle(user.username)}</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-3 py-4 text-center text-gray-400">
+                <p className="text-xs">No results found</p>
+              </div>
+            )}
           </div>
                  ) : (
            /* Nostr Coming Soon */
