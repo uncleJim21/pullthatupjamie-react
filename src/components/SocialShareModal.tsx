@@ -7,6 +7,7 @@ import AuthService from '../services/authService.ts';
 import RegisterModal from './RegisterModal.tsx';
 import SocialShareSuccessModal from './SocialShareSuccessModal.tsx';
 import MentionsLookupView from './MentionsLookupView.tsx';
+import { MentionResult } from '../types/mention.ts';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -244,7 +245,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [showMentionsLookup, setShowMentionsLookup] = useState(false);
   const [mentionSearchQuery, setMentionSearchQuery] = useState('');
   const [mentionStartIndex, setMentionStartIndex] = useState(-1);
-  const [firstMention, setFirstMention] = useState<any>(null);
+  const [firstMention, setFirstMention] = useState<MentionResult | null>(null);
 
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
@@ -975,7 +976,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     // Handle Tab key to select first mention
     if (e.key === 'Tab' && showMentionsLookup && firstMention) {
       e.preventDefault();
-      handleMentionSelect(firstMention, 'twitter');
+      handleMentionSelect(firstMention, firstMention.platform);
     }
   };
 
@@ -1069,10 +1070,21 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   };
 
   // Handler for mention selection
-  const handleMentionSelect = (mention: any, platform: string) => {
+  const handleMentionSelect = (mention: MentionResult, platform: string) => {
     if (mentionStartIndex === -1) return;
     
-    const mentionText = `@${mention.username} `; // Add space after username
+    // Extract the appropriate identifier based on platform
+    let mentionIdentifier: string;
+    if (mention.platform === 'twitter') {
+      mentionIdentifier = mention.username;
+    } else if (mention.platform === 'nostr') {
+      // For Nostr, use nip05 if available, otherwise use shortened npub
+      mentionIdentifier = mention.nip05 || mention.npub.slice(0, 16) + '...';
+    } else {
+      mentionIdentifier = 'unknown';
+    }
+    
+    const mentionText = `@${mentionIdentifier} `; // Add space after identifier
     
     // Replace the @ and search text with the selected mention
     const beforeMention = content.substring(0, mentionStartIndex);
@@ -1089,7 +1101,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     // Mark as user edited
     setUserEditedSinceLastAssist(true);
     
-    printLog(`Selected mention: @${mention.username} on ${platform}`);
+    printLog(`Selected mention: @${mentionIdentifier} on ${platform}`);
   };
 
   // Handler to close mentions popup
