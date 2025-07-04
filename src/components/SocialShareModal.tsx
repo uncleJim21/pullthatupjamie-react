@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check } from 'lucide-react';
+import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
@@ -7,6 +7,7 @@ import AuthService from '../services/authService.ts';
 import RegisterModal from './RegisterModal.tsx';
 import SocialShareSuccessModal from './SocialShareSuccessModal.tsx';
 import MentionsLookupView from './MentionsLookupView.tsx';
+import MentionPinManagement from './MentionPinManagement.tsx';
 import { MentionResult } from '../types/mention.ts';
 
 // Define relay pool for Nostr
@@ -246,6 +247,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [mentionSearchQuery, setMentionSearchQuery] = useState('');
   const [mentionStartIndex, setMentionStartIndex] = useState(-1);
   const [firstMention, setFirstMention] = useState<MentionResult | null>(null);
+  const [showPinManagement, setShowPinManagement] = useState(false);
 
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
@@ -1308,21 +1310,37 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             style={{ resize: "none", height: "120px", minHeight: "100px" }}
           />
           
-          {/* Mentions Lookup Overlay */}
-          {showMentionsLookup && (
-            <div className="absolute top-full left-0 right-0 z-50 mt-1 flex justify-center">
-              <MentionsLookupView 
-                onMentionSelect={handleMentionSelect}
-                searchQuery={mentionSearchQuery}
-                onClose={handleCloseMentions}
-                onFirstMentionChange={setFirstMention}
-              />
-            </div>
-          )}
+                  {/* Mentions Lookup Overlay */}
+        {showMentionsLookup && (
+          <div className="absolute top-full left-0 right-0 z-50 mt-1 flex justify-center">
+            <MentionsLookupView 
+              onMentionSelect={handleMentionSelect}
+              searchQuery={mentionSearchQuery}
+              onClose={handleCloseMentions}
+              onFirstMentionChange={setFirstMention}
+            />
+          </div>
+        )}
+
+        {/* Pin Management Modal */}
+        <MentionPinManagement
+          isOpen={showPinManagement}
+          onClose={() => setShowPinManagement(false)}
+        />
         </div>
         
-        <div className="text-gray-400 text-xs mb-2 sm:mb-3 text-left pl-1">
-          The link to your {itemName} and attribution will be added automatically when you publish.
+        <div className="flex items-center justify-between mb-2 sm:mb-3">
+          <div className="text-gray-400 text-xs pl-1">
+            The link to your {itemName} and attribution will be added automatically when you publish.
+          </div>
+          <button
+            onClick={() => setShowPinManagement(true)}
+            className="flex items-center space-x-1 text-xs text-gray-400 hover:text-yellow-500 transition-colors"
+            title="Manage pinned mentions"
+          >
+            <Pin className="w-3 h-3" />
+            <span>Pins</span>
+          </button>
         </div>
         
         {/* Platform Selection with Checkboxes */}
