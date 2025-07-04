@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
@@ -248,6 +248,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [mentionStartIndex, setMentionStartIndex] = useState(-1);
   const [firstMention, setFirstMention] = useState<MentionResult | null>(null);
   const [showPinManagement, setShowPinManagement] = useState(false);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(-1);
+  const [mentionResults, setMentionResults] = useState<MentionResult[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
@@ -961,6 +964,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
           setMentionSearchQuery(textAfterAt);
           setMentionStartIndex(lastAtIndex);
+          setSelectedMentionIndex(-1); // Reset selection when search query changes
           setShowMentionsLookup(true);
           return;
         }
@@ -971,6 +975,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setShowMentionsLookup(false);
     setMentionSearchQuery('');
     setMentionStartIndex(-1);
+    setSelectedMentionIndex(-1);
   };
 
   // Handle keyboard events for textarea
@@ -979,6 +984,33 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     if (e.key === 'Tab' && showMentionsLookup && firstMention) {
       e.preventDefault();
       handleMentionSelect(firstMention, firstMention.platform);
+    }
+    
+    // Handle arrow keys for mention navigation
+    if (showMentionsLookup && mentionResults.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedMentionIndex(prev => {
+          // If no selection yet, start with first item (index 0)
+          if (prev === -1) return 0;
+          const newIndex = prev < mentionResults.length - 1 ? prev + 1 : 0;
+          return newIndex;
+        });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedMentionIndex(prev => {
+          // If no selection yet, start with last item
+          if (prev === -1) return mentionResults.length - 1;
+          const newIndex = prev > 0 ? prev - 1 : mentionResults.length - 1;
+          return newIndex;
+        });
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        const selectedMention = mentionResults[selectedMentionIndex >= 0 ? selectedMentionIndex : 0];
+        if (selectedMention) {
+          handleMentionSelect(selectedMention, selectedMention.platform);
+        }
+      }
     }
   };
 
@@ -1095,13 +1127,25 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     
     setContent(newContent);
     
+    // Calculate cursor position after insertion
+    const cursorPosition = mentionStartIndex + mentionText.length;
+    
     // Hide mentions popup
     setShowMentionsLookup(false);
     setMentionSearchQuery('');
     setMentionStartIndex(-1);
+    setSelectedMentionIndex(-1);
     
     // Mark as user edited
     setUserEditedSinceLastAssist(true);
+    
+    // Set cursor position after a brief delay to ensure DOM update
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(cursorPosition, cursorPosition);
+      }
+    }, 10);
     
     printLog(`Selected mention: @${mentionIdentifier} on ${platform}`);
   };
@@ -1111,6 +1155,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setShowMentionsLookup(false);
     setMentionSearchQuery('');
     setMentionStartIndex(-1);
+    setSelectedMentionIndex(-1);
   };
 
   if (!isOpen || !fileUrl) return null;
@@ -1302,6 +1347,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         <div className="relative">
           <textarea
+            ref={textareaRef}
             value={content}
             onChange={handleContentChange}
             onKeyDown={handleTextareaKeyDown}
@@ -1318,6 +1364,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               searchQuery={mentionSearchQuery}
               onClose={handleCloseMentions}
               onFirstMentionChange={setFirstMention}
+              selectedIndex={selectedMentionIndex}
+              mentionResults={mentionResults}
+              onMentionResultsChange={setMentionResults}
             />
           </div>
         )}

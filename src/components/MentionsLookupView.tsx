@@ -13,13 +13,19 @@ interface MentionsLookupViewProps {
   searchQuery?: string;
   onClose?: () => void;
   onFirstMentionChange?: (mention: MentionResult | null) => void;
+  selectedIndex?: number;
+  mentionResults?: MentionResult[];
+  onMentionResultsChange?: (results: MentionResult[]) => void;
 }
 
 const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   onMentionSelect,
   searchQuery = '',
   onClose,
-  onFirstMentionChange
+  onFirstMentionChange,
+  selectedIndex = -1,
+  mentionResults: externalMentionResults,
+  onMentionResultsChange
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(Platform.Twitter);
   const [mentionResults, setMentionResults] = useState<MentionResult[]>([]);
@@ -27,10 +33,20 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [pinningStates, setPinningStates] = useState<{[key: string]: boolean}>({});
 
+  // Use external mention results if provided, otherwise use internal state
+  const displayResults = externalMentionResults || mentionResults;
+  const setDisplayResults = onMentionResultsChange || ((results: MentionResult[] | ((prev: MentionResult[]) => MentionResult[])) => {
+    if (typeof results === 'function') {
+      setMentionResults(results);
+    } else {
+      setMentionResults(results);
+    }
+  });
+
   // Make fetchMentions accessible
   const fetchMentions = React.useCallback(async () => {
     if (!searchQuery || searchQuery.length < 2) {
-      setMentionResults([]);
+      setDisplayResults([]);
       return;
     }
     setIsLoading(true);
@@ -43,18 +59,18 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
         limit: 10
       });
       if (result.success && result.results) {
-        setMentionResults(result.results);
+        setDisplayResults(result.results);
       } else {
         setError(result.error || 'Failed to fetch mentions');
-        setMentionResults([]);
+        setDisplayResults([]);
       }
     } catch (err) {
       setError('Network error occurred');
-      setMentionResults([]);
+      setDisplayResults([]);
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, setDisplayResults]);
 
   // Fetch mentions when searchQuery changes
   useEffect(() => {
@@ -63,7 +79,7 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   }, [fetchMentions]);
 
   // Filter results by selected platform
-  const filteredResults = mentionResults.filter(result => result.platform === selectedPlatform);
+  const filteredResults = displayResults.filter(result => result.platform === selectedPlatform);
 
   // Notify parent of first mention changes for Tab key functionality
   useEffect(() => {
@@ -82,20 +98,21 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
     setPinningStates(prev => ({ ...prev, [mentionKey]: true }));
     try {
       const result = await mentionService.togglePin(mention);
-      if (result.success) {
-        // Toggle UI state directly on success
-        setMentionResults(prev => prev.map(m => {
-          const mKey = `${m.platform}-${m.platform === 'twitter' ? m.username : m.npub}`;
-          if (mKey === mentionKey) {
-            return {
-              ...m,
-              isPinned: !m.isPinned,
-              pinId: m.isPinned ? null : result.data?.id || 'temp-id'
-            };
-          }
-          return m;
-        }));
-      } else {
+              if (result.success) {
+          // Toggle UI state directly on success
+          const updatedResults = displayResults.map(m => {
+            const mKey = `${m.platform}-${m.platform === 'twitter' ? m.username : m.npub}`;
+            if (mKey === mentionKey) {
+              return {
+                ...m,
+                isPinned: !m.isPinned,
+                pinId: m.isPinned ? null : result.data?.id || 'temp-id'
+              };
+            }
+            return m;
+          });
+          setDisplayResults(updatedResults);
+        } else {
         console.error('Failed to toggle pin:', result.error);
       }
     } catch (error) {
@@ -125,15 +142,18 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
     return str.slice(0, startLength) + ellipsis + str.slice(-endLength);
   };
 
-  const renderTwitterResult = (result: TwitterResult) => {
+  const renderTwitterResult = (result: TwitterResult, index: number) => {
     const mentionKey = `twitter-${result.username}`;
     const isPinning = pinningStates[mentionKey];
+    const isSelected = index === selectedIndex;
     
     return (
       <div
         key={result.id}
         onClick={() => handleMentionClick(result)}
-        className="px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors group grid grid-cols-[32px_1fr_auto] gap-3 items-center"
+        className={`px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors group grid grid-cols-[32px_1fr_auto] gap-3 items-center ${
+          isSelected ? 'bg-blue-600/20 border-l-2 border-blue-500' : ''
+        }`}
       >
         {/* Profile Image */}
         <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
@@ -151,7 +171,7 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
         {/* User Info */}
         <div className="min-w-0 flex items-center space-x-2">
           <div className="flex items-center space-x-1">
-            <span className="text-white font-medium text-xs">
+            <span className={`font-medium text-xs ${isSelected ? 'text-blue-300' : 'text-white'}`}>
               {truncateMiddle(result.name)}
             </span>
             {result.verified && (
@@ -176,7 +196,7 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
               />
             )}
           </div>
-          <div className="text-gray-400 text-xs">@{truncateMiddle(result.username)}</div>
+          <div className={`text-xs ${isSelected ? 'text-blue-300' : 'text-gray-400'}`}>@{truncateMiddle(result.username)}</div>
         </div>
 
         {/* Pin Toggle Button */}
@@ -202,15 +222,18 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
     );
   };
 
-  const renderNostrResult = (result: NostrResult) => {
+  const renderNostrResult = (result: NostrResult, index: number) => {
     const mentionKey = `nostr-${result.npub}`;
     const isPinning = pinningStates[mentionKey];
+    const isSelected = index === selectedIndex;
     
     return (
       <div
         key={result.npub}
         onClick={() => handleMentionClick(result)}
-        className="px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors group grid grid-cols-[32px_1fr_auto] gap-3 items-center"
+        className={`px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors group grid grid-cols-[32px_1fr_auto] gap-3 items-center ${
+          isSelected ? 'bg-purple-600/20 border-l-2 border-purple-500' : ''
+        }`}
       >
         {/* Profile Image */}
         <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
@@ -233,7 +256,7 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
         {/* User Info */}
         <div className="min-w-0 flex items-center space-x-2">
           <div className="flex items-center space-x-1">
-            <span className="text-white font-medium text-xs">
+            <span className={`font-medium text-xs ${isSelected ? 'text-purple-300' : 'text-white'}`}>
               {truncateMiddle(result.displayName || 'Unknown')}
             </span>
             {result.nip05 && (
@@ -254,7 +277,7 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
               </div>
             )}
           </div>
-          <div className="text-gray-400 text-xs">
+          <div className={`text-xs ${isSelected ? 'text-purple-300' : 'text-gray-400'}`}>
             {result.nip05 || `${truncateMiddle(result.npub, 12)}...`}
           </div>
         </div>
@@ -296,9 +319,9 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
         >
           <Twitter className="w-3 h-3 mr-1.5" />
           Twitter
-          {mentionResults.filter(r => r.platform === 'twitter').length > 0 && (
+          {displayResults.filter(r => r.platform === 'twitter').length > 0 && (
             <span className="ml-2 bg-gray-600 text-xs px-1.5 py-0.5 rounded">
-              {mentionResults.filter(r => r.platform === 'twitter').length}
+              {displayResults.filter(r => r.platform === 'twitter').length}
             </span>
           )}
         </button>
@@ -317,9 +340,9 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
             style={{ filter: 'brightness(1.2)' }}
           />
           Nostr
-          {mentionResults.filter(r => r.platform === 'nostr').length > 0 && (
+          {displayResults.filter(r => r.platform === 'nostr').length > 0 && (
             <span className="ml-2 bg-gray-600 text-xs px-1.5 py-0.5 rounded">
-              {mentionResults.filter(r => r.platform === 'nostr').length}
+              {displayResults.filter(r => r.platform === 'nostr').length}
             </span>
           )}
         </button>
@@ -338,10 +361,10 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
               <p className="text-xs text-red-400">{error}</p>
             </div>
           ) : filteredResults.length > 0 ? (
-            filteredResults.map((result) => 
+            filteredResults.map((result, index) => 
               result.platform === 'twitter' 
-                ? renderTwitterResult(result as TwitterResult)
-                : renderNostrResult(result as NostrResult)
+                ? renderTwitterResult(result as TwitterResult, index)
+                : renderNostrResult(result as NostrResult, index)
             )
           ) : (
             <div className="px-3 py-4 text-center text-gray-400">
