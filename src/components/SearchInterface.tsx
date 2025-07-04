@@ -1666,7 +1666,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <PodcastLoadingPlaceholder />
       )}
 
-      {searchMode === 'podcast-search' && !isAnyModalOpen() && !isClipBatchPage && (
+      {searchMode === 'podcast-search' && !isAnyModalOpen() && (
         <div
           className={`fixed w-full z-50 transition-all duration-300 ${
             hasSearchedInMode('podcast-search') ? 'bottom-24' : 'bottom-0'
