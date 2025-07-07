@@ -172,6 +172,8 @@ const ASPECT_RATIO = 16 / 9;
 const PREVIEW_WIDTH = 240; // px, adjust as needed
 const PREVIEW_HEIGHT = PREVIEW_WIDTH / ASPECT_RATIO;
 
+const MENTION_MIN_CHARS = 2;
+
 const SocialShareModal: React.FC<SocialShareModalProps> = ({
   isOpen,
   onClose,
@@ -1359,15 +1361,21 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   {/* Mentions Lookup Overlay */}
         {showMentionsLookup && (
           <div className="absolute top-full left-0 right-0 z-50 mt-1 flex justify-center">
-            <MentionsLookupView 
-              onMentionSelect={handleMentionSelect}
-              searchQuery={mentionSearchQuery}
-              onClose={handleCloseMentions}
-              onFirstMentionChange={setFirstMention}
-              selectedIndex={selectedMentionIndex}
-              mentionResults={mentionResults}
-              onMentionResultsChange={setMentionResults}
-            />
+            {mentionSearchQuery.length < MENTION_MIN_CHARS ? (
+              <div className="bg-gray-900 text-gray-400 px-4 py-2 rounded shadow text-sm">
+                Keep typing to search for mentions...
+              </div>
+            ) : (
+              <MentionsLookupView 
+                onMentionSelect={handleMentionSelect}
+                searchQuery={mentionSearchQuery}
+                onClose={handleCloseMentions}
+                onFirstMentionChange={setFirstMention}
+                selectedIndex={selectedMentionIndex}
+                mentionResults={mentionResults}
+                onMentionResultsChange={setMentionResults}
+              />
+            )}
           </div>
         )}
 
@@ -1461,7 +1469,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   src="/nostr-logo-square.png" 
                   alt="Nostr" 
                   className="w-6 h-6"
-                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen', opacity: nostrStatus.available ? 1 : 0.5 }}
                 />
                 <div className="flex-1">
                   {nostrStatus.available && nostrStatus.authenticated ? (
@@ -1480,7 +1488,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   ) : nostrStatus.available ? (
                     <p className="text-white text-sm">Connect NIP07 Extension to Post on Nostr</p>
                   ) : (
-                    <p className="text-white text-sm">Install Nostr Extension</p>
+                    <div className="text-xs text-gray-400 italic opacity-70">Nostr: Coming Soon</div>
                   )}
                 </div>
                 {nostrStatus.available && !nostrStatus.authenticated && (
@@ -1491,11 +1499,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   >
                     Connect
                   </button>
-                )}
-                {!nostrStatus.available && (
-                  <div className="text-xs text-gray-400">
-                    <a href="https://getalby.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Get Alby</a>
-                  </div>
                 )}
               </div>
               <div className="flex items-center space-x-2 ml-2">

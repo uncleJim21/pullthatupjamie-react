@@ -351,7 +351,13 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
       {/* Content */}
       <div className="max-h-48 overflow-y-auto">
         <div className="divide-y divide-gray-800">
-          {isLoading ? (
+          {selectedPlatform === Platform.Nostr ? (
+            <div className="px-3 py-8 text-center text-purple-300 italic opacity-80">
+              <img src="/nostr-logo-square.png" alt="Nostr" className="w-6 h-6 mx-auto mb-2 opacity-70" style={{ filter: 'brightness(1.2)' }} />
+              <div className="text-base font-semibold mb-1">Nostr: Coming Soon</div>
+              <div className="text-xs text-gray-400">Nostr mention search is in development and will be available soon.</div>
+            </div>
+          ) : isLoading ? (
             <div className="px-3 py-4 text-center text-gray-400">
               <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
               <p className="text-xs">Loading...</p>
