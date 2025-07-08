@@ -10,10 +10,12 @@ interface SignInModalProps {
   onClose: () => void;
   onSignInSuccess: () => void;
   onSignUpSuccess: () => void;
+  customTitle?: string;
+  initialMode?: AuthMode;
 }
 
-export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignInSuccess, onSignUpSuccess }) => {
-  const [mode, setMode] = useState<AuthMode>('signin');
+export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignInSuccess, onSignUpSuccess, customTitle, initialMode }) => {
+  const [mode, setMode] = useState<AuthMode>(initialMode || 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -131,7 +133,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSig
           </div>
 
           <h2 className="text-2xl font-bold mb-6 text-white">
-            {mode === 'signin' ? 'Sign In' : 'Create Account'}
+            {customTitle || (mode === 'signin' ? 'Sign In' : 'Create Account')}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">

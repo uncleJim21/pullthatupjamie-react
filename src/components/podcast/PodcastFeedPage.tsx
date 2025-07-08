@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
@@ -7,6 +7,7 @@ import { SubscribeLinks } from './SubscribeSection.tsx';
 import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share, Shield } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
+import { SocialPlatform } from '../SocialShareModal.tsx';
 import PodcastFeedService, { 
   Episode, 
   PodcastFeedData, 
@@ -17,14 +18,59 @@ import { JamieChat } from './JamieChat.tsx';
 import UploadModal from '../UploadModal.tsx';
 import ShareModal from '../ShareModal.tsx';
 import SignInModal from '../SignInModal.tsx';
+import CheckoutModal from '../CheckoutModal.tsx';
 import UploadService, { UploadItem, PaginationData } from '../../services/uploadService.ts';
+import { createFeedShareUrl } from '../../utils/urlUtils.ts';
+import PageBanner from '../PageBanner.tsx';
 import SocialShareModal from '../SocialShareModal.tsx';
+import TutorialModal from '../TutorialModal.tsx';
+import WelcomeModal from '../WelcomeModal.tsx';
+
+interface SubscriptionSuccessPopupProps {
+  onClose: () => void;
+  isJamiePro?: boolean;
+}
+
+const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionSuccessPopupProps) => (
+  <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
+    <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+      <h2 className="text-white text-lg font-bold mb-4">
+        {isJamiePro ? 'Welcome to Jamie Pro!' : 'Your subscription was successful!'}
+      </h2>
+      <p className="text-gray-400 mb-4">
+        {isJamiePro ? (
+          'A team member will be in contact with you within 1 business day to complete your onboarding.'
+        ) : (
+          <>
+            Enjoy unlimited access to Jamie and other{' '}
+            <a
+              href="https://cascdr.xyz"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 underline"
+            >
+              CASCDR apps
+            </a>
+            .
+          </>
+        )}
+      </p>
+      <button
+        onClick={onClose}
+        className="mt-4 px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+);
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history';
 
 const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> = ({ initialView, defaultTab }) => {
     const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [feedData, setFeedData] = useState<PodcastFeedData | null>(null);
     const [featuredEpisode, setFeaturedEpisode] = useState<Episode | null>(null);
     const [activeTab, setActiveTab] = useState<TabType>('Episodes');
@@ -48,11 +94,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [currentShareUrl, setCurrentShareUrl] = useState<string | null>(null);
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
     const [error, setError] = useState<{ status: number; message: string } | null>(null);
+    const [isUserSignedIn, setIsUserSignedIn] = useState(false);
+    const [isProDashboardModalOpen, setIsProDashboardModalOpen] = useState(false);
+    const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+    const [isTutorialOpen, setIsTutorialOpen] = useState(false);
     const [autoShare, setAutoShare] = useState(() => {
         const settings = localStorage.getItem('userSettings');
         return settings ? JSON.parse(settings).autoStartCrosspost : false;
     });
     const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
+    const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -209,42 +260,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     }
   }, [activeTab]);
 
-  useEffect(() => {
-      console.log(`feedId: ${feedId}`);
-      const checkPrivileges = async () => {
-          try {
-              const token = localStorage.getItem("auth_token") as string;
-              if(!token){
-                  setIsAdmin(false);
-                  return;
-              }
-              const response = await AuthService.checkPrivs(token);
-              console.log(`checkPrivs response:${JSON.stringify(response,null,2)}`)
-              if (response && response.privs.privs && response.privs.privs.feedId === feedId) {
-                  console.log(`Admin privileges granted`);
-                  setIsAdmin(response.privs.privs.access === 'admin');
-              } else {
-                  setIsAdmin(false);
-              }
-          } catch (error) {
-              console.error("Error checking privileges:", error);
-              setIsAdmin(false);
-          }
-      };
-
-      if (feedId) {
-          if (DEBUG_MODE) {
-              console.log('Debug mode: Simulating admin privileges');
-              // Even in debug mode, still check real privileges but override in development
-              checkPrivileges().then(() => {
-                  // After real check, override for development purposes
-                  setIsAdmin(true);
-              });
-          } else {
-              checkPrivileges();
-          }
-      }
-  }, [feedId]); 
+  // This useEffect is removed - using the one below that properly checks isUserSignedIn dependency 
 
   useEffect(() => {
     const fetchFeedData = async () => {
@@ -370,6 +386,126 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     setCurrentShareUrl(null);
   };
 
+  // Load authentication state from localStorage
+  useEffect(() => {
+    const checkSignedIn = () => {
+      const hasToken = !!localStorage.getItem('auth_token');
+      const hasSquareId = !!localStorage.getItem('squareId');
+      setIsUserSignedIn(hasToken && hasSquareId);
+    };
+  
+    // Add a slight delay before checking localStorage
+    const timeout = setTimeout(checkSignedIn, 50); // 50ms delay
+  
+    return () => clearTimeout(timeout); // Cleanup timeout
+  }, []);
+
+  // Handle sign in modal open from PageBanner
+  const handleOpenSignInModal = () => {
+    setIsSignInModalOpen(true);
+  };
+  
+  // Handle sign in success
+  const handleSignInSuccess = () => {
+    setIsSignInModalOpen(false);
+    setIsUserSignedIn(true);
+    
+    // Check privileges after sign-in
+    if (feedId) {
+      checkPrivileges(feedId);
+    }
+    
+    // Refresh run history or uploads if needed
+    if (activeTab === 'Jamie Pro') {
+      fetchRunHistory();
+    } else if (activeTab === 'Uploads') {
+      fetchUploads();
+    }
+  };
+  
+  // Handle sign out
+  const handleSignOut = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('squareId');
+    localStorage.removeItem('isSubscribed');
+    setIsUserSignedIn(false);
+    setIsAdmin(false);
+    
+    // Reset any authenticated-only data
+    setRunHistory([]);
+    setUploads([]);
+  };
+
+  // Check admin privileges
+  const checkPrivileges = async (feedId: string) => {
+    try {
+      const token = localStorage.getItem("auth_token") as string;
+      if(!token){
+          setIsAdmin(false);
+          return;
+      }
+      const response = await AuthService.checkPrivs(token);
+      console.log(`checkPrivs response:${JSON.stringify(response,null,2)}`);
+      if (response && response.privs.privs && response.privs.privs.feedId === feedId) {
+          console.log(`Admin privileges granted`);
+          setIsAdmin(response.privs.privs.access === 'admin');
+      } else {
+          setIsAdmin(false);
+      }
+    } catch (error) {
+      console.error("Error checking privileges:", error);
+      setIsAdmin(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log(`feedId: ${feedId}`);
+    if (feedId && isUserSignedIn) {
+      checkPrivileges(feedId);
+    } else {
+      setIsAdmin(false);
+    }
+  }, [feedId, isUserSignedIn]); 
+
+  // Handle URL parameter for showing Pro Dashboard modal
+  useEffect(() => {
+    const showProModal = searchParams.get('showProModal');
+    if (showProModal === 'true' && !isAdmin) {
+      setIsProDashboardModalOpen(true);
+      // Clean up URL parameter
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('showProModal');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [searchParams, isAdmin, setSearchParams]);
+
+  const handleProDashboardUpgrade = () => {
+    setIsProDashboardModalOpen(false);
+    setIsCheckoutModalOpen(true);
+  };
+
+  const handleUpgrade = () => {
+    setIsCheckoutModalOpen(true);
+  };
+
+  const handleUpgradeSuccess = () => {
+    setIsCheckoutModalOpen(false);
+    setIsUpgradeSuccessPopUpOpen(true); // Show the popup
+    // Optionally refresh admin privileges after successful upgrade
+    if (feedId) {
+      checkPrivileges(feedId);
+    }
+  };
+
+  // Handle PageBanner upgrade success (from AccountButton)
+  const handlePageBannerUpgradeSuccess = () => {
+    setIsUpgradeSuccessPopUpOpen(true); // Show the popup
+    // Optionally refresh admin privileges after successful upgrade
+    if (feedId) {
+      checkPrivileges(feedId);
+    }
+  };
+
   const handleAutoShareChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.checked;
     setAutoShare(newValue);
@@ -393,6 +529,14 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       setIsShareModalOpen(true);
       setIsSocialShareModalOpen(false);
     }
+  };
+
+  const handleTutorialClick = () => {
+    setIsTutorialOpen(true);
+  };
+
+  const handleTutorialClose = () => {
+    setIsTutorialOpen(false);
   };
 
   if (isLoading) {
@@ -419,6 +563,17 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
   return (
     <div className="min-h-screen pb-12 bg-black text-white">
+      {/* Page Banner */}
+      <PageBanner 
+        logoText="Pull That Up Jamie!" 
+        onSignIn={handleOpenSignInModal}
+        onSignOut={handleSignOut}
+        onUpgrade={handlePageBannerUpgradeSuccess}
+        onTutorialClick={handleTutorialClick}
+        isUserSignedIn={isUserSignedIn}
+        setIsUserSignedIn={setIsUserSignedIn}
+      />
+      
       {/* Header Section */}
       <div 
         className="w-full py-8 px-4"
@@ -514,7 +669,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
               <div className="py-8">
                 <h2 className="text-xl font-bold mb-6">Featured Episode</h2>
                 <PodcastSearchResultItem
-                  key={featuredEpisode.id}
                   id={featuredEpisode.id}
                   quote={featuredEpisode.description || ''}
                   episode={featuredEpisode.title}
@@ -531,7 +685,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   isPlaying={currentlyPlayingId === featuredEpisode.id}
                   onPlayPause={handlePlayPause}
                   onEnded={handleEnded}
-                  shareUrl=""
+                  shareUrl={createFeedShareUrl(feedId || '')}
                   shareLink=""
                 />
               </div>
@@ -541,7 +695,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
               <div className="space-y-6">
                 {feedData.episodes.map(episode => (
                   <PodcastSearchResultItem
-                    key={episode.id}
                     id={episode.id}
                     quote={episode.description || ''}
                     episode={episode.title}
@@ -558,7 +711,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                     isPlaying={currentlyPlayingId === episode.id}
                     onPlayPause={handlePlayPause}
                     onEnded={handleEnded}
-                    shareUrl=""
+                    shareUrl={createFeedShareUrl(feedId || '')}
                     shareLink=""
                   />
                 ))}
@@ -573,7 +726,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   <div className="py-8">
                     <h2 className="text-xl font-bold mb-6">Featured Episode</h2>
                     <PodcastSearchResultItem
-                      key={featuredEpisode.id}
                       id={featuredEpisode.id}
                       quote={featuredEpisode.description || ''}
                       episode={featuredEpisode.title}
@@ -590,7 +742,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       isPlaying={currentlyPlayingId === featuredEpisode.id}
                       onPlayPause={handlePlayPause}
                       onEnded={handleEnded}
-                      shareUrl=""
+                      shareUrl={createFeedShareUrl(feedId || '')}
                       shareLink=""
                     />
                   </div>
@@ -600,7 +752,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   <div className="space-y-6">
                     {feedData.episodes.map(episode => (
                       <PodcastSearchResultItem
-                        key={episode.id}
                         id={episode.id}
                         quote={episode.description || ''}
                         episode={episode.title}
@@ -617,7 +768,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         isPlaying={currentlyPlayingId === episode.id}
                         onPlayPause={handlePlayPause}
                         onEnded={handleEnded}
-                        shareUrl=""
+                        shareUrl={createFeedShareUrl(feedId || '')}
                         shareLink=""
                       />
                     ))}
@@ -828,7 +979,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden hover:border-gray-700 transition-colors cursor-pointer"
                         onClick={() => {
                           if (run._id && feedId) {
-                            window.location.href = `/feed/${feedId}/clipBatch/${run._id}`;
+                            window.location.href = `/app/feed/${feedId}/clipBatch/${run._id}`;
                           }
                         }}
                       >
@@ -849,7 +1000,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                             isPlaying={currentlyPlayingId === run.recommendations[0].paragraph_ids[0]}
                             onPlayPause={handlePlayPause}
                             onEnded={handleEnded}
-                            shareUrl={`${window.location.origin}/feed/${feedId}`}
+                            shareUrl={createFeedShareUrl(feedId || '')}
                             shareLink={run.recommendations[0].paragraph_ids[0]}
                             authConfig={null}
                             presentationContext={PresentationContext.runHistoryPreview}
@@ -906,23 +1057,82 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           fileUrl={currentShareUrl}
           itemName="upload"
           onComplete={() => setIsSocialShareModalOpen(false)}
-          platform="twitter"
-          showCopy={true}
-          showDownload={true}
+          platform={SocialPlatform.Twitter}
         />
       )}
 
       <SignInModal
         isOpen={isSignInModalOpen}
         onClose={() => setIsSignInModalOpen(false)}
-        onSignInSuccess={() => {
-          setIsSignInModalOpen(false);
-          window.location.reload(); // Reload the page after successful sign-in to retry access
-        }}
+        onSignInSuccess={handleSignInSuccess}
         onSignUpSuccess={() => {
           setIsSignInModalOpen(false);
-          window.location.reload(); // Reload the page after successful sign-up to retry access
+          setIsUserSignedIn(true);
+          
+          // Check privileges after sign-up
+          if (feedId) {
+            checkPrivileges(feedId);
+          }
         }}
+      />
+
+      {/* Pro Dashboard Modal */}
+      {isProDashboardModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+          <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+            <h2 className="text-white text-xl font-bold mb-4">
+              Pro Dashboard Access Required
+            </h2>
+            <p className="text-gray-400 mb-6">
+              The Pro Dashboard is exclusively for Jamie Pro subscribers. Upgrade now to access advanced podcast management features, analytics, and premium tools.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setIsProDashboardModalOpen(false)}
+                className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleProDashboardUpgrade}
+                className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              >
+                Upgrade to Pro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Modal for internal upgrade buttons */}
+      <CheckoutModal 
+        isOpen={isCheckoutModalOpen} 
+        onClose={() => setIsCheckoutModalOpen(false)} 
+        onSuccess={handleUpgradeSuccess}
+        productName="jamie-pro"
+        customDescription="Unlock advanced podcast management features and the Pro Dashboard"
+        customFeatures={[
+          "Pro Dashboard Access",
+          "Advanced Analytics",
+          "Premium Podcast Tools",
+          "Priority Support"
+        ]}
+        customPrice="49.99"
+      />
+
+      {/* Subscription Success Popup */}
+      {isUpgradeSuccessPopUpOpen && (
+        <SubscriptionSuccessPopup onClose={() => {
+          setIsUpgradeSuccessPopUpOpen(false);
+          setIsCheckoutModalOpen(false);
+        }} />
+      )}
+
+      {/* Tutorial Modal */}
+      <TutorialModal
+        isOpen={isTutorialOpen}
+        onClose={handleTutorialClose}
+        defaultSection={2} // Jamie Pro section for dashboard pages
       />
     </div>
   );

@@ -1,7 +1,7 @@
 import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
-import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog } from '../constants/constants.ts';
+import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef} from 'react';
@@ -12,7 +12,6 @@ import LightningService from '../services/lightning.ts'
 import {ClipProgress, ClipStatus, ClipRequest} from '../types/clips.ts'
 import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
-import {AccountButton} from './AccountButton.tsx'
 import {CheckoutModal} from './CheckoutModal.tsx'
 import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
@@ -22,7 +21,12 @@ import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
 import { Filter } from 'lucide-react';
 import PodcastSourceFilterModal from './PodcastSourceFilterModal.tsx';
+import { createClipShareUrl } from '../utils/urlUtils.ts';
+import PageBanner from './PageBanner.tsx';
 import ShareModal from './ShareModal.tsx';
+import TutorialModal from './TutorialModal.tsx';
+import WelcomeModal from './WelcomeModal.tsx';
+import AccountButton from './AccountButton.tsx';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 
 
@@ -105,6 +109,7 @@ interface SearchInterfaceProps {
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
+  isJamiePro?: boolean;
 }
 
 interface BackoffConfig {
@@ -119,23 +124,29 @@ const defaultBackoff: BackoffConfig = {
   factor: 1.1           // Increase by 50% each time
 };
 
-const SubscriptionSuccessPopup = ({ onClose }: SubscriptionSuccessPopupProps) => (
+const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionSuccessPopupProps) => (
   <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
     <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
       <h2 className="text-white text-lg font-bold mb-4">
-        Your subscription was successful!
+        {isJamiePro ? 'Welcome to Jamie Pro!' : 'Your subscription was successful!'}
       </h2>
       <p className="text-gray-400 mb-4">
-        Enjoy unlimited access to Jamie and other{' '}
-        <a
-          href="https://cascdr.xyz"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-400 hover:text-blue-300 underline"
-        >
-          CASCDR apps
-        </a>
-        .
+        {isJamiePro ? (
+          'A team member will be in contact with you within 1 business day to complete your onboarding.'
+        ) : (
+          <>
+            Enjoy unlimited access to Jamie and other{' '}
+            <a
+              href="https://cascdr.xyz"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 underline"
+            >
+              CASCDR apps
+            </a>
+            .
+          </>
+        )}
       </p>
       <button
         onClick={onClose}
@@ -220,6 +231,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // This allows users to specify the search mode via URL parameter, e.g. ?mode=web-search or ?mode=podcast-search
   const [searchParams] = useSearchParams();
   const modeParam = searchParams.get('mode');
+  const queryParam = searchParams.get('q');
   
   const [searchMode, setSearchMode] = useState(
     // Only use the modeParam if it's a valid SearchMode
@@ -282,6 +294,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
            isUpgradeSuccessPopUpOpen || 
            isSendingFeedback ||
            isShareModalOpen ||
+           isTutorialOpen ||
+           isWelcomeOpen ||
            isSocialShareModalOpen;
   };
 
@@ -896,6 +910,64 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     printLog(`model:${model}`)
   }, [model]);
 
+  // Auto-search when 'q' parameter is present in URL (e.g., from TryJamieWizard)
+  useEffect(() => {
+    if (queryParam && !hasSearchedInMode(searchMode) && !searchState.isLoading) {
+      setQuery(queryParam);
+      // Small delay to ensure component is fully loaded and query state is set
+      const timer = setTimeout(() => {
+        // Use the queryParam directly instead of relying on state
+        if (searchMode === 'podcast-search') {
+          // Set the conversation first
+          setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
+          setSearchState(prev => ({ ...prev, isLoading: true }));
+          setSearchHistory(prev => ({...prev, [searchMode]: true}));
+          
+          // Call the search with the direct query parameter
+          const performSearchWithQuery = async () => {
+            try {
+              const auth = await getAuth() as AuthConfig;
+              if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+                setIsRegisterModalOpen(true);
+                setSearchState(prev => ({ ...prev, isLoading: false }));
+                return;
+              }
+              
+              const currentSelectedFeedIds = Array.from(selectedSources) as string[];
+              const quoteResults = await handleQuoteSearch(queryParam, auth, currentSelectedFeedIds);
+              
+              setConversation(prev => [...prev, {
+                id: nextConversationId.current++,
+                type: 'podcast-search' as const,
+                query: queryParam,
+                timestamp: new Date(),
+                isStreaming: false,
+                data: {
+                  quotes: quoteResults.results
+                }
+              }]);
+              setQuery("");
+            } catch (error) {
+              console.error("Error during auto quote search:", error);
+              setSearchState(prev => ({
+                ...prev,
+                error: error as Error,
+                isLoading: false
+              }));
+            } finally {
+              setSearchState(prev => ({ ...prev, isLoading: false }));
+            }
+          };
+          
+          performSearchWithQuery();
+        } else {
+          handleStreamingSearch(queryParam);
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [queryParam, searchMode, hasSearchedInMode(searchMode), searchState.isLoading]);
+
   useEffect(() => {
     if(searchMode === 'podcast-search' && searchState.isLoading === true){
 
@@ -947,25 +1019,34 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               timestamp: new Date(),
               isStreaming: false,
               data: {
-                quotes: response.data.recommendations.map(rec => ({
-                  id: rec.paragraph_ids[0],
-                  quote: rec.text,
-                  episode: rec.title,
-                  creator: `${rec.feed_title} - ${rec.episode_title}`,
-                  audioUrl: rec.audio_url,
-                  date: response.data.run_date,
-                  timeContext: {
-                    start_time: rec.start_time,
-                    end_time: rec.end_time
-                  },
-                  similarity: { 
-                    combined: rec.relevance_score / 100, 
-                    vector: rec.relevance_score / 100 
-                  },
-                  episodeImage: rec.episode_image,
-                  shareUrl: `${window.location.origin}/share?clip=${rec.paragraph_ids[0]}`,
-                  shareLink: rec.paragraph_ids[0]
-                }))
+                quotes: response.data.recommendations.map(rec => {
+                  const clipId = rec.paragraph_ids[0];
+                  
+                  // Generate the share URL using our utility
+                  let shareUrl = createClipShareUrl(clipId);
+                  
+                  // LAST RESORT OVERRIDE - Directly force localhost in development
+                  if (process.env.NODE_ENV === 'development' && !shareUrl.includes('localhost')) {
+                    shareUrl = `http://localhost:3000/app/share?clip=${clipId}`;
+                  }
+                  
+                  return ({
+                    id: clipId,
+                    quote: rec.text,
+                    episode: rec.title,
+                    creator: `${rec.feed_title} - ${rec.episode_title}`,
+                    audioUrl: rec.audio_url,
+                    date: response.data?.run_date || '',
+                    timeContext: {
+                      start_time: rec.start_time,
+                      end_time: rec.end_time
+                    },
+                    similarity: rec.relevance_score / 100,
+                    episodeImage: rec.episode_image,
+                    shareUrl: shareUrl,
+                    shareLink: clipId
+                  })
+                })
               }
             }]);
           } catch (error) {
@@ -1038,6 +1119,58 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     printLog(`selectedSources updated: ${JSON.stringify(Array.from(selectedSources))}`);
   }, [selectedSources]);
 
+  // Welcome modal state for first-time visitors
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(() => {
+    // Check if this is the user's first visit
+    const settings = localStorage.getItem('userSettings');
+    const userSettings = settings ? JSON.parse(settings) : {};
+    return userSettings.isFirstVisit !== false; // Default to true if not set
+  });
+
+  // Tutorial modal state
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+
+  // Determine which tutorial section to show based on search mode
+  const getDefaultTutorialSection = () => {
+    switch (searchMode) {
+      case 'podcast-search':
+        return 0; // Podcast Search section
+      case 'web-search':
+        return 1; // Web Search section
+      default:
+        return 2; // Jamie Pro section
+    }
+  };
+
+  const handleWelcomeQuickTour = () => {
+    setIsWelcomeOpen(false);
+    setIsTutorialOpen(true);
+  };
+
+  const handleWelcomeGetStarted = () => {
+    // Mark that the user has visited before
+    const settings = localStorage.getItem('userSettings');
+    const userSettings = settings ? JSON.parse(settings) : {};
+    userSettings.isFirstVisit = false;
+    localStorage.setItem('userSettings', JSON.stringify(userSettings));
+    
+    setIsWelcomeOpen(false);
+  };
+
+  const handleTutorialClose = () => {
+    // Mark that the user has visited before
+    const settings = localStorage.getItem('userSettings');
+    const userSettings = settings ? JSON.parse(settings) : {};
+    userSettings.isFirstVisit = false;
+    localStorage.setItem('userSettings', JSON.stringify(userSettings));
+    
+    setIsTutorialOpen(false);
+  };
+
+  const handleTutorialClick = () => {
+    setIsTutorialOpen(true);
+  };
+
   // Add handler for ClipTrackerModal share clicks
   const handleClipShare = (lookupHash: string, cdnLink: string) => {
     setShareModalData({
@@ -1049,6 +1182,31 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   return (
     <div className="min-h-screen bg-black text-white relative pb-0.5">
+      {/* Welcome Modal */}
+      <WelcomeModal
+        isOpen={isWelcomeOpen}
+        onQuickTour={handleWelcomeQuickTour}
+        onGetStarted={handleWelcomeGetStarted}
+      />
+
+      {/* Tutorial Modal */}
+      <TutorialModal
+        isOpen={isTutorialOpen}
+        onClose={handleTutorialClose}
+        defaultSection={getDefaultTutorialSection()}
+      />
+      {/* Page Banner */}
+      <PageBanner 
+        logoText="Pull That Up Jamie!" 
+        onConnect={() => initializeLightning()}
+        onSignIn={() => setIsSignInModalOpen(true)}
+        onUpgrade={handleUpgrade}
+        onSignOut={handleSignOut}
+        onTutorialClick={handleTutorialClick}
+        isUserSignedIn={isUserSignedIn}
+        setIsUserSignedIn={setIsUserSignedIn}
+      />
+      
       {/* Add the PodcastSourceFilterModal component */}
       <PodcastSourceFilterModal 
         isOpen={isFilterModalOpen}
@@ -1074,18 +1232,110 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
           
-          // For clipBatch pages, reload to retry access after authentication
-          if (isClipBatchPage) {
-            window.location.reload();
+          // For clipBatch pages, retry access after authentication without page reload
+          if (isClipBatchPage && runId && feedId) {
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+              // Explicitly fetch the clip batch data with the new token
+              PodcastFeedService.getClipBatchByRunId(feedId, runId, token)
+                .then(response => {
+                  if (response.success && response.data) {
+                    setConversation([{
+                      id: nextConversationId.current++,
+                      type: 'podcast-search' as const,
+                      query: '', 
+                      timestamp: new Date(),
+                      isStreaming: false,
+                      data: {
+                        quotes: response.data.recommendations.map(rec => {
+                          const clipId = rec.paragraph_ids[0];
+                          // Generate the share URL using our utility
+                          let shareUrl = createClipShareUrl(clipId);
+                          return ({
+                            id: clipId,
+                            quote: rec.text,
+                            episode: rec.title,
+                            creator: `${rec.feed_title} - ${rec.episode_title}`,
+                            audioUrl: rec.audio_url,
+                            date: response.data?.run_date || '',
+                            timeContext: {
+                              start_time: rec.start_time,
+                              end_time: rec.end_time
+                            },
+                            similarity: rec.relevance_score / 100,
+                            episodeImage: rec.episode_image,
+                            shareUrl: shareUrl,
+                            shareLink: clipId
+                          });
+                        })
+                      }
+                    }]);
+                  }
+                })
+                .catch(error => {
+                  console.error('Error loading clip batch after authentication:', error);
+                  setSearchState(prev => ({
+                    ...prev,
+                    error: error as Error,
+                    isLoading: false
+                  }));
+                });
+            }
           }
         }}
-        onSignUpSuccess={()=>{
+        onSignUpSuccess={() => {
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
           
-          // For clipBatch pages, reload to retry access after authentication
-          if (isClipBatchPage) {
-            window.location.reload();
+          // For clipBatch pages, retry access after authentication without page reload
+          if (isClipBatchPage && runId && feedId) {
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+              // Explicitly fetch the clip batch data with the new token
+              PodcastFeedService.getClipBatchByRunId(feedId, runId, token)
+                .then(response => {
+                  if (response.success && response.data) {
+                    setConversation([{
+                      id: nextConversationId.current++,
+                      type: 'podcast-search' as const,
+                      query: '', 
+                      timestamp: new Date(),
+                      isStreaming: false,
+                      data: {
+                        quotes: response.data.recommendations.map(rec => {
+                          const clipId = rec.paragraph_ids[0];
+                          // Generate the share URL using our utility
+                          let shareUrl = createClipShareUrl(clipId);
+                          return ({
+                            id: clipId,
+                            quote: rec.text,
+                            episode: rec.title,
+                            creator: `${rec.feed_title} - ${rec.episode_title}`,
+                            audioUrl: rec.audio_url,
+                            date: response.data?.run_date || '',
+                            timeContext: {
+                              start_time: rec.start_time,
+                              end_time: rec.end_time
+                            },
+                            similarity: rec.relevance_score / 100,
+                            episodeImage: rec.episode_image,
+                            shareUrl: shareUrl,
+                            shareLink: clipId
+                          });
+                        })
+                      }
+                    }]);
+                  }
+                })
+                .catch(error => {
+                  console.error('Error loading clip batch after authentication:', error);
+                  setSearchState(prev => ({
+                    ...prev,
+                    error: error as Error,
+                    isLoading: false
+                  }));
+                });
+            }
           } else {
             handleUpgrade();
           }
@@ -1103,18 +1353,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {isUpgradeSuccessPopUpOpen && (
         <SubscriptionSuccessPopup onClose={() => setIsUpgradeSuccessPopUpOpen(false)} />
       )}
-      {!isAnyModalOpen() && (
-        <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
-          <AccountButton 
-            onConnect={() => initializeLightning()}
-            onSignInClick={() => setIsSignInModalOpen(true)}
-            onUpgradeClick={handleUpgrade}
-            onSignOut={handleSignOut}
-            isSignedIn={isUserSignedIn}
-          />
-        </div>
-      )}
-      { DEBUG_MODE &&
+      
+      {/* { DEBUG_MODE &&
         (<button
         onClick={async () => {
           const email = localStorage.getItem('squareId');
@@ -1129,7 +1369,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       >
         Test Registration
       </button>)
-      }
+      } */}
       <br></br>
       <div className={`${hasSearchedInMode(searchMode) ? 'mb-8' : ''} ml-4 mr-4`}>
         {/* Header with Logo */}
@@ -1137,7 +1377,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           <div className="relative w-full max-w-4xl mx-auto">
             <div className="flex justify-start md:block mb-4 md:mb-0">
               <button 
-                onClick={() => window.location.href = `/feed/${feedId}/jamieProHistory`} 
+                onClick={() => window.location.href = `/app/feed/${feedId}/jamieProHistory`} 
                 className="md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2 h-12 w-12 flex items-center justify-center bg-transparent text-white hover:text-gray-300 focus:outline-none z-10 ml-4 md:ml-0"
                 style={{
                   color: '#C0C0C0',

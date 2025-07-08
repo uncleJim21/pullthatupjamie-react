@@ -504,9 +504,10 @@ const AvailableSourcesSection: React.FC<AvailableSourcesProps> = ({
           productName={isJamiePro ? "jamie-pro" : "amber"}
           customDescription={isJamiePro ? "Early Access, Search, and AI Clips. Unlock all features for podcasts." : undefined}
           customFeatures={isJamiePro ? [
-            "All Features Pods Searchable",
-            "AI Curated Clips & Alerts",
-            "AI Assist for Social Media"
+            "Pods Transcribed & Searchable",
+            "AI Curated Clips & Email Alerts",
+            "AI Assist for Social Media",
+            "Easy Nostr/Twitter Crossposting"
           ] : undefined}
           customPrice={isJamiePro ? "49.99" : undefined}
         />

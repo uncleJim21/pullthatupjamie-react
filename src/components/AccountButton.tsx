@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, Radio } from 'lucide-react';
-import BitcoinConnectButton from './BitcoinConnectButton.tsx'; // Regular import
+import React, { useState, useEffect } from 'react';
+import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, Radio, BookOpen } from 'lucide-react';
+import BitcoinConnectButton from './BitcoinConnectButton.tsx';
 import { useNavigate } from 'react-router-dom';
 import AuthService from '../services/authService.ts';
-import { DEBUG_MODE } from '../constants/constants.ts';
 
 interface AccountButtonProps {
   onConnect: () => void;
   onSignInClick: () => void;
   onUpgradeClick: () => void;
   onSignOut: () => void;
-  isSignedIn: boolean; // Prop passed from the parent component
+  onTutorialClick: () => void;
+  isSignedIn: boolean;
+  isInMobileMenu?: boolean; // New prop to detect if we're in mobile menu
 }
 
 interface AdminFeed {
@@ -23,111 +24,164 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
   onSignInClick,
   onSignOut,
   onUpgradeClick,
+  onTutorialClick,
   isSignedIn,
+  isInMobileMenu = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
+  const [showNickname, setShowNickname] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [adminFeed, setAdminFeed] = useState<AdminFeed | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
 
-  // Check for admin privileges
-  const checkAdminPrivileges = async () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) return;
-
-      const response = await AuthService.checkPrivs(token);
-      console.log('Admin privileges check:', response);
-      
-      if (response && response.privs && response.privs.privs) {
-        // If user has admin privileges for a feed, store it
-        setAdminFeed({
-          feedId: response.privs.privs.feedId,
-          access: response.privs.privs.access
-        });
-      } else {
-        setAdminFeed(null);
-      }
-    } catch (error) {
-      console.error('Error checking admin privileges:', error);
-      setAdminFeed(null);
-    }
-  };
-
+  // Check for mobile screen size
   useEffect(() => {
-    const email = localStorage.getItem('squareId') as string;
-    if (email) {
-      setNickname(email);
-    }
-  }, [isSignedIn]);
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
 
-  // Check admin privileges when signed in status changes
   useEffect(() => {
     if (isSignedIn) {
-      checkAdminPrivileges();
+      setNickname(localStorage.getItem('squareId'));
+      
+      // Check admin privileges
+      const checkAdmin = async () => {
+        try {
+          const token = localStorage.getItem('auth_token');
+          if (!token) return;
+          
+          const response = await AuthService.checkPrivs(token);
+          if (response?.privs?.privs) {
+            setAdminFeed({
+              feedId: response.privs.privs.feedId,
+              access: response.privs.privs.access
+            });
+          }
+        } catch (error) {
+          setAdminFeed(null);
+        }
+      };
+      
+      checkAdmin();
+      
+      // Check if user is subscribed
+      setTimeout(() => {
+        setShowUpgrade(localStorage.getItem('isSubscribed') !== 'true');
+      }, 1000);
+
+      // Add small delay before showing nickname to ensure smooth transition
+      setTimeout(() => {
+        setShowNickname(true);
+      }, 100);
     } else {
       setAdminFeed(null);
+      setShowNickname(false);
     }
-  }, [isSignedIn]);
-
-  useEffect(() => {
-    async function checkUpgradePath(){
-      const isUpgraded = localStorage.getItem('isSubscribed') as string === 'true';
-      setShowUpgrade(!isUpgraded);
-    }
-    setTimeout(checkUpgradePath, 2000);
   }, [isSignedIn]);
 
   const truncateMiddle = (str: string, maxLength: number) => {
     if (str.length <= maxLength) return str;
-    const start = str.slice(0, Math.floor(maxLength / 2));
-    const end = str.slice(-Math.floor(maxLength / 2));
-    return `${start}...${end}`;
+    const half = Math.floor(maxLength / 2);
+    return `${str.slice(0, half)}...${str.slice(-half)}`;
   };
 
-  const handleMyFeedClick = () => {
-    if (adminFeed && adminFeed.feedId) {
-      navigate(`/feed/${adminFeed.feedId}`);
-      setIsOpen(false);
+  // Determine dropdown positioning based on screen size and mobile menu context
+  const getDropdownPositioning = () => {
+    if (isInMobileMenu) {
+      // When in mobile menu, position relative to the button but stay within bounds
+      return {
+        left: '0',
+        right: 'auto',
+        transform: 'translateX(-50%)', // Center the dropdown relative to button
+        marginTop: '8px'
+      };
+    } else if (isMobile) {
+      // On mobile but not in mobile menu, position to the left to avoid overflow
+      return {
+        left: '0',
+        right: 'auto',
+        transform: 'translateX(-80%)',
+        marginLeft: '-8px'
+      };
     }
+    // Desktop positioning - align to right as before
+    return {
+      right: '0',
+      left: 'auto'
+    };
   };
+
+  const buttonStyle = isInMobileMenu 
+    ? { width: '100%', maxWidth: '180px' } // Constrain width in mobile menu
+    : { minWidth: '130px' }; // Original desktop behavior
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       {/* Main Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-4 py-2 bg-[#111111] text-white rounded-lg border border-gray-800 hover:border-gray-700 transition-all"
+        style={buttonStyle}
       >
         <User size={20} />
-        <span
-          className="hidden sm:inline max-w-[200px] overflow-hidden text-ellipsis"
-          title={nickname || "Account"}
-        >
-          {isSignedIn
-            ? nickname
-              ? truncateMiddle(nickname, 20) // Adjust the max length as needed
-              : "Account"
-            : "Account"}
-        </span>
+        <div className="hidden sm:block overflow-hidden" style={{ width: '100%', maxWidth: isInMobileMenu ? '120px' : '180px' }}>
+          <span
+            className="inline-block whitespace-nowrap overflow-hidden text-ellipsis transition-all duration-500 ease-in-out"
+            title={nickname || "Account"}
+            style={{ 
+              opacity: isSignedIn && showNickname && nickname ? 1 : 0.7,
+              maxWidth: isSignedIn && showNickname && nickname ? (isInMobileMenu ? '120px' : '180px') : '0px',
+              transform: isSignedIn && showNickname && nickname ? 'translateX(0)' : 'translateX(-20px)',
+            }}
+          >
+            {isSignedIn && nickname ? truncateMiddle(nickname, isInMobileMenu ? 15 : 20) : ""}
+          </span>
+          <span
+            className="inline-block transition-all duration-500 ease-in-out"
+            style={{ 
+              opacity: isSignedIn && showNickname && nickname ? 0 : 1,
+              maxWidth: isSignedIn && showNickname && nickname ? '0px' : (isInMobileMenu ? '120px' : '180px'),
+              transform: isSignedIn && showNickname && nickname ? 'translateX(20px)' : 'translateX(0)',
+              position: isSignedIn && showNickname && nickname ? 'absolute' : 'relative',
+            }}
+          >
+            Account
+          </span>
+        </div>
         {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
       </button>
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-60 bg-[#111111] border border-gray-800 rounded-lg shadow-xl overflow-hidden z-50">
+        <div 
+          className="absolute mt-2 bg-[#111111] border border-gray-800 rounded-lg shadow-xl overflow-hidden"
+          style={{
+            ...getDropdownPositioning(),
+            width: isInMobileMenu ? '190px' : '240px', // Increased mobile width to match new container
+            zIndex: isInMobileMenu ? '60' : '50' // Higher z-index in mobile menu
+          }}
+        >
           <div className="p-2 space-y-1">
             {/* Bitcoin Connect */}
             <div className="p-2">
               <BitcoinConnectButton onConnect={onConnect} />
             </div>
 
-            {/* My Feed Button (Shown only when admin privileges exist) */}
-            {adminFeed && adminFeed.access === 'admin' && (
+            {/* My Feed Button (for admins) */}
+            {adminFeed?.access === 'admin' && (
               <button
-                onClick={handleMyFeedClick}
+                onClick={() => {
+                  navigate(`/app/feed/${adminFeed.feedId}`);
+                  setIsOpen(false);
+                }}
                 className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
               >
                 <Radio size={20} />
@@ -139,8 +193,8 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
             {showUpgrade && isSignedIn && (
               <button
                 onClick={() => {
-                  setIsOpen(false);
                   onUpgradeClick();
+                  setIsOpen(false);
                 }}
                 className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
               >
@@ -149,30 +203,38 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
               </button>
             )}
 
+            {/* Tutorial Button */}
+            <button
+              onClick={() => {
+                onTutorialClick();
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <BookOpen size={20} />
+              <span>Tutorial</span>
+            </button>
+
             {/* Sign In/Out */}
-            {isSignedIn ? (
-              <button
-                onClick={() => {
-                  onSignOut();
-                  setIsOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
-              >
-                <LogOut size={20} />
-                <span>Sign Out</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  onSignInClick();
-                  setIsOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
-              >
-                <LogIn size={20} />
-                <span>Sign In</span>
-              </button>
-            )}
+            <button
+              onClick={() => {
+                isSignedIn ? onSignOut() : onSignInClick();
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
+            >
+              {isSignedIn ? (
+                <>
+                  <LogOut size={20} />
+                  <span>Sign Out</span>
+                </>
+              ) : (
+                <>
+                  <LogIn size={20} />
+                  <span>Sign In</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}

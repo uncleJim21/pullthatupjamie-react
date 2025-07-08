@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { X, Loader2, Twitter, Sparkles, ChevronDown, ChevronUp, ChevronRight, Info, Save, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
 import AuthService from '../services/authService.ts';
 import RegisterModal from './RegisterModal.tsx';
 import SocialShareSuccessModal from './SocialShareSuccessModal.tsx';
+import MentionsLookupView from './MentionsLookupView.tsx';
+import MentionPinManagement from './MentionPinManagement.tsx';
+import { MentionResult } from '../types/mention.ts';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -169,6 +172,8 @@ const ASPECT_RATIO = 16 / 9;
 const PREVIEW_WIDTH = 240; // px, adjust as needed
 const PREVIEW_HEIGHT = PREVIEW_WIDTH / ASPECT_RATIO;
 
+const MENTION_MIN_CHARS = 2;
+
 const SocialShareModal: React.FC<SocialShareModalProps> = ({
   isOpen,
   onClose,
@@ -238,6 +243,16 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Add state to track retrying the thumbnail
   const [thumbnailRetry, setThumbnailRetry] = useState(false);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
+
+  // Add state for mentions lookup
+  const [showMentionsLookup, setShowMentionsLookup] = useState(false);
+  const [mentionSearchQuery, setMentionSearchQuery] = useState('');
+  const [mentionStartIndex, setMentionStartIndex] = useState(-1);
+  const [firstMention, setFirstMention] = useState<MentionResult | null>(null);
+  const [showPinManagement, setShowPinManagement] = useState(false);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(-1);
+  const [mentionResults, setMentionResults] = useState<MentionResult[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
@@ -582,6 +597,23 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   }, [isOpen]);
 
+  // Handle escape key to close mentions
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showMentionsLookup) {
+        handleCloseMentions();
+      }
+    };
+
+    if (showMentionsLookup) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showMentionsLookup]);
+
   // Nostr-specific functions
   const connectToRelay = (relay: string): Promise<WebSocket> => {
     return new Promise((resolve, reject) => {
@@ -911,12 +943,76 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Function to handle content changes and track user edits
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
+    const cursorPosition = e.target.selectionStart;
+    
     setContent(newContent);
     
     // Only mark as edited if there's actual content
     if (newContent.trim() !== '') {
       // Mark that user has edited content since last Jamie Assist call
       setUserEditedSinceLastAssist(true);
+    }
+    
+    // Check for @ mention detection
+    const textBeforeCursor = newContent.substring(0, cursorPosition);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (lastAtIndex !== -1) {
+      // Check if @ is at start or preceded by whitespace
+      const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
+      if (charBeforeAt === ' ' || charBeforeAt === '\n' || lastAtIndex === 0) {
+        const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+        // Check if there's no space after @ (still typing the mention)
+        if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
+          setMentionSearchQuery(textAfterAt);
+          setMentionStartIndex(lastAtIndex);
+          setSelectedMentionIndex(-1); // Reset selection when search query changes
+          setShowMentionsLookup(true);
+          return;
+        }
+      }
+    }
+    
+    // Hide mentions if no valid @ pattern found
+    setShowMentionsLookup(false);
+    setMentionSearchQuery('');
+    setMentionStartIndex(-1);
+    setSelectedMentionIndex(-1);
+  };
+
+  // Handle keyboard events for textarea
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle Tab key to select first mention
+    if (e.key === 'Tab' && showMentionsLookup && firstMention) {
+      e.preventDefault();
+      handleMentionSelect(firstMention, firstMention.platform);
+    }
+    
+    // Handle arrow keys for mention navigation
+    if (showMentionsLookup && mentionResults.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedMentionIndex(prev => {
+          // If no selection yet, start with first item (index 0)
+          if (prev === -1) return 0;
+          const newIndex = prev < mentionResults.length - 1 ? prev + 1 : 0;
+          return newIndex;
+        });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedMentionIndex(prev => {
+          // If no selection yet, start with last item
+          if (prev === -1) return mentionResults.length - 1;
+          const newIndex = prev > 0 ? prev - 1 : mentionResults.length - 1;
+          return newIndex;
+        });
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        const selectedMention = mentionResults[selectedMentionIndex >= 0 ? selectedMentionIndex : 0];
+        if (selectedMention) {
+          handleMentionSelect(selectedMention, selectedMention.platform);
+        }
+      }
     }
   };
 
@@ -1007,6 +1103,61 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
     onClose(); // Close the main modal after success modal is dismissed
+  };
+
+  // Handler for mention selection
+  const handleMentionSelect = (mention: MentionResult, platform: string) => {
+    if (mentionStartIndex === -1) return;
+    
+    // Extract the appropriate identifier based on platform
+    let mentionIdentifier: string;
+    if (mention.platform === 'twitter') {
+      mentionIdentifier = mention.username;
+    } else if (mention.platform === 'nostr') {
+      // For Nostr, use nip05 if available, otherwise use shortened npub
+      mentionIdentifier = mention.nip05 || mention.npub.slice(0, 16) + '...';
+    } else {
+      mentionIdentifier = 'unknown';
+    }
+    
+    const mentionText = `@${mentionIdentifier} `; // Add space after identifier
+    
+    // Replace the @ and search text with the selected mention
+    const beforeMention = content.substring(0, mentionStartIndex);
+    const afterMention = content.substring(mentionStartIndex + 1 + mentionSearchQuery.length);
+    const newContent = beforeMention + mentionText + afterMention;
+    
+    setContent(newContent);
+    
+    // Calculate cursor position after insertion
+    const cursorPosition = mentionStartIndex + mentionText.length;
+    
+    // Hide mentions popup
+    setShowMentionsLookup(false);
+    setMentionSearchQuery('');
+    setMentionStartIndex(-1);
+    setSelectedMentionIndex(-1);
+    
+    // Mark as user edited
+    setUserEditedSinceLastAssist(true);
+    
+    // Set cursor position after a brief delay to ensure DOM update
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(cursorPosition, cursorPosition);
+      }
+    }, 10);
+    
+    printLog(`Selected mention: @${mentionIdentifier} on ${platform}`);
+  };
+
+  // Handler to close mentions popup
+  const handleCloseMentions = () => {
+    setShowMentionsLookup(false);
+    setMentionSearchQuery('');
+    setMentionStartIndex(-1);
+    setSelectedMentionIndex(-1);
   };
 
   if (!isOpen || !fileUrl) return null;
@@ -1196,16 +1347,57 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           )}
         </div>
         
-        <textarea
-          value={content}
-          onChange={handleContentChange}
-          className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
-          placeholder={`Write about this ${itemName}...`}
-          style={{ resize: "none", height: "120px", minHeight: "100px" }}
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={handleContentChange}
+            onKeyDown={handleTextareaKeyDown}
+            className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
+            placeholder={`Write about this ${itemName}...`}
+            style={{ resize: "none", height: "120px", minHeight: "100px" }}
+          />
+          
+                  {/* Mentions Lookup Overlay */}
+        {showMentionsLookup && (
+          <div className="absolute top-full left-0 right-0 z-50 mt-1 flex justify-center">
+            {mentionSearchQuery.length < MENTION_MIN_CHARS ? (
+              <div className="bg-gray-900 text-gray-400 px-4 py-2 rounded shadow text-sm">
+                Keep typing to search for mentions...
+              </div>
+            ) : (
+              <MentionsLookupView 
+                onMentionSelect={handleMentionSelect}
+                searchQuery={mentionSearchQuery}
+                onClose={handleCloseMentions}
+                onFirstMentionChange={setFirstMention}
+                selectedIndex={selectedMentionIndex}
+                mentionResults={mentionResults}
+                onMentionResultsChange={setMentionResults}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Pin Management Modal */}
+        <MentionPinManagement
+          isOpen={showPinManagement}
+          onClose={() => setShowPinManagement(false)}
         />
+        </div>
         
-        <div className="text-gray-400 text-xs mb-2 sm:mb-3 text-left pl-1">
-          The link to your {itemName} and attribution will be added automatically when you publish.
+        <div className="flex items-center justify-between mb-2 sm:mb-3">
+          <div className="text-gray-400 text-xs pl-1">
+            The link to your {itemName} and attribution will be added automatically when you publish.
+          </div>
+          <button
+            onClick={() => setShowPinManagement(true)}
+            className="flex items-center space-x-1 text-xs text-gray-400 hover:text-yellow-500 transition-colors"
+            title="Manage pinned mentions"
+          >
+            <Pin className="w-3 h-3" />
+            <span>Pins</span>
+          </button>
         </div>
         
         {/* Platform Selection with Checkboxes */}
@@ -1277,7 +1469,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   src="/nostr-logo-square.png" 
                   alt="Nostr" 
                   className="w-6 h-6"
-                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen' }}
+                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen', opacity: nostrStatus.available ? 1 : 0.5 }}
                 />
                 <div className="flex-1">
                   {nostrStatus.available && nostrStatus.authenticated ? (
@@ -1296,7 +1488,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   ) : nostrStatus.available ? (
                     <p className="text-white text-sm">Connect NIP07 Extension to Post on Nostr</p>
                   ) : (
-                    <p className="text-white text-sm">Install Nostr Extension</p>
+                    <div className="text-xs text-gray-400 italic opacity-70">Nostr: Coming Soon</div>
                   )}
                 </div>
                 {nostrStatus.available && !nostrStatus.authenticated && (
@@ -1307,11 +1499,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   >
                     Connect
                   </button>
-                )}
-                {!nostrStatus.available && (
-                  <div className="text-xs text-gray-400">
-                    <a href="https://getalby.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Get Alby</a>
-                  </div>
                 )}
               </div>
               <div className="flex items-center space-x-2 ml-2">

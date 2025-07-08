@@ -1,0 +1,386 @@
+import React, { useState, useEffect } from 'react';
+import { Twitter, Loader2, Pin, PinOff } from 'lucide-react';
+import { mentionService } from '../services/mentionService.ts';
+import { MentionResult, TwitterResult, NostrResult } from '../types/mention.ts';
+
+enum Platform {
+  Twitter = 'twitter',
+  Nostr = 'nostr'
+}
+
+interface MentionsLookupViewProps {
+  onMentionSelect?: (mention: MentionResult, platform: Platform) => void;
+  searchQuery?: string;
+  onClose?: () => void;
+  onFirstMentionChange?: (mention: MentionResult | null) => void;
+  selectedIndex?: number;
+  mentionResults?: MentionResult[];
+  onMentionResultsChange?: (results: MentionResult[]) => void;
+}
+
+const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
+  onMentionSelect,
+  searchQuery = '',
+  onClose,
+  onFirstMentionChange,
+  selectedIndex = -1,
+  mentionResults: externalMentionResults,
+  onMentionResultsChange
+}) => {
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(Platform.Twitter);
+  const [mentionResults, setMentionResults] = useState<MentionResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pinningStates, setPinningStates] = useState<{[key: string]: boolean}>({});
+
+  // Use external mention results if provided, otherwise use internal state
+  const displayResults = externalMentionResults || mentionResults;
+  const setDisplayResults = onMentionResultsChange || ((results: MentionResult[] | ((prev: MentionResult[]) => MentionResult[])) => {
+    if (typeof results === 'function') {
+      setMentionResults(results);
+    } else {
+      setMentionResults(results);
+    }
+  });
+
+  // Make fetchMentions accessible
+  const fetchMentions = React.useCallback(async () => {
+    if (!searchQuery || searchQuery.length < 2) {
+      setDisplayResults([]);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await mentionService.searchMentions(searchQuery, {
+        platforms: ['twitter', 'nostr'],
+        includePersonalPins: true,
+        includeCrossPlatformMappings: true,
+        limit: 10
+      });
+      if (result.success && result.results) {
+        setDisplayResults(result.results);
+      } else {
+        setError(result.error || 'Failed to fetch mentions');
+        setDisplayResults([]);
+      }
+    } catch (err) {
+      setError('Network error occurred');
+      setDisplayResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchQuery, setDisplayResults]);
+
+  // Fetch mentions when searchQuery changes
+  useEffect(() => {
+    const debounceTimer = setTimeout(fetchMentions, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [fetchMentions]);
+
+  // Filter results by selected platform
+  const filteredResults = displayResults.filter(result => result.platform === selectedPlatform);
+
+  // Notify parent of first mention changes for Tab key functionality
+  useEffect(() => {
+    const firstMention = filteredResults.length > 0 ? filteredResults[0] : null;
+    onFirstMentionChange?.(firstMention);
+  }, [filteredResults, onFirstMentionChange]);
+
+  const handleMentionClick = (mention: MentionResult) => {
+    onMentionSelect?.(mention, selectedPlatform);
+    onClose?.();
+  };
+
+  const handlePinToggle = async (mention: MentionResult, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const mentionKey = `${mention.platform}-${mention.platform === 'twitter' ? mention.username : mention.npub}`;
+    setPinningStates(prev => ({ ...prev, [mentionKey]: true }));
+    try {
+      const result = await mentionService.togglePin(mention);
+              if (result.success) {
+          // Toggle UI state directly on success
+          const updatedResults = displayResults.map(m => {
+            const mKey = `${m.platform}-${m.platform === 'twitter' ? m.username : m.npub}`;
+            if (mKey === mentionKey) {
+              return {
+                ...m,
+                isPinned: !m.isPinned,
+                pinId: m.isPinned ? null : result.data?.id || 'temp-id'
+              };
+            }
+            return m;
+          });
+          setDisplayResults(updatedResults);
+        } else {
+        console.error('Failed to toggle pin:', result.error);
+      }
+    } catch (error) {
+      console.error('Error toggling pin:', error);
+    } finally {
+      setPinningStates(prev => ({ ...prev, [mentionKey]: false }));
+    }
+  };
+
+  const formatFollowerCount = (count: number) => {
+    if (count >= 1000000) {
+      return `${(count / 1000000).toFixed(1)}M`;
+    } else if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}K`;
+    }
+    return count.toString();
+  };
+
+  const truncateMiddle = (str: string, maxLength: number = 14) => {
+    if (str.length <= maxLength) return str;
+    
+    const ellipsis = '...';
+    const remainingLength = maxLength - ellipsis.length;
+    const startLength = Math.ceil(remainingLength / 2);
+    const endLength = Math.floor(remainingLength / 2);
+    
+    return str.slice(0, startLength) + ellipsis + str.slice(-endLength);
+  };
+
+  const renderTwitterResult = (result: TwitterResult, index: number) => {
+    const mentionKey = `twitter-${result.username}`;
+    const isPinning = pinningStates[mentionKey];
+    const isSelected = index === selectedIndex;
+    
+    return (
+      <div
+        key={result.id}
+        onClick={() => handleMentionClick(result)}
+        className={`px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors group grid grid-cols-[32px_1fr_auto] gap-3 items-center ${
+          isSelected ? 'bg-blue-600/20 border-l-2 border-blue-500' : ''
+        }`}
+      >
+        {/* Profile Image */}
+        <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
+          {result.profile_image_url ? (
+            <img 
+              src={result.profile_image_url} 
+              alt={result.name}
+              className="w-8 h-8 object-cover"
+            />
+          ) : (
+            <Twitter className="w-4 h-4 text-blue-400" />
+          )}
+        </div>
+        
+        {/* User Info */}
+        <div className="min-w-0 flex items-center space-x-2">
+          <div className="flex items-center space-x-1">
+            <span className={`font-medium text-xs ${isSelected ? 'text-blue-300' : 'text-white'}`}>
+              {truncateMiddle(result.name)}
+            </span>
+            {result.verified && (
+              <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            )}
+            {result.isPinned && (
+              <div className="w-3 h-3 bg-yellow-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <Pin className="w-2 h-2 text-white" />
+              </div>
+            )}
+            {result.crossPlatformMapping?.hasNostrMapping && (
+              <img 
+                src="/nostr-logo-square.png" 
+                alt="Has Nostr mapping" 
+                className="w-3 h-3"
+                style={{ filter: 'brightness(1.2)' }}
+                title="Also available on Nostr"
+              />
+            )}
+          </div>
+          <div className={`text-xs ${isSelected ? 'text-blue-300' : 'text-gray-400'}`}>@{truncateMiddle(result.username)}</div>
+        </div>
+
+        {/* Pin Toggle Button */}
+        <button
+          onClick={(e) => handlePinToggle(result, e)}
+          disabled={isPinning}
+          className={`p-1 rounded-full transition-colors ${
+            result.isPinned 
+              ? 'text-yellow-500 hover:text-yellow-400' 
+              : 'text-gray-400 hover:text-yellow-500'
+          } ${isPinning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          title={result.isPinned ? 'Unpin user' : 'Pin user'}
+        >
+          {isPinning ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : result.isPinned ? (
+            <PinOff className="w-3 h-3" />
+          ) : (
+            <Pin className="w-3 h-3" />
+          )}
+        </button>
+      </div>
+    );
+  };
+
+  const renderNostrResult = (result: NostrResult, index: number) => {
+    const mentionKey = `nostr-${result.npub}`;
+    const isPinning = pinningStates[mentionKey];
+    const isSelected = index === selectedIndex;
+    
+    return (
+      <div
+        key={result.npub}
+        onClick={() => handleMentionClick(result)}
+        className={`px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors group grid grid-cols-[32px_1fr_auto] gap-3 items-center ${
+          isSelected ? 'bg-purple-600/20 border-l-2 border-purple-500' : ''
+        }`}
+      >
+        {/* Profile Image */}
+        <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
+          {result.picture ? (
+            <img 
+              src={result.picture} 
+              alt={result.displayName || 'Nostr User'}
+              className="w-8 h-8 object-cover"
+            />
+          ) : (
+            <img 
+              src="/nostr-logo-square.png" 
+              alt="Nostr" 
+              className="w-4 h-4"
+              style={{ filter: 'brightness(1.2)' }}
+            />
+          )}
+        </div>
+        
+        {/* User Info */}
+        <div className="min-w-0 flex items-center space-x-2">
+          <div className="flex items-center space-x-1">
+            <span className={`font-medium text-xs ${isSelected ? 'text-purple-300' : 'text-white'}`}>
+              {truncateMiddle(result.displayName || 'Unknown')}
+            </span>
+            {result.nip05 && (
+              <div className="w-3 h-3 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            )}
+            {result.isPinned && (
+              <div className="w-3 h-3 bg-yellow-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <Pin className="w-2 h-2 text-white" />
+              </div>
+            )}
+            {result.crossPlatformMapping?.hasTwitterMapping && (
+              <div title="Also available on Twitter">
+                <Twitter className="w-3 h-3 text-blue-400" />
+              </div>
+            )}
+          </div>
+          <div className={`text-xs ${isSelected ? 'text-purple-300' : 'text-gray-400'}`}>
+            {result.nip05 || `${truncateMiddle(result.npub, 12)}...`}
+          </div>
+        </div>
+
+        {/* Pin Toggle Button */}
+        <button
+          onClick={(e) => handlePinToggle(result, e)}
+          disabled={isPinning}
+          className={`p-1 rounded-full transition-colors ${
+            result.isPinned 
+              ? 'text-yellow-500 hover:text-yellow-400' 
+              : 'text-gray-400 hover:text-yellow-500'
+          } ${isPinning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          title={result.isPinned ? 'Unpin user' : 'Pin user'}
+        >
+          {isPinning ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : result.isPinned ? (
+            <PinOff className="w-3 h-3" />
+          ) : (
+            <Pin className="w-3 h-3" />
+          )}
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="w-72 sm:w-80 mx-2 sm:mx-0 bg-black border border-gray-700 rounded-lg shadow-xl overflow-hidden">
+      {/* Compact Header with Platform Tabs */}
+      <div className="flex bg-gray-900 border-b border-gray-700">
+        <button
+          onClick={() => setSelectedPlatform(Platform.Twitter)}
+          className={`flex-1 flex items-center justify-center py-2 px-3 text-xs font-medium transition-all ${
+            selectedPlatform === Platform.Twitter
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800'
+          }`}
+        >
+          <Twitter className="w-3 h-3 mr-1.5" />
+          Twitter
+          {displayResults.filter(r => r.platform === 'twitter').length > 0 && (
+            <span className="ml-2 bg-gray-600 text-xs px-1.5 py-0.5 rounded">
+              {displayResults.filter(r => r.platform === 'twitter').length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setSelectedPlatform(Platform.Nostr)}
+          className={`flex-1 flex items-center justify-center py-2 px-3 text-xs font-medium transition-all ${
+            selectedPlatform === Platform.Nostr
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800'
+          }`}
+        >
+          <img 
+            src="/nostr-logo-square.png" 
+            alt="Nostr" 
+            className="w-3 h-3 mr-1.5"
+            style={{ filter: 'brightness(1.2)' }}
+          />
+          Nostr
+          {displayResults.filter(r => r.platform === 'nostr').length > 0 && (
+            <span className="ml-2 bg-gray-600 text-xs px-1.5 py-0.5 rounded">
+              {displayResults.filter(r => r.platform === 'nostr').length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="max-h-48 overflow-y-auto">
+        <div className="divide-y divide-gray-800">
+          {selectedPlatform === Platform.Nostr ? (
+            <div className="px-3 py-8 text-center text-purple-300 italic opacity-80">
+              <img src="/nostr-logo-square.png" alt="Nostr" className="w-6 h-6 mx-auto mb-2 opacity-70" style={{ filter: 'brightness(1.2)' }} />
+              <div className="text-base font-semibold mb-1">Nostr: Coming Soon</div>
+              <div className="text-xs text-gray-400">Nostr mention search is in development and will be available soon.</div>
+            </div>
+          ) : isLoading ? (
+            <div className="px-3 py-4 text-center text-gray-400">
+              <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
+              <p className="text-xs">Loading...</p>
+            </div>
+          ) : error ? (
+            <div className="px-3 py-4 text-center text-gray-400">
+              <p className="text-xs text-red-400">{error}</p>
+            </div>
+          ) : filteredResults.length > 0 ? (
+            filteredResults.map((result, index) => 
+              result.platform === 'twitter' 
+                ? renderTwitterResult(result as TwitterResult, index)
+                : renderNostrResult(result as NostrResult, index)
+            )
+          ) : (
+            <div className="px-3 py-4 text-center text-gray-400">
+              <p className="text-xs">No results found</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default MentionsLookupView; 

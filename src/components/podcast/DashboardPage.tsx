@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { PodcastSearchResultItem, PresentationContext } from '../podcast/PodcastSearchResultItem.tsx';
 import { getRecommendedClips, ClipItem } from '../../services/dashboardService.ts';
+import { FRONTEND_URL } from '../../constants/constants.ts';
+import { createClipShareUrl } from '../../utils/urlUtils.ts';
+import PageBanner from '../PageBanner.tsx';
+import TutorialModal from '../TutorialModal.tsx';
+import WelcomeModal from '../WelcomeModal.tsx';
 
 // Default podcast image to use when none is provided
 const DEFAULT_PODCAST_IMAGE = '/podcast-logo.png'; // Update with your default image path
@@ -13,9 +18,18 @@ const DashboardPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [enableFieldFiltering, setEnableFieldFiltering] = useState(false);
+  
+  // Tutorial and welcome modal states
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+  const [isUserSignedIn, setIsUserSignedIn] = useState(false);
 
   useEffect(() => {
     fetchRecommendedClips();
+    
+    // Check if user is signed in
+    const token = localStorage.getItem('auth_token');
+    setIsUserSignedIn(!!token);
   }, [feedId, enableFieldFiltering]);
 
   const fetchRecommendedClips = async () => {
@@ -56,8 +70,52 @@ const DashboardPage: React.FC = () => {
     setEnableFieldFiltering(!enableFieldFiltering);
   };
 
+  const handleTutorialClick = () => {
+    setIsTutorialOpen(true);
+  };
+
+  const handleTutorialClose = () => {
+    setIsTutorialOpen(false);
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('squareId');
+    setIsUserSignedIn(false);
+    window.location.href = '/';
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
+      {/* Page Banner */}
+      <PageBanner 
+        logoText="Pull That Up Jamie!" 
+        onConnect={() => {}}
+        onSignIn={() => {}}
+        onUpgrade={() => {}}
+        onSignOut={handleSignOut}
+        onTutorialClick={handleTutorialClick}
+        isUserSignedIn={isUserSignedIn}
+        setIsUserSignedIn={setIsUserSignedIn}
+      />
+
+      {/* Tutorial Modal */}
+      <TutorialModal
+        isOpen={isTutorialOpen}
+        onClose={handleTutorialClose}
+        defaultSection={2} // Jamie Pro section for dashboard
+      />
+
+      {/* Welcome Modal */}
+      <WelcomeModal
+        isOpen={isWelcomeOpen}
+        onQuickTour={() => {
+          setIsWelcomeOpen(false);
+          setIsTutorialOpen(true);
+        }}
+        onGetStarted={() => setIsWelcomeOpen(false)}
+      />
+
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Recommended Clips for {feedId}</h1>
@@ -110,7 +168,7 @@ const DashboardPage: React.FC = () => {
                   isPlaying={currentlyPlayingId === (clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`)}
                   onPlayPause={handlePlayPause}
                   onEnded={handleEnded}
-                  shareUrl={`${window.location.origin}/share?clip=${clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`}`}
+                  shareUrl={createClipShareUrl(clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`)}
                   shareLink={clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`}
                   presentationContext={PresentationContext.dashboard}
                 />
