@@ -61,7 +61,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     "Access 20+ CASCDR Apps",
     "Early previews of new features"
   ]) : [
-    "Your Pod Feed Transcribed & Searchable",
+    "Your Pod Feed Auto Transcribed & Searchable",
     "AI Curated Clips & Email Alerts",
     "AI Assist for Social Media",
     "Easy Nostr/Twitter Crossposting"

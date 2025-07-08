@@ -148,6 +148,7 @@ const TryJamieWizard: React.FC = () => {
   } | null>(null);
   const [imageLoadedStates, setImageLoadedStates] = useState<Record<string, boolean>>({});
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isSigningInForUpgrade, setIsSigningInForUpgrade] = useState(false);
   const navigate = useNavigate();
 
   const handleTutorialClick = () => {
@@ -209,7 +210,12 @@ const TryJamieWizard: React.FC = () => {
 
   // Handle upgrade functions
   const handleUpgrade = () => {
-    setIsCheckoutModalOpen(true);
+    if (!isUserSignedIn) {
+      setIsSigningInForUpgrade(true);
+      setIsSignInModalOpen(true);
+    } else {
+      setIsCheckoutModalOpen(true);
+    }
   };
 
   const handleUpgradeSuccess = () => {
@@ -928,6 +934,18 @@ const TryJamieWizard: React.FC = () => {
         </div>
       )}
       
+      {/* Upgrade Button for Non-Signed In Users */}
+      {!isUserSignedIn && (
+        <div className="absolute top-24 left-1/2 transform -translate-x-1/2 sm:left-auto sm:right-6 sm:transform-none flex flex-col items-center sm:items-end space-y-2 mb-8">
+          <button
+            onClick={handleUpgrade}
+            className="bg-white text-black hover:bg-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg"
+          >
+            Upgrade Now
+          </button>
+        </div>
+      )}
+      
       {/* Step Indicator */}
       <StepIndicator currentStep={currentStep} hasQuotaInfo={isUserSignedIn && !!quotaInfo} />
       
@@ -939,20 +957,39 @@ const TryJamieWizard: React.FC = () => {
       {/* Sign In Modal */}
       <SignInModal 
         isOpen={isSignInModalOpen} 
-        onClose={() => setIsSignInModalOpen(false)}
+        onClose={() => {
+          setIsSignInModalOpen(false);
+          setIsSigningInForUpgrade(false); // Reset the flag when modal is closed
+        }}
         onSignInSuccess={() => {
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
           checkQuotaEligibility(); // Refresh quota after sign in
-          setProcessingFailed(false); // Reset failure state
-          setCurrentStep(4); // Proceed to processing step after sign in
+          
+          if (isSigningInForUpgrade) {
+            // User signed in for upgrade, show checkout modal
+            setIsSigningInForUpgrade(false);
+            setIsCheckoutModalOpen(true);
+          } else {
+            // User signed in for processing, proceed to step 4
+            setProcessingFailed(false); // Reset failure state
+            setCurrentStep(4); // Proceed to processing step after sign in
+          }
         }}
         onSignUpSuccess={() => {
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
           checkQuotaEligibility(); // Refresh quota after sign up
-          setProcessingFailed(false); // Reset failure state
-          setCurrentStep(4); // Proceed to processing step after sign up
+          
+          if (isSigningInForUpgrade) {
+            // User signed up for upgrade, show checkout modal
+            setIsSigningInForUpgrade(false);
+            setIsCheckoutModalOpen(true);
+          } else {
+            // User signed up for processing, proceed to step 4
+            setProcessingFailed(false); // Reset failure state
+            setCurrentStep(4); // Proceed to processing step after sign up
+          }
         }}
         customTitle="Let's get a good email for ya"
         initialMode="signup"
@@ -963,6 +1000,7 @@ const TryJamieWizard: React.FC = () => {
         isOpen={isCheckoutModalOpen} 
         onClose={() => setIsCheckoutModalOpen(false)} 
         onSuccess={handleUpgradeSuccess}
+        productName="jamie-pro"
       />
 
       {/* Quota Exceeded Notification Modal */}
