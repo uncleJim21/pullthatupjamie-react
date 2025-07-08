@@ -1,4 +1,4 @@
-export const DEBUG_MODE = true;
+export const DEBUG_MODE = false;
 
 // More explicit approach to determine FRONTEND_URL
 export const FRONTEND_URL = (() => {

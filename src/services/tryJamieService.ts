@@ -1,4 +1,6 @@
-const BASE_URL = process.env.REACT_APP_JAMIE_API_URL || 'http://localhost:4111';
+import { API_URL } from "../constants/constants.ts";
+
+const BASE_URL = API_URL;
 
 export interface OnDemandRunRequest {
   message: string;

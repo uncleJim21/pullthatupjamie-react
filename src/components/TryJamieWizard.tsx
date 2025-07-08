@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
 import PageBanner from './PageBanner.tsx';
 import rssService, { PodcastFeed, PodcastEpisode, FeedInfo } from '../services/rssService.ts';
@@ -189,7 +190,7 @@ const TryJamieWizard: React.FC = () => {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_JAMIE_API_URL || 'http://localhost:4111'}/api/check-ondemand-eligibility`, {
+      const response = await fetch(`${API_URL}/api/check-ondemand-eligibility`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
