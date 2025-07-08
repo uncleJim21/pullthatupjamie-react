@@ -149,6 +149,7 @@ const TryJamieWizard: React.FC = () => {
   const [imageLoadedStates, setImageLoadedStates] = useState<Record<string, boolean>>({});
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [isSigningInForUpgrade, setIsSigningInForUpgrade] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
   const navigate = useNavigate();
 
   const handleTutorialClick = () => {
@@ -178,10 +179,17 @@ const TryJamieWizard: React.FC = () => {
   // Auto-show quota exceeded modal when user is over quota
   useEffect(() => {
     // Auto-show quota exceeded modal if user loads page and is over quota
-    if (isUserSignedIn && quotaInfo && !quotaInfo.eligible && currentStep === 1 && !isQuotaExceededModalOpen) {
+    if (
+      isUserSignedIn &&
+      quotaInfo &&
+      !quotaInfo.eligible &&
+      currentStep === 1 &&
+      !isQuotaExceededModalOpen &&
+      !isUpgrading
+    ) {
       setIsQuotaExceededModalOpen(true);
     }
-  }, [isUserSignedIn, quotaInfo, isQuotaExceededModalOpen, currentStep]);
+  }, [isUserSignedIn, quotaInfo, isQuotaExceededModalOpen, currentStep, isUpgrading]);
 
   // Function to check on-demand run eligibility
   const checkQuotaEligibility = async () => {
@@ -998,8 +1006,14 @@ const TryJamieWizard: React.FC = () => {
       {/* Checkout Modal for internal upgrade buttons */}
       <CheckoutModal 
         isOpen={isCheckoutModalOpen} 
-        onClose={() => setIsCheckoutModalOpen(false)} 
-        onSuccess={handleUpgradeSuccess}
+        onClose={() => {
+          setIsCheckoutModalOpen(false);
+          setIsUpgrading(false);
+        }} 
+        onSuccess={() => {
+          handleUpgradeSuccess();
+          setIsUpgrading(false);
+        }}
         productName="jamie-pro"
       />
 
@@ -1016,8 +1030,11 @@ const TryJamieWizard: React.FC = () => {
             </p>
             <button
               onClick={() => {
+                setIsUpgrading(true);
                 setIsQuotaExceededModalOpen(false);
-                handleUpgrade();
+                setTimeout(() => {
+                  handleUpgrade();
+                }, 100);
               }}
               className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
             >
