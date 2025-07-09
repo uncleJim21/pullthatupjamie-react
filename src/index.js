@@ -44,6 +44,12 @@ const OldFeedRedirect = () => {
   return <Navigate to={`/app/feed/${feedId}`} replace />;
 };
 
+// Component to handle old clipBatch URL redirects
+const OldClipBatchRedirect = () => {
+  const { feedId, runId } = useParams();
+  return <Navigate to={`/app/feed/${feedId}/clipBatch/${runId}`} replace />;
+};
+
 // 404 Component that redirects to home after a brief delay
 const NotFound = () => {
   useEffect(() => {
@@ -104,6 +110,7 @@ const App = () => (
       
       {/* Redirect old URLs to new structure */}
       <Route path="/feed/:feedId" element={<OldFeedRedirect />} />
+      <Route path="/feed/:feedId/clipBatch/:runId" element={<OldClipBatchRedirect />} />
       <Route path="/share" element={<Navigate to="/app/share" replace />} />
       <Route path="/dashboard/:feedId" element={<Navigate to="/app/dashboard" replace />} />
       
