@@ -960,8 +960,8 @@ const TryJamieWizard: React.FC = () => {
             onClick={handleUpgrade}
             className="bg-white text-black hover:bg-gray-200 px-2 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg"
           >
-            {'Upgrade for Full Pro Experience'}
-          </button>
+            {isUserSignedIn ? 'Upgrade for Full Pro Experience' : 'Sign Up for More Runs'}
+            </button>
         </div>
       )}
       
