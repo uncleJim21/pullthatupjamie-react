@@ -145,6 +145,9 @@ const TryJamieWizard: React.FC = () => {
     periodStart: string;
     nextResetDate: string;
     daysUntilReset: number;
+    authType?: 'ip' | 'user';
+    userEmail?: string;
+    clientIp?: string;
   } | null>(null);
   const [imageLoadedStates, setImageLoadedStates] = useState<Record<string, boolean>>({});
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
@@ -160,27 +163,23 @@ const TryJamieWizard: React.FC = () => {
     setIsTutorialOpen(false);
   };
 
-  // Check if user is signed in and auto-show quota modal
+  // Check eligibility on component mount and when user signs in/out
   useEffect(() => {
     const checkSignedIn = () => {
       const hasToken = !!localStorage.getItem('auth_token');
       const hasSquareId = !!localStorage.getItem('squareId');
       setIsUserSignedIn(hasToken && hasSquareId);
-      
-      // If user is signed in, check their quota
-      if (hasToken && hasSquareId) {
-        checkQuotaEligibility();
-      }
     };
     
     checkSignedIn();
+    // Always check eligibility regardless of sign-in status
+    checkQuotaEligibility();
   }, []);
 
   // Auto-show quota exceeded modal when user is over quota
   useEffect(() => {
     // Auto-show quota exceeded modal if user loads page and is over quota
     if (
-      isUserSignedIn &&
       quotaInfo &&
       !quotaInfo.eligible &&
       currentStep === 1 &&
@@ -189,26 +188,43 @@ const TryJamieWizard: React.FC = () => {
     ) {
       setIsQuotaExceededModalOpen(true);
     }
-  }, [isUserSignedIn, quotaInfo, isQuotaExceededModalOpen, currentStep, isUpgrading]);
+  }, [quotaInfo, isQuotaExceededModalOpen, currentStep, isUpgrading]);
 
   // Function to check on-demand run eligibility
   const checkQuotaEligibility = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      if (!token) {
-        return;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      // Add JWT token if available
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${API_URL}/api/check-ondemand-eligibility`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await fetch(`${API_URL}/api/on-demand/checkEligibility`, {
+        method: 'GET',
+        headers: headers
       });
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.eligibility) {
-          setQuotaInfo(data.eligibility);
+        if (data.success) {
+          // Handle both new and old API response formats
+          const quotaData = data.quotaInfo || data.eligibility || data;
+          setQuotaInfo({
+            eligible: data.eligible !== undefined ? data.eligible : (quotaData?.eligible || true),
+            remainingRuns: quotaData?.remainingRuns || 0,
+            totalLimit: quotaData?.totalLimit || 0,
+            usedThisPeriod: quotaData?.usedThisPeriod || 0,
+            periodStart: quotaData?.periodStart || '',
+            nextResetDate: quotaData?.nextResetDate || '',
+            daysUntilReset: parseInt(quotaData?.daysUntilReset, 10) || 0,
+            authType: data.authType || 'user',
+            userEmail: data.userEmail,
+            clientIp: data.clientIp
+          });
         }
       }
     } catch (error) {
@@ -897,12 +913,15 @@ const TryJamieWizard: React.FC = () => {
           <div className="flex justify-end mt-6">
             <button 
               onClick={() => {
-                if (!isUserSignedIn) {
-                  setIsSignInModalOpen(true);
-                } else if (quotaInfo && !quotaInfo.eligible) {
+                if (quotaInfo && !quotaInfo.eligible) {
                   // User is out of runs, show notification modal first
                   setIsQuotaExceededModalOpen(true);
+                } else if (!isUserSignedIn) {
+                  // User is not signed in but has quota, proceed to processing
+                  setProcessingFailed(false); // Reset failure state
+                  setCurrentStep(4);
                 } else {
+                  // User is signed in and has quota, proceed to processing
                   setProcessingFailed(false); // Reset failure state
                   setCurrentStep(4);
                 }
@@ -928,34 +947,26 @@ const TryJamieWizard: React.FC = () => {
       <PageBanner logoText="Pull That Up Jamie!" onTutorialClick={handleTutorialClick} onUpgrade={handleUpgrade} />
       
       {/* Quota Display */}
-      {isUserSignedIn && quotaInfo && (
+      {quotaInfo && (
         <div className="absolute top-24 left-1/2 transform -translate-x-1/2 sm:left-auto sm:right-6 sm:transform-none flex flex-col items-center sm:items-end space-y-2 mb-8">
           <div className="text-white text-sm bg-black/50 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-700 shadow-lg">
-            <div>{quotaInfo.totalLimit - quotaInfo.usedThisPeriod}/{quotaInfo.totalLimit} Free Runs left.  {quotaInfo.daysUntilReset} Days Until Reset.</div>
+            <div className="flex items-center space-x-2">
+              <span>{quotaInfo.remainingRuns}/{quotaInfo.totalLimit} Free Runs left</span>
+              <span className="text-gray-400">•</span>
+              <span>{quotaInfo.daysUntilReset} Days Until Reset</span>
+            </div>
           </div>
           <button
             onClick={handleUpgrade}
             className="bg-white text-black hover:bg-gray-200 px-2 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg"
           >
-            Upgrade for Full Pro Experience
-          </button>
-        </div>
-      )}
-      
-      {/* Upgrade Button for Non-Signed In Users */}
-      {!isUserSignedIn && (
-        <div className="absolute top-24 left-1/2 transform -translate-x-1/2 sm:left-auto sm:right-6 sm:transform-none flex flex-col items-center sm:items-end space-y-2 mb-8">
-          <button
-            onClick={handleUpgrade}
-            className="bg-white text-black hover:bg-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg"
-          >
-            Upgrade Now
+            {'Upgrade for Full Pro Experience'}
           </button>
         </div>
       )}
       
       {/* Step Indicator */}
-      <StepIndicator currentStep={currentStep} hasQuotaInfo={isUserSignedIn && !!quotaInfo} />
+      <StepIndicator currentStep={currentStep} hasQuotaInfo={!!quotaInfo} />
       
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 py-4">
@@ -979,9 +990,13 @@ const TryJamieWizard: React.FC = () => {
             setIsSigningInForUpgrade(false);
             setIsCheckoutModalOpen(true);
           } else {
-            // User signed in for processing, proceed to step 4
-            setProcessingFailed(false); // Reset failure state
-            setCurrentStep(4); // Proceed to processing step after sign in
+            // User signed in for processing, check if they have quota
+            if (quotaInfo && !quotaInfo.eligible) {
+              setIsQuotaExceededModalOpen(true);
+            } else {
+              setProcessingFailed(false); // Reset failure state
+              setCurrentStep(4); // Proceed to processing step after sign in
+            }
           }
         }}
         onSignUpSuccess={() => {
@@ -994,9 +1009,13 @@ const TryJamieWizard: React.FC = () => {
             setIsSigningInForUpgrade(false);
             setIsCheckoutModalOpen(true);
           } else {
-            // User signed up for processing, proceed to step 4
-            setProcessingFailed(false); // Reset failure state
-            setCurrentStep(4); // Proceed to processing step after sign up
+            // User signed up for processing, check if they have quota
+            if (quotaInfo && !quotaInfo.eligible) {
+              setIsQuotaExceededModalOpen(true);
+            } else {
+              setProcessingFailed(false); // Reset failure state
+              setCurrentStep(4); // Proceed to processing step after sign up
+            }
           }
         }}
         customTitle="Let's get a good email for ya"
@@ -1022,11 +1041,14 @@ const TryJamieWizard: React.FC = () => {
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
           <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
             <h2 className="text-white text-xl font-bold mb-4">
-              You've Used Your Free Episodes!
+              {isUserSignedIn ? "You've Used Your Free Episodes!" : "You've Used Your Free Episodes!"}
             </h2>
             <p className="text-gray-400 mb-6">
-              You've processed {quotaInfo?.usedThisPeriod || 2} out of {quotaInfo?.totalLimit || 2} free episodes this month. 
-              Upgrade to Jamie Pro for unlimited episode processing and instant access to all your favorite podcasts.
+              {isUserSignedIn ? (
+                `You've processed ${quotaInfo?.usedThisPeriod || 0} out of ${quotaInfo?.totalLimit || 0} free episodes this month. Upgrade to Jamie Pro for unlimited episode processing and instant access to all your favorite podcasts.`
+              ) : (
+                `You've processed ${quotaInfo?.usedThisPeriod || 0} out of ${quotaInfo?.totalLimit || 0} free episodes this week. Sign up for an account to get more free episodes or upgrade to Jamie Pro for unlimited processing.`
+              )}
             </p>
             <button
               onClick={() => {
@@ -1038,7 +1060,7 @@ const TryJamieWizard: React.FC = () => {
               }}
               className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
             >
-              Upgrade Now
+              {isUserSignedIn ? 'Upgrade Now' : 'Sign Up for More'}
             </button>
           </div>
         </div>
