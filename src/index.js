@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import './index.css';
 import SearchInterface from './components/SearchInterface.tsx';
 import PodcastFeedPage from './components/podcast/PodcastFeedPage.tsx';
@@ -41,13 +41,32 @@ if (typeof window !== 'undefined' && window.navigator) {
 // Component to handle old URL redirects
 const OldFeedRedirect = () => {
   const { feedId } = useParams();
-  return <Navigate to={`/app/feed/${feedId}`} replace />;
+  const location = useLocation();
+  const search = location.search; // This preserves the query string
+  return <Navigate to={`/app/feed/${feedId}${search}`} replace />;
 };
 
 // Component to handle old clipBatch URL redirects
 const OldClipBatchRedirect = () => {
   const { feedId, runId } = useParams();
-  return <Navigate to={`/app/feed/${feedId}/clipBatch/${runId}`} replace />;
+  const location = useLocation();
+  const search = location.search; // This preserves the query string
+  return <Navigate to={`/app/feed/${feedId}/clipBatch/${runId}${search}`} replace />;
+};
+
+// Component to handle old share URL redirects with query parameters
+const OldShareRedirect = () => {
+  const location = useLocation();
+  const search = location.search; // This preserves the query string
+  return <Navigate to={`/app/share${search}`} replace />;
+};
+
+// Component to handle old dashboard URL redirects with query parameters
+const OldDashboardRedirect = () => {
+  const { feedId } = useParams();
+  const location = useLocation();
+  const search = location.search; // This preserves the query string
+  return <Navigate to={`/app/dashboard/${feedId}${search}`} replace />;
 };
 
 // 404 Component that redirects to home after a brief delay
@@ -111,8 +130,8 @@ const App = () => (
       {/* Redirect old URLs to new structure */}
       <Route path="/feed/:feedId" element={<OldFeedRedirect />} />
       <Route path="/feed/:feedId/clipBatch/:runId" element={<OldClipBatchRedirect />} />
-      <Route path="/share" element={<Navigate to="/app/share" replace />} />
-      <Route path="/dashboard/:feedId" element={<Navigate to="/app/dashboard" replace />} />
+      <Route path="/share" element={<OldShareRedirect />} />
+      <Route path="/dashboard/:feedId" element={<OldDashboardRedirect />} />
       
       {/* Catch-all route for 404s */}
       <Route path="*" element={<NotFound />} />
