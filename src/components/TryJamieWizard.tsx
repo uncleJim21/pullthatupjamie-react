@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { API_URL } from '../constants/constants.ts';
+import { API_URL, printLog } from '../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
 import PageBanner from './PageBanner.tsx';
 import rssService, { PodcastFeed, PodcastEpisode, FeedInfo } from '../services/rssService.ts';
@@ -177,14 +177,14 @@ const TryJamieWizard: React.FC = () => {
   
   // Debug state changes
   useEffect(() => {
-    console.log('Onboarding state changed:', onboardingState);
+    printLog(`Onboarding state changed: ${JSON.stringify(onboardingState)}`);
     
     // Debug success modal rendering
     if (onboardingState.status === 'done') {
-      console.log('Should render success modal:', {
+      printLog(`Should render success modal: ${JSON.stringify({
         justUpgraded: onboardingState.justUpgraded,
         modalType: onboardingState.justUpgraded ? 'SubscriptionSuccessPopup' : 'FreeRunsSuccessPopup'
-      });
+      })}`);
     }
   }, [onboardingState]);
 
@@ -211,22 +211,24 @@ const TryJamieWizard: React.FC = () => {
 
   // Auto-show quota exceeded modal when user is over quota (only on initial load)
   useEffect(() => {
-    console.log('Quota check useEffect triggered', { 
+    printLog(`Quota check useEffect triggered: ${JSON.stringify({ 
       quotaInfo, 
       eligible: quotaInfo?.eligible, 
       onboardingState: onboardingState.status,
-      isInitialLoad
-    });
+      isInitialLoad,
+      currentStep
+    })}`);
     
     // Don't interfere with active flows - only show quota exceeded on initial load
-    // or when explicitly triggered (like from process button)
+    // Never interrupt processing (steps 4-5) or ongoing onboarding flows
     if (
       quotaInfo &&
       !quotaInfo.eligible &&
       onboardingState.status === 'idle' &&
-      isInitialLoad
+      isInitialLoad &&
+      currentStep <= 3 // Don't interrupt processing or completion steps
     ) {
-      console.log('Setting state to quota_exceeded');
+      printLog('Setting state to quota_exceeded');
       setOnboardingState({ status: 'quota_exceeded' });
       setIsInitialLoad(false);
     }
@@ -270,7 +272,7 @@ const TryJamieWizard: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Error checking quota eligibility:', error);
+      printLog(`Error checking quota eligibility: ${error}`);
     }
   };
 
@@ -293,36 +295,36 @@ const TryJamieWizard: React.FC = () => {
 
   // Handle sign-in success
   const handleSignInSuccess = () => {
-    console.log('handleSignInSuccess called, current state:', onboardingState);
+    printLog(`handleSignInSuccess called, current state: ${JSON.stringify(onboardingState)}`);
     isInSuccessFlow.current = true;
     setIsUserSignedIn(true);
 
     if (onboardingState.status === 'sign_in') {
       if (onboardingState.upgradeIntent) {
         // User signed in with upgrade intent, go to checkout
-        console.log('Setting state to checkout');
+        printLog('Setting state to checkout');
         setOnboardingState({ status: 'checkout' });
       } else {
         // User signed in for free runs, show success
-        console.log('Setting state to done (free runs)');
+        printLog('Setting state to done (free runs)');
         setOnboardingState({ status: 'done', justUpgraded: false });
       }
     }
   };
 
   const handleSignUpSuccess = () => {
-    console.log('handleSignUpSuccess called, current state:', onboardingState);
+    printLog(`handleSignUpSuccess called, current state: ${JSON.stringify(onboardingState)}`);
     isInSuccessFlow.current = true;
     setIsUserSignedIn(true);
 
     if (onboardingState.status === 'sign_in') {
       if (onboardingState.upgradeIntent) {
         // User signed up with upgrade intent, go to checkout
-        console.log('Setting state to checkout');
+        printLog('Setting state to checkout');
         setOnboardingState({ status: 'checkout' });
       } else {
         // User signed up for free runs, show success
-        console.log('Setting state to done (free runs)');
+        printLog('Setting state to done (free runs)');
         setOnboardingState({ status: 'done', justUpgraded: false });
       }
     }
@@ -413,14 +415,14 @@ const TryJamieWizard: React.FC = () => {
     setHasSearched(true);
     try {
       const response = await rssService.searchFeeds(searchQuery);
-      console.log('Search response:', response);
+      printLog(`Search response: ${JSON.stringify(response)}`);
       if (response.data && response.data.status === 'true' && response.data.feeds) {
         setSearchResults(response.data.feeds);
       } else {
         setSearchResults([]);
       }
     } catch (error) {
-      console.error('Error searching feeds:', error);
+      printLog(`Error searching feeds: ${error}`);
       setSearchResults([]);
     } finally {
       setIsLoading(false);
@@ -432,10 +434,10 @@ const TryJamieWizard: React.FC = () => {
     setIsLoading(true);
     try {
       const response = await rssService.getFeed(feed.url, feed.id);
-      console.log('Feed episodes response:', response);
+      printLog(`Feed episodes response: ${JSON.stringify(response)}`);
       if (response.episodes && response.episodes.feedInfo) {
         const info = response.episodes.feedInfo;
-        console.log('Selected podcast:', JSON.stringify(info,null,2));
+        printLog(`Selected podcast: ${JSON.stringify(info, null, 2)}`);
         
         // Prioritize image from search results over feed info
         // Use feed.image first, then feed.artwork, then fallback to info.podcastImage
@@ -452,7 +454,7 @@ const TryJamieWizard: React.FC = () => {
         setCurrentStep(2); // Move to the next step
       }
     } catch (error) {
-      console.error('Error fetching feed episodes:', error);
+      printLog(`Error fetching feed episodes: ${error}`);
     } finally {
       setIsLoading(false);
     }
@@ -543,7 +545,7 @@ const TryJamieWizard: React.FC = () => {
           }
         }, pollIntervalTime);
       } catch (e) {
-        console.error('Job submission error:', e);
+        printLog(`Job submission error: ${e}`);
         setProcessing(false);
         
         // Check if the error is due to quota exceeded or authentication
@@ -1063,7 +1065,7 @@ const TryJamieWizard: React.FC = () => {
       <SignInModal 
         isOpen={onboardingState.status === 'sign_in'} 
         onClose={() => {
-          console.log('SignInModal onClose called, isInSuccessFlow:', isInSuccessFlow.current);
+          printLog(`SignInModal onClose called, isInSuccessFlow: ${isInSuccessFlow.current}`);
           // Only close if we're not in the middle of a success flow
           if (!isInSuccessFlow.current) {
             setOnboardingState({ status: 'idle' });
