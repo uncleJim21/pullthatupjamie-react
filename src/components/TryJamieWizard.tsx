@@ -277,10 +277,10 @@ const TryJamieWizard: React.FC = () => {
   // Handle upgrade functions
   const handleUpgrade = () => {
     if (!isUserSignedIn) {
-      // For non-signed-in users, show sign-in modal with upgrade intent
-      setOnboardingState({ status: 'sign_in', upgradeIntent: true });
+      // For non-signed-in users, "Sign Up for More Runs" should be for free runs
+      setOnboardingState({ status: 'sign_in', upgradeIntent: false });
     } else {
-      // For signed-in users, show checkout modal directly
+      // For signed-in users, show checkout modal directly for upgrade
       setOnboardingState({ status: 'checkout' });
     }
   };
