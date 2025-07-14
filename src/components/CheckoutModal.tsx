@@ -131,7 +131,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             if(statusContainer) {
             statusContainer.innerHTML = "Payment Successful";
             }
-            setIsPaymentProcessing(false);
             
             // Update quota after successful payment (non-blocking)
             try {
@@ -141,7 +140,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               printLog(`Quota update failed after payment: ${error}`);
               // Continue with success flow even if quota update fails
             }
-            
+            setIsPaymentProcessing(false);
             onSuccess();
         } else {
             setPaymentFailed(true);
