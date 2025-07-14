@@ -39,7 +39,7 @@ const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionS
       </h2>
       <p className="text-gray-400 mb-4">
         {isJamiePro ? (
-          'A team member will be in contact with you within 1 business day to complete your onboarding.'
+          'A team member will be in contact with you within 1 business day to complete your onboarding. \nIn the meantime enjoy additional on demand episode runs.'
         ) : (
           <>
             Enjoy unlimited access to Jamie and other{' '}

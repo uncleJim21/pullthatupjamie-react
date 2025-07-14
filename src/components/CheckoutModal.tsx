@@ -4,6 +4,7 @@ import { Stepper, Step, StepLabel, Button, Typography, Box, Paper, FormControlLa
 import PricingCard from './PricingCard.tsx';
 import AddressForm from './AddressForm.tsx';
 import PaymentFormComponent from './PaymentFormComponent.tsx';
+import TryJamieService from '../services/tryJamieService.ts';
 import { MONTHLY_PRICE_STRING, DEBUG_MODE, printLog } from '../constants/constants.ts';
 
 const steps = ['Sign In', 'Billing', 'Card'];
@@ -131,6 +132,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             statusContainer.innerHTML = "Payment Successful";
             }
             setIsPaymentProcessing(false);
+            
+            // Update quota after successful payment (non-blocking)
+            try {
+              await TryJamieService.updateOnDemandQuota();
+              printLog('Quota updated successfully after payment');
+            } catch (error) {
+              printLog(`Quota update failed after payment: ${error}`);
+              // Continue with success flow even if quota update fails
+            }
+            
             onSuccess();
         } else {
             setPaymentFailed(true);

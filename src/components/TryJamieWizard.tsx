@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { API_URL } from '../constants/constants.ts';
+import React, { useState, useEffect, useRef } from 'react';
+import { API_URL, printLog } from '../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
 import PageBanner from './PageBanner.tsx';
 import rssService, { PodcastFeed, PodcastEpisode, FeedInfo } from '../services/rssService.ts';
@@ -22,7 +22,7 @@ const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionS
       </h2>
       <p className="text-gray-400 mb-4">
         {isJamiePro ? (
-          'A team member will be in contact with you within 1 business day to complete your onboarding.'
+          'A team member will be in contact with you within 1 business day to complete your onboarding. \nIn the meantime enjoy additional on demand episode runs.'
         ) : (
           <>
             Enjoy unlimited access to Jamie and other{' '}
@@ -43,6 +43,24 @@ const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionS
         className="mt-4 px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors"
       >
         Close
+      </button>
+    </div>
+  </div>
+);
+
+// Success Modal for Free Runs
+const FreeRunsSuccessPopup = ({ onClose }: { onClose: () => void }) => (
+  <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
+    <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+      <h2 className="text-white text-lg font-bold mb-4">Welcome to Jamie!</h2>
+      <p className="text-gray-400 mb-4">
+        You now have additional free runs to process more episodes. Enjoy exploring your favorite podcasts!
+      </p>
+      <button
+        onClick={onClose}
+        className="mt-4 px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors"
+      >
+        Continue
       </button>
     </div>
   </div>
@@ -105,6 +123,15 @@ export interface SelectedPodcast {
   podcastImage: string;
 }
 
+// Define the onboarding state type
+type OnboardingState =
+  | { status: 'idle' }
+  | { status: 'quota_exceeded' }
+  | { status: 'sign_in'; upgradeIntent: boolean }
+  | { status: 'checkout' }
+  | { status: 'processing' }
+  | { status: 'done'; justUpgraded: boolean };
+
 const TryJamieWizard: React.FC = () => {
   const isDebug = false;
   const debugFeed : SelectedPodcast = {
@@ -114,13 +141,7 @@ const TryJamieWizard: React.FC = () => {
     "podcastImage": "https://assets.podhome.fm/77ae8d2c-0dcb-407e-93e7-08dd5a75ee77/638769544435807117TrustRevolution_Cover.jpg",
     "feedGuid": "a7d58130-6f1d-4ff3-9c5a-aee3b8cc07cc"
   }
-  // const debugFeed : SelectedPodcast = {
-  //     feedId: 6786106,
-  //     feedTitle: "The Joe Rogan Experience",
-  //     feedUrl: "https://feeds.megaphone.fm/GLT1412515089",
-  //     podcastImage: "https://megaphone.imgix.net/podcasts/8e5bcebc-ca16-11ee-89f0-0fa0b9bdfc7c/image/c2c595e6e3c2a64e6ea18fb6c6da8860.jpg",
-  //     feedGuid: "a7d58130-6f1d-4ff3-9c5a-aee3b8cc07cc",
-  //   }
+  
   const [currentStep, setCurrentStep] = useState(isDebug ? 5 : 1);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PodcastFeed[]>([]);
@@ -132,11 +153,7 @@ const TryJamieWizard: React.FC = () => {
   const [jobId, setJobId] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [processingFailed, setProcessingFailed] = useState(false);
-  const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
-  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
-  const [isQuotaExceededModalOpen, setIsQuotaExceededModalOpen] = useState(false);
-  const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
   const [quotaInfo, setQuotaInfo] = useState<{
     eligible: boolean;
     remainingRuns: number;
@@ -145,12 +162,31 @@ const TryJamieWizard: React.FC = () => {
     periodStart: string;
     nextResetDate: string;
     daysUntilReset: number;
+    authType?: 'ip' | 'user';
+    userEmail?: string;
+    clientIp?: string;
   } | null>(null);
   const [imageLoadedStates, setImageLoadedStates] = useState<Record<string, boolean>>({});
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
-  const [isSigningInForUpgrade, setIsSigningInForUpgrade] = useState(false);
-  const [isUpgrading, setIsUpgrading] = useState(false);
   const navigate = useNavigate();
+
+  // Single state object for onboarding flow
+  const [onboardingState, setOnboardingState] = useState<OnboardingState>({ status: 'idle' });
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const isInSuccessFlow = useRef(false);
+  
+  // Debug state changes
+  useEffect(() => {
+    printLog(`Onboarding state changed: ${JSON.stringify(onboardingState)}`);
+    
+    // Debug success modal rendering
+    if (onboardingState.status === 'done') {
+      printLog(`Should render success modal: ${JSON.stringify({
+        justUpgraded: onboardingState.justUpgraded,
+        modalType: onboardingState.justUpgraded ? 'SubscriptionSuccessPopup' : 'FreeRunsSuccessPopup'
+      })}`);
+    }
+  }, [onboardingState]);
 
   const handleTutorialClick = () => {
     setIsTutorialOpen(true);
@@ -160,80 +196,149 @@ const TryJamieWizard: React.FC = () => {
     setIsTutorialOpen(false);
   };
 
-  // Check if user is signed in and auto-show quota modal
+  // Check eligibility on component mount and when user signs in/out
   useEffect(() => {
     const checkSignedIn = () => {
       const hasToken = !!localStorage.getItem('auth_token');
       const hasSquareId = !!localStorage.getItem('squareId');
       setIsUserSignedIn(hasToken && hasSquareId);
-      
-      // If user is signed in, check their quota
-      if (hasToken && hasSquareId) {
-        checkQuotaEligibility();
-      }
     };
     
     checkSignedIn();
+    // Always check eligibility regardless of sign-in status
+    checkQuotaEligibility();
   }, []);
 
-  // Auto-show quota exceeded modal when user is over quota
+  // Auto-show quota exceeded modal when user is over quota (only on initial load)
   useEffect(() => {
-    // Auto-show quota exceeded modal if user loads page and is over quota
+    printLog(`Quota check useEffect triggered: ${JSON.stringify({ 
+      quotaInfo, 
+      eligible: quotaInfo?.eligible, 
+      onboardingState: onboardingState.status,
+      isInitialLoad,
+      currentStep
+    })}`);
+    
+    // Don't interfere with active flows - only show quota exceeded on initial load
+    // Never interrupt processing (steps 4-5) or ongoing onboarding flows
     if (
-      isUserSignedIn &&
       quotaInfo &&
       !quotaInfo.eligible &&
-      currentStep === 1 &&
-      !isQuotaExceededModalOpen &&
-      !isUpgrading
+      onboardingState.status === 'idle' &&
+      isInitialLoad &&
+      currentStep <= 3 // Don't interrupt processing or completion steps
     ) {
-      setIsQuotaExceededModalOpen(true);
+      printLog('Setting state to quota_exceeded');
+      setOnboardingState({ status: 'quota_exceeded' });
+      setIsInitialLoad(false);
     }
-  }, [isUserSignedIn, quotaInfo, isQuotaExceededModalOpen, currentStep, isUpgrading]);
+  }, [quotaInfo]); // Only watch quotaInfo to avoid interference
 
   // Function to check on-demand run eligibility
   const checkQuotaEligibility = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      if (!token) {
-        return;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      // Add JWT token if available
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${API_URL}/api/check-ondemand-eligibility`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await fetch(`${API_URL}/api/on-demand/checkEligibility`, {
+        method: 'GET',
+        headers: headers
       });
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.eligibility) {
-          setQuotaInfo(data.eligibility);
+        if (data.success) {
+          // Handle both new and old API response formats
+          const quotaData = data.quotaInfo || data.eligibility || data;
+          setQuotaInfo({
+            eligible: data.eligible !== undefined ? data.eligible : (typeof quotaData?.eligible === 'boolean' ? quotaData.eligible : true),
+            remainingRuns: quotaData?.remainingRuns || 0,
+            totalLimit: quotaData?.totalLimit || 0,
+            usedThisPeriod: quotaData?.usedThisPeriod || 0,
+            periodStart: quotaData?.periodStart || '',
+            nextResetDate: quotaData?.nextResetDate || '',
+            daysUntilReset: parseInt(quotaData?.daysUntilReset, 10) || 0,
+            authType: data.authType || 'user',
+            userEmail: data.userEmail,
+            clientIp: data.clientIp
+          });
         }
       }
     } catch (error) {
-      console.error('Error checking quota eligibility:', error);
+      printLog(`Error checking quota eligibility: ${error}`);
     }
   };
 
   // Handle upgrade functions
   const handleUpgrade = () => {
     if (!isUserSignedIn) {
-      setIsSigningInForUpgrade(true);
-      setIsSignInModalOpen(true);
+      // For non-signed-in users, "Sign Up for More Runs" should be for free runs
+      setOnboardingState({ status: 'sign_in', upgradeIntent: false });
     } else {
-      setIsCheckoutModalOpen(true);
+      // For signed-in users, show checkout modal directly for upgrade
+      setOnboardingState({ status: 'checkout' });
     }
   };
 
   const handleUpgradeSuccess = () => {
-    setIsCheckoutModalOpen(false);
-    setIsUpgradeSuccessPopUpOpen(true); // Show the popup
+    setOnboardingState({ status: 'done', justUpgraded: true });
     // Refresh quota after successful upgrade
     checkQuotaEligibility();
   };
 
+  // Handle sign-in success
+  const handleSignInSuccess = () => {
+    printLog(`handleSignInSuccess called, current state: ${JSON.stringify(onboardingState)}`);
+    isInSuccessFlow.current = true;
+    setIsUserSignedIn(true);
 
+    if (onboardingState.status === 'sign_in') {
+      if (onboardingState.upgradeIntent) {
+        // User signed in with upgrade intent, go to checkout
+        printLog('Setting state to checkout');
+        setOnboardingState({ status: 'checkout' });
+      } else {
+        // User signed in for free runs, show success
+        printLog('Setting state to done (free runs)');
+        setOnboardingState({ status: 'done', justUpgraded: false });
+      }
+    } else {
+      // Handle sign in from other states (like direct account button)
+      printLog('Sign in successful, closing modal');
+      setOnboardingState({ status: 'idle' });
+      isInSuccessFlow.current = false; // Allow modal to close
+    }
+  };
+
+  const handleSignUpSuccess = () => {
+    printLog(`handleSignUpSuccess called, current state: ${JSON.stringify(onboardingState)}`);
+    isInSuccessFlow.current = true;
+    setIsUserSignedIn(true);
+
+    if (onboardingState.status === 'sign_in') {
+      if (onboardingState.upgradeIntent) {
+        // User signed up with upgrade intent, go to checkout
+        printLog('Setting state to checkout');
+        setOnboardingState({ status: 'checkout' });
+      } else {
+        // User signed up for free runs, show success
+        printLog('Setting state to done (free runs)');
+        setOnboardingState({ status: 'done', justUpgraded: false });
+      }
+    } else {
+      // Handle sign up from other states (like direct account button)
+      printLog('Sign up successful, closing modal');
+      setOnboardingState({ status: 'idle' });
+      isInSuccessFlow.current = false; // Allow modal to close
+    }
+  };
 
   // Static feeds for default display
   const staticFeeds = [
@@ -320,14 +425,14 @@ const TryJamieWizard: React.FC = () => {
     setHasSearched(true);
     try {
       const response = await rssService.searchFeeds(searchQuery);
-      console.log('Search response:', response);
+      printLog(`Search response: ${JSON.stringify(response)}`);
       if (response.data && response.data.status === 'true' && response.data.feeds) {
         setSearchResults(response.data.feeds);
       } else {
         setSearchResults([]);
       }
     } catch (error) {
-      console.error('Error searching feeds:', error);
+      printLog(`Error searching feeds: ${error}`);
       setSearchResults([]);
     } finally {
       setIsLoading(false);
@@ -339,10 +444,10 @@ const TryJamieWizard: React.FC = () => {
     setIsLoading(true);
     try {
       const response = await rssService.getFeed(feed.url, feed.id);
-      console.log('Feed episodes response:', response);
+      printLog(`Feed episodes response: ${JSON.stringify(response)}`);
       if (response.episodes && response.episodes.feedInfo) {
         const info = response.episodes.feedInfo;
-        console.log('Selected podcast:', JSON.stringify(info,null,2));
+        printLog(`Selected podcast: ${JSON.stringify(info, null, 2)}`);
         
         // Prioritize image from search results over feed info
         // Use feed.image first, then feed.artwork, then fallback to info.podcastImage
@@ -359,7 +464,7 @@ const TryJamieWizard: React.FC = () => {
         setCurrentStep(2); // Move to the next step
       }
     } catch (error) {
-      console.error('Error fetching feed episodes:', error);
+      printLog(`Error fetching feed episodes: ${error}`);
     } finally {
       setIsLoading(false);
     }
@@ -450,20 +555,20 @@ const TryJamieWizard: React.FC = () => {
           }
         }, pollIntervalTime);
       } catch (e) {
-        console.error('Job submission error:', e);
+        printLog(`Job submission error: ${e}`);
         setProcessing(false);
         
         // Check if the error is due to quota exceeded or authentication
         if (e instanceof Error) {
           if (e.message.includes('limit exceeded') || e.message.includes('quota')) {
-            // Show notification modal first for quota exceeded
-            setIsQuotaExceededModalOpen(true);
+            // Show quota exceeded modal
+            setOnboardingState({ status: 'quota_exceeded' });
             // Go back to step 3 so user can try again after upgrade
             setCurrentStep(3);
           } else if (e.message.includes('Authentication failed')) {
             // Handle authentication failure
             setIsUserSignedIn(false);
-            setIsSignInModalOpen(true);
+            setOnboardingState({ status: 'sign_in', upgradeIntent: false });
             // Go back to step 3 so user can try again after sign in
             setCurrentStep(3);
           } else {
@@ -897,13 +1002,13 @@ const TryJamieWizard: React.FC = () => {
           <div className="flex justify-end mt-6">
             <button 
               onClick={() => {
-                if (!isUserSignedIn) {
-                  setIsSignInModalOpen(true);
-                } else if (quotaInfo && !quotaInfo.eligible) {
-                  // User is out of runs, show notification modal first
-                  setIsQuotaExceededModalOpen(true);
+                if (quotaInfo && !quotaInfo.eligible) {
+                  // User is out of runs, show quota exceeded modal
+                  setOnboardingState({ status: 'quota_exceeded' });
+                  setIsInitialLoad(false); // Not initial load anymore
                 } else {
-                  setProcessingFailed(false); // Reset failure state
+                  // User has quota, proceed to processing
+                  setProcessingFailed(false);
                   setCurrentStep(4);
                 }
               }}
@@ -928,34 +1033,38 @@ const TryJamieWizard: React.FC = () => {
       <PageBanner logoText="Pull That Up Jamie!" onTutorialClick={handleTutorialClick} onUpgrade={handleUpgrade} />
       
       {/* Quota Display */}
-      {isUserSignedIn && quotaInfo && (
+      {quotaInfo && (
         <div className="absolute top-24 left-1/2 transform -translate-x-1/2 sm:left-auto sm:right-6 sm:transform-none flex flex-col items-center sm:items-end space-y-2 mb-8">
           <div className="text-white text-sm bg-black/50 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-700 shadow-lg">
-            <div>{quotaInfo.totalLimit - quotaInfo.usedThisPeriod}/{quotaInfo.totalLimit} Free Runs left.  {quotaInfo.daysUntilReset} Days Until Reset.</div>
+            <div className="flex items-center space-x-2">
+              <span>{quotaInfo.remainingRuns}/{quotaInfo.totalLimit} Free Runs left</span>
+              <span className="text-gray-400">•</span>
+              <span>{quotaInfo.daysUntilReset} Days Until Reset</span>
+              {quotaInfo.authType === 'ip' && (
+                <>
+                  <span className="text-gray-400">•</span>
+                  <span className="text-gray-400 text-xs">IP-based</span>
+                </>
+              )}
+              {quotaInfo.authType === 'user' && quotaInfo.userEmail && (
+                <>
+                  <span className="text-gray-400">•</span>
+                  <span className="text-gray-400 text-xs">Account</span>
+                </>
+              )}
+            </div>
           </div>
           <button
             onClick={handleUpgrade}
             className="bg-white text-black hover:bg-gray-200 px-2 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg"
           >
-            Upgrade for Full Pro Experience
-          </button>
-        </div>
-      )}
-      
-      {/* Upgrade Button for Non-Signed In Users */}
-      {!isUserSignedIn && (
-        <div className="absolute top-24 left-1/2 transform -translate-x-1/2 sm:left-auto sm:right-6 sm:transform-none flex flex-col items-center sm:items-end space-y-2 mb-8">
-          <button
-            onClick={handleUpgrade}
-            className="bg-white text-black hover:bg-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg"
-          >
-            Upgrade Now
-          </button>
+            {isUserSignedIn ? 'Upgrade for Full Pro Experience' : 'Sign Up for More Runs'}
+            </button>
         </div>
       )}
       
       {/* Step Indicator */}
-      <StepIndicator currentStep={currentStep} hasQuotaInfo={isUserSignedIn && !!quotaInfo} />
+      <StepIndicator currentStep={currentStep} hasQuotaInfo={!!quotaInfo} />
       
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 py-4">
@@ -964,94 +1073,94 @@ const TryJamieWizard: React.FC = () => {
 
       {/* Sign In Modal */}
       <SignInModal 
-        isOpen={isSignInModalOpen} 
+        isOpen={onboardingState.status === 'sign_in'} 
         onClose={() => {
-          setIsSignInModalOpen(false);
-          setIsSigningInForUpgrade(false); // Reset the flag when modal is closed
-        }}
-        onSignInSuccess={() => {
-          setIsUserSignedIn(true);
-          setIsSignInModalOpen(false);
-          checkQuotaEligibility(); // Refresh quota after sign in
-          
-          if (isSigningInForUpgrade) {
-            // User signed in for upgrade, show checkout modal
-            setIsSigningInForUpgrade(false);
-            setIsCheckoutModalOpen(true);
-          } else {
-            // User signed in for processing, proceed to step 4
-            setProcessingFailed(false); // Reset failure state
-            setCurrentStep(4); // Proceed to processing step after sign in
+          printLog(`SignInModal onClose called, isInSuccessFlow: ${isInSuccessFlow.current}`);
+          // Only close if we're not in the middle of a success flow
+          if (!isInSuccessFlow.current) {
+            setOnboardingState({ status: 'idle' });
           }
+          // Reset the success flow flag
+          isInSuccessFlow.current = false;
         }}
-        onSignUpSuccess={() => {
-          setIsUserSignedIn(true);
-          setIsSignInModalOpen(false);
-          checkQuotaEligibility(); // Refresh quota after sign up
-          
-          if (isSigningInForUpgrade) {
-            // User signed up for upgrade, show checkout modal
-            setIsSigningInForUpgrade(false);
-            setIsCheckoutModalOpen(true);
-          } else {
-            // User signed up for processing, proceed to step 4
-            setProcessingFailed(false); // Reset failure state
-            setCurrentStep(4); // Proceed to processing step after sign up
-          }
-        }}
+        onSignInSuccess={handleSignInSuccess}
+        onSignUpSuccess={handleSignUpSuccess}
         customTitle="Let's get a good email for ya"
         initialMode="signup"
       />
 
-      {/* Checkout Modal for internal upgrade buttons */}
+      {/* Checkout Modal */}
       <CheckoutModal 
-        isOpen={isCheckoutModalOpen} 
-        onClose={() => {
-          setIsCheckoutModalOpen(false);
-          setIsUpgrading(false);
-        }} 
-        onSuccess={() => {
-          handleUpgradeSuccess();
-          setIsUpgrading(false);
-        }}
+        isOpen={onboardingState.status === 'checkout'} 
+        onClose={() => setOnboardingState({ status: 'idle' })} 
+        onSuccess={handleUpgradeSuccess}
         productName="jamie-pro"
       />
 
-      {/* Quota Exceeded Notification Modal */}
-      {isQuotaExceededModalOpen && (
+      {/* Quota Exceeded Modal */}
+      {onboardingState.status === 'quota_exceeded' && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
           <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
             <h2 className="text-white text-xl font-bold mb-4">
               You've Used Your Free Episodes!
             </h2>
             <p className="text-gray-400 mb-6">
-              You've processed {quotaInfo?.usedThisPeriod || 2} out of {quotaInfo?.totalLimit || 2} free episodes this month. 
-              Upgrade to Jamie Pro for unlimited episode processing and instant access to all your favorite podcasts.
+              {isUserSignedIn ? (
+                `You've processed ${quotaInfo?.usedThisPeriod || 0} out of ${quotaInfo?.totalLimit || 0} free episodes this month. Upgrade to Jamie Pro for unlimited episode processing and instant access to all your favorite podcasts.`
+              ) : (
+                `You've processed ${quotaInfo?.usedThisPeriod || 0} out of ${quotaInfo?.totalLimit || 0} free episodes this week. Sign up for an account to get more free episodes or upgrade to Jamie Pro for unlimited processing.`
+              )}
             </p>
-            <button
-              onClick={() => {
-                setIsUpgrading(true);
-                setIsQuotaExceededModalOpen(false);
-                setTimeout(() => {
-                  handleUpgrade();
-                }, 100);
-              }}
-              className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
-            >
-              Upgrade Now
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              {!isUserSignedIn && (
+                <button
+                  onClick={() => setOnboardingState({ status: 'sign_in', upgradeIntent: false })}
+                  className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                >
+                  Sign Up for More Runs
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (isUserSignedIn) {
+                    setOnboardingState({ status: 'checkout' });
+                  } else {
+                    setOnboardingState({ status: 'sign_in', upgradeIntent: true });
+                  }
+                }}
+                className={`px-6 py-2 rounded-lg transition-colors font-medium ${
+                  isUserSignedIn 
+                    ? 'bg-white text-black hover:bg-gray-100' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {isUserSignedIn ? 'Upgrade Now' : 'Upgrade to Pro'}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Subscription Success Popup */}
-      {isUpgradeSuccessPopUpOpen && (
+      {/* Success Modals */}
+      {onboardingState.status === 'done' && onboardingState.justUpgraded && (
         <SubscriptionSuccessPopup 
           isJamiePro={true}
           onClose={() => {
-          setIsUpgradeSuccessPopUpOpen(false);
-          setIsCheckoutModalOpen(false);
-        }} />
+            isInSuccessFlow.current = false;
+            setOnboardingState({ status: 'idle' });
+            checkQuotaEligibility(); // Refresh quota after success
+          }} 
+        />
+      )}
+      
+      {onboardingState.status === 'done' && !onboardingState.justUpgraded && (
+        <FreeRunsSuccessPopup 
+          onClose={() => {
+            isInSuccessFlow.current = false;
+            setOnboardingState({ status: 'idle' });
+            checkQuotaEligibility(); // Refresh quota after success
+          }} 
+        />
       )}
 
       {/* Tutorial Modal */}
