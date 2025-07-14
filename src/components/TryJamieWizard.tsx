@@ -22,7 +22,7 @@ const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionS
       </h2>
       <p className="text-gray-400 mb-4">
         {isJamiePro ? (
-          'A team member will be in contact with you within 1 business day to complete your onboarding.'
+          'A team member will be in contact with you within 1 business day to complete your onboarding. \nIn the meantime enjoy additional on demand episode runs.'
         ) : (
           <>
             Enjoy unlimited access to Jamie and other{' '}
@@ -309,6 +309,11 @@ const TryJamieWizard: React.FC = () => {
         printLog('Setting state to done (free runs)');
         setOnboardingState({ status: 'done', justUpgraded: false });
       }
+    } else {
+      // Handle sign in from other states (like direct account button)
+      printLog('Sign in successful, closing modal');
+      setOnboardingState({ status: 'idle' });
+      isInSuccessFlow.current = false; // Allow modal to close
     }
   };
 
@@ -327,6 +332,11 @@ const TryJamieWizard: React.FC = () => {
         printLog('Setting state to done (free runs)');
         setOnboardingState({ status: 'done', justUpgraded: false });
       }
+    } else {
+      // Handle sign up from other states (like direct account button)
+      printLog('Sign up successful, closing modal');
+      setOnboardingState({ status: 'idle' });
+      isInSuccessFlow.current = false; // Allow modal to close
     }
   };
 
