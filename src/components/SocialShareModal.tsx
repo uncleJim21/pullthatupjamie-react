@@ -40,6 +40,14 @@ export enum SocialPlatform {
   Nostr = 'nostr'
 }
 
+// Add operation types for better state management
+enum OperationType {
+  IDLE = 'idle',
+  CONNECTING = 'connecting',
+  DISCONNECTING = 'disconnecting',
+  PUBLISHING = 'publishing'
+}
+
 interface SocialShareModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -53,11 +61,12 @@ interface SocialShareModalProps {
   auth?: any; // Auth object for API calls
 }
 
-interface PlatformStatus {
+// Simplified unified state interface
+interface PlatformState {
   enabled: boolean;
   available: boolean;
   authenticated: boolean;
-  publishing: boolean;
+  currentOperation: OperationType;
   success: boolean | null;
   error: string | null;
   username?: string;
@@ -187,24 +196,23 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   auth
 }) => {
   const [content, setContent] = useState<string>('');
-  const [isPublishing, setIsPublishing] = useState(false);
   
-  // Platform status objects
-  const [twitterStatus, setTwitterStatus] = useState<PlatformStatus>({
+  // Unified platform state objects
+  const [twitterState, setTwitterState] = useState<PlatformState>({
     enabled: true,
     available: true,
     authenticated: false,
-    publishing: false,
+    currentOperation: OperationType.IDLE,
     success: null,
     error: null,
     username: undefined
   });
   
-  const [nostrStatus, setNostrStatus] = useState<PlatformStatus>({
+  const [nostrState, setNostrState] = useState<PlatformState>({
     enabled: true,
     available: false,
     authenticated: false,
-    publishing: false,
+    currentOperation: OperationType.IDLE,
     success: null,
     error: null
   });
@@ -253,6 +261,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(-1);
   const [mentionResults, setMentionResults] = useState<MentionResult[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Computed state for overall publishing status
+  const isPublishing = twitterState.currentOperation === OperationType.PUBLISHING || 
+                      nostrState.currentOperation === OperationType.PUBLISHING;
 
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
@@ -354,7 +366,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             setPollingInterval(null);
             
             // Update Twitter auth state
-            setTwitterStatus(prev => ({ 
+            setTwitterState(prev => ({ 
               ...prev, 
               authenticated: true,
               username: data.twitterUsername
@@ -494,14 +506,14 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const checkNostrExtension = async () => {
     try {
       if (window.nostr) {
-        setNostrStatus(prev => ({ ...prev, available: true }));
+        setNostrState(prev => ({ ...prev, available: true }));
         printLog("Nostr extension detected but not authenticated yet");
         // Don't automatically request public key - only check availability
       } else {
-        setNostrStatus(prev => ({ ...prev, available: false, authenticated: false }));
+        setNostrState(prev => ({ ...prev, available: false, authenticated: false }));
       }
     } catch (error) {
-      setNostrStatus(prev => ({ ...prev, available: false, authenticated: false }));
+      setNostrState(prev => ({ ...prev, available: false, authenticated: false }));
       console.error("Error checking for Nostr extension:", error);
     }
   };
@@ -510,14 +522,14 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     try {
       if (window.nostr) {
         const pubKey = await window.nostr.getPublicKey();
-        setNostrStatus(prev => ({ ...prev, authenticated: true }));
+        setNostrState(prev => ({ ...prev, authenticated: true }));
         printLog(`Nostr extension connected with public key: ${pubKey}`);
       } else {
-        setNostrStatus(prev => ({ ...prev, available: false, authenticated: false }));
+        setNostrState(prev => ({ ...prev, available: false, authenticated: false }));
       }
     } catch (error) {
       printLog("Failed to connect to Nostr extension");
-      setNostrStatus(prev => ({ ...prev, authenticated: false }));
+      setNostrState(prev => ({ ...prev, authenticated: false }));
       console.error("Error connecting to Nostr extension:", error);
     }
   };
@@ -528,7 +540,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     try {
       const status = await AuthService.checkTwitterStatus();
       printLog(`Twitter auth status: ${status.authenticated}`);
-      setTwitterStatus(prev => ({ 
+      setTwitterState(prev => ({ 
         ...prev, 
         authenticated: status.authenticated,
         available: true, // Always available for admin users
@@ -536,14 +548,14 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       }));
     } catch (error) {
       printLog(`Error checking Twitter status: ${error}`);
-      setTwitterStatus(prev => ({ ...prev, authenticated: false }));
+      setTwitterState(prev => ({ ...prev, authenticated: false }));
     }
   };
 
   // Updated connectTwitter function to start polling
   const connectTwitter = async () => {
     printLog('Connect Twitter button clicked in SocialShareModal');
-    setTwitterStatus(prev => ({ ...prev, publishing: true }));
+    setTwitterState(prev => ({ ...prev, currentOperation: OperationType.CONNECTING }));
     try {
       const authUrl = await AuthService.startTwitterAuth();
       printLog(`Opening Twitter auth URL: ${authUrl}`);
@@ -555,7 +567,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       printLog(`Error starting Twitter auth: ${error}`);
       setJamieAssistError(error instanceof Error ? error.message : 'Failed to start Twitter auth');
     } finally {
-      setTwitterStatus(prev => ({ ...prev, publishing: false }));
+      setTwitterState(prev => ({ ...prev, currentOperation: OperationType.IDLE }));
     }
   };
 
@@ -570,13 +582,13 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
 
     printLog('Disconnect Twitter button clicked in SocialShareModal');
-    setTwitterStatus(prev => ({ ...prev, publishing: true }));
+    setTwitterState(prev => ({ ...prev, currentOperation: OperationType.DISCONNECTING }));
     try {
       const response = await twitterService.revoke(true);
       printLog(`Twitter disconnect response: ${JSON.stringify(response)}`);
       
       if (response.success) {
-        setTwitterStatus(prev => ({ ...prev, authenticated: false, username: undefined }));
+        setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
         setJamieAssistError(null);
         printLog('Twitter account disconnected successfully');
       } else {
@@ -586,7 +598,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       printLog(`Error disconnecting Twitter: ${error}`);
       setJamieAssistError(error instanceof Error ? error.message : 'Failed to disconnect Twitter account');
     } finally {
-      setTwitterStatus(prev => ({ ...prev, publishing: false }));
+      setTwitterState(prev => ({ ...prev, currentOperation: OperationType.IDLE }));
     }
   };
 
@@ -709,15 +721,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
 
     try {
-      setNostrStatus(prev => ({ ...prev, publishing: true }));
+      setNostrState(prev => ({ ...prev, currentOperation: OperationType.PUBLISHING }));
       
       // If not authenticated, try to authenticate first
-      if (!nostrStatus.authenticated) {
+      if (!nostrState.authenticated) {
         try {
           await connectNostrExtension();
         } catch (error) {
           console.error("Failed to authenticate with Nostr extension before publishing");
-          setNostrStatus(prev => ({ ...prev, publishing: false }));
+          setNostrState(prev => ({ ...prev, currentOperation: OperationType.IDLE }));
           return false;
         }
       }
@@ -755,23 +767,23 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         setSuccessUrls(prev => ({ ...prev, nostr: primalUrl }));
       }
       
-      setNostrStatus(prev => ({ ...prev, publishing: false, success }));
+      setNostrState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success }));
       return success;
     } catch (error) {
       console.error("Error publishing to Nostr:", error);
-      setNostrStatus(prev => ({ ...prev, publishing: false, success: false, error: error instanceof Error ? error.message : 'Failed to publish' }));
+      setNostrState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: false, error: error instanceof Error ? error.message : 'Failed to publish' }));
       return false;
     }
   };
 
   const publishToTwitter = async (): Promise<boolean> => {
     try {
-      setTwitterStatus(prev => ({ ...prev, publishing: true }));
+      setTwitterState(prev => ({ ...prev, currentOperation: OperationType.PUBLISHING }));
       
       const mediaUrl = fileUrl || renderUrl;
       const isAdmin = AuthService.isAdmin();
       
-      if (isAdmin && twitterStatus.authenticated) {
+      if (isAdmin && twitterState.authenticated) {
         printLog(`Posting tweet with content: "${content}" and mediaUrl: "${mediaUrl}"`);
         
         const response = await twitterService.postTweet(content, mediaUrl);
@@ -779,7 +791,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         if (response.error === 'TWITTER_AUTH_EXPIRED' && response.requiresReauth) {
           printLog('Twitter auth expired detected in SocialShareModal');
-          setTwitterStatus(prev => ({ ...prev, authenticated: false, publishing: false, error: 'Authentication expired' }));
+          setTwitterState(prev => ({ ...prev, authenticated: false, currentOperation: OperationType.IDLE, error: 'Authentication expired' }));
           return false;
         }
         
@@ -787,10 +799,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           printLog('Tweet posted successfully');
           const tweetUrl = `https://x.com/RobinSeyr/status/${response.tweet.id}`;
           setSuccessUrls(prev => ({ ...prev, twitter: tweetUrl }));
-          setTwitterStatus(prev => ({ ...prev, publishing: false, success: true }));
+          setTwitterState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: true }));
           return true;
         } else {
-          setTwitterStatus(prev => ({ ...prev, publishing: false, success: false, error: response.message || response.error || 'Failed to post tweet' }));
+          setTwitterState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: false, error: response.message || response.error || 'Failed to post tweet' }));
           return false;
         }
       } else {
@@ -798,33 +810,30 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         const tweetText = `${content}\n${mediaUrl}\n\nShared via https://pullthatupjamie.ai`;
         const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
         window.open(twitterUrl, '_blank');
-        setTwitterStatus(prev => ({ ...prev, publishing: false, success: true }));
+        setTwitterState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: true }));
         return true;
       }
     } catch (error) {
       printLog(`Error posting tweet: ${error}`);
-      setTwitterStatus(prev => ({ ...prev, publishing: false, success: false, error: error instanceof Error ? error.message : 'Failed to post tweet' }));
+      setTwitterState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: false, error: error instanceof Error ? error.message : 'Failed to post tweet' }));
       return false;
     }
   };
 
   const handlePublish = async () => {
-    setIsPublishing(true);
-    
     const promises: Promise<boolean>[] = [];
     
     // Add Twitter publishing if enabled and available
-    if (twitterStatus.enabled && twitterStatus.available) {
+    if (twitterState.enabled && twitterState.available) {
       promises.push(publishToTwitter());
     }
     
     // Add Nostr publishing if enabled and available
-    if (nostrStatus.enabled && nostrStatus.available && nostrStatus.authenticated) {
+    if (nostrState.enabled && nostrState.available && nostrState.authenticated) {
       promises.push(publishToNostr());
     }
     
     if (promises.length === 0) {
-      setIsPublishing(false);
       return;
     }
     
@@ -837,15 +846,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         result.status === 'fulfilled' && result.value === true
       );
       
-      setIsPublishing(false);
-      
       if (anySuccess) {
         // Show success modal instead of closing
         setShowSuccessModal(true);
       }
     } catch (error) {
       console.error('Error during publishing:', error);
-      setIsPublishing(false);
     }
   };
 
@@ -1408,7 +1414,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               <div className="flex items-center space-x-3">
                 <Twitter className="w-6 h-6 text-blue-400" />
                 <div className="flex-1">
-                  {isAdmin && twitterStatus.authenticated ? (
+                  {isAdmin && twitterState.authenticated ? (
                     successUrls.twitter ? (
                       <a 
                         href={successUrls.twitter} 
@@ -1419,7 +1425,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                         Post Successful - View on Twitter
                       </a>
                     ) : (
-                      <p className="text-white text-sm">Signed in as @{twitterStatus.username}</p>
+                      <p className="text-white text-sm">Signed in as @{twitterState.username}</p>
                     )
                   ) : (
                     <p className="text-white text-sm">
@@ -1429,34 +1435,35 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 </div>
                 {isAdmin && (
                   <div className="flex items-center space-x-2">
-                    {twitterStatus.authenticated ? (
+                    {twitterState.authenticated ? (
                       <button
                         onClick={disconnectTwitter}
-                        disabled={twitterStatus.publishing}
+                        disabled={twitterState.currentOperation === OperationType.CONNECTING || twitterState.currentOperation === OperationType.DISCONNECTING}
                         className="px-3 py-1 text-xs bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
                       >
-                        {twitterStatus.publishing ? 'Disconnecting...' : 'Disconnect'}
+                        {twitterState.currentOperation === OperationType.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
                       </button>
                     ) : (
                       <button
                         onClick={connectTwitter}
-                        disabled={twitterStatus.publishing}
+                        disabled={twitterState.currentOperation === OperationType.CONNECTING}
                         className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50"
                       >
-                        {twitterStatus.publishing ? 'Connecting...' : 'Connect'}
+                        {twitterState.currentOperation === OperationType.CONNECTING ? 'Connecting...' : 'Connect'}
                       </button>
                     )}
                   </div>
                 )}
               </div>
               <div className="flex items-center space-x-2 ml-2">
-                {twitterStatus.publishing && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
-                {twitterStatus.success === true && <Check className="w-4 h-4 text-green-500" />}
-                {twitterStatus.success === false && <X className="w-4 h-4 text-red-500" />}
+                {twitterState.currentOperation === OperationType.CONNECTING && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
+                {twitterState.currentOperation === OperationType.PUBLISHING && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
+                {twitterState.success === true && <Check className="w-4 h-4 text-green-500" />}
+                {twitterState.success === false && <X className="w-4 h-4 text-red-500" />}
                 <input
                   type="checkbox"
-                  checked={twitterStatus.enabled}
-                  onChange={(e) => setTwitterStatus(prev => ({ ...prev, enabled: e.target.checked }))}
+                  checked={twitterState.enabled}
+                  onChange={(e) => setTwitterState(prev => ({ ...prev, enabled: e.target.checked }))}
                   className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
                 />
               </div>
@@ -1469,10 +1476,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   src="/nostr-logo-square.png" 
                   alt="Nostr" 
                   className="w-6 h-6"
-                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen', opacity: nostrStatus.available ? 1 : 0.5 }}
+                  style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen', opacity: nostrState.available ? 1 : 0.5 }}
                 />
                 <div className="flex-1">
-                  {nostrStatus.available && nostrStatus.authenticated ? (
+                  {nostrState.available && nostrState.authenticated ? (
                     successUrls.nostr ? (
                       <a 
                         href={successUrls.nostr} 
@@ -1485,16 +1492,16 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                     ) : (
                       <p className="text-white text-sm">Extension connected</p>
                     )
-                  ) : nostrStatus.available ? (
+                  ) : nostrState.available ? (
                     <p className="text-white text-sm">Connect NIP07 Extension to Post on Nostr</p>
                   ) : (
                     <div className="text-xs text-gray-400 italic opacity-70">Nostr: Coming Soon</div>
                   )}
                 </div>
-                {nostrStatus.available && !nostrStatus.authenticated && (
+                {nostrState.available && !nostrState.authenticated && (
                   <button
                     onClick={connectNostrExtension}
-                    disabled={nostrStatus.publishing}
+                    disabled={nostrState.currentOperation === OperationType.CONNECTING}
                     className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-500 disabled:opacity-50"
                   >
                     Connect
@@ -1502,14 +1509,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 )}
               </div>
               <div className="flex items-center space-x-2 ml-2">
-                {nostrStatus.publishing && <Loader2 className="w-4 h-4 animate-spin text-purple-400" />}
-                {nostrStatus.success === true && <Check className="w-4 h-4 text-green-500" />}
-                {nostrStatus.success === false && <X className="w-4 h-4 text-red-500" />}
+                {nostrState.currentOperation === OperationType.CONNECTING && <Loader2 className="w-4 h-4 animate-spin text-purple-400" />}
+                {nostrState.currentOperation === OperationType.PUBLISHING && <Loader2 className="w-4 h-4 animate-spin text-purple-400" />}
+                {nostrState.success === true && <Check className="w-4 h-4 text-green-500" />}
+                {nostrState.success === false && <X className="w-4 h-4 text-red-500" />}
                 <input
                   type="checkbox"
-                  checked={nostrStatus.enabled && nostrStatus.available && nostrStatus.authenticated}
-                  onChange={(e) => setNostrStatus(prev => ({ ...prev, enabled: e.target.checked }))}
-                  disabled={!nostrStatus.available || !nostrStatus.authenticated}
+                  checked={nostrState.enabled && nostrState.available && nostrState.authenticated}
+                  onChange={(e) => setNostrState(prev => ({ ...prev, enabled: e.target.checked }))}
+                  disabled={!nostrState.available || !nostrState.authenticated}
                   className="w-4 h-4 text-purple-500 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 disabled:opacity-50"
                 />
               </div>
@@ -1558,7 +1566,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               <h3 className="text-white font-medium text-sm">Publishing...</h3>
               <Loader2 className="animate-spin w-4 h-4" />
             </div>
-            {nostrStatus.enabled && nostrStatus.available && (
+            {nostrState.enabled && nostrState.available && (
               <div className="text-xs text-gray-400">
                 Nostr relays: {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
               </div>
@@ -1624,9 +1632,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           </button>
           <button
             onClick={handlePublish}
-            disabled={isPublishing || isGeneratingContent || content.trim().length === 0 || (!twitterStatus.enabled && !nostrStatus.enabled)}
+            disabled={isPublishing || isGeneratingContent || content.trim().length === 0 || (!twitterState.enabled && !nostrState.enabled)}
             className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-white text-black font-medium 
-              ${(isPublishing || isGeneratingContent || content.trim().length === 0 || (!twitterStatus.enabled && !nostrStatus.enabled)) ? 
+              ${(isPublishing || isGeneratingContent || content.trim().length === 0 || (!twitterState.enabled && !nostrState.enabled)) ? 
                 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 transition-colors'}`}
           >
             {isPublishing ? (
