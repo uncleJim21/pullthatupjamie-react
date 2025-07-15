@@ -16,6 +16,8 @@ interface MentionsLookupViewProps {
   selectedIndex?: number;
   mentionResults?: MentionResult[];
   onMentionResultsChange?: (results: MentionResult[]) => void;
+  isLoading?: boolean;
+  error?: string | null;
 }
 
 const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
@@ -24,59 +26,25 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   onClose,
   onFirstMentionChange,
   selectedIndex = -1,
-  mentionResults: externalMentionResults,
-  onMentionResultsChange
+  mentionResults: externalMentionResults = [],
+  onMentionResultsChange,
+  isLoading: externalIsLoading = false,
+  error: externalError = null
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(Platform.Twitter);
-  const [mentionResults, setMentionResults] = useState<MentionResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [pinningStates, setPinningStates] = useState<{[key: string]: boolean}>({});
 
-  // Use external mention results if provided, otherwise use internal state
-  const displayResults = externalMentionResults || mentionResults;
-  const setDisplayResults = onMentionResultsChange || ((results: MentionResult[] | ((prev: MentionResult[]) => MentionResult[])) => {
-    if (typeof results === 'function') {
-      setMentionResults(results);
-    } else {
-      setMentionResults(results);
-    }
-  });
-
-  // Make fetchMentions accessible
-  const fetchMentions = React.useCallback(async () => {
-    if (!searchQuery || searchQuery.length < 2) {
-      setDisplayResults([]);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await mentionService.searchMentions(searchQuery, {
-        platforms: ['twitter', 'nostr'],
-        includePersonalPins: true,
-        includeCrossPlatformMappings: true,
-        limit: 10
-      });
-      if (result.success && result.results) {
-        setDisplayResults(result.results);
-      } else {
-        setError(result.error || 'Failed to fetch mentions');
-        setDisplayResults([]);
-      }
-    } catch (err) {
-      setError('Network error occurred');
-      setDisplayResults([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [searchQuery, setDisplayResults]);
+  // Always use external results and states (no internal search anymore)
+  const displayResults = externalMentionResults;
+  const isLoading = externalIsLoading;
+  const error = externalError;
 
   // Fetch mentions when searchQuery changes
-  useEffect(() => {
-    const debounceTimer = setTimeout(fetchMentions, 300);
-    return () => clearTimeout(debounceTimer);
-  }, [fetchMentions]);
+  // DISABLED: Now using streaming search from parent component
+  // useEffect(() => {
+  //   const debounceTimer = setTimeout(fetchMentions, 300);
+  //   return () => clearTimeout(debounceTimer);
+  // }, [fetchMentions]);
 
   // Filter results by selected platform
   const filteredResults = displayResults.filter(result => result.platform === selectedPlatform);
@@ -111,7 +79,10 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
             }
             return m;
           });
-          setDisplayResults(updatedResults);
+          // Update results through parent callback if available
+          if (onMentionResultsChange) {
+            onMentionResultsChange(updatedResults);
+          }
         } else {
         console.error('Failed to toggle pin:', result.error);
       }
