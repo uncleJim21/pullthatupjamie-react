@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
@@ -9,6 +9,7 @@ import SocialShareSuccessModal from './SocialShareSuccessModal.tsx';
 import MentionsLookupView from './MentionsLookupView.tsx';
 import MentionPinManagement from './MentionPinManagement.tsx';
 import { MentionResult } from '../types/mention.ts';
+import { useStreamingMentionSearch } from '../hooks/useStreamingMentionSearch.ts';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -259,8 +260,20 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [firstMention, setFirstMention] = useState<MentionResult | null>(null);
   const [showPinManagement, setShowPinManagement] = useState(false);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(-1);
-  const [mentionResults, setMentionResults] = useState<MentionResult[]>([]);
+  const [lastSearchQuery, setLastSearchQuery] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Streaming mention search hook
+  const {
+    results: mentionResults,
+    loading: mentionSearchLoading,
+    completedSources,
+    error: mentionSearchError,
+    streamSearch: performMentionSearch,
+    clearSearch: clearMentionSearch,
+    updateResults: updateMentionResults
+  } = useStreamingMentionSearch();
 
   // Computed state for overall publishing status
   const isPublishing = twitterState.currentOperation === OperationType.PUBLISHING || 
@@ -502,6 +515,31 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       printLog('SocialShareModal initialized without lookupHash');
     }
   }, [lookupHash]);
+
+  // Cleanup streaming search when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      // Clear any pending search timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      clearMentionSearch();
+      setShowMentionsLookup(false);
+      setMentionSearchQuery('');
+      setMentionStartIndex(-1);
+      setSelectedMentionIndex(-1);
+      setLastSearchQuery('');
+    }
+  }, [isOpen, clearMentionSearch]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const checkNostrExtension = async () => {
     try {
@@ -946,6 +984,34 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
+  // Debounced search function
+  const debouncedSearch = useCallback((query: string) => {
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Don't search if query hasn't changed
+    if (query === lastSearchQuery) {
+      return;
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      if (query.length >= 2) {
+        setLastSearchQuery(query);
+        performMentionSearch(query, {
+          platforms: ['twitter', 'nostr'],
+          includePersonalPins: true,
+          includeCrossPlatformMappings: true,
+          limit: 10
+        });
+      } else {
+        setLastSearchQuery('');
+        clearMentionSearch();
+      }
+    }, 300); // 300ms debounce
+  }, [lastSearchQuery, performMentionSearch, clearMentionSearch]);
+
   // Function to handle content changes and track user edits
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
@@ -974,6 +1040,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           setMentionStartIndex(lastAtIndex);
           setSelectedMentionIndex(-1); // Reset selection when search query changes
           setShowMentionsLookup(true);
+          
+          // Use debounced search
+          debouncedSearch(textAfterAt);
           return;
         }
       }
@@ -984,6 +1053,13 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setMentionSearchQuery('');
     setMentionStartIndex(-1);
     setSelectedMentionIndex(-1);
+    setLastSearchQuery('');
+    
+    // Clear any pending search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    clearMentionSearch();
   };
 
   // Handle keyboard events for textarea
@@ -1372,15 +1448,39 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 Keep typing to search for mentions...
               </div>
             ) : (
-              <MentionsLookupView 
-                onMentionSelect={handleMentionSelect}
-                searchQuery={mentionSearchQuery}
-                onClose={handleCloseMentions}
-                onFirstMentionChange={setFirstMention}
-                selectedIndex={selectedMentionIndex}
-                mentionResults={mentionResults}
-                onMentionResultsChange={setMentionResults}
-              />
+              <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-lg p-2 max-w-md w-full">
+                {/* Streaming Search Status */}
+                {mentionSearchLoading && (
+                  <div className="flex items-center justify-between mb-2 px-2 py-1 bg-gray-800 rounded text-xs">
+                    <span className="text-gray-300">Searching...</span>
+                    <div className="flex items-center space-x-2">
+                      {completedSources.includes('pins') && <span className="text-yellow-500">📌</span>}
+                      {completedSources.includes('twitter') && <span className="text-blue-400">🐦</span>}
+                      {completedSources.includes('mappings') && <span className="text-purple-400">🔗</span>}
+                      <Loader2 className="w-3 h-3 animate-spin text-blue-400" />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Error Display */}
+                {mentionSearchError && (
+                  <div className="mb-2 px-2 py-1 bg-red-900/30 border border-red-800 rounded text-xs text-red-300">
+                    {mentionSearchError}
+                  </div>
+                )}
+                
+                <MentionsLookupView 
+                  onMentionSelect={handleMentionSelect}
+                  searchQuery={mentionSearchQuery}
+                  onClose={handleCloseMentions}
+                  onFirstMentionChange={setFirstMention}
+                  selectedIndex={selectedMentionIndex}
+                  mentionResults={mentionResults}
+                  onMentionResultsChange={updateMentionResults}
+                  isLoading={mentionSearchLoading}
+                  error={mentionSearchError}
+                />
+              </div>
             )}
           </div>
         )}
