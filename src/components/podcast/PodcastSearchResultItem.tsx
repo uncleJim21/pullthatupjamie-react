@@ -50,6 +50,7 @@ interface PodcastSearchResultItemProps {
   error?: { status: number; message: string } | undefined;
   onShareModalOpen?: (isOpen: boolean) => void;
   onSocialShareModalOpen?: (isOpen: boolean) => void;
+  shareable?: boolean;
 }
 
 export const PodcastSearchResultItem = ({
@@ -76,7 +77,8 @@ export const PodcastSearchResultItem = ({
   onSignInClick,
   error,
   onShareModalOpen,
-  onSocialShareModalOpen
+  onSocialShareModalOpen,
+  shareable = true
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
@@ -559,7 +561,7 @@ export const PodcastSearchResultItem = ({
                   <span className="truncate">Clip</span>
                 </button>
                 )}
-                {presentationContext === PresentationContext.clipBatch && (
+                {presentationContext === PresentationContext.clipBatch && shareable && (
                   <button
                     className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                     onClick={handleShareClip}

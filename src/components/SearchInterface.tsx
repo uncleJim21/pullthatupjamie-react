@@ -1044,7 +1044,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     similarity: rec.relevance_score / 100,
                     episodeImage: rec.episode_image,
                     shareUrl: shareUrl,
-                    shareLink: clipId
+                    shareLink: clipId,
+                    shareable: rec.shareable
                   })
                 })
               }
