@@ -4,6 +4,7 @@ import { Headphones, Search, LayoutDashboard } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import AccountButton from './AccountButton.tsx';
 import SignInModal from './SignInModal.tsx';
+import {printLog} from '../constants/constants.ts';
 
 interface PageBannerProps {
   logoText?: string;
@@ -81,11 +82,11 @@ const PageBanner: React.FC<PageBannerProps> = ({
     const checkAdminPrivileges = async () => {
       try {
         const token = localStorage.getItem('auth_token');
-        console.log('Checking admin privileges, token exists:', !!token);
+        printLog(`Checking admin privileges, token exists: ${!!token}`);
         if (!token) return;
 
         const response = await AuthService.checkPrivs(token);
-        console.log('Admin privileges check response:', response);
+        printLog(`Admin privileges check response: ${JSON.stringify(response)}`);
         
         if (response && response.privs && response.privs.privs) {
           // If user has admin privileges for a feed, store it
@@ -93,23 +94,23 @@ const PageBanner: React.FC<PageBannerProps> = ({
             feedId: response.privs.privs.feedId,
             access: response.privs.privs.access
           };
-          console.log('Setting admin feed:', newAdminFeed);
+          printLog(`Setting admin feed: ${JSON.stringify(newAdminFeed)}`);
           setAdminFeed(newAdminFeed);
         } else {
-          console.log('No admin privileges found in response');
+          printLog('No admin privileges found in response');
           setAdminFeed(null);
         }
       } catch (error) {
-        console.error('Error checking admin privileges:', error);
+        printLog(`Error checking admin privileges: ${error}`);
         setAdminFeed(null);
       }
     };
 
     if (isUserSignedIn) {
-      console.log('User is signed in, checking admin privileges');
+      printLog('User is signed in, checking admin privileges');
       checkAdminPrivileges();
     } else {
-      console.log('User is not signed in, clearing admin feed');
+      printLog('User is not signed in, clearing admin feed');
       setAdminFeed(null);
     }
   }, [isUserSignedIn]);
@@ -131,18 +132,18 @@ const PageBanner: React.FC<PageBannerProps> = ({
 
   const handleProDashboardClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    console.log('Pro Dashboard clicked, adminFeed:', adminFeed, 'isUserSignedIn:', isUserSignedIn);
+    printLog(`Pro Dashboard clicked, adminFeed: ${JSON.stringify(adminFeed)}, isUserSignedIn: ${isUserSignedIn}`);
     
     // Close mobile menu if open
     setIsMenuOpen(false);
     
     if (adminFeed && adminFeed.feedId) {
       // If user has admin privileges, navigate to their feed
-      console.log('Navigating to:', `/app/feed/${adminFeed.feedId}`);
+      printLog(`Navigating to: /app/feed/${adminFeed.feedId}`);
       navigate(`/app/feed/${adminFeed.feedId}`);
     } else {
       // If user doesn't have admin privileges, show Pro Dashboard modal immediately
-      console.log('No admin feed found, showing Pro Dashboard modal');
+      printLog('No admin feed found, showing Pro Dashboard modal');
       setIsProDashboardModalOpen(true);
     }
   };
@@ -165,7 +166,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
     if (onConnect) {
       onConnect();
     } else {
-      console.log("Bitcoin Connect clicked - no handler provided");
+      printLog("Bitcoin Connect clicked - no handler provided");
     }
   };
 
@@ -207,7 +208,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
     if (onUpgrade) {
       onUpgrade();
     } else {
-      console.log("Upgrade clicked - no handler provided");
+      printLog("Upgrade clicked - no handler provided");
     }
   };
 
