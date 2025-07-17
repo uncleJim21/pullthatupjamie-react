@@ -1564,7 +1564,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             <div>
               <form onSubmit={handleSearch} className="relative">
             {/* Filter button and toggle - desktop version (outside search bar) */}
-            {searchMode === 'podcast-search' && (
+            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
               <div className="absolute -right-14 top-0 z-10 hidden md:block">
                 <button
                   onClick={handleFilterClick}
@@ -1576,7 +1576,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               </div>
             )}
             {/* Filter button - mobile version (inside search bar) */}
-            {searchMode === 'podcast-search' && (
+            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
               <div className="absolute right-2 top-2 z-10 md:hidden">
                 <button
                   onClick={handleFilterClick}
@@ -1602,46 +1602,50 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               }}
             />
             <div className={searchSettingsBarStyle}>
-              {/* Left side - Toggle or empty space */}
+              {/* Left side - Empty space */}
               <div className="flex-shrink-0">
-                {!!adminFeedId && searchMode === 'podcast-search' ? (
-                  <div className="inline-flex rounded-md border border-gray-700 p-0.5 bg-transparent">
-                    <button
-                      type="button"
-                      className={`px-2 py-1 rounded-sm text-xs transition-all ${
-                        podcastSearchMode === 'global'
-                          ? 'bg-[#1A1A1A] text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      onClick={() => setPodcastSearchMode('global')}
-                    >
-                      {podcastSearchMode === 'global' ? '🌐 All Pods' : '🌐'}
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-2 py-1 rounded-sm text-xs transition-all ${
-                        podcastSearchMode === 'my-pod'
-                          ? 'bg-[#1A1A1A] text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      onClick={() => setPodcastSearchMode('my-pod')}
-                    >
-                      {podcastSearchMode === 'my-pod' ? '👤 My Pod' : '👤'}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-0" />
-                )}
+                <div className="w-0" />
               </div>
               
-              {/* Right side - Settings and Search Button */}
+              {/* Right side - Toggle, Settings, and Search Button */}
               <div className="flex items-center space-x-2">
+                {/* Podcast Mode Toggle - first on the right */}
+                {!!adminFeedId && searchMode === 'podcast-search' && (
+                  <div className="flex-shrink-0">
+                    <div className="inline-flex rounded-md border border-gray-700 p-0.5 bg-transparent">
+                      <button
+                        type="button"
+                        className={`px-2 py-1 rounded-sm text-xs transition-all ${
+                          podcastSearchMode === 'global'
+                            ? 'bg-[#1A1A1A] text-white'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                        onClick={() => setPodcastSearchMode('global')}
+                      >
+                        {podcastSearchMode === 'global' ? '🌐 All Pods' : '🌐'}
+                      </button>
+                      <button
+                        type="button"
+                        className={`px-2 py-1 rounded-sm text-xs transition-all ${
+                          podcastSearchMode === 'my-pod'
+                            ? 'bg-[#1A1A1A] text-white'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                        onClick={() => setPodcastSearchMode('my-pod')}
+                      >
+                        {podcastSearchMode === 'my-pod' ? '👤 My Pod' : '👤'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 <ModelSettingsBar
                   model={model}
                   setModel={setModel}
                   searchMode={searchMode}
                   setSearchMode={setSearchMode}
                 />
+                
                 <button
                   type="submit"
                   className="pl-3 pr-3 bg-white rounded-lg py-1 border-gray-800 hover:border-gray-700 flex-shrink-0"
@@ -1836,8 +1840,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-40">
           <form onSubmit={handleSearch} className="relative">
             {/* Filter button and toggle - desktop version (outside search bar) */}
-            {searchMode === 'podcast-search' && (
-              <div className="absolute -right-20 top-0 z-10 hidden md:block">
+            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
+              <div className="absolute -right-14 top-0 z-10 hidden md:block">
                 <button
                   onClick={handleFilterClick}
                   className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
@@ -1848,7 +1852,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               </div>
             )}
             {/* Filter button - mobile version (inside search bar) */}
-            {searchMode === 'podcast-search' && (
+            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
               <div className="absolute right-2 top-2 z-10 md:hidden">
                 <button
                   onClick={handleFilterClick}
@@ -1874,40 +1878,43 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               }}
             />
             <div className={searchSettingsBarStyle}>
-              {/* Left side - Toggle or empty space */}
+              {/* Left side - Empty space */}
               <div className="flex-shrink-0">
-                {!!adminFeedId && searchMode === 'podcast-search' ? (
-                  <div className="inline-flex rounded-md border border-gray-700 p-0.5 bg-transparent">
-                    <button
-                      type="button"
-                      className={`px-2 py-1 rounded-sm text-xs transition-all ${
-                        podcastSearchMode === 'global'
-                          ? 'bg-[#1A1A1A] text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      onClick={() => setPodcastSearchMode('global')}
-                    >
-                      {podcastSearchMode === 'global' ? '🌐 All Pods' : '🌐'}
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-2 py-1 rounded-sm text-xs transition-all ${
-                        podcastSearchMode === 'my-pod'
-                          ? 'bg-[#1A1A1A] text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      onClick={() => setPodcastSearchMode('my-pod')}
-                    >
-                      {podcastSearchMode === 'my-pod' ? '👤 My Pod' : '👤'}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-0" />
-                )}
+                <div className="w-0" />
               </div>
               
-              {/* Right side - Settings and Search Button */}
+              {/* Right side - Toggle, Settings, and Search Button */}
               <div className="flex items-center space-x-2">
+                {/* Podcast Mode Toggle - first on the right */}
+                {!!adminFeedId && searchMode === 'podcast-search' && (
+                  <div className="flex-shrink-0">
+                    <div className="inline-flex rounded-md border border-gray-700 p-0.5 bg-transparent">
+                      <button
+                        type="button"
+                        className={`px-2 py-1 rounded-sm text-xs transition-all ${
+                          podcastSearchMode === 'global'
+                            ? 'bg-[#1A1A1A] text-white'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                        onClick={() => setPodcastSearchMode('global')}
+                      >
+                        {podcastSearchMode === 'global' ? '🌐 All Pods' : '🌐'}
+                      </button>
+                      <button
+                        type="button"
+                        className={`px-2 py-1 rounded-sm text-xs transition-all ${
+                          podcastSearchMode === 'my-pod'
+                            ? 'bg-[#1A1A1A] text-white'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                        onClick={() => setPodcastSearchMode('my-pod')}
+                      >
+                        {podcastSearchMode === 'my-pod' ? '👤 My Pod' : '👤'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 <ModelSettingsBar
                   model={model}
                   setModel={setModel}
@@ -1915,6 +1922,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   setSearchMode={setSearchMode}
                   dropUp={true}
                 />
+                
                 <button
                   type="submit"
                   className="pl-3 pr-3 bg-white rounded-lg py-1 border-gray-800 hover:border-gray-700 flex-shrink-0"
