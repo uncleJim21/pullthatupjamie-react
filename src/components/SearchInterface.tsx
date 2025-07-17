@@ -1608,25 +1608,25 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   <div className="inline-flex rounded-md border border-gray-700 p-0.5 bg-transparent">
                     <button
                       type="button"
-                      className={`px-2 py-1 rounded-sm text-xs font-medium transition-all ${
+                      className={`px-2 py-1 rounded-sm text-xs transition-all ${
                         podcastSearchMode === 'global'
                           ? 'bg-[#1A1A1A] text-white'
                           : 'text-gray-400 hover:text-white'
                       }`}
                       onClick={() => setPodcastSearchMode('global')}
                     >
-                      All Pods
+                      {podcastSearchMode === 'global' ? '🌐 All Pods' : '🌐'}
                     </button>
                     <button
                       type="button"
-                      className={`px-2 py-1 rounded-sm text-xs font-medium transition-all ${
+                      className={`px-2 py-1 rounded-sm text-xs transition-all ${
                         podcastSearchMode === 'my-pod'
                           ? 'bg-[#1A1A1A] text-white'
                           : 'text-gray-400 hover:text-white'
                       }`}
                       onClick={() => setPodcastSearchMode('my-pod')}
                     >
-                      My Pod
+                      {podcastSearchMode === 'my-pod' ? '👤 My Pod' : '👤'}
                     </button>
                   </div>
                 ) : (
@@ -1880,25 +1880,25 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   <div className="inline-flex rounded-md border border-gray-700 p-0.5 bg-transparent">
                     <button
                       type="button"
-                      className={`px-2 py-1 rounded-sm text-xs font-medium transition-all ${
+                      className={`px-2 py-1 rounded-sm text-xs transition-all ${
                         podcastSearchMode === 'global'
                           ? 'bg-[#1A1A1A] text-white'
                           : 'text-gray-400 hover:text-white'
                       }`}
                       onClick={() => setPodcastSearchMode('global')}
                     >
-                      All Pods
+                      {podcastSearchMode === 'global' ? '🌐 All Pods' : '🌐'}
                     </button>
                     <button
                       type="button"
-                      className={`px-2 py-1 rounded-sm text-xs font-medium transition-all ${
+                      className={`px-2 py-1 rounded-sm text-xs transition-all ${
                         podcastSearchMode === 'my-pod'
                           ? 'bg-[#1A1A1A] text-white'
                           : 'text-gray-400 hover:text-white'
                       }`}
                       onClick={() => setPodcastSearchMode('my-pod')}
                     >
-                      My Pod
+                      {podcastSearchMode === 'my-pod' ? '👤 My Pod' : '👤'}
                     </button>
                   </div>
                 ) : (

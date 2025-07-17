@@ -1,5 +1,5 @@
 // components/ModelSettingsBar.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface ModelSettingsBarProps {
   model: 'gpt-3.5-turbo' | 'claude-3-sonnet';
@@ -14,20 +14,46 @@ const SearchDropdown = ({ searchMode, setSearchMode, className = "" }: {
   searchMode: 'web-search' | 'podcast-search';
   setSearchMode: (mode: 'web-search' | 'podcast-search') => void;
   className?: string;
-}) => (
-  <div className={`mr-6 ${className}`}>
-    <div className="border border-gray-700 rounded-md px-2 py-1">
-      <select
-        value={searchMode}
-        onChange={(e) => setSearchMode(e.target.value as 'web-search' | 'podcast-search')}
-        className="bg-transparent text-gray-400 border-none focus:outline-none cursor-pointer text-sm pr-4"
-      >
-        <option value="web-search" className="bg-[#111111]">🌐 Web Search</option>
-        <option value="podcast-search" className="bg-[#111111]">🎙️ Podcast Search</option>
-      </select>
+}) => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  const getOptionText = (mode: 'web-search' | 'podcast-search') => {
+    if (isMobile) {
+      return mode === 'web-search' ? '🌐' : '🎙️';
+    }
+    return mode === 'web-search' ? 'Web Search 🌐' : 'Podcast Search 🎙️';
+  };
+
+  return (
+    <div className={`mr-6 ${className}`}>
+      <div className="border border-gray-700 rounded-md px-2 py-1">
+        <select
+          value={searchMode}
+          onChange={(e) => setSearchMode(e.target.value as 'web-search' | 'podcast-search')}
+          className="bg-transparent text-gray-400 border-none focus:outline-none cursor-pointer text-sm pr-4"
+        >
+          <option value="web-search" className="bg-[#111111]">
+            {getOptionText('web-search')}
+          </option>
+          <option value="podcast-search" className="bg-[#111111]">
+            {getOptionText('podcast-search')}
+          </option>
+        </select>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const ModelSettings = ({ model, setModel, isOpen, setIsOpen, dropUp = false }: {
   model: 'gpt-3.5-turbo' | 'claude-3-sonnet';
