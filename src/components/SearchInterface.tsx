@@ -787,16 +787,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   };
 
   const updateAuthMethodAndRegisterModalStatus = async () => {
-    if (localStorage.getItem('bc:config')) {
-      setRequestAuthMethod(RequestAuthMethod.LIGHTNING);
-      return;
-    } else if (localStorage.getItem('squareId')) {
+     if(localStorage.getItem('squareId')) {
       setRequestAuthMethod(RequestAuthMethod.SQUARE);
       const email = localStorage.getItem('squareId') as string;
       const success = await registerSubscription(email);
       printLog(`Registration result:${success}`);
       return;
-    } else {
+    }else if (localStorage.getItem('bc:config')) {
+      setRequestAuthMethod(RequestAuthMethod.LIGHTNING);
+      return;
+    } 
+    else {
       // Check Free Tier Eligibility
       const eligible = await checkFreeTierEligibility();
       if (eligible) {
@@ -893,14 +894,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   }, [requestAuthMethod]);
 
   useEffect(() => {
-    if(!isLightningInitialized && localStorage.getItem('bc:config')){
+    if(!isLightningInitialized && localStorage.getItem('bc:config') && localStorage.getItem('isSubscribed') !== 'true'){
       printLog('Initializing lightning from stored config...');
       initializeLightning();
     } else {
-      printLog(`Not initializing lightning:${{
+      printLog(`Not initializing lightning:${JSON.stringify({
         isLightningInitialized,
-        hasConfig: !!localStorage.getItem('bc:config')
-      }}`);
+        hasConfig: !!localStorage.getItem('bc:config'),
+        isSubscribed: localStorage.getItem('isSubscribed')
+      })}`);
     }
     return () => {
     };
