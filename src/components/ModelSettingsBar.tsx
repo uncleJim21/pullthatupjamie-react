@@ -1,12 +1,12 @@
 // components/ModelSettingsBar.tsx
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 interface ModelSettingsBarProps {
   model: 'gpt-3.5-turbo' | 'claude-3-sonnet';
   setModel: (model: 'gpt-3.5-turbo' | 'claude-3-sonnet') => void;
   searchMode: 'web-search' | 'podcast-search';
   setSearchMode: (mode: 'web-search' | 'podcast-search') => void;
-  dropUp?: boolean;  // New prop
+  dropUp?: boolean;
   className?: string;
 }
 
@@ -15,16 +15,16 @@ const SearchDropdown = ({ searchMode, setSearchMode, className = "" }: {
   setSearchMode: (mode: 'web-search' | 'podcast-search') => void;
   className?: string;
 }) => (
-  <div className={`absolute right-20 top-1/2 -translate-y-1/2 mr-6 ${className}`}>
-    <select
-      value={searchMode}
-      onChange={(e) => setSearchMode(e.target.value as 'web-search' | 'podcast-search')}
-      className="bg-transparent text-gray-400 border-none focus:outline-none cursor-pointer text-sm pr-8"
-    >
-      <option value="web-search" className="bg-[#111111]">🌐 Web Search</option>
-      <option value="podcast-search" className="bg-[#111111]">🎙️ Podcast Search</option>
-    </select>
-    <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none">
+  <div className={`mr-6 ${className}`}>
+    <div className="border border-gray-700 rounded-md px-2 py-1">
+      <select
+        value={searchMode}
+        onChange={(e) => setSearchMode(e.target.value as 'web-search' | 'podcast-search')}
+        className="bg-transparent text-gray-400 border-none focus:outline-none cursor-pointer text-sm pr-4"
+      >
+        <option value="web-search" className="bg-[#111111]">🌐 Web Search</option>
+        <option value="podcast-search" className="bg-[#111111]">🎙️ Podcast Search</option>
+      </select>
     </div>
   </div>
 );
@@ -37,7 +37,7 @@ const ModelSettings = ({ model, setModel, isOpen, setIsOpen, dropUp = false }: {
   dropUp?: boolean;
 }) => {
   return (
-    <div className="absolute right-12 top-1/2 -translate-y-1/2 mr-3 pr-2 pl-2.5">
+    <div className="relative mr-3 pr-2 pl-2.5">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="text-gray-400 hover:text-gray-300 transition-colors"
@@ -116,7 +116,7 @@ export const ModelSettingsBar: React.FC<ModelSettingsBarProps> = ({
   setModel,
   searchMode,
   setSearchMode,
-  dropUp = false,  // New prop with default value
+  dropUp = false,
   className = ""
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -129,7 +129,7 @@ export const ModelSettingsBar: React.FC<ModelSettingsBarProps> = ({
         setModel={setModel} 
         isOpen={isSettingsOpen}
         setIsOpen={setIsSettingsOpen}
-        dropUp={dropUp}  // Pass the prop through
+        dropUp={dropUp}
       />
     </>
   );
