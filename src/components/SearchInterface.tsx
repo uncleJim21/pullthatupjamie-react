@@ -28,6 +28,7 @@ import TutorialModal from './TutorialModal.tsx';
 import WelcomeModal from './WelcomeModal.tsx';
 import AccountButton from './AccountButton.tsx';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
+import AuthService from '../services/authService.ts';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -240,6 +241,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       : (isSharePage || isClipBatchPage ? 'podcast-search' as SearchMode : 'podcast-search' as SearchMode)
   );
   
+  // Add state for admin privileges and toggle
+  const [adminFeedId, setAdminFeedId] = useState<string | null>(null);
+  const [podcastSearchMode, setPodcastSearchMode] = useState<'global' | 'my-pod'>('global');
+  
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const clipId = searchParams.get('clip');
   const { runId, feedId } = useParams<{ runId: string; feedId: string }>();
@@ -317,7 +322,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const resultTextRef = useRef('');
   const eventSourceRef = useRef<EventSource | null>(null);
   const nextConversationId = useRef(0);
-  const searchSettingsBarStyle = "bg-[#000000] border-gray-800 border shadow-white-glow rounded-lg mt-2 pt-2 pb-1 max-w-3xl pr-1 mx-auto px-4 flex items-start relative"
+  const searchSettingsBarStyle = "bg-[#000000] border-gray-800 border shadow-white-glow rounded-lg mt-2 pt-2 pb-1 max-w-3xl pr-1 mx-auto px-4 flex items-center justify-between relative"
   const searchButtonStyle = "ml-auto mt-1 mr-1 pl-3 pr-3 bg-white rounded-lg pt-1 pb-1 border-gray-800 hover:border-gray-700"
 
   //Lightning related
@@ -705,14 +710,23 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     
     printLog("Starting quote search...");
     
-    // Capture the current selection at the moment of search to ensure it's used
-    // Create a deep copy to prevent any reference issues
-    const currentSelectedFeedIds = Array.from(selectedSources) as string[];
+    // Determine which sources to use based on podcast search mode
+    let feedIdsToUse: string[];
+    
+    if (podcastSearchMode === 'my-pod' && adminFeedId) {
+      // Use only the admin feedId when in "My Pod" mode
+      feedIdsToUse = [adminFeedId];
+      printLog(`Using My Pod mode with feedId: ${adminFeedId}`);
+    } else {
+      // Use selected podcast sources when in "Global" mode
+      feedIdsToUse = Array.from(selectedSources) as string[];
+      printLog(`Using Global mode with selected sources: ${JSON.stringify(feedIdsToUse)}`);
+    }
     
     // Store the current selection in localStorage as a backup
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSelectedFeedIds));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(feedIdsToUse));
     
-    printLog(`Using selected sources for search: ${JSON.stringify(currentSelectedFeedIds,null,2)}`);
+    printLog(`Using feed IDs for search: ${JSON.stringify(feedIdsToUse,null,2)}`);
 
     const auth = await getAuth() as AuthConfig;
     if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
@@ -723,7 +737,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     printLog(`Request auth method:${requestAuthMethod}`)
     
     try {
-      const quoteResults = await handleQuoteSearch(query, auth, currentSelectedFeedIds);
+      const quoteResults = await handleQuoteSearch(query, auth, feedIdsToUse);
       setConversation(prev => [...prev, {
         id: searchState.activeConversationId as number,
         type: 'podcast-search' as const,
@@ -813,6 +827,32 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   useEffect(() => {
     updateAuthMethodAndRegisterModalStatus();    
   }, []);
+
+  // Add useEffect for checking admin privileges when user signs in
+  useEffect(() => {
+    if (isUserSignedIn) {
+      checkAndStoreAdminPrivileges();
+    } else {
+      setAdminFeedId(null);
+    }
+  }, [isUserSignedIn]);
+
+  // Add useEffect to load stored feedId on component mount
+  useEffect(() => {
+    const storedFeedId = getStoredFeedId();
+    if (storedFeedId) {
+      setAdminFeedId(storedFeedId);
+      printLog(`Loaded stored feedId: ${storedFeedId}`);
+    }
+    printLog(`Initial adminFeedId state: ${storedFeedId}`);
+  }, []);
+
+  // Debug adminFeedId changes
+  useEffect(() => {
+    printLog(`adminFeedId changed to: ${adminFeedId}`);
+    printLog(`searchMode: ${searchMode}`);
+    printLog(`hasSearchedInMode(searchMode): ${hasSearchedInMode(searchMode)}`);
+  }, [adminFeedId, searchMode]);
 
   // Add useEffect for fetching podcast stats
   useEffect(() => {
@@ -935,8 +975,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 return;
               }
               
-              const currentSelectedFeedIds = Array.from(selectedSources) as string[];
-              const quoteResults = await handleQuoteSearch(queryParam, auth, currentSelectedFeedIds);
+              // Determine which sources to use based on podcast search mode
+              let feedIdsToUse: string[];
+              if (podcastSearchMode === 'my-pod' && adminFeedId) {
+                feedIdsToUse = [adminFeedId];
+              } else {
+                feedIdsToUse = Array.from(selectedSources) as string[];
+              }
+              
+              const quoteResults = await handleQuoteSearch(queryParam, auth, feedIdsToUse);
               
               setConversation(prev => [...prev, {
                 id: nextConversationId.current++,
@@ -1046,8 +1093,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     similarity: rec.relevance_score / 100,
                     episodeImage: rec.episode_image,
                     shareUrl: shareUrl,
-                    shareLink: clipId,
-                    shareable: rec.shareable
+                    shareLink: clipId
                   })
                 })
               }
@@ -1181,6 +1227,56 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       lookupHash: lookupHash
     });
     setIsShareModalOpen(true);
+  };
+
+  // Function to safely store feedId in userSettings
+  const storeFeedIdInUserSettings = (feedId: string) => {
+    try {
+      const settings = localStorage.getItem('userSettings');
+      const userSettings = settings ? JSON.parse(settings) : {};
+      userSettings.adminFeedId = feedId;
+      localStorage.setItem('userSettings', JSON.stringify(userSettings));
+      printLog(`Stored feedId ${feedId} in userSettings`);
+    } catch (error) {
+      console.error('Error storing feedId in userSettings:', error);
+    }
+  };
+
+  // Function to get stored feedId from userSettings
+  const getStoredFeedId = (): string | null => {
+    try {
+      const settings = localStorage.getItem('userSettings');
+      const userSettings = settings ? JSON.parse(settings) : {};
+      return userSettings.adminFeedId || null;
+    } catch (error) {
+      console.error('Error getting feedId from userSettings:', error);
+      return null;
+    }
+  };
+
+  // Function to check admin privileges and store feedId
+  const checkAndStoreAdminPrivileges = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        setAdminFeedId(null);
+        return;
+      }
+
+      const response = await AuthService.checkPrivs(token);
+      if (response?.privs?.privs?.feedId && response.privs.privs.access === 'admin') {
+        const feedId = response.privs.privs.feedId;
+        setAdminFeedId(feedId);
+        storeFeedIdInUserSettings(feedId);
+        printLog(`Admin privileges confirmed for feedId: ${feedId}`);
+      } else {
+        setAdminFeedId(null);
+        printLog('No admin privileges found');
+      }
+    } catch (error) {
+      console.error('Error checking admin privileges:', error);
+      setAdminFeedId(null);
+    }
   };
 
   return (
@@ -1449,22 +1545,26 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         */}
 
         {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (searchState.isLoading === false) && !isClipBatchPage && (
-          <AvailableSourcesSection 
-            hasSearched={hasSearchedInMode(searchMode)} 
-            selectedSources={selectedSources} 
-            setSelectedSources={setSelectedSources} 
-            isSendingFeedback={isSendingFeedback}
-            setIsSendingFeedback={setIsSendingFeedback}
-            sizeOverride={'24'}
+          <div>
+
+            <AvailableSourcesSection 
+              hasSearched={hasSearchedInMode(searchMode)} 
+              selectedSources={selectedSources} 
+              setSelectedSources={setSelectedSources} 
+              isSendingFeedback={isSendingFeedback}
+              setIsSendingFeedback={setIsSendingFeedback}
+              sizeOverride={'24'}
             /> 
+          </div>
           )}
 
         {/* Initial Search Form */}
         <div className="max-w-3xl mx-auto px-4">
           {!hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && (
-            <form onSubmit={handleSearch} className="relative">
-            {/* Filter button - desktop version (outside search bar) */}
-            {searchMode === 'podcast-search' && (
+            <div>
+              <form onSubmit={handleSearch} className="relative">
+            {/* Filter button and toggle - desktop version (outside search bar) */}
+            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
               <div className="absolute -right-14 top-0 z-10 hidden md:block">
                 <button
                   onClick={handleFilterClick}
@@ -1476,7 +1576,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               </div>
             )}
             {/* Filter button - mobile version (inside search bar) */}
-            {searchMode === 'podcast-search' && (
+            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
               <div className="absolute right-2 top-2 z-10 md:hidden">
                 <button
                   onClick={handleFilterClick}
@@ -1502,39 +1602,80 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               }}
             />
             <div className={searchSettingsBarStyle}>
-              <ModelSettingsBar
-                model={model}
-                setModel={setModel}
-                searchMode={searchMode}
-                setSearchMode={setSearchMode}
-              />
-              <button
-                type="submit"
-                className={searchButtonStyle}
-                disabled={searchState.isLoading}
-              >
-                {searchState.isLoading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
-                ) : (
-                  <svg
-                    className="w-5 h-5 text-black"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
+              {/* Left side - Empty space */}
+              <div className="flex-shrink-0">
+                <div className="w-0" />
+              </div>
+              
+              {/* Right side - Toggle, Settings, and Search Button */}
+              <div className="flex items-center space-x-2">
+                {/* Podcast Mode Toggle - first on the right */}
+                {!!adminFeedId && searchMode === 'podcast-search' && (
+                  <div className="flex-shrink-0">
+                    <div className="inline-flex rounded-md border border-gray-700 p-0.5 bg-transparent">
+                      <button
+                        type="button"
+                        className={`py-1 rounded-sm text-xs transition-all ${
+                          podcastSearchMode === 'global'
+                            ? 'bg-[#1A1A1A] text-white px-2'
+                            : 'text-gray-400 hover:text-white px-4'
+                        }`}
+                        onClick={() => setPodcastSearchMode('global')}
+                      >
+                        {podcastSearchMode === 'global' ? '🌐 All Pods' : '🌐'}
+                      </button>
+                      <button
+                        type="button"
+                        className={`py-1 rounded-sm text-xs transition-all ${
+                          podcastSearchMode === 'my-pod'
+                            ? 'bg-[#1A1A1A] text-white px-2'
+                            : 'text-gray-400 hover:text-white px-4'
+                        }`}
+                        onClick={() => setPodcastSearchMode('my-pod')}
+                      >
+                        {podcastSearchMode === 'my-pod' ? '👤 My Pod' : '👤'}
+                      </button>
+                    </div>
+                  </div>
                 )}
-              </button>
+                
+                <ModelSettingsBar
+                  model={model}
+                  setModel={setModel}
+                  searchMode={searchMode}
+                  setSearchMode={setSearchMode}
+                />
+                
+                <button
+                  type="submit"
+                  className="pl-3 pr-3 bg-white rounded-lg py-1 border-gray-800 hover:border-gray-700 flex-shrink-0"
+                  disabled={searchState.isLoading}
+                >
+                  {searchState.isLoading ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
+                  ) : (
+                    <svg
+                      className="w-5 h-5 text-black"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
           </form>
-          )}
           
+
+          </div>
+          )}
           {/* Stats display for podcast search mode */}
           {!hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (
             <div className="text-center mt-8 text-gray-300">
@@ -1624,9 +1765,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 }
                 setSearchState(prev => ({ ...prev, isLoading: true, data: {quotes:[]} }));
                 setSearchHistory(prev => ({...prev, [searchMode]: true}));
-                const selectedFeedIds = Array.from(selectedSources) as string[]
-                printLog(`selectedSources:${JSON.stringify(selectedFeedIds,null,2)}`);
-                handleQuoteSearch(topicQuery,auth,selectedFeedIds).then(quoteResults => {
+                // Determine which sources to use based on podcast search mode
+                let feedIdsToUse: string[];
+                if (podcastSearchMode === 'my-pod' && adminFeedId) {
+                  feedIdsToUse = [adminFeedId];
+                } else {
+                  feedIdsToUse = Array.from(selectedSources) as string[];
+                }
+                printLog(`selectedSources:${JSON.stringify(feedIdsToUse,null,2)}`);
+                handleQuoteSearch(topicQuery,auth,feedIdsToUse).then(quoteResults => {
                   if(quoteResults === false){
                     setIsRegisterModalOpen(true);
                     return;
@@ -1692,9 +1839,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
         <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-40">
           <form onSubmit={handleSearch} className="relative">
-            {/* Filter button - desktop version (outside search bar) */}
-            {searchMode === 'podcast-search' && (
-              <div className="absolute -right-20 top-0 z-10 hidden md:block">
+            {/* Filter button and toggle - desktop version (outside search bar) */}
+            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
+              <div className="absolute -right-14 top-0 z-10 hidden md:block">
                 <button
                   onClick={handleFilterClick}
                   className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
@@ -1705,7 +1852,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               </div>
             )}
             {/* Filter button - mobile version (inside search bar) */}
-            {searchMode === 'podcast-search' && (
+            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
               <div className="absolute right-2 top-2 z-10 md:hidden">
                 <button
                   onClick={handleFilterClick}
@@ -1731,38 +1878,80 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               }}
             />
             <div className={searchSettingsBarStyle}>
-              <ModelSettingsBar
-                model={model}
-                setModel={setModel}
-                searchMode={searchMode}
-                setSearchMode={setSearchMode}
-                dropUp={true}
-              />
-              <button
-                type="submit"
-                className={searchButtonStyle}
-                disabled={searchState.isLoading}
-              >
-                {searchState.isLoading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
-                ) : (
-                  <svg
-                    className="w-5 h-5 text-black"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
+              {/* Left side - Empty space */}
+              <div className="flex-shrink-0">
+                <div className="w-0" />
+              </div>
+              
+              {/* Right side - Toggle, Settings, and Search Button */}
+              <div className="flex items-center space-x-2">
+                {/* Podcast Mode Toggle - first on the right */}
+                {!!adminFeedId && searchMode === 'podcast-search' && (
+                  <div className="flex-shrink-0">
+                    <div className="inline-flex rounded-md border border-gray-700 p-0.5 bg-transparent">
+                      <button
+                        type="button"
+                        className={`px-2 py-1 rounded-sm text-xs transition-all ${
+                          podcastSearchMode === 'global'
+                            ? 'bg-[#1A1A1A] text-white'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                        onClick={() => setPodcastSearchMode('global')}
+                      >
+                        {podcastSearchMode === 'global' ? '🌐 All Pods' : '🌐'}
+                      </button>
+                      <button
+                        type="button"
+                        className={`px-2 py-1 rounded-sm text-xs transition-all ${
+                          podcastSearchMode === 'my-pod'
+                            ? 'bg-[#1A1A1A] text-white'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                        onClick={() => setPodcastSearchMode('my-pod')}
+                      >
+                        {podcastSearchMode === 'my-pod' ? '👤 My Pod' : '👤'}
+                      </button>
+                    </div>
+                  </div>
                 )}
-              </button>
+                
+                <ModelSettingsBar
+                  model={model}
+                  setModel={setModel}
+                  searchMode={searchMode}
+                  setSearchMode={setSearchMode}
+                  dropUp={true}
+                />
+                
+                <button
+                  type="submit"
+                  className="pl-3 pr-3 bg-white rounded-lg py-1 border-gray-800 hover:border-gray-700 flex-shrink-0"
+                  disabled={searchState.isLoading}
+                >
+                  {searchState.isLoading ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
+                  ) : (
+                    <svg
+                      className="w-5 h-5 text-black"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
           </form>
+          
+
+
         </div>
       )}
       {searchMode === 'web-search' && (
