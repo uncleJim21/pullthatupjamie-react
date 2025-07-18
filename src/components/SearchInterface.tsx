@@ -348,6 +348,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     localStorage.removeItem('auth_token');
     localStorage.removeItem('squareId');
     localStorage.removeItem('isSubscribed');
+    
+    // Remove adminFeedId from localStorage and reset state
+    const settings = localStorage.getItem('userSettings');
+    if (settings) {
+      const userSettings = JSON.parse(settings);
+      delete userSettings.adminFeedId;
+      localStorage.setItem('userSettings', JSON.stringify(userSettings));
+    }
+    setAdminFeedId(null);
+    
     setRequestAuthMethod(RequestAuthMethod.FREE);
   };
 
@@ -1591,7 +1601,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `How Can I Help You Today?`}
+              placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `Search the web privately with LLM summary`}
               className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-10 md:pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
               // disabled={searchMode !== "web-search"}
               onKeyDown={(e) => {
@@ -1867,7 +1877,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `How Can I Help You Today?`}
+              placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `Search the web privately with LLM summary`}
               className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 pl-4 pr-32 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
               // disabled={searchMode === 'web-search'}
               onKeyDown={(e) => {
