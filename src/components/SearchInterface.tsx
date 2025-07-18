@@ -1615,10 +1615,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     <div className="inline-flex rounded-md border border-gray-700 p-0.5 bg-transparent">
                       <button
                         type="button"
-                        className={`px-2 py-1 rounded-sm text-xs transition-all ${
+                        className={`py-1 rounded-sm text-xs transition-all ${
                           podcastSearchMode === 'global'
-                            ? 'bg-[#1A1A1A] text-white'
-                            : 'text-gray-400 hover:text-white'
+                            ? 'bg-[#1A1A1A] text-white px-2'
+                            : 'text-gray-400 hover:text-white px-4'
                         }`}
                         onClick={() => setPodcastSearchMode('global')}
                       >
@@ -1626,10 +1626,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                       </button>
                       <button
                         type="button"
-                        className={`px-2 py-1 rounded-sm text-xs transition-all ${
+                        className={`py-1 rounded-sm text-xs transition-all ${
                           podcastSearchMode === 'my-pod'
-                            ? 'bg-[#1A1A1A] text-white'
-                            : 'text-gray-400 hover:text-white'
+                            ? 'bg-[#1A1A1A] text-white px-2'
+                            : 'text-gray-400 hover:text-white px-4'
                         }`}
                         onClick={() => setPodcastSearchMode('my-pod')}
                       >
