@@ -41,8 +41,13 @@ export interface RunHistoryRecommendation {
   duration: number;
   paragraph_ids: string[];
   expanded_context: boolean;
-  first_word_index: number;
-  last_word_index: number;
+  first_word_index: number | null;
+  last_word_index: number | null;
+  shareable: boolean;
+  shareableReason: string;
+  lookupHash: string;
+  clipId: string;
+  cdnUrl: string | null;
 }
 
 export interface RunHistory {
