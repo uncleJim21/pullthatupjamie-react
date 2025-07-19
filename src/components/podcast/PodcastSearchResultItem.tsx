@@ -78,7 +78,7 @@ export const PodcastSearchResultItem = ({
   error,
   onShareModalOpen,
   onSocialShareModalOpen,
-  shareable = true
+  shareable = false
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);

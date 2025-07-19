@@ -1008,6 +1008,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                             feedId={feedId}
                             onSignInClick={() => setIsSignInModalOpen(true)}
                             error={error || undefined}
+                            shareable={run.recommendations[0].shareable}
                           />
                         )}
                       </div>

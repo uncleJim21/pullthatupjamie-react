@@ -11,4 +11,5 @@ export interface QuoteResult {
     start_time: number;
     end_time: number;
   };
+  shareable?: boolean;
 }
