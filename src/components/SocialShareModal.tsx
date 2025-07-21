@@ -752,6 +752,40 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     });
   };
 
+  // Helper function to get user signature from localStorage
+  const getUserSignature = (): string | null => {
+    try {
+      const settings = localStorage.getItem('userSettings');
+      if (settings) {
+        const parsed = JSON.parse(settings);
+        const signature = parsed.crosspostSignature;
+        
+        // Handle null, undefined, or empty string cases
+        if (signature == null || signature === '') {
+          return null;
+        }
+        
+        // Trim whitespace and check if it's effectively empty
+        const trimmedSignature = signature.trim();
+        return trimmedSignature.length > 0 ? trimmedSignature : null;
+      }
+    } catch (error) {
+      console.error('Error reading user signature from localStorage:', error);
+    }
+    return null;
+  };
+
+  // Helper function to build final content with signature
+  const buildFinalContent = (baseContent: string, mediaUrl: string, platform: 'twitter' | 'nostr'): string => {
+    const signature = getUserSignature();
+    const signaturePart = signature ? `\n\n${signature}` : '';
+    
+    // Only include media URL for Nostr posts
+    const mediaUrlPart = platform === 'nostr' ? `\n\n${mediaUrl}` : '';
+    
+    return `${baseContent}${signaturePart}${mediaUrlPart}\n\nShared via https://pullthatupjamie.ai`;
+  };
+
   const publishToNostr = async (): Promise<boolean> => {
     if (!window.nostr) {
       console.error("No Nostr extension available");
@@ -772,7 +806,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         }
       }
       
-      const finalContent = `${content}\n\n${fileUrl}\n\nShared via https://pullthatupjamie.ai`;
+      const mediaUrl = fileUrl || renderUrl || '';
+      const finalContent = buildFinalContent(content, mediaUrl, 'nostr');
       
       const event = {
         kind: 1,
@@ -818,13 +853,14 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     try {
       setTwitterState(prev => ({ ...prev, currentOperation: OperationType.PUBLISHING }));
       
-      const mediaUrl = fileUrl || renderUrl;
+      const mediaUrl = fileUrl || renderUrl || '';
       const isAdmin = AuthService.isAdmin();
       
       if (isAdmin && twitterState.authenticated) {
-        printLog(`Posting tweet with content: "${content}" and mediaUrl: "${mediaUrl}"`);
+        const finalContent = buildFinalContent(content, mediaUrl, 'twitter');
+        printLog(`Posting tweet with content: "${finalContent}" and mediaUrl: "${mediaUrl}"`);
         
-        const response = await twitterService.postTweet(content, mediaUrl);
+        const response = await twitterService.postTweet(finalContent, mediaUrl);
         printLog(`Twitter post response: ${JSON.stringify(response)}`);
         
         if (response.error === 'TWITTER_AUTH_EXPIRED' && response.requiresReauth) {
@@ -845,8 +881,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         }
       } else {
         // For non-admin users or unauthenticated admins, open Twitter web intent
-        const tweetText = `${content}\n${mediaUrl}\n\nShared via https://pullthatupjamie.ai`;
-        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+        const finalContent = buildFinalContent(content, mediaUrl, 'twitter');
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(finalContent)}`;
         window.open(twitterUrl, '_blank');
         setTwitterState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: true }));
         return true;
@@ -1142,7 +1178,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             
             <div className="p-3 bg-gray-900/60 border border-gray-800 rounded-lg mt-4 mb-4">
               <p className="text-gray-400 text-sm">
-                <span className="text-amber-500">Tip:</span> The link to your clip and attribution will be added automatically when you publish.
+                <span className="text-amber-500">Tip:</span> The link to your clip, attribution, and a signature will be added automatically when you publish.
               </p>
             </div>
           </div>
@@ -1494,7 +1530,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         <div className="flex items-center justify-between mb-2 sm:mb-3">
           <div className="text-gray-400 text-xs pl-1">
-            The link to your {itemName} and attribution will be added automatically when you publish.
+            The link to your {itemName}, attribution, and a signature will be added automatically when you publish.
           </div>
           <button
             onClick={() => setShowPinManagement(true)}

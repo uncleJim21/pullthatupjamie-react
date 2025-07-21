@@ -4,7 +4,7 @@ import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share, Shield } from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share, Shield, Settings } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
 import { SocialPlatform } from '../SocialShareModal.tsx';
@@ -66,7 +66,7 @@ const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionS
 );
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
-type JamieProView = 'chat' | 'history';
+type JamieProView = 'chat' | 'history' | 'settings';
 
 const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> = ({ initialView, defaultTab }) => {
     const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
@@ -104,6 +104,40 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     });
     const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
     const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
+
+    // Settings state
+    const [settingsData, setSettingsData] = useState(() => {
+        const settings = localStorage.getItem('userSettings');
+        const parsed = settings ? JSON.parse(settings) : {};
+        return {
+            autoStartCrosspost: parsed.autoStartCrosspost || false,
+            crosspostSignature: parsed.crosspostSignature || ''
+        };
+    });
+
+    // Settings handlers
+    const handleSettingChange = (key: string, value: boolean | string) => {
+        const newSettings = { ...settingsData, [key]: value };
+        setSettingsData(newSettings);
+        
+        // Update localStorage
+        const existingSettings = localStorage.getItem('userSettings');
+        const currentSettings = existingSettings ? JSON.parse(existingSettings) : {};
+        localStorage.setItem('userSettings', JSON.stringify({
+            ...currentSettings,
+            ...newSettings
+        }));
+    };
+
+    const handleAutoShareChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newValue = e.target.checked;
+        setAutoShare(newValue);
+        handleSettingChange('autoStartCrosspost', newValue);
+    };
+
+    const handleCrosspostSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        handleSettingChange('crosspostSignature', e.target.value);
+    };
 
     // Add these handlers:
     const handlePlayPause = (id: string) => {
@@ -504,18 +538,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     if (feedId) {
       checkPrivileges(feedId);
     }
-  };
-
-  const handleAutoShareChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.checked;
-    setAutoShare(newValue);
-    // Update localStorage
-    const settings = localStorage.getItem('userSettings');
-    const currentSettings = settings ? JSON.parse(settings) : {};
-    localStorage.setItem('userSettings', JSON.stringify({
-      ...currentSettings,
-      autoStartCrosspost: newValue
-    }));
   };
 
   const handleUploadShare = (fileUrl: string) => {
@@ -944,6 +966,17 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       <History size={20} className="mr-2.5" />
                       Run History
                     </button>
+                    <button
+                      onClick={() => setJamieProView('settings')}
+                      className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                        jamieProView === 'settings'
+                          ? 'bg-gray-800 text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <Settings size={20} className="mr-2.5" />
+                      Settings
+                    </button>
                   </div>
                 </div>
 
@@ -953,6 +986,50 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       <p className="text-lg">Unable to load chat. Please try again.</p>
                     </div>
                   )
+                ) : jamieProView === 'settings' ? (
+                  <div className="max-w-2xl mx-auto">
+                    <div className="bg-[#111111] border border-gray-800 rounded-lg p-6">
+                      <h3 className="text-xl font-bold text-white mb-6">Settings</h3>
+                      
+                      <div className="space-y-6">
+                        {/* Auto Start Crosspost Setting */}
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="text-white font-medium mb-1">Auto Start Crosspost</h4>
+                            <p className="text-gray-400 text-sm">
+                              Automatically start the crosspost process after uploading files
+                            </p>
+                          </div>
+                          <div className="ml-4">
+                            <input
+                              type="checkbox"
+                              id="autoStartCrosspost"
+                              checked={settingsData.autoStartCrosspost}
+                              onChange={handleAutoShareChange}
+                              className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white focus:ring-2"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Crosspost Signature Setting */}
+                        <div className="space-y-2">
+                          <div>
+                            <h4 className="text-white font-medium mb-1">Crosspost Signature</h4>
+                            <p className="text-gray-400 text-sm">
+                              Text that appears at the bottom of all crossposts (e.g., "Check out my pod at https://podhome.com/pullthatupjamie")
+                            </p>
+                          </div>
+                          <textarea
+                            value={settingsData.crosspostSignature}
+                            onChange={handleCrosspostSignatureChange}
+                            placeholder="Enter your crosspost signature..."
+                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent resize-none"
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ) : isLoadingHistory ? (
                   <div className="flex justify-center items-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
