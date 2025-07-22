@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "app/**/*.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "framework": "create-react-app"
+} 
