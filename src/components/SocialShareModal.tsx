@@ -782,8 +782,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     
     // Only include media URL for Nostr posts
     const mediaUrlPart = platform === 'nostr' ? `\n\n${mediaUrl}` : '';
+    const callToActionPart = platform === 'nostr' ? `\n\nShared via https://pullthatupjamie.ai` : '';
     
-    return `${baseContent}${signaturePart}${mediaUrlPart}\n\nShared via https://pullthatupjamie.ai`;
+    return `${baseContent}${signaturePart}${mediaUrlPart}${callToActionPart}`;
   };
 
   const publishToNostr = async (): Promise<boolean> => {

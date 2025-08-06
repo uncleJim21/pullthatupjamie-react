@@ -23,7 +23,7 @@ console.log('Constants loaded:', {
   hostname: typeof window !== 'undefined' ? window.location.hostname : 'not in browser'
 });
 
-export const API_URL = DEBUG_MODE ? "http://localhost:4111" : "https://pullthatupjamie-nsh57.ondigitalocean.app";
+export const API_URL = DEBUG_MODE ? "http://localhost:4132" : "https://pullthatupjamie-nsh57.ondigitalocean.app";
 export const MONTHLY_PRICE_STRING = "$9.99"
 
 export const printLog = (log:string) =>{
