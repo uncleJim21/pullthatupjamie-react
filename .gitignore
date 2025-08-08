@@ -24,3 +24,8 @@ yarn-error.log*
 test-getfeeds.json
 *.txt
 /utility-scripts
+restore_cursor_cache.sh
+clear_cursor_cache.sh
+docs/WIP/WIP.md
+docs/WIP/WIP.md
+docs/WIP/WIP.md

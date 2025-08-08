@@ -85,7 +85,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
 
   // Handle delete
   const handleDelete = async (postId: string) => {
-    if (!confirm('Are you sure you want to delete this scheduled post?')) {
+    if (!window.confirm('Are you sure you want to delete this scheduled post?')) {
       return;
     }
 
@@ -108,30 +108,6 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
       alert('Failed to retry post. Please try again.');
     }
   };
-
-  if (loading) {
-    return (
-      <div className={`flex items-center justify-center py-12 ${className}`}>
-        <RefreshCw className="w-6 h-6 animate-spin text-gray-400 mr-2" />
-        <span className="text-gray-400">Loading scheduled posts...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className={`text-center py-12 ${className}`}>
-        <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-        <p className="text-red-300 mb-4">{error}</p>
-        <button
-          onClick={loadPosts}
-          className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className={className}>
@@ -168,11 +144,27 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
         ))}
       </div>
 
-      {/* Posts list */}
-      {posts.length === 0 ? (
+      {/* Content area */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <RefreshCw className="w-6 h-6 animate-spin text-gray-400 mr-2" />
+          <span className="text-gray-400">Loading scheduled posts...</span>
+        </div>
+      ) : error ? (
+        <div className="text-center py-12">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <p className="text-red-300 mb-4">{error}</p>
+          <button
+            onClick={loadPosts}
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : posts.length === 0 ? (
         <div className="text-center py-12">
           <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400 mb-2">No scheduled posts found</p>
+          <p className="text-gray-400 mb-2">No posts found</p>
           <p className="text-gray-500 text-sm">
             {filter === 'all' ? 'Create your first scheduled post!' : `No ${filter} posts yet.`}
           </p>
@@ -268,7 +260,11 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
       )}
     </div>
   );
+
+
 };
 
 export default ScheduledPostsList;
+
+
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, Twitter } from 'lucide-react';
+import { X, Twitter, Calendar } from 'lucide-react';
+import { FRONTEND_URL } from '../constants/constants.ts';
 
 interface SocialShareSuccessModalProps {
   isOpen: boolean;
@@ -66,12 +67,29 @@ const SocialShareSuccessModal: React.FC<SocialShareSuccessModalProps> = ({
           )}
         </div>
 
-        <button
-          onClick={onClose}
-          className="mt-6 px-6 py-2 rounded-lg bg-white text-black font-medium hover:bg-gray-100 transition-colors"
-        >
-          Dismiss
-        </button>
+        <div className="flex flex-col space-y-3 mt-6">
+          <button
+            onClick={() => {
+              const currentUrl = window.location.href;
+              const feedId = currentUrl.split('/feed/')[1]?.split('/')[0];
+              if (feedId) {
+                const jamieProUrl = `${FRONTEND_URL}/app/feed/${feedId}/jamieProHistory?view=scheduled-posts`;
+                window.open(jamieProUrl, '_blank');
+              }
+            }}
+            className="flex items-center justify-center space-x-2 px-6 py-2 rounded-lg bg-gray-800 text-white font-medium hover:bg-gray-700 transition-colors"
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Scheduled Posts</span>
+          </button>
+          
+          <button
+            onClick={onClose}
+            className="px-6 py-2 rounded-lg bg-white text-black font-medium hover:bg-gray-100 transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
       </div>
     </div>
   );

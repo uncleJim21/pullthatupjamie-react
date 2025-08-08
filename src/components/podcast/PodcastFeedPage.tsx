@@ -4,7 +4,7 @@ import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share, Shield, Settings } from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share, Shield, Settings, Calendar } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
 import { SocialPlatform } from '../SocialShareModal.tsx';
@@ -25,6 +25,7 @@ import PageBanner from '../PageBanner.tsx';
 import SocialShareModal from '../SocialShareModal.tsx';
 import TutorialModal from '../TutorialModal.tsx';
 import WelcomeModal from '../WelcomeModal.tsx';
+import ScheduledPostsList from '../ScheduledPostsList.tsx';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -82,6 +83,18 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [runHistory, setRunHistory] = useState<RunHistory[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [jamieProView, setJamieProView] = useState<JamieProView>('history');
+    
+    // Initialize jamieProView from URL parameter
+    useEffect(() => {
+      const viewParam = searchParams.get('view');
+      console.log('URL view parameter:', viewParam);
+      if (viewParam && ['chat', 'history', 'settings', 'scheduled-posts'].includes(viewParam)) {
+        console.log('Setting jamieProView to:', viewParam);
+        setJamieProView(viewParam as JamieProView);
+        // Also set the active tab to Jamie Pro if we have a view parameter
+        setActiveTab('Jamie Pro');
+      }
+    }, [searchParams, feedData]);
     const [uploadModalOpen, setUploadModalOpen] = useState(false);
     const [uploads, setUploads] = useState<UploadItem[]>([]);
     const [isLoadingUploads, setIsLoadingUploads] = useState(false);
@@ -326,7 +339,9 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   useEffect(() => {
     if (feedData && initialView === 'jamiePro') {
       setActiveTab('Jamie Pro');
-      if (defaultTab === 'history') {
+      // Only set jamieProView to 'history' if no URL parameter is present
+      const viewParam = searchParams.get('view');
+      if (defaultTab === 'history' && !viewParam) {
         setJamieProView('history');
       }
       // Let the fetchRunHistory function handle unauthorized access
@@ -338,7 +353,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         console.log('Non-admin user attempted to access Uploads tab, falling back to Episodes tab');
       }
     }
-  }, [feedData, initialView, defaultTab, isAdmin]);
+  }, [feedData, initialView, defaultTab, isAdmin, searchParams]);
 
   // Add a useEffect to ensure activeTab is never 'Jamie Pro' for non-admin users
   useEffect(() => {
@@ -967,6 +982,17 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       Run History
                     </button>
                     <button
+                      onClick={() => setJamieProView('scheduled-posts')}
+                      className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                        jamieProView === 'scheduled-posts'
+                          ? 'bg-gray-800 text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <Calendar size={20} className="mr-2.5" />
+                      Scheduled Posts
+                    </button>
+                    <button
                       onClick={() => setJamieProView('settings')}
                       className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
                         jamieProView === 'settings'
@@ -986,6 +1012,10 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       <p className="text-lg">Unable to load chat. Please try again.</p>
                     </div>
                   )
+                ) : jamieProView === 'scheduled-posts' ? (
+                  <div className="max-w-4xl mx-auto">
+                    <ScheduledPostsList />
+                  </div>
                 ) : jamieProView === 'settings' ? (
                   <div className="max-w-2xl mx-auto">
                     <div className="bg-[#111111] border border-gray-800 rounded-lg p-6">
