@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin } from 'lucide-react';
+import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin, Clock } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
@@ -8,8 +8,11 @@ import RegisterModal from './RegisterModal.tsx';
 import SocialShareSuccessModal from './SocialShareSuccessModal.tsx';
 import MentionsLookupView from './MentionsLookupView.tsx';
 import MentionPinManagement from './MentionPinManagement.tsx';
+import DateTimePicker from './DateTimePicker.tsx';
 import { MentionResult } from '../types/mention.ts';
 import { useStreamingMentionSearch } from '../hooks/useStreamingMentionSearch.ts';
+import ScheduledPostService from '../services/scheduledPostService.ts';
+import { CreateScheduledPostRequest } from '../types/scheduledPost.ts';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -253,6 +256,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [thumbnailRetry, setThumbnailRetry] = useState(false);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
+  // Add state for scheduling functionality
+  const [isSchedulingMode, setIsSchedulingMode] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [schedulingError, setSchedulingError] = useState<string | null>(null);
+
   // Add state for mentions lookup
   const [showMentionsLookup, setShowMentionsLookup] = useState(false);
   const [mentionSearchQuery, setMentionSearchQuery] = useState('');
@@ -296,44 +305,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
 
-  // Function to check tokens endpoint (for initial check)
-  const checkTokensEndpoint = async (): Promise<boolean> => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        printLog('No auth token found for tokens check');
-        return false;
-      }
 
-      printLog(`Checking tokens at ${API_URL}/api/twitter/tokens`);
-      const response = await fetch(`${API_URL}/api/twitter/tokens`, {
-        method: 'POST',
-        headers: {
-          'Accept': '*/*',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Origin': window.location.origin
-        },
-        credentials: 'include',
-        mode: 'cors'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        printLog(`Tokens endpoint response: ${JSON.stringify(data)}`);
-        
-        // Show the main UI for any valid response from the endpoint
-        // The authenticated status will be handled by the existing Twitter auth flow
-        return true;
-      } else {
-        printLog(`Tokens endpoint returned ${response.status}`);
-        return false;
-      }
-    } catch (error) {
-      printLog(`Error checking tokens endpoint: ${error}`);
-      return false;
-    }
-  };
 
   // Update the polling function to handle Twitter auth status
   const startTokenPolling = () => {
@@ -407,16 +379,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setIsPollingTokens(false);
   };
 
-  // Initial token check when modal opens
+  // Initial check when modal opens - unified with Twitter auth
   useEffect(() => {
     if (isOpen) {
       const initialCheck = async () => {
         setIsCheckingTokens(true);
         try {
-          const hasTokens = await checkTokensEndpoint();
-          setHasValidTokens(hasTokens);
+          await checkTwitterAuth(); // This now handles both auth check and hasValidTokens
         } catch (error) {
-          printLog(`Error during initial token check: ${error}`);
+          printLog(`Error during initial check: ${error}`);
           setHasValidTokens(false);
         } finally {
           setIsCheckingTokens(false);
@@ -467,9 +438,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     // No default content, empty textarea with just placeholder
     setContent('');
     
-    // Check both platforms
+    // Check Nostr platform
     checkNostrExtension();
-    checkTwitterAuth();
 
     // Initialize relay status
     const initialStatus: {[key: string]: string} = {};
@@ -572,21 +542,51 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
-  // Check Twitter authentication status
+  // Check Twitter authentication status (unified with token checking)
   const checkTwitterAuth = async () => {
     printLog('Checking Twitter auth status in SocialShareModal...');
     try {
-      const status = await AuthService.checkTwitterStatus();
-      printLog(`Twitter auth status: ${status.authenticated}`);
-      setTwitterState(prev => ({ 
-        ...prev, 
-        authenticated: status.authenticated,
-        available: true, // Always available for admin users
-        username: status.authenticated ? status.twitterUsername : undefined
-      }));
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        printLog('No auth token found for Twitter auth check');
+        setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/twitter/tokens`, {
+        method: 'POST',
+        headers: {
+          'Accept': '*/*',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin
+        },
+        credentials: 'include',
+        mode: 'cors'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        printLog(`Twitter auth check response: ${JSON.stringify(data)}`);
+        
+        setTwitterState(prev => ({ 
+          ...prev, 
+          authenticated: data.authenticated === true,
+          available: true,
+          username: data.authenticated ? data.twitterUsername : undefined
+        }));
+        
+        // Set hasValidTokens for the UI flow
+        setHasValidTokens(data.authenticated === true);
+      } else {
+        printLog(`Twitter auth check failed with status ${response.status}`);
+        setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
+        setHasValidTokens(false);
+      }
     } catch (error) {
-      printLog(`Error checking Twitter status: ${error}`);
-      setTwitterState(prev => ({ ...prev, authenticated: false }));
+      printLog(`Error checking Twitter auth: ${error}`);
+      setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
+      setHasValidTokens(false);
     }
   };
 
@@ -640,12 +640,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
-  // Initialize Twitter auth check when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      checkTwitterAuth();
-    }
-  }, [isOpen]);
+
 
   // Handle escape key to close mentions
   useEffect(() => {
@@ -892,6 +887,69 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       printLog(`Error posting tweet: ${error}`);
       setTwitterState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: false, error: error instanceof Error ? error.message : 'Failed to post tweet' }));
       return false;
+    }
+  };
+
+
+  const handleSchedule = async () => {
+    if (!scheduledDate) {
+      setSchedulingError("Please select a date and time");
+      return;
+    }
+
+    // Check if scheduled date is in the future (user's perspective)
+    if (scheduledDate <= new Date()) {
+      setSchedulingError("Please select a future date and time");
+      return;
+    }
+
+    // Check if we have either content or media URL
+    const mediaUrl = fileUrl || renderUrl || '';
+    if (!content.trim() && !mediaUrl) {
+      setSchedulingError("Please enter some content or select media for your post");
+      return;
+    }
+
+    const enabledPlatforms: ("twitter" | "nostr")[] = [];
+    if (twitterState.enabled && twitterState.available) {
+      enabledPlatforms.push("twitter");
+    }
+    if (nostrState.enabled && nostrState.available && nostrState.authenticated) {
+      enabledPlatforms.push("nostr");
+    }
+
+    if (enabledPlatforms.length === 0) {
+      setSchedulingError("Please enable at least one platform");
+      return;
+    }
+
+    setIsScheduling(true);
+    setSchedulingError(null);
+
+    try {
+      const mediaUrl = fileUrl || renderUrl || "";
+      const signature = getUserSignature();
+      const signaturePart = signature ? `\n\n${signature}` : "";
+      const finalContent = `${content}${signaturePart}`;
+
+      const request: CreateScheduledPostRequest = {
+        text: finalContent,
+        mediaUrl,
+        scheduledFor: scheduledDate.toISOString(),
+        platforms: enabledPlatforms,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      };
+
+      const scheduledPosts = await ScheduledPostService.createScheduledPost(request);
+      printLog(`Successfully scheduled ${scheduledPosts.length} posts`);
+      
+      // Show success and close modal
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error("Error scheduling post:", error);
+      setSchedulingError(error instanceof Error ? error.message : "Failed to schedule post");
+    } finally {
+      setIsScheduling(false);
     }
   };
 
@@ -1744,6 +1802,48 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           </div>
         </div>
         
+        {/* Scheduling Section */}
+        <div className="mb-4 sm:mb-6">
+          <div className="flex justify-center mb-3">
+            <button
+              onClick={() => setIsSchedulingMode(!isSchedulingMode)}
+              disabled={isGeneratingContent || isPublishing}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium flex items-center
+                ${isSchedulingMode 
+                  ? "bg-white text-black hover:bg-gray-100" 
+                  : "bg-black border border-white text-white hover:bg-gray-900"
+                } ${(isGeneratingContent || isPublishing) ? 'opacity-50 cursor-not-allowed' : 'transition-colors'}`}
+            >
+              <Clock className="w-4 h-4 mr-1 sm:mr-2" />
+              Schedule
+            </button>
+          </div>
+          {isSchedulingMode && (
+            <div className="text-center mb-3">
+              <span className="text-xs text-gray-400">
+                Choose when to publish this post
+              </span>
+            </div>
+          )}
+          
+          {isSchedulingMode && (
+            <div className="space-y-3">
+              <DateTimePicker
+                value={scheduledDate}
+                onChange={setScheduledDate}
+                placeholder="Select date and time"
+                className=""
+              />
+              
+              {schedulingError && (
+                <div className="px-3 py-2 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300">
+                  {schedulingError}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        
         {/* Jamie Assist Error Message */}
         {jamieAssistError && (
           <div className="mb-3 sm:mb-4 px-3 sm:px-4 py-2 sm:py-3 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300 relative">
@@ -1761,26 +1861,49 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         <div className="flex space-x-3 sm:space-x-4 justify-center">
           <button
             onClick={onClose}
-            disabled={isPublishing || isGeneratingContent}
+            disabled={isPublishing || isGeneratingContent || isScheduling}
             className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-gray-700 text-gray-300 
-              ${(isPublishing || isGeneratingContent) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
+              ${(isPublishing || isGeneratingContent || isScheduling) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
           >
             Cancel
           </button>
-          <button
-            onClick={handlePublish}
-            disabled={isPublishing || isGeneratingContent || content.trim().length === 0 || (!twitterState.enabled && !nostrState.enabled)}
-            className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-white text-black font-medium 
-              ${(isPublishing || isGeneratingContent || content.trim().length === 0 || (!twitterState.enabled && !nostrState.enabled)) ? 
-                'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 transition-colors'}`}
-          >
-            {isPublishing ? (
-              <span className="flex items-center">
-                <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                Publishing...
-              </span>
-            ) : 'Post'}
-          </button>
+          
+          {isSchedulingMode ? (
+            <button
+              onClick={handleSchedule}
+              disabled={isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled) || !scheduledDate}
+              className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-black border border-white text-white font-medium 
+                ${(isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled) || !scheduledDate) ? 
+                  'opacity-50 cursor-not-allowed' : 'hover:bg-gray-900 transition-colors'}`}
+            >
+              {isScheduling ? (
+                <span className="flex items-center">
+                  <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                  Scheduling...
+                </span>
+              ) : (
+                <span className="flex items-center">
+                  <Clock className="w-4 h-4 mr-1 sm:mr-2" />
+                  Schedule
+                </span>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={handlePublish}
+              disabled={isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled)}
+              className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-white text-black font-medium 
+                ${(isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled)) ? 
+                  'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 transition-colors'}`}
+            >
+              {isPublishing ? (
+                <span className="flex items-center">
+                  <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                  Publishing...
+                </span>
+              ) : 'Post Now'}
+            </button>
+          )}
         </div>
         
         <div className="text-gray-500 text-xs mt-2 sm:mt-4 text-center">

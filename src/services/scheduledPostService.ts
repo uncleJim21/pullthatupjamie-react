@@ -1,0 +1,227 @@
+import { 
+  ScheduledPost, 
+  CreateScheduledPostRequest, 
+  UpdateScheduledPostRequest, 
+  ScheduledPostsResponse, 
+  ScheduledPostsQuery,
+  ScheduledPostStats 
+} from '../types/scheduledPost';
+import { API_URL, printLog } from '../constants/constants.ts';
+
+export class ScheduledPostService {
+  private static getAuthHeaders(): HeadersInit {
+    const token = localStorage.getItem('auth_token');
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json'
+    };
+  }
+
+  private static async handleResponse<T>(response: Response): Promise<T> {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`;
+      throw new Error(errorMessage);
+    }
+    return response.json();
+  }
+
+  /**
+   * Create a new scheduled post for one or more platforms
+   */
+  static async createScheduledPost(request: CreateScheduledPostRequest): Promise<ScheduledPost[]> {
+    try {
+      printLog(`Creating scheduled post for platforms: ${request.platforms.join(', ')}`);
+      
+      const response = await fetch(`${API_URL}/api/social/posts`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(request)
+      });
+
+      const data = await this.handleResponse<{ posts: ScheduledPost[] }>(response);
+      printLog(`Successfully created ${data.posts.length} scheduled posts`);
+      
+      return data.posts;
+    } catch (error) {
+      printLog(`Error creating scheduled post: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get list of scheduled posts with optional filtering
+   */
+  static async getScheduledPosts(query: ScheduledPostsQuery = {}): Promise<ScheduledPostsResponse> {
+    try {
+      const searchParams = new URLSearchParams();
+      
+      Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined) {
+          searchParams.append(key, value.toString());
+        }
+      });
+
+      const url = `${API_URL}/api/social/posts?${searchParams.toString()}`;
+      printLog(`Fetching scheduled posts: ${url}`);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      const data = await this.handleResponse<ScheduledPostsResponse>(response);
+      printLog(`Fetched ${data.posts.length} scheduled posts`);
+      
+      return data;
+    } catch (error) {
+      printLog(`Error fetching scheduled posts: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a specific scheduled post by ID
+   */
+  static async getScheduledPost(postId: string): Promise<ScheduledPost> {
+    try {
+      printLog(`Fetching scheduled post: ${postId}`);
+      
+      const response = await fetch(`${API_URL}/api/social/posts/${postId}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      const data = await this.handleResponse<{ post: ScheduledPost }>(response);
+      printLog(`Successfully fetched scheduled post: ${postId}`);
+      
+      return data.post;
+    } catch (error) {
+      printLog(`Error fetching scheduled post ${postId}: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Update a scheduled post (only works for status: 'scheduled')
+   */
+  static async updateScheduledPost(postId: string, updates: UpdateScheduledPostRequest): Promise<ScheduledPost> {
+    try {
+      printLog(`Updating scheduled post: ${postId}`);
+      
+      const response = await fetch(`${API_URL}/api/social/posts/${postId}`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(updates)
+      });
+
+      const data = await this.handleResponse<{ post: ScheduledPost }>(response);
+      printLog(`Successfully updated scheduled post: ${postId}`);
+      
+      return data.post;
+    } catch (error) {
+      printLog(`Error updating scheduled post ${postId}: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete/cancel a scheduled post
+   */
+  static async deleteScheduledPost(postId: string): Promise<void> {
+    try {
+      printLog(`Deleting scheduled post: ${postId}`);
+      
+      const response = await fetch(`${API_URL}/api/social/posts/${postId}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders()
+      });
+
+      await this.handleResponse<{}>(response);
+      printLog(`Successfully deleted scheduled post: ${postId}`);
+    } catch (error) {
+      printLog(`Error deleting scheduled post ${postId}: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Retry a failed post
+   */
+  static async retryScheduledPost(postId: string): Promise<ScheduledPost> {
+    try {
+      printLog(`Retrying scheduled post: ${postId}`);
+      
+      const response = await fetch(`${API_URL}/api/social/posts/${postId}/retry`, {
+        method: 'POST',
+        headers: this.getAuthHeaders()
+      });
+
+      const data = await this.handleResponse<{ post: ScheduledPost }>(response);
+      printLog(`Successfully retried scheduled post: ${postId}`);
+      
+      return data.post;
+    } catch (error) {
+      printLog(`Error retrying scheduled post ${postId}: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get statistics about scheduled posts
+   */
+  static async getStats(): Promise<ScheduledPostStats> {
+    try {
+      printLog('Fetching scheduled posts statistics');
+      
+      const response = await fetch(`${API_URL}/api/social/stats`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      const data = await this.handleResponse<ScheduledPostStats>(response);
+      printLog('Successfully fetched scheduled posts statistics');
+      
+      return data;
+    } catch (error) {
+      printLog(`Error fetching scheduled posts statistics: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get posts scheduled for a specific date range (useful for calendar view)
+   */
+  static async getPostsForDateRange(startDate: Date, endDate: Date, platforms?: ('twitter' | 'nostr')[]): Promise<ScheduledPost[]> {
+    try {
+      const query: ScheduledPostsQuery = {
+        limit: 1000, // Get all posts in range
+        sortBy: 'scheduledFor',
+        sortOrder: 'asc'
+      };
+
+      const response = await this.getScheduledPosts(query);
+      
+      // Filter by date range on the client side for now
+      // In production, you might want to add date range parameters to the API
+      const filtered = response.posts.filter(post => {
+        const postDate = new Date(post.scheduledFor);
+        const isInRange = postDate >= startDate && postDate <= endDate;
+        const isPlatformMatch = !platforms || platforms.includes(post.platform);
+        return isInRange && isPlatformMatch;
+      });
+
+      printLog(`Found ${filtered.length} posts in date range ${startDate.toISOString()} - ${endDate.toISOString()}`);
+      return filtered;
+    } catch (error) {
+      printLog(`Error fetching posts for date range: ${error}`);
+      throw error;
+    }
+  }
+}
+
+export default ScheduledPostService;
+
+
+
