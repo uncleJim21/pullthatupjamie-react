@@ -27,7 +27,7 @@ const SocialShareSuccessModal: React.FC<SocialShareSuccessModalProps> = ({
           <X className="w-6 h-6" />
         </button>
 
-        <h2 className="text-xl font-semibold text-white mb-6">Posts Published Successfully!</h2>
+        <h2 className="text-xl font-semibold text-white mb-6">Posts Scheduled Successfully!</h2>
 
         <div className="space-y-4">
           {successUrls.twitter && (
