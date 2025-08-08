@@ -3,6 +3,11 @@ import { Calendar, Clock, Twitter, Edit, Trash2, RefreshCw, AlertCircle, CheckCi
 import ScheduledPostService from '../services/scheduledPostService.ts';
 import { ScheduledPost, ScheduledPostsQuery } from '../types/scheduledPost.ts';
 
+// Constants for preview sizing (matching SocialShareModal)
+const ASPECT_RATIO = 16 / 9;
+const PREVIEW_WIDTH = 160; // Smaller for list view
+const PREVIEW_HEIGHT = (PREVIEW_WIDTH / ASPECT_RATIO) * 1.3; // Increased by 30%
+
 interface ScheduledPostsListProps {
   className?: string;
 }
@@ -174,34 +179,126 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
           {posts.map((post) => (
             <div
               key={post.postId}
-              className="bg-gray-900 border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors"
+              className="bg-gray-900 border border-gray-800 rounded-lg p-5 hover:border-gray-700 transition-colors"
             >
               <div className="flex items-start justify-between">
+                {/* Media Preview */}
+                {post.content.mediaUrl && (
+                  <div className="mr-4 flex-shrink-0">
+                    <div
+                      style={{
+                        width: PREVIEW_WIDTH,
+                        height: PREVIEW_HEIGHT,
+                        position: 'relative',
+                        background: '#222',
+                        borderRadius: 6,
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {/* Check if it's a video */}
+                      {post.content.mediaUrl.match(/\.(mp4|webm|mov)$/i) ? (
+                        <>
+                          {/* Video thumbnail with play icon */}
+                          <img
+                            src={`${post.content.mediaUrl}?thumbnail=1`}
+                            alt=""
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                            }}
+                            onError={(e) => {
+                              // Fallback to video element if thumbnail fails
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const video = target.nextElementSibling as HTMLVideoElement;
+                              if (video) video.style.display = 'block';
+                            }}
+                          />
+                          <video
+                            src={post.content.mediaUrl}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              display: 'none',
+                              background: '#222',
+                            }}
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                          {/* Play icon overlay */}
+                          <div style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            background: 'rgba(0,0,0,0.5)',
+                            borderRadius: '50%',
+                            width: 20,
+                            height: 20,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            pointerEvents: 'none',
+                          }}>
+                            <svg width={12} height={12} viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="18" cy="18" r="18" fill="rgba(0,0,0,0.6)"/>
+                              <polygon points="14,11 27,18 14,25" fill="#fff" />
+                            </svg>
+                          </div>
+                        </>
+                      ) : (
+                        /* Image preview */
+                        <img
+                          src={post.content.mediaUrl}
+                          alt=""
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex-1 min-w-0">
                   {/* Header with platform and status */}
                   <div className="flex items-center space-x-2 mb-2">
                     {getPlatformIcon(post.platform)}
-                    <span className="text-sm text-gray-400 capitalize">{post.platform}</span>
+                    <span className="text-base text-gray-400 capitalize">{post.platform}</span>
                     <div className="flex items-center space-x-1">
                       {getStatusIcon(post.status)}
-                      <span className="text-sm text-gray-400 capitalize">{post.status}</span>
+                      <span className="text-base text-gray-400 capitalize">{post.status}</span>
                     </div>
                   </div>
 
                   {/* Content preview */}
-                  <p className="text-white text-sm mb-3 line-clamp-3">
+                  <p className="text-white text-base mb-3 line-clamp-3">
                     {post.content.text || <span className="text-gray-500 italic">Media only post</span>}
                   </p>
 
                   {/* Scheduled time */}
-                  <div className="flex items-center space-x-2 text-xs text-gray-400">
-                    <Clock className="w-3 h-3" />
+                  <div className="flex items-center space-x-2 text-sm text-gray-400 mt-10">
+                    <Clock className="w-4 h-4" />
                     <span>Scheduled for {formatDate(post.scheduledFor)}</span>
                   </div>
 
                   {/* Error message for failed posts */}
                   {post.status === 'failed' && post.platformData?.errorMessage && (
-                    <div className="mt-2 p-2 bg-red-900/30 border border-red-800 rounded text-xs text-red-300">
+                    <div className="mt-2 p-2 bg-red-900/30 border border-red-800 rounded text-sm text-red-300">
                       {post.platformData.errorMessage}
                     </div>
                   )}
@@ -213,7 +310,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
                         href={post.platformData.twitterPostUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                        className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
                       >
                         View on Twitter →
                       </a>
