@@ -248,7 +248,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
               key={getPostId(post)}
               className="bg-gray-900 border border-gray-800 rounded-lg p-5 hover:border-gray-700 transition-colors"
             >
-              <div className="flex items-start justify-between">
+              <div className="flex justify-between">
                 {/* Media Preview */}
                 {post.content.mediaUrl && (
                   <div className="mr-4 flex-shrink-0">
@@ -341,7 +341,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
                   </div>
                 )}
 
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 flex flex-col" style={{ minHeight: post.content.mediaUrl ? PREVIEW_HEIGHT : 'auto' }}>
                   {/* Header with platform and status */}
                   <div className="flex items-center space-x-2 mb-2">
                     {getPlatformIcon(post.platform)}
@@ -353,12 +353,15 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
                   </div>
 
                   {/* Content preview */}
-                  <p className="text-white text-base mb-3 line-clamp-3">
+                  <p className="text-white text-base mb-3 line-clamp-2">
                     {post.content.text || <span className="text-gray-500 italic">Media only post</span>}
                   </p>
 
-                  {/* Scheduled time */}
-                  <div className="flex items-center space-x-2 text-sm text-gray-400 mt-10">
+                  {/* Spacer to push scheduled time to bottom */}
+                  <div className="flex-grow"></div>
+
+                  {/* Scheduled time - aligned to bottom */}
+                  <div className="flex items-center space-x-2 text-sm text-gray-400">
                     <Clock className="w-4 h-4" />
                     <span>Scheduled for {formatDate(post.scheduledFor)}</span>
                   </div>
