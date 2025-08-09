@@ -18,12 +18,12 @@ interface TimeOption {
   label: string;
 }
 
-// Generate time options with minute precision
+// Generate time options with minute precision (5-minute increments)
 const generateTimeOptions = (): TimeOption[] => {
   const options: TimeOption[] = [];
   
   for (let hour = 0; hour < 24; hour++) {
-    for (let minute = 0; minute < 60; minute += 15) { // 15-minute intervals for better UX
+    for (let minute = 0; minute < 60; minute += 5) { // 5-minute intervals
       const hourStr = hour.toString().padStart(2, '0');
       const minuteStr = minute.toString().padStart(2, '0');
       const value = `${hourStr}:${minuteStr}`;
@@ -68,10 +68,10 @@ const findNextAvailableTimeSlot = (date: string): string | null => {
   const currentHour = nowPlusFive.getHours();
   const currentMinute = nowPlusFive.getMinutes();
   
-  // Round up to next 15-minute interval
-  const nextQuarterMinute = Math.ceil(currentMinute / 15) * 15;
-  const nextHour = nextQuarterMinute >= 60 ? currentHour + 1 : currentHour;
-  const nextMinute = nextQuarterMinute >= 60 ? 0 : nextQuarterMinute;
+  // Round up to next 5-minute interval
+  const nextBucketMinute = Math.ceil(currentMinute / 5) * 5;
+  const nextHour = nextBucketMinute >= 60 ? currentHour + 1 : currentHour;
+  const nextMinute = nextBucketMinute >= 60 ? 0 : nextBucketMinute;
   
   // Handle hour overflow (past midnight)
   const finalHour = nextHour >= 24 ? 0 : nextHour;

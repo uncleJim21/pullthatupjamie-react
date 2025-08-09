@@ -27,6 +27,13 @@ export interface CreateScheduledPostRequest {
   scheduledFor: string; // ISO date string
   platforms: ('twitter' | 'nostr')[];
   timezone: string;
+  // Optional platform-specific data required by backend for validation (e.g., Nostr signatures)
+  platformData?: {
+    nostrEventId?: string;
+    nostrSignature?: string;
+    nostrPubkey?: string;
+    nostrRelays?: string[];
+  };
 }
 
 export interface UpdateScheduledPostRequest {
@@ -34,6 +41,13 @@ export interface UpdateScheduledPostRequest {
   mediaUrl?: string;
   scheduledFor?: string;
   timezone?: string;
+  // Allow passing platform-specific data on update if required by backend
+  platformData?: {
+    nostrEventId?: string;
+    nostrSignature?: string;
+    nostrPubkey?: string;
+    nostrRelays?: string[];
+  };
 }
 
 export interface ScheduledPostsResponse {

@@ -1000,16 +1000,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         // Close modal
         onClose();
       } else {
-        // Create new scheduled post
-        const enabledPlatforms: ("twitter" | "nostr")[] = [];
-        if (twitterState.enabled && twitterState.available) {
-          enabledPlatforms.push("twitter");
-        }
-        if (nostrState.enabled && nostrState.available && nostrState.authenticated) {
-          enabledPlatforms.push("nostr");
-        }
+        // Create new scheduled post(s) - schedule Nostr first, then Twitter
+        const twitterEnabled = twitterState.enabled && twitterState.available;
+        const nostrEnabled = nostrState.enabled && nostrState.available && nostrState.authenticated;
 
-        if (enabledPlatforms.length === 0) {
+        if (!twitterEnabled && !nostrEnabled) {
           setSchedulingError("Please enable at least one platform");
           return;
         }
@@ -1018,19 +1013,87 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         const signaturePart = signature ? `\n\n${signature}` : "";
         const finalContent = `${content}${signaturePart}`;
 
-        const request: CreateScheduledPostRequest = {
-          text: finalContent,
-          mediaUrl,
-          scheduledFor: scheduledDate.toISOString(),
-          platforms: enabledPlatforms,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        let nostrSucceeded = false;
+        let twitterSucceeded = false;
+
+        // Helper to create a minimal Nostr event for signature validation
+        const createNostrEvent = (text: string, media?: string) => {
+          const evt: any = {
+            kind: 1,
+            created_at: Math.floor(Date.now() / 1000),
+            content: text,
+            tags: [] as any[],
+          };
+          if (media) {
+            evt.tags.push(["r", media]);
+          }
+          return evt;
         };
 
-        const scheduledPosts = await ScheduledPostService.createScheduledPost(request);
-        printLog(`Successfully scheduled ${scheduledPosts.length} posts`);
-        
-        // Show success and close modal
-        setShowSuccessModal(true);
+        // Schedule Nostr first if enabled
+        if (nostrEnabled) {
+          try {
+            if (!window.nostr) {
+              throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
+            }
+            const eventToSign = createNostrEvent(finalContent, mediaUrl || undefined);
+            const signedEvent = await window.nostr.signEvent(eventToSign);
+
+            const nostrRequest: CreateScheduledPostRequest = {
+              text: finalContent,
+              mediaUrl,
+              scheduledFor: scheduledDate.toISOString(),
+              platforms: ["nostr"],
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              platformData: {
+                nostrEventId: signedEvent.id,
+                nostrSignature: signedEvent.sig,
+                nostrPubkey: signedEvent.pubkey,
+                nostrRelays: relayPool,
+              },
+            };
+
+            const nostrResult = await ScheduledPostService.createScheduledPost(nostrRequest);
+            printLog(`Successfully scheduled ${nostrResult.length} Nostr post(s)`);
+            nostrSucceeded = true;
+          } catch (error: any) {
+            console.error("Error scheduling Nostr post:", error);
+            const message = (error instanceof Error ? error.message : String(error)) || '';
+            if (message.toLowerCase().includes('signature')) {
+              setSchedulingError('Nostr signature validation failed. Please confirm your Nostr extension is connected and try again.');
+            } else {
+              setSchedulingError(message || 'Failed to schedule Nostr post.');
+            }
+            // Do not proceed to Twitter scheduling if Nostr fails
+            return;
+          }
+        }
+
+        // Schedule Twitter second if enabled
+        if (twitterEnabled) {
+          try {
+            const twitterRequest: CreateScheduledPostRequest = {
+              text: finalContent,
+              mediaUrl,
+              scheduledFor: scheduledDate.toISOString(),
+              platforms: ["twitter"],
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+            const twitterResult = await ScheduledPostService.createScheduledPost(twitterRequest);
+            printLog(`Successfully scheduled ${twitterResult.length} Twitter post(s)`);
+            twitterSucceeded = true;
+          } catch (error: any) {
+            console.error('Error scheduling Twitter post:', error);
+            const message = (error instanceof Error ? error.message : String(error)) || '';
+            setSchedulingError(message || 'Failed to schedule Twitter post.');
+            // We intentionally do not early return here since Nostr already succeeded
+          }
+        }
+
+        // Show success if at least one platform scheduled successfully
+        if ((nostrEnabled && nostrSucceeded) || (twitterEnabled && twitterSucceeded)) {
+          setShowSuccessModal(true);
+        }
       }
     } catch (error) {
       console.error("Error scheduling post:", error);
