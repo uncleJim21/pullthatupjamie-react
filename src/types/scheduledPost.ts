@@ -1,5 +1,6 @@
 export interface ScheduledPost {
   postId: string;
+  _id?: string; // MongoDB ID field (for backend compatibility)
   adminEmail: string;
   platform: 'twitter' | 'nostr';
   status: 'scheduled' | 'processing' | 'posted' | 'failed' | 'cancelled';

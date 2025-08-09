@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Twitter, Edit, Trash2, RefreshCw, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import ScheduledPostService from '../services/scheduledPostService.ts';
 import { ScheduledPost, ScheduledPostsQuery } from '../types/scheduledPost.ts';
+import SocialShareModal from './SocialShareModal.tsx';
+import { SocialPlatform } from './SocialShareModal.tsx';
 
 // Constants for preview sizing (matching SocialShareModal)
 const ASPECT_RATIO = 16 / 9;
@@ -17,6 +19,15 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'posted' | 'failed'>('all');
+  
+  // Edit modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
+
+  // Helper function to get the correct ID (handles both postId and _id)
+  const getPostId = (post: ScheduledPost): string => {
+    return post.postId || post._id || '';
+  };
 
   // Load scheduled posts
   const loadPosts = async () => {
@@ -114,6 +125,34 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
     }
   };
 
+  // Handle edit
+  const handleEdit = (post: ScheduledPost) => {
+    setSelectedPost(post);
+    setIsEditModalOpen(true);
+  };
+
+  // Handle edit modal close
+  const handleEditModalClose = () => {
+    setIsEditModalOpen(false);
+    setSelectedPost(null);
+  };
+
+  // Handle post update
+  const handlePostUpdate = (updatedPost: ScheduledPost) => {
+    // Update the post in the local state (optimistic update)
+    setPosts(prevPosts => 
+      prevPosts.map(post => 
+        getPostId(post) === getPostId(updatedPost) ? updatedPost : post
+      )
+    );
+    
+    // Close the modal
+    handleEditModalClose();
+    
+    // Optionally refresh the list to ensure consistency with server
+    // loadPosts();
+  };
+
   return (
     <div className={className}>
       {/* Header */}
@@ -178,7 +217,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
         <div className="space-y-3">
           {posts.map((post) => (
             <div
-              key={post.postId}
+              key={getPostId(post)}
               className="bg-gray-900 border border-gray-800 rounded-lg p-5 hover:border-gray-700 transition-colors"
             >
               <div className="flex items-start justify-between">
@@ -322,7 +361,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
                 <div className="flex items-center space-x-2 ml-4">
                   {post.status === 'scheduled' && (
                     <button
-                      onClick={() => console.log('Edit post:', post.postId)} // TODO: Implement edit
+                      onClick={() => handleEdit(post)}
                       className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
                       title="Edit"
                     >
@@ -332,7 +371,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
                   
                   {post.status === 'failed' && (
                     <button
-                      onClick={() => handleRetry(post.postId)}
+                      onClick={() => handleRetry(getPostId(post))}
                       className="p-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 transition-colors"
                       title="Retry"
                     >
@@ -342,7 +381,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
 
                   {(post.status === 'scheduled' || post.status === 'failed') && (
                     <button
-                      onClick={() => handleDelete(post.postId)}
+                      onClick={() => handleDelete(getPostId(post))}
                       className="p-2 rounded-lg bg-red-600 hover:bg-red-500 transition-colors"
                       title="Delete"
                     >
@@ -355,10 +394,27 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
           ))}
         </div>
       )}
+
+      {/* Edit Modal */}
+      {selectedPost && (
+        <SocialShareModal
+          isOpen={isEditModalOpen}
+          onClose={handleEditModalClose}
+          fileUrl={selectedPost.content.mediaUrl || ''}
+          itemName="scheduled post"
+          onComplete={() => {}} // Not used in update mode
+          platform={selectedPost.platform === 'twitter' ? SocialPlatform.Twitter : SocialPlatform.Nostr}
+          updateContext={{
+            scheduledPost: {
+              ...selectedPost,
+              postId: getPostId(selectedPost) // Ensure postId is set correctly
+            },
+            onUpdate: handlePostUpdate
+          }}
+        />
+      )}
     </div>
   );
-
-
 };
 
 export default ScheduledPostsList;

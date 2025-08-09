@@ -12,7 +12,7 @@ import DateTimePicker from './DateTimePicker.tsx';
 import { MentionResult } from '../types/mention.ts';
 import { useStreamingMentionSearch } from '../hooks/useStreamingMentionSearch.ts';
 import ScheduledPostService from '../services/scheduledPostService.ts';
-import { CreateScheduledPostRequest } from '../types/scheduledPost.ts';
+import { CreateScheduledPostRequest, ScheduledPost } from '../types/scheduledPost.ts';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -63,6 +63,11 @@ interface SocialShareModalProps {
   renderUrl?: string; // URL to use in place of fileUrl for Twitter sharing
   lookupHash?: string; // Added lookupHash for Jamie Assist
   auth?: any; // Auth object for API calls
+  // Update context props
+  updateContext?: {
+    scheduledPost: ScheduledPost;
+    onUpdate: (updatedPost: ScheduledPost) => void;
+  };
 }
 
 // Simplified unified state interface
@@ -197,7 +202,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   platform,
   renderUrl,
   lookupHash,
-  auth
+  auth,
+  updateContext
 }) => {
   const [content, setContent] = useState<string>('');
   
@@ -261,6 +267,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
   const [isScheduling, setIsScheduling] = useState(false);
   const [schedulingError, setSchedulingError] = useState<string | null>(null);
+  
+  // Check if we're in update mode
+  const isUpdateMode = !!updateContext;
 
   // Add state for mentions lookup
   const [showMentionsLookup, setShowMentionsLookup] = useState(false);
@@ -435,8 +444,27 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   // Initialize content with default text and check for Nostr extension if needed
   useEffect(() => {
-    // No default content, empty textarea with just placeholder
-    setContent('');
+    if (isUpdateMode && updateContext) {
+      // Update mode: populate with existing scheduled post data
+      const scheduledPost = updateContext.scheduledPost;
+      setContent(scheduledPost.content.text || '');
+      setIsSchedulingMode(true);
+      setScheduledDate(new Date(scheduledPost.scheduledFor));
+      
+      // Set platform states based on the scheduled post's platform
+      if (scheduledPost.platform === 'twitter') {
+        setTwitterState(prev => ({ ...prev, enabled: true }));
+        setNostrState(prev => ({ ...prev, enabled: false }));
+      } else if (scheduledPost.platform === 'nostr') {
+        setTwitterState(prev => ({ ...prev, enabled: false }));
+        setNostrState(prev => ({ ...prev, enabled: true }));
+      }
+    } else {
+      // Create mode: empty content
+      setContent('');
+      setIsSchedulingMode(false);
+      setScheduledDate(undefined);
+    }
     
     // Check Nostr platform
     checkNostrExtension();
@@ -460,7 +488,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         }
       });
     };
-  }, [fileUrl, itemName, isOpen]);
+  }, [fileUrl, itemName, isOpen, isUpdateMode, updateContext]);
 
   // Effect to check for Nostr extension when modal opens
   useEffect(() => {
@@ -910,41 +938,74 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       return;
     }
 
-    const enabledPlatforms: ("twitter" | "nostr")[] = [];
-    if (twitterState.enabled && twitterState.available) {
-      enabledPlatforms.push("twitter");
-    }
-    if (nostrState.enabled && nostrState.available && nostrState.authenticated) {
-      enabledPlatforms.push("nostr");
-    }
-
-    if (enabledPlatforms.length === 0) {
-      setSchedulingError("Please enable at least one platform");
-      return;
-    }
-
     setIsScheduling(true);
     setSchedulingError(null);
 
     try {
-      const mediaUrl = fileUrl || renderUrl || "";
-      const signature = getUserSignature();
-      const signaturePart = signature ? `\n\n${signature}` : "";
-      const finalContent = `${content}${signaturePart}`;
+      if (isUpdateMode && updateContext) {
+        // Update existing scheduled post
+        const signature = getUserSignature();
+        const signaturePart = signature ? `\n\n${signature}` : "";
+        const finalContent = `${content}${signaturePart}`;
 
-      const request: CreateScheduledPostRequest = {
-        text: finalContent,
-        mediaUrl,
-        scheduledFor: scheduledDate.toISOString(),
-        platforms: enabledPlatforms,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      };
+        // Get the correct post ID (handles both postId and _id)
+        const postId = updateContext.scheduledPost.postId || updateContext.scheduledPost._id;
+        console.log('Update mode - Post ID:', postId, 'Post object:', updateContext.scheduledPost);
 
-      const scheduledPosts = await ScheduledPostService.createScheduledPost(request);
-      printLog(`Successfully scheduled ${scheduledPosts.length} posts`);
-      
-      // Show success and close modal
-      setShowSuccessModal(true);
+        if (!postId) {
+          throw new Error('No valid post ID found for update');
+        }
+
+        const updatedPost = await ScheduledPostService.updateScheduledPost(
+          postId,
+          {
+            text: finalContent,
+            mediaUrl: mediaUrl,
+            scheduledFor: scheduledDate.toISOString(),
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          }
+        );
+
+        printLog(`Successfully updated scheduled post: ${updatedPost.postId}`);
+        
+        // Call the update callback
+        updateContext.onUpdate(updatedPost);
+        
+        // Close modal
+        onClose();
+      } else {
+        // Create new scheduled post
+        const enabledPlatforms: ("twitter" | "nostr")[] = [];
+        if (twitterState.enabled && twitterState.available) {
+          enabledPlatforms.push("twitter");
+        }
+        if (nostrState.enabled && nostrState.available && nostrState.authenticated) {
+          enabledPlatforms.push("nostr");
+        }
+
+        if (enabledPlatforms.length === 0) {
+          setSchedulingError("Please enable at least one platform");
+          return;
+        }
+
+        const signature = getUserSignature();
+        const signaturePart = signature ? `\n\n${signature}` : "";
+        const finalContent = `${content}${signaturePart}`;
+
+        const request: CreateScheduledPostRequest = {
+          text: finalContent,
+          mediaUrl,
+          scheduledFor: scheduledDate.toISOString(),
+          platforms: enabledPlatforms,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+
+        const scheduledPosts = await ScheduledPostService.createScheduledPost(request);
+        printLog(`Successfully scheduled ${scheduledPosts.length} posts`);
+        
+        // Show success and close modal
+        setShowSuccessModal(true);
+      }
     } catch (error) {
       console.error("Error scheduling post:", error);
       setSchedulingError(error instanceof Error ? error.message : "Failed to schedule post");
@@ -1769,59 +1830,63 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           </div>
         )}
         
-        {/* Jamie Assist button and info button */}
-        <div className="flex justify-center mb-3">
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleJamieAssist}
-              disabled={isGeneratingContent || isPublishing || !lookupHash}
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
-                ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
-            >
-              {isGeneratingContent ? (
-                <span className="flex items-center">
-                  <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                  Generating...
-                </span>
-              ) : (
-                <span className="flex items-center">
-                  <Sparkles className="w-4 h-4 mr-1 sm:mr-2" />
-                  Jamie Assist
-                </span>
-              )}
-            </button>
-            
-            <button
-              onClick={() => setShowInfoModal(true)}
-              className="flex items-center space-x-1 px-2 py-1 rounded-full border border-gray-700 group hover:bg-gray-800 hover:border-amber-500/30 transition-colors"
-              title="About Jamie Assist"
-              aria-label="Learn more about Jamie Assist"
-            >
-              <Info className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-500" />
-            </button>
+        {/* Jamie Assist button and info button - hidden in update mode */}
+        {!isUpdateMode && (
+          <div className="flex justify-center mb-3">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleJamieAssist}
+                disabled={isGeneratingContent || isPublishing || !lookupHash}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
+                  ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
+              >
+                {isGeneratingContent ? (
+                  <span className="flex items-center">
+                    <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                    Generating...
+                  </span>
+                ) : (
+                  <span className="flex items-center">
+                    <Sparkles className="w-4 h-4 mr-1 sm:mr-2" />
+                    Jamie Assist
+                  </span>
+                )}
+              </button>
+              
+              <button
+                onClick={() => setShowInfoModal(true)}
+                className="flex items-center space-x-1 px-2 py-1 rounded-full border border-gray-700 group hover:bg-gray-800 hover:border-amber-500/30 transition-colors"
+                title="About Jamie Assist"
+                aria-label="Learn more about Jamie Assist"
+              >
+                <Info className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-500" />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
         
         {/* Scheduling Section */}
         <div className="mb-4 sm:mb-6">
-          <div className="flex justify-center mb-3">
-            <button
-              onClick={() => setIsSchedulingMode(!isSchedulingMode)}
-              disabled={isGeneratingContent || isPublishing}
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium flex items-center
-                ${isSchedulingMode 
-                  ? "bg-white text-black hover:bg-gray-100" 
-                  : "bg-black border border-white text-white hover:bg-gray-900"
-                } ${(isGeneratingContent || isPublishing) ? 'opacity-50 cursor-not-allowed' : 'transition-colors'}`}
-            >
-              <Clock className="w-4 h-4 mr-1 sm:mr-2" />
-              Schedule
-            </button>
-          </div>
+          {!isUpdateMode && (
+            <div className="flex justify-center mb-3">
+              <button
+                onClick={() => setIsSchedulingMode(!isSchedulingMode)}
+                disabled={isGeneratingContent || isPublishing}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium flex items-center
+                  ${isSchedulingMode 
+                    ? "bg-white text-black hover:bg-gray-100" 
+                    : "bg-black border border-white text-white hover:bg-gray-900"
+                  } ${(isGeneratingContent || isPublishing) ? 'opacity-50 cursor-not-allowed' : 'transition-colors'}`}
+              >
+                <Clock className="w-4 h-4 mr-1 sm:mr-2" />
+                Schedule
+              </button>
+            </div>
+          )}
           {isSchedulingMode && (
             <div className="text-center mb-3">
               <span className="text-xs text-gray-400">
-                Choose when to publish this post
+                {isUpdateMode ? 'Edit scheduled time' : 'Choose when to publish this post'}
               </span>
             </div>
           )}
@@ -1871,20 +1936,20 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           {isSchedulingMode ? (
             <button
               onClick={handleSchedule}
-              disabled={isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled) || !scheduledDate}
+              disabled={isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate}
               className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-black border border-white text-white font-medium 
-                ${(isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled) || !scheduledDate) ? 
+                ${(isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate) ? 
                   'opacity-50 cursor-not-allowed' : 'hover:bg-gray-900 transition-colors'}`}
             >
               {isScheduling ? (
                 <span className="flex items-center">
                   <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                  Scheduling...
+                  {isUpdateMode ? 'Updating...' : 'Scheduling...'}
                 </span>
               ) : (
                 <span className="flex items-center">
                   <Clock className="w-4 h-4 mr-1 sm:mr-2" />
-                  Schedule
+                  {isUpdateMode ? 'Update' : 'Schedule'}
                 </span>
               )}
             </button>

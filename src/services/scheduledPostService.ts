@@ -11,6 +11,9 @@ import { API_URL, printLog } from '../constants/constants.ts';
 export class ScheduledPostService {
   private static getAuthHeaders(): HeadersInit {
     const token = localStorage.getItem('auth_token');
+    if (!token) {
+      throw new Error('No auth token found');
+    }
     return {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
@@ -20,6 +23,12 @@ export class ScheduledPostService {
 
   private static async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
+      if (response.status === 401) {
+        // Clear invalid token and throw auth error
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('squareId');
+        throw new Error('Authentication failed. Please sign in again.');
+      }
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`;
       throw new Error(errorMessage);
