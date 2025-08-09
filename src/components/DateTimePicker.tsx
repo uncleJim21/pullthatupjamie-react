@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Calendar, Clock, ChevronDown } from 'lucide-react';
 import CustomCalendar from './CustomCalendar.tsx';
+import { printLog } from '../constants/constants.ts';
 
 interface DateTimePickerProps {
   value?: Date;
@@ -40,6 +41,68 @@ const generateTimeOptions = (): TimeOption[] => {
 
 const timeOptions = generateTimeOptions();
 
+// Function to find the next available time slot closest to current time
+const findNextAvailableTimeSlot = (date: string): string | null => {
+  printLog('🔍 findNextAvailableTimeSlot called with date: ' + date);
+  
+  if (!date) {
+    printLog('❌ No date provided, returning null');
+    return null;
+  }
+  
+  const now = new Date();
+  const selectedDate = new Date(date + 'T00:00:00');
+  const isToday = selectedDate.toDateString() === now.toDateString();
+  
+  printLog('📅 Date comparison: now=' + now.toDateString() + ', selected=' + selectedDate.toDateString() + ', isToday=' + isToday);
+  
+  if (!isToday) {
+    // If it's a future date, return the first time slot
+    printLog('🔮 Future date, returning first time slot: ' + timeOptions[0].value);
+    return timeOptions[0].value;
+  }
+  
+  // For today, find the next available time slot (at least 5 minutes from now)
+  const nowPlusFive = new Date(now.getTime() + 5 * 60 * 1000); // Add 5 minutes
+  const currentHour = nowPlusFive.getHours();
+  const currentMinute = nowPlusFive.getMinutes();
+  
+  // Round up to next 15-minute interval
+  const nextQuarterMinute = Math.ceil(currentMinute / 15) * 15;
+  const nextHour = nextQuarterMinute >= 60 ? currentHour + 1 : currentHour;
+  const nextMinute = nextQuarterMinute >= 60 ? 0 : nextQuarterMinute;
+  
+  // Handle hour overflow (past midnight)
+  const finalHour = nextHour >= 24 ? 0 : nextHour;
+  
+  // Format as HH:MM
+  const nextTimeValue = `${finalHour.toString().padStart(2, '0')}:${nextMinute.toString().padStart(2, '0')}`;
+  
+  printLog('⏰ Time calculation: now=' + now.toLocaleTimeString() + ', nextTime=' + nextTimeValue + ', currentMin=' + currentMinute + ', nextMin=' + nextMinute);
+  
+  // If we've gone past midnight, return null (no valid time today)
+  if (nextHour >= 24) {
+    printLog('❌ Past midnight, no valid time today');
+    return null;
+  }
+  
+  // Find this exact time in our options first
+  let targetIndex = timeOptions.findIndex(option => option.value === nextTimeValue);
+  
+  printLog('🎯 Looking for time ' + nextTimeValue + ', found at index: ' + targetIndex);
+  
+  // If exact time not found, find the first time after our calculated time
+  if (targetIndex === -1) {
+    targetIndex = timeOptions.findIndex(option => option.value > nextTimeValue);
+    printLog('🔄 Fallback search, found at index: ' + targetIndex);
+  }
+  
+  const result = targetIndex >= 0 ? timeOptions[targetIndex].value : null;
+  printLog('✅ Final result: ' + result);
+  
+  return result;
+};
+
 // Timezone utilities
 const getUserTimezone = (): string => {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -76,6 +139,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   
   const isInitializingRef = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeDropdownRef = useRef<HTMLDivElement | null>(null);
 
   // Debounced onChange to prevent feedback loops
   const debouncedOnChange = useCallback((date: Date) => {
@@ -110,6 +174,28 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     }
   }, [value]);
 
+  // Auto-select time when date changes or component mounts
+  useEffect(() => {
+    if (selectedDate && !selectedTime && !isInitializingRef.current) {
+      printLog('🎯 Date selected but no time, auto-selecting...');
+      const nextAvailableTime = findNextAvailableTimeSlot(selectedDate);
+      if (nextAvailableTime) {
+        printLog('⚡ Auto-setting time to: ' + nextAvailableTime);
+        setSelectedTime(nextAvailableTime);
+      }
+    }
+  }, [selectedDate, selectedTime]);
+
+  // Auto-select today's date and time if no value is provided
+  useEffect(() => {
+    if (!value && !selectedDate && !isInitializingRef.current) {
+      printLog('🔄 No initial value, setting today and auto-selecting time...');
+      const today = new Date().toISOString().split('T')[0];
+      setSelectedDate(today);
+      // Time will be auto-selected by the effect above
+    }
+  }, [value, selectedDate]);
+
   // Update parent when date or time changes
   useEffect(() => {
     if (selectedDate && selectedTime && !isInitializingRef.current) {
@@ -123,6 +209,34 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
       debouncedOnChange(userDateTime);
     }
   }, [selectedDate, selectedTime, debouncedOnChange]);
+
+  // Auto-scroll to next available time when dropdown opens
+  useEffect(() => {
+    printLog('🔄 Auto-scroll useEffect triggered: dropdown=' + showTimeDropdown + ', date=' + selectedDate + ', time=' + selectedTime);
+    
+    if (showTimeDropdown && timeDropdownRef.current && selectedDate) {
+      let timeToScrollTo = selectedTime;
+      
+      // Find the index of the time to scroll to
+      if (timeToScrollTo) {
+        const targetIndex = timeOptions.findIndex(option => option.value === timeToScrollTo);
+        printLog('📍 Scrolling to time: ' + timeToScrollTo + ' at index ' + targetIndex);
+        
+        if (targetIndex >= 0) {
+          // Use requestAnimationFrame for better timing
+          requestAnimationFrame(() => {
+            if (timeDropdownRef.current) {
+              const optionHeight = 40; // Height of each option button
+              const containerHeight = timeDropdownRef.current.clientHeight;
+              const scrollTop = Math.max(0, targetIndex * optionHeight - containerHeight / 2 + optionHeight / 2);
+              printLog('📜 Scrolling dropdown to position: ' + scrollTop);
+              timeDropdownRef.current.scrollTop = scrollTop;
+            }
+          });
+        }
+      }
+    }
+  }, [showTimeDropdown, selectedDate]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -147,19 +261,86 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
   const handleCustomDateSelect = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
+    printLog('📅 Date selected: ' + dateStr);
     setSelectedDate(dateStr);
     handleCalendarClose();
     
-    // Auto-set time if needed
+    // Auto-set time if needed using our new function
     if (!selectedTime || isDateTimeInPast(dateStr, selectedTime)) {
-      const now = new Date();
-      now.setMinutes(now.getMinutes() + 5);
-      const nextQuarter = Math.ceil(now.getMinutes() / 15) * 15;
-      const hours = nextQuarter >= 60 ? now.getHours() + 1 : now.getHours();
-      const minutes = nextQuarter >= 60 ? 0 : nextQuarter;
+      printLog('🔄 Auto-setting time for new date...');
+      const nextAvailableTime = findNextAvailableTimeSlot(dateStr);
+      printLog('⏰ Next available time for date: ' + nextAvailableTime);
+      if (nextAvailableTime) {
+        printLog('✅ Setting time to: ' + nextAvailableTime);
+        setSelectedTime(nextAvailableTime);
+      }
+    }
+  };
+
+  // Mouse wheel handler for time
+  const handleTimeWheel = (e: React.WheelEvent) => {
+    printLog('🖱️ Time wheel event triggered! deltaY=' + e.deltaY);
+    
+    if (!selectedDate || disabled || showTimeDropdown) {
+      printLog('❌ Time wheel blocked: date=' + selectedDate + ', disabled=' + disabled + ', dropdown=' + showTimeDropdown);
+      return; // Don't trigger if dropdown is open
+    }
+    
+    printLog('✅ Time wheel proceeding with change');
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const currentIndex = selectedTime 
+      ? timeOptions.findIndex(option => option.value === selectedTime)
+      : timeOptions.findIndex(option => option.value === findNextAvailableTimeSlot(selectedDate));
+    
+    if (currentIndex === -1) return;
+    
+    const direction = e.deltaY > 0 ? 1 : -1; // Scroll down = next time, scroll up = previous time
+    let newIndex = currentIndex + direction;
+    
+    // Ensure we stay within bounds and don't select past times
+    while (newIndex >= 0 && newIndex < timeOptions.length) {
+      const newTime = timeOptions[newIndex];
+      if (!isDateTimeInPast(selectedDate, newTime.value)) {
+        setSelectedTime(newTime.value);
+        break;
+      }
+      newIndex += direction;
+    }
+  };
+
+  // Mouse wheel handler for date
+  const handleDateWheel = (e: React.WheelEvent) => {
+    printLog('📅 Date wheel event triggered! deltaY=' + e.deltaY);
+    
+    if (disabled || showCalendar) {
+      printLog('❌ Date wheel blocked: disabled=' + disabled + ', calendar=' + showCalendar);
+      return; // Don't trigger if calendar is open
+    }
+    
+    printLog('✅ Date wheel proceeding with change');
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const currentDate = selectedDate ? new Date(selectedDate + 'T00:00:00') : new Date();
+    const direction = e.deltaY > 0 ? 1 : -1; // Scroll down = next day, scroll up = previous day
+    
+    const newDate = new Date(currentDate);
+    newDate.setDate(currentDate.getDate() + direction);
+    
+    // Don't go before minDate
+    if (newDate >= minDate) {
+      const newDateStr = newDate.toISOString().split('T')[0];
+      setSelectedDate(newDateStr);
       
-      const timeValue = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      setSelectedTime(timeValue);
+      // Auto-adjust time if current time is now in the past for the new date
+      if (selectedTime && isDateTimeInPast(newDateStr, selectedTime)) {
+        const nextAvailableTime = findNextAvailableTimeSlot(newDateStr);
+        if (nextAvailableTime) {
+          setSelectedTime(nextAvailableTime);
+        }
+      }
     }
   };
 
@@ -207,6 +388,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
           <button
             type="button"
             onClick={() => showCalendar ? handleCalendarClose() : setShowCalendar(true)}
+            onWheel={handleDateWheel}
             disabled={disabled}
             className="w-full bg-gray-900 text-white border border-gray-700 rounded-lg pl-10 pr-4 py-3 
                      text-left focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500
@@ -243,6 +425,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
           <button
             type="button"
             onClick={() => setShowTimeDropdown(!showTimeDropdown)}
+            onWheel={handleTimeWheel}
             disabled={disabled || !selectedDate}
             className="w-full bg-gray-900 text-white border border-gray-700 rounded-lg pl-10 pr-10 py-3 
                      text-left focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500
@@ -261,7 +444,9 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
           
           {/* Time Dropdown */}
           {showTimeDropdown && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 
+            <div 
+              ref={timeDropdownRef}
+              className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 
                           rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
               {timeOptions.map((option) => {
                 const isPastTime = selectedDate && isDateTimeInPast(selectedDate, option.value);
