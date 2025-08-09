@@ -68,6 +68,7 @@ interface SocialShareModalProps {
     scheduledPost: ScheduledPost;
     onUpdate: (updatedPost: ScheduledPost) => void;
   };
+  onSchedulingModeChange?: (isScheduling: boolean, hasDropdowns: boolean) => void;
 }
 
 // Simplified unified state interface
@@ -203,7 +204,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   renderUrl,
   lookupHash,
   auth,
-  updateContext
+  updateContext,
+  onSchedulingModeChange
 }) => {
   const [content, setContent] = useState<string>('');
   
@@ -267,6 +269,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
   const [isScheduling, setIsScheduling] = useState(false);
   const [schedulingError, setSchedulingError] = useState<string | null>(null);
+  const [hasOpenDropdowns, setHasOpenDropdowns] = useState(false);
+  const [pendingScheduledDate, setPendingScheduledDate] = useState<Date | undefined>(undefined);
   
   // Check if we're in update mode
   const isUpdateMode = !!updateContext;
@@ -313,6 +317,27 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   useEffect(() => {
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
+
+  // Notify parent of scheduling mode and dropdown state changes
+  useEffect(() => {
+    if (onSchedulingModeChange) {
+      onSchedulingModeChange(isSchedulingMode, hasOpenDropdowns);
+    }
+  }, [isSchedulingMode, hasOpenDropdowns, onSchedulingModeChange]);
+
+  // Disable body scroll when scheduling mode is active and no dropdowns are open
+  useEffect(() => {
+    if (isOpen && isSchedulingMode && !hasOpenDropdowns) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, isSchedulingMode, hasOpenDropdowns]);
 
 
 
@@ -448,7 +473,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       // Update mode: populate with existing scheduled post data
       const scheduledPost = updateContext.scheduledPost;
       setContent(scheduledPost.content.text || '');
-      setIsSchedulingMode(true);
+      // Start in non-scheduling mode when editing so all items are visible
+      setIsSchedulingMode(false);
       setScheduledDate(new Date(scheduledPost.scheduledFor));
       
       // Set platform states based on the scheduled post's platform
@@ -1455,30 +1481,33 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     // Main unified interface
     return (
       <>
-        <div className="flex items-center mb-3 sm:mb-4 px-2">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-800 mr-2 sm:mr-3 flex items-center justify-center overflow-hidden">
-            <img src="/twitter-nostr-crosspost.png" alt="Twitter and Nostr" className="w-8 h-8 object-cover" />
-          </div>
-          <div className="text-left flex-1">
-            <p className="text-white font-medium">Your Post</p>
-          </div>
-        </div>
-        
-        {/* Preview Section (between label and textarea) */}
-        <div
-          style={{
-            width: PREVIEW_WIDTH,
-            height: PREVIEW_HEIGHT,
-            position: 'relative',
-            background: '#222',
-            borderRadius: 8,
-            overflow: 'hidden',
-            margin: '0 auto 16px auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+        {/* Hide header and preview when in scheduling mode */}
+        {!isSchedulingMode && (
+          <>
+            <div className="flex items-center mb-3 sm:mb-4 px-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-800 mr-2 sm:mr-3 flex items-center justify-center overflow-hidden">
+                <img src="/twitter-nostr-crosspost.png" alt="Twitter and Nostr" className="w-8 h-8 object-cover" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-white font-medium">Your Post</p>
+              </div>
+            </div>
+            
+            {/* Preview Section (between label and textarea) */}
+            <div
+              style={{
+                width: PREVIEW_WIDTH,
+                height: PREVIEW_HEIGHT,
+                position: 'relative',
+                background: '#222',
+                borderRadius: 8,
+                overflow: 'hidden',
+                margin: '0 auto 16px auto',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
           {/* Shimmer while loading */}
           {!previewLoaded && !thumbnailFailed && (
             <div
@@ -1583,18 +1612,21 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               </svg>
             </div>
           )}
-        </div>
+          </div>
+        </>
+        )}
         
-        <div className="relative">
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={handleContentChange}
-            onKeyDown={handleTextareaKeyDown}
-            className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
-            placeholder={`Write about this ${itemName}...`}
-            style={{ resize: "none", height: "120px", minHeight: "100px" }}
-          />
+        {!isSchedulingMode && (
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={handleContentChange}
+              onKeyDown={handleTextareaKeyDown}
+              className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
+              placeholder={`Write about this ${itemName}...`}
+              style={{ resize: "none", height: "120px", minHeight: "100px" }}
+            />
           
                   {/* Mentions Lookup Overlay */}
         {showMentionsLookup && (
@@ -1646,24 +1678,27 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           isOpen={showPinManagement}
           onClose={() => setShowPinManagement(false)}
         />
-        </div>
-        
-        <div className="flex items-center justify-between mb-2 sm:mb-3">
-          <div className="text-gray-400 text-xs pl-1">
-            The link to your {itemName}, attribution, and a signature will be added automatically when you publish.
           </div>
-          <button
-            onClick={() => setShowPinManagement(true)}
-            className="flex items-center space-x-1 text-xs text-gray-400 hover:text-yellow-500 transition-colors"
-            title="Manage pinned mentions"
-          >
-            <Pin className="w-3 h-3" />
-            <span>Pins</span>
-          </button>
-        </div>
+        )}
         
-        {/* Platform Selection with Checkboxes */}
-        <div className="mb-6">
+        {!isSchedulingMode && (
+          <>
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <div className="text-gray-400 text-xs pl-1">
+                The link to your {itemName}, attribution, and a signature will be added automatically when you publish.
+              </div>
+              <button
+                onClick={() => setShowPinManagement(true)}
+                className="flex items-center space-x-1 text-xs text-gray-400 hover:text-yellow-500 transition-colors"
+                title="Manage pinned mentions"
+              >
+                <Pin className="w-3 h-3" />
+                <span>Pins</span>
+              </button>
+            </div>
+            
+            {/* Platform Selection with Checkboxes */}
+            <div className="mb-6">
           <div className="space-y-3">
             {/* Twitter Platform */}
             <div className="flex items-center justify-between p-3 bg-gray-900/60 border border-gray-700 rounded-lg">
@@ -1779,10 +1814,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               </div>
             </div>
           </div>
-        </div>
-        
-        {/* Jamie Assist Advanced Preferences */}
-        <div className="mb-4 sm:mb-6">
+            </div>
+            
+            {/* Jamie Assist Advanced Preferences */}
+            <div className="mb-4 sm:mb-6">
           <button 
             onClick={() => setShowAdvancedPrefs(!showAdvancedPrefs)}
             className="flex items-center text-gray-400 hover:text-white text-sm mb-1 sm:mb-2"
@@ -1813,7 +1848,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               </div>
             </div>
           )}
-        </div>
+            </div>
+          </>
+        )}
         
         {/* Publishing status for enabled platforms */}
         {isPublishing && (
@@ -1830,8 +1867,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           </div>
         )}
         
-        {/* Jamie Assist button and info button - hidden in update mode */}
-        {!isUpdateMode && (
+        {/* Jamie Assist button and info button */}
+        {!isSchedulingMode && (
           <div className="flex justify-center mb-3">
             <div className="flex items-center space-x-2">
               <button
@@ -1867,22 +1904,32 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         {/* Scheduling Section */}
         <div className="mb-4 sm:mb-6">
-          {!isUpdateMode && (
-            <div className="flex justify-center mb-3">
+          <div className="flex flex-col items-center mb-3">
+            <div className="flex items-center space-x-3">
               <button
-                onClick={() => setIsSchedulingMode(!isSchedulingMode)}
+                onClick={() => {
+                  if (!isSchedulingMode) {
+                    setPendingScheduledDate(scheduledDate);
+                  }
+                  setIsSchedulingMode(!isSchedulingMode);
+                }}
                 disabled={isGeneratingContent || isPublishing}
                 className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium flex items-center
                   ${isSchedulingMode 
                     ? "bg-white text-black hover:bg-gray-100" 
-                    : "bg-black border border-white text-white hover:bg-gray-900"
-                  } ${(isGeneratingContent || isPublishing) ? 'opacity-50 cursor-not-allowed' : 'transition-colors'}`}
+                    : "bg-black border border-white text-white hover:bg-gray-900"}
+                  ${(isGeneratingContent || isPublishing) ? ' opacity-50 cursor-not-allowed' : ' transition-colors'}`}
               >
                 <Clock className="w-4 h-4 mr-1 sm:mr-2" />
-                Schedule
+                {isSchedulingMode ? 'Close Scheduler' : 'Schedule'}
               </button>
+              {!isSchedulingMode && scheduledDate && (
+                <span className="text-xs text-gray-400">
+                  Scheduled for {new Date(scheduledDate).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                </span>
+              )}
             </div>
-          )}
+          </div>
           {isSchedulingMode && (
             <div className="text-center mb-3">
               <span className="text-xs text-gray-400">
@@ -1894,10 +1941,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           {isSchedulingMode && (
             <div className="space-y-3">
               <DateTimePicker
-                value={scheduledDate}
-                onChange={setScheduledDate}
+                value={pendingScheduledDate ?? scheduledDate}
+                onChange={setPendingScheduledDate}
                 placeholder="Select date and time"
                 className=""
+                onDropdownStateChange={setHasOpenDropdowns}
               />
               
               {schedulingError && (
@@ -1924,50 +1972,69 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         )}
         
         <div className="flex space-x-3 sm:space-x-4 justify-center">
-          <button
-            onClick={onClose}
-            disabled={isPublishing || isGeneratingContent || isScheduling}
-            className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-gray-700 text-gray-300 
-              ${(isPublishing || isGeneratingContent || isScheduling) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
-          >
-            Cancel
-          </button>
-          
           {isSchedulingMode ? (
-            <button
-              onClick={handleSchedule}
-              disabled={isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate}
-              className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-black border border-white text-white font-medium 
-                ${(isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate) ? 
-                  'opacity-50 cursor-not-allowed' : 'hover:bg-gray-900 transition-colors'}`}
-            >
-              {isScheduling ? (
-                <span className="flex items-center">
-                  <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                  {isUpdateMode ? 'Updating...' : 'Scheduling...'}
-                </span>
-              ) : (
-                <span className="flex items-center">
-                  <Clock className="w-4 h-4 mr-1 sm:mr-2" />
-                  {isUpdateMode ? 'Update' : 'Schedule'}
-                </span>
-              )}
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  setPendingScheduledDate(scheduledDate);
+                  setIsSchedulingMode(false);
+                }}
+                disabled={isPublishing || isGeneratingContent}
+                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-gray-700 text-gray-300 
+                  ${(isPublishing || isGeneratingContent) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={() => {
+                  setScheduledDate(pendingScheduledDate);
+                  setIsSchedulingMode(false);
+                }}
+                disabled={!pendingScheduledDate || isPublishing || isGeneratingContent}
+                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-black border border-white text-white font-medium 
+                  ${(!pendingScheduledDate || isPublishing || isGeneratingContent) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-900 transition-colors'}`}
+              >
+                Confirm Time
+              </button>
+            </>
           ) : (
-            <button
-              onClick={handlePublish}
-              disabled={isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled)}
-              className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-white text-black font-medium 
-                ${(isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled)) ? 
-                  'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 transition-colors'}`}
-            >
-              {isPublishing ? (
-                <span className="flex items-center">
-                  <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                  Publishing...
-                </span>
-              ) : 'Post Now'}
-            </button>
+            <>
+              <button
+                onClick={onClose}
+                disabled={isPublishing || isGeneratingContent || isScheduling}
+                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-gray-700 text-gray-300 
+                  ${(isPublishing || isGeneratingContent || isScheduling) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (scheduledDate) {
+                    // Directly schedule (create or update) when a time exists
+                    handleSchedule();
+                  } else {
+                    handlePublish();
+                  }
+                }}
+                disabled={
+                  scheduledDate
+                    ? (isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate)
+                    : (isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled))
+                }
+                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg ${scheduledDate ? 'bg-white text-black' : 'bg-white text-black'} font-medium 
+                  ${scheduledDate
+                    ? ((isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100')
+                    : ((isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled)) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100')
+                  } transition-colors`}
+              >
+                {isPublishing ? (
+                  <span className="flex items-center">
+                    <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                    {scheduledDate ? 'Scheduling...' : 'Publishing...'}
+                  </span>
+                ) : scheduledDate ? 'Schedule' : 'Post Now'}
+              </button>
+            </>
           )}
         </div>
         
@@ -1986,7 +2053,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             <X className="w-6 h-6" />
           </button>
           
-          <div className="overflow-y-auto flex-1 pr-2 mt-8" 
+          <div 
+            className={`flex-1 pr-2 mt-8 ${(isSchedulingMode && !hasOpenDropdowns) ? 'overflow-hidden' : 'overflow-y-auto'}`}
             style={{ 
               scrollbarWidth: 'thin',
               scrollbarColor: '#ffffff #374151',

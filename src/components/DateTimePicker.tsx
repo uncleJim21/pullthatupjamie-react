@@ -10,6 +10,7 @@ interface DateTimePickerProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  onDropdownStateChange?: (hasOpenDropdowns: boolean) => void;
 }
 
 interface TimeOption {
@@ -128,7 +129,8 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   minDate = new Date(),
   placeholder = "Select date and time",
   disabled = false,
-  className = ""
+  className = "",
+  onDropdownStateChange
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
@@ -238,6 +240,14 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     }
   }, [showTimeDropdown, selectedDate]);
 
+  // Notify parent of dropdown state changes
+  useEffect(() => {
+    if (onDropdownStateChange) {
+      const hasOpenDropdowns = showCalendar || showTimeDropdown;
+      onDropdownStateChange(hasOpenDropdowns);
+    }
+  }, [showCalendar, showTimeDropdown, onDropdownStateChange]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -279,6 +289,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
   // Mouse wheel handler for time
   const handleTimeWheel = (e: React.WheelEvent) => {
+    // Immediately stop propagation to prevent any bubbling
+    e.preventDefault();
+    e.stopPropagation();
+    
     printLog('🖱️ Time wheel event triggered! deltaY=' + e.deltaY);
     
     if (!selectedDate || disabled || showTimeDropdown) {
@@ -287,8 +301,6 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     }
     
     printLog('✅ Time wheel proceeding with change');
-    e.preventDefault();
-    e.stopPropagation();
     
     const currentIndex = selectedTime 
       ? timeOptions.findIndex(option => option.value === selectedTime)
@@ -312,6 +324,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
   // Mouse wheel handler for date
   const handleDateWheel = (e: React.WheelEvent) => {
+    // Immediately stop propagation to prevent any bubbling
+    e.preventDefault();
+    e.stopPropagation();
+    
     printLog('📅 Date wheel event triggered! deltaY=' + e.deltaY);
     
     if (disabled || showCalendar) {
@@ -320,8 +336,6 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     }
     
     printLog('✅ Date wheel proceeding with change');
-    e.preventDefault();
-    e.stopPropagation();
     
     const currentDate = selectedDate ? new Date(selectedDate + 'T00:00:00') : new Date();
     const direction = e.deltaY > 0 ? 1 : -1; // Scroll down = next day, scroll up = previous day
@@ -389,10 +403,12 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
             type="button"
             onClick={() => showCalendar ? handleCalendarClose() : setShowCalendar(true)}
             onWheel={handleDateWheel}
+            onWheelCapture={handleDateWheel}
             disabled={disabled}
             className="w-full bg-gray-900 text-white border border-gray-700 rounded-lg pl-10 pr-4 py-3 
                      text-left focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500
                      disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800 transition-colors"
+            style={{ touchAction: 'none' }}
           >
             {selectedDate ? (
               new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { 
@@ -426,10 +442,12 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
             type="button"
             onClick={() => setShowTimeDropdown(!showTimeDropdown)}
             onWheel={handleTimeWheel}
+            onWheelCapture={handleTimeWheel}
             disabled={disabled || !selectedDate}
             className="w-full bg-gray-900 text-white border border-gray-700 rounded-lg pl-10 pr-10 py-3 
                      text-left focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500
                      disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800 transition-colors"
+            style={{ touchAction: 'none' }}
           >
             {selectedTime ? (
               timeOptions.find(opt => opt.value === selectedTime)?.label || selectedTime
