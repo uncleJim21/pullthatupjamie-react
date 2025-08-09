@@ -4,6 +4,7 @@ import ScheduledPostService from '../services/scheduledPostService.ts';
 import { ScheduledPost, ScheduledPostsQuery } from '../types/scheduledPost.ts';
 import SocialShareModal from './SocialShareModal.tsx';
 import { SocialPlatform } from './SocialShareModal.tsx';
+import DeleteConfirmationModal from './DeleteConfirmationModal.tsx';
 
 // Constants for preview sizing (matching SocialShareModal)
 const ASPECT_RATIO = 16 / 9;
@@ -23,6 +24,11 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
   // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
+
+  // Delete modal state
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<ScheduledPost | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Helper function to get the correct ID (handles both postId and _id)
   const getPostId = (post: ScheduledPost): string => {
@@ -99,18 +105,40 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
     }
   };
 
-  // Handle delete
-  const handleDelete = async (postId: string) => {
-    if (!window.confirm('Are you sure you want to delete this scheduled post?')) {
-      return;
-    }
+  // Handle delete button click
+  const handleDeleteClick = (post: ScheduledPost) => {
+    setPostToDelete(post);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = async () => {
+    if (!postToDelete) return;
 
     try {
+      setIsDeleting(true);
+      const postId = getPostId(postToDelete);
       await ScheduledPostService.deleteScheduledPost(postId);
-      await loadPosts(); // Refresh list
-    } catch (err) {
-      console.error('Error deleting post:', err);
-      alert('Failed to delete post. Please try again.');
+      
+      // Remove the deleted post from the local state
+      setPosts(prevPosts => prevPosts.filter(post => getPostId(post) !== postId));
+      
+      // Close the modal
+      setIsDeleteModalOpen(false);
+      setPostToDelete(null);
+    } catch (error) {
+      console.error('Error deleting scheduled post:', error);
+      // Could add error handling UI here
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Handle delete modal close
+  const handleDeleteModalClose = () => {
+    if (!isDeleting) {
+      setIsDeleteModalOpen(false);
+      setPostToDelete(null);
     }
   };
 
@@ -381,7 +409,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
 
                   {(post.status === 'scheduled' || post.status === 'failed') && (
                     <button
-                      onClick={() => handleDelete(getPostId(post))}
+                      onClick={() => handleDeleteClick(post)}
                       className="p-2 rounded-lg bg-red-600 hover:bg-red-500 transition-colors"
                       title="Delete"
                     >
@@ -413,6 +441,22 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
           }}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={handleDeleteModalClose}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Scheduled Post"
+        message={
+          postToDelete
+            ? `Are you sure you want to delete this ${postToDelete.platform} post scheduled for ${new Date(postToDelete.scheduledFor).toLocaleDateString()}? This action cannot be undone.`
+            : "Are you sure you want to delete this scheduled post? This action cannot be undone."
+        }
+        isDeleting={isDeleting}
+        deleteButtonText="Delete Post"
+        itemType="scheduled post"
+      />
     </div>
   );
 };
