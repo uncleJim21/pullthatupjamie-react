@@ -148,7 +148,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         handleSettingChange('autoStartCrosspost', newValue);
     };
 
-    const handleCrosspostSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleCrosspostSignatureChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         handleSettingChange('crosspostSignature', e.target.value);
     };
 
@@ -979,7 +979,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       }`}
                     >
                       <History size={26} className="sm:mr-2.5 sm:!w-5 sm:!h-5" />
-                      <span className="hidden sm:inline">Run History</span>
+                      <span className="hidden sm:inline">AI Curations</span>
                     </button>
                     <button
                       onClick={() => setJamieProView('scheduled-posts')}
@@ -1076,7 +1076,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   </div>
                 ) : runHistory.length === 0 ? (
                   <div className="text-center py-12 text-gray-400">
-                    <p className="text-lg">No run history available.</p>
+                    <p className="text-lg">No AI curations available.</p>
                   </div>
                 ) : (
                   <div className="space-y-6 max-w-3xl mx-auto">
