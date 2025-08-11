@@ -13,6 +13,7 @@ import { MentionResult } from '../types/mention.ts';
 import { useStreamingMentionSearch } from '../hooks/useStreamingMentionSearch.ts';
 import ScheduledPostService from '../services/scheduledPostService.ts';
 import { CreateScheduledPostRequest, ScheduledPost } from '../types/scheduledPost.ts';
+import { formatScheduledDate } from '../utils/time.ts';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -1036,6 +1037,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             const eventToSign = createNostrEventUnified(fullContentWithMedia, mediaUrl || undefined);
             const signedEvent = await window.nostr.signEvent(eventToSign);
             
+            // Generate Primal URL from event ID
+            const bech32EventId = encodeBech32('nevent', signedEvent.id);
+            const primalUrl = `https://primal.net/e/${bech32EventId}`;
+
             const nostrRequest: CreateScheduledPostRequest = {
               text: fullContentWithMedia, // Send the complete content including media URL
               mediaUrl, // Still send mediaUrl for backend reference
@@ -1048,6 +1053,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 nostrPubkey: signedEvent.pubkey,
                 nostrCreatedAt: (signedEvent as any)?.created_at ?? eventToSign.created_at,
                 nostrRelays: relayPool,
+                nostrPostUrl: primalUrl, // Include client-calculated Primal URL
               },
             };
 
@@ -1986,7 +1992,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               </button>
               {!isSchedulingMode && scheduledDate && (
                 <span className="text-xs text-gray-400">
-                  Scheduled for {new Date(scheduledDate).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  Scheduled for {formatScheduledDate(scheduledDate)}
                 </span>
               )}
             </div>

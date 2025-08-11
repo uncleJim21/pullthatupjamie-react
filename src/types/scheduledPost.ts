@@ -17,6 +17,7 @@ export interface ScheduledPost {
     nostrPubkey?: string;
     nostrCreatedAt?: number;
     nostrRelays?: string[];
+    nostrPostUrl?: string;
     errorMessage?: string;
   };
   createdAt: string;
@@ -38,6 +39,7 @@ export interface CreateScheduledPostRequest {
     nostrPubkey?: string;
     nostrCreatedAt?: number;
     nostrRelays?: string[];
+    nostrPostUrl?: string;
   };
 }
 
@@ -53,6 +55,7 @@ export interface UpdateScheduledPostRequest {
     nostrPubkey?: string;
     nostrCreatedAt?: number;
     nostrRelays?: string[];
+    nostrPostUrl?: string;
   };
 }
 

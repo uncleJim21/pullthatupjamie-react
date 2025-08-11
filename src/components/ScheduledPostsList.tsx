@@ -5,6 +5,7 @@ import { ScheduledPost, ScheduledPostsQuery } from '../types/scheduledPost.ts';
 import SocialShareModal from './SocialShareModal.tsx';
 import { SocialPlatform } from './SocialShareModal.tsx';
 import DeleteConfirmationModal from './DeleteConfirmationModal.tsx';
+import { formatScheduledDate, formatShortDate } from '../utils/time.ts';
 
 // Constants for preview sizing (matching SocialShareModal)
 const ASPECT_RATIO = 16 / 9;
@@ -63,17 +64,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
     loadPosts();
   }, [filter]);
 
-  // Format date for display
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  // Note: Using imported formatScheduledDate from utils/time.ts
 
   // Get status icon and color
   const getStatusIcon = (status: ScheduledPost['status']) => {
@@ -246,7 +237,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
           {posts.map((post) => (
             <div
               key={getPostId(post)}
-              className="bg-gray-900 border border-gray-800 rounded-lg p-5 hover:border-gray-700 transition-colors"
+              className="bg-gray-900 border border-gray-800 rounded-lg p-3 sm:p-5 hover:border-gray-700 transition-colors"
             >
               <div className="flex justify-between">
                 {/* Media Preview */}
@@ -363,7 +354,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
                   {/* Scheduled time - aligned to bottom */}
                   <div className="flex items-center space-x-2 text-sm text-gray-400">
                     <Clock className="w-4 h-4" />
-                    <span>Scheduled for {formatDate(post.scheduledFor)}</span>
+                    <span>Scheduled for {formatScheduledDate(post.scheduledFor)}</span>
                   </div>
 
                   {/* Error message for failed posts */}
@@ -383,6 +374,18 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
                         className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
                       >
                         View on Twitter →
+                      </a>
+                    </div>
+                  )}
+                  {post.status === 'posted' && post.platformData?.nostrPostUrl && (
+                    <div className="mt-2">
+                      <a
+                        href={post.platformData.nostrPostUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                      >
+                        View on Primal →
                       </a>
                     </div>
                   )}
@@ -453,7 +456,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
         title="Delete Scheduled Post"
         message={
           postToDelete
-            ? `Are you sure you want to delete this ${postToDelete.platform} post scheduled for ${new Date(postToDelete.scheduledFor).toLocaleDateString()}? This action cannot be undone.`
+            ? `Are you sure you want to delete this ${postToDelete.platform} post scheduled for ${formatShortDate(postToDelete.scheduledFor)}? This action cannot be undone.`
             : "Are you sure you want to delete this scheduled post? This action cannot be undone."
         }
         isDeleting={isDeleting}

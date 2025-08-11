@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Calendar, Clock, ChevronDown } from 'lucide-react';
 import CustomCalendar from './CustomCalendar.tsx';
 import { printLog } from '../constants/constants.ts';
+import { formatShortDate } from '../utils/time.ts';
 
 interface DateTimePickerProps {
   value?: Date;
@@ -374,11 +375,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     const ampm = hours >= 12 ? 'PM' : 'AM';
     
     const date = new Date(selectedDate);
-    const dateStr = date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      year: 'numeric'
-    });
+    const dateStr = formatShortDate(date);
     
     return `${dateStr} at ${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   };
@@ -411,11 +408,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
             style={{ touchAction: 'none' }}
           >
             {selectedDate ? (
-              new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric',
-                year: 'numeric'
-              })
+              formatShortDate(new Date(selectedDate + 'T00:00:00'))
             ) : (
               <span className="text-gray-400">Select date</span>
             )}

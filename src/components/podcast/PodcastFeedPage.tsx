@@ -961,47 +961,47 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   <div className="inline-flex rounded-lg border border-gray-800 p-1.5">
                     <button
                       onClick={() => setJamieProView('chat')}
-                      className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                      className={`inline-flex items-center px-3 sm:px-6 py-3 rounded-md text-base sm:text-lg ${
                         jamieProView === 'chat'
                           ? 'bg-gray-800 text-white'
                           : 'text-gray-400 hover:text-white'
                       }`}
                     >
-                      <MessageSquare size={20} className="mr-2.5" />
-                      Chat with Jamie
+                      <MessageSquare size={26} className="sm:mr-2.5 sm:!w-5 sm:!h-5" />
+                      <span className="hidden sm:inline">Chat with Jamie</span>
                     </button>
                     <button
                       onClick={() => setJamieProView('history')}
-                      className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                      className={`inline-flex items-center px-3 sm:px-6 py-3 rounded-md text-base sm:text-lg ${
                         jamieProView === 'history'
                           ? 'bg-gray-800 text-white'
                           : 'text-gray-400 hover:text-white'
                       }`}
                     >
-                      <History size={20} className="mr-2.5" />
-                      Run History
+                      <History size={26} className="sm:mr-2.5 sm:!w-5 sm:!h-5" />
+                      <span className="hidden sm:inline">Run History</span>
                     </button>
                     <button
                       onClick={() => setJamieProView('scheduled-posts')}
-                      className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                      className={`inline-flex items-center px-3 sm:px-6 py-3 rounded-md text-base sm:text-lg ${
                         jamieProView === 'scheduled-posts'
                           ? 'bg-gray-800 text-white'
                           : 'text-gray-400 hover:text-white'
                       }`}
                     >
-                      <Calendar size={20} className="mr-2.5" />
-                      Scheduled Posts
+                      <Calendar size={26} className="sm:mr-2.5 sm:!w-5 sm:!h-5" />
+                      <span className="hidden sm:inline">Scheduled Posts</span>
                     </button>
                     <button
                       onClick={() => setJamieProView('settings')}
-                      className={`inline-flex items-center px-6 py-3 rounded-md text-base sm:text-lg ${
+                      className={`inline-flex items-center px-3 sm:px-6 py-3 rounded-md text-base sm:text-lg ${
                         jamieProView === 'settings'
                           ? 'bg-gray-800 text-white'
                           : 'text-gray-400 hover:text-white'
                       }`}
                     >
-                      <Settings size={20} className="mr-2.5" />
-                      Settings
+                      <Settings size={26} className="sm:mr-2.5 sm:!w-5 sm:!h-5" />
+                      <span className="hidden sm:inline">Settings</span>
                     </button>
                   </div>
                 </div>
