@@ -46,7 +46,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
         status: filter === 'all' ? undefined : filter,
         limit: 50,
         sortBy: 'scheduledFor',
-        sortOrder: 'asc'
+        sortOrder: 'desc'
       };
       
       const response = await ScheduledPostService.getScheduledPosts(query);

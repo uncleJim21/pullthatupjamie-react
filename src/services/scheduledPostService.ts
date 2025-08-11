@@ -207,7 +207,7 @@ export class ScheduledPostService {
       const query: ScheduledPostsQuery = {
         limit: 1000, // Get all posts in range
         sortBy: 'scheduledFor',
-        sortOrder: 'asc'
+        sortOrder: 'desc'
       };
 
       const response = await this.getScheduledPosts(query);
