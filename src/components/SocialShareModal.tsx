@@ -986,15 +986,43 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           throw new Error('No valid post ID found for update');
         }
 
-        const updatedPost = await ScheduledPostService.updateScheduledPost(
-          postId,
-          {
-            text: finalContent,
-            mediaUrl: mediaUrl,
-            scheduledFor: scheduledDate.toISOString(),
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        let updateRequest: any = {
+          text: finalContent,
+          mediaUrl: mediaUrl,
+          scheduledFor: scheduledDate.toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+
+        // If this is a Nostr post, we need to re-sign the event with new content
+        if (updateContext.scheduledPost.platform === 'nostr') {
+          if (!window.nostr) {
+            throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
           }
-        );
+
+          // Build the EXACT content that will be sent to backend
+          const fullContentWithMedia = buildFinalContent(content, mediaUrl || '', 'nostr');
+          
+          // Re-sign the event with the new content
+          const eventToSign = createNostrEventUnified(fullContentWithMedia, mediaUrl || undefined);
+          const signedEvent = await window.nostr.signEvent(eventToSign);
+
+          // Generate new Primal URL from new event ID
+          const bech32EventId = encodeBech32('nevent', signedEvent.id);
+          const primalUrl = `https://primal.net/e/${bech32EventId}`;
+
+          // Update the request to include new Nostr platform data
+          updateRequest.text = fullContentWithMedia;
+          updateRequest.platformData = {
+            nostrEventId: signedEvent.id,
+            nostrSignature: signedEvent.sig,
+            nostrPubkey: signedEvent.pubkey,
+            nostrCreatedAt: (signedEvent as any)?.created_at ?? eventToSign.created_at,
+            nostrRelays: relayPool,
+            nostrPostUrl: primalUrl,
+          };
+        }
+
+        const updatedPost = await ScheduledPostService.updateScheduledPost(postId, updateRequest);
 
         printLog(`Successfully updated scheduled post: ${updatedPost.postId}`);
         
