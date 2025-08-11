@@ -829,11 +829,22 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     const signature = getUserSignature();
     const signaturePart = signature ? `\n\n${signature}` : '';
     
-    // Only include media URL for Nostr posts
+    // Only include media URL for Nostr posts (back to original behavior)
     const mediaUrlPart = platform === 'nostr' ? `\n\n${mediaUrl}` : '';
     const callToActionPart = platform === 'nostr' ? `\n\nShared via https://pullthatupjamie.ai` : '';
     
     return `${baseContent}${signaturePart}${mediaUrlPart}${callToActionPart}`;
+  };
+
+  // Unified helper to build a Nostr event: NO r-tag, media URL goes in content (original behavior)
+  const createNostrEventUnified = (text: string, media?: string) => {
+    const evt: any = {
+      kind: 1,
+      created_at: Math.floor(Date.now() / 1000),
+      content: text, // text already includes media URL via buildFinalContent
+      tags: [], // no r-tag
+    };
+    return evt;
   };
 
   const publishToNostr = async (): Promise<boolean> => {
@@ -858,16 +869,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       
       const mediaUrl = fileUrl || renderUrl || '';
       const finalContent = buildFinalContent(content, mediaUrl, 'nostr');
-      
-      const event = {
-        kind: 1,
-        content: finalContent,
-        tags: [],
-        created_at: Math.floor(Date.now() / 1000),
-        pubkey: await window.nostr.getPublicKey()
-      };
-
-      const signedEvent = await window.nostr.signEvent(event);
+      const eventToSign = createNostrEventUnified(finalContent, mediaUrl || undefined);
+      const signedEvent = await window.nostr.signEvent(eventToSign);
       printLog(`Successfully signed Nostr event: ${JSON.stringify(signedEvent)}`);
       
       const publishPromises = relayPool.map(relay => 
@@ -1017,18 +1020,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         let twitterSucceeded = false;
 
         // Helper to create a minimal Nostr event for signature validation
-        const createNostrEvent = (text: string, media?: string) => {
-          const evt: any = {
-            kind: 1,
-            created_at: Math.floor(Date.now() / 1000),
-            content: text,
-            tags: [] as any[],
-          };
-          if (media) {
-            evt.tags.push(["r", media]);
-          }
-          return evt;
-        };
+        // Use unified event construction for Nostr
 
         // Schedule Nostr first if enabled
         if (nostrEnabled) {
@@ -1036,12 +1028,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             if (!window.nostr) {
               throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
             }
-            const eventToSign = createNostrEvent(finalContent, mediaUrl || undefined);
+            
+            // Build the EXACT content that will be sent to backend
+            const fullContentWithMedia = buildFinalContent(content, mediaUrl || '', 'nostr');
+            
+            // Sign that EXACT content
+            const eventToSign = createNostrEventUnified(fullContentWithMedia, mediaUrl || undefined);
             const signedEvent = await window.nostr.signEvent(eventToSign);
-
+            
             const nostrRequest: CreateScheduledPostRequest = {
-              text: finalContent,
-              mediaUrl,
+              text: fullContentWithMedia, // Send the complete content including media URL
+              mediaUrl, // Still send mediaUrl for backend reference
               scheduledFor: scheduledDate.toISOString(),
               platforms: ["nostr"],
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -1049,6 +1046,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 nostrEventId: signedEvent.id,
                 nostrSignature: signedEvent.sig,
                 nostrPubkey: signedEvent.pubkey,
+                nostrCreatedAt: (signedEvent as any)?.created_at ?? eventToSign.created_at,
                 nostrRelays: relayPool,
               },
             };

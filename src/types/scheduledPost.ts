@@ -13,6 +13,10 @@ export interface ScheduledPost {
   platformData?: {
     twitterPostUrl?: string;
     nostrEventId?: string;
+    nostrSignature?: string;
+    nostrPubkey?: string;
+    nostrCreatedAt?: number;
+    nostrRelays?: string[];
     errorMessage?: string;
   };
   createdAt: string;
@@ -32,6 +36,7 @@ export interface CreateScheduledPostRequest {
     nostrEventId?: string;
     nostrSignature?: string;
     nostrPubkey?: string;
+    nostrCreatedAt?: number;
     nostrRelays?: string[];
   };
 }
@@ -46,6 +51,7 @@ export interface UpdateScheduledPostRequest {
     nostrEventId?: string;
     nostrSignature?: string;
     nostrPubkey?: string;
+    nostrCreatedAt?: number;
     nostrRelays?: string[];
   };
 }
