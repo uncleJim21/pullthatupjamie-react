@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin } from 'lucide-react';
+import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin, Clock } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
@@ -8,8 +8,12 @@ import RegisterModal from './RegisterModal.tsx';
 import SocialShareSuccessModal from './SocialShareSuccessModal.tsx';
 import MentionsLookupView from './MentionsLookupView.tsx';
 import MentionPinManagement from './MentionPinManagement.tsx';
+import DateTimePicker from './DateTimePicker.tsx';
 import { MentionResult } from '../types/mention.ts';
 import { useStreamingMentionSearch } from '../hooks/useStreamingMentionSearch.ts';
+import ScheduledPostService from '../services/scheduledPostService.ts';
+import { CreateScheduledPostRequest, ScheduledPost } from '../types/scheduledPost.ts';
+import { formatScheduledDate } from '../utils/time.ts';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -60,6 +64,12 @@ interface SocialShareModalProps {
   renderUrl?: string; // URL to use in place of fileUrl for Twitter sharing
   lookupHash?: string; // Added lookupHash for Jamie Assist
   auth?: any; // Auth object for API calls
+  // Update context props
+  updateContext?: {
+    scheduledPost: ScheduledPost;
+    onUpdate: (updatedPost: ScheduledPost) => void;
+  };
+  onSchedulingModeChange?: (isScheduling: boolean, hasDropdowns: boolean) => void;
 }
 
 // Simplified unified state interface
@@ -194,7 +204,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   platform,
   renderUrl,
   lookupHash,
-  auth
+  auth,
+  updateContext,
+  onSchedulingModeChange
 }) => {
   const [content, setContent] = useState<string>('');
   
@@ -253,6 +265,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [thumbnailRetry, setThumbnailRetry] = useState(false);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
+  // Add state for scheduling functionality
+  const [isSchedulingMode, setIsSchedulingMode] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [schedulingError, setSchedulingError] = useState<string | null>(null);
+  const [hasOpenDropdowns, setHasOpenDropdowns] = useState(false);
+  const [pendingScheduledDate, setPendingScheduledDate] = useState<Date | undefined>(undefined);
+  
+  // Check if we're in update mode
+  const isUpdateMode = !!updateContext;
+
   // Add state for mentions lookup
   const [showMentionsLookup, setShowMentionsLookup] = useState(false);
   const [mentionSearchQuery, setMentionSearchQuery] = useState('');
@@ -296,44 +319,28 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
 
-  // Function to check tokens endpoint (for initial check)
-  const checkTokensEndpoint = async (): Promise<boolean> => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        printLog('No auth token found for tokens check');
-        return false;
-      }
-
-      printLog(`Checking tokens at ${API_URL}/api/twitter/tokens`);
-      const response = await fetch(`${API_URL}/api/twitter/tokens`, {
-        method: 'POST',
-        headers: {
-          'Accept': '*/*',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Origin': window.location.origin
-        },
-        credentials: 'include',
-        mode: 'cors'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        printLog(`Tokens endpoint response: ${JSON.stringify(data)}`);
-        
-        // Show the main UI for any valid response from the endpoint
-        // The authenticated status will be handled by the existing Twitter auth flow
-        return true;
-      } else {
-        printLog(`Tokens endpoint returned ${response.status}`);
-        return false;
-      }
-    } catch (error) {
-      printLog(`Error checking tokens endpoint: ${error}`);
-      return false;
+  // Notify parent of scheduling mode and dropdown state changes
+  useEffect(() => {
+    if (onSchedulingModeChange) {
+      onSchedulingModeChange(isSchedulingMode, hasOpenDropdowns);
     }
-  };
+  }, [isSchedulingMode, hasOpenDropdowns, onSchedulingModeChange]);
+
+  // Disable body scroll when scheduling mode is active and no dropdowns are open
+  useEffect(() => {
+    if (isOpen && isSchedulingMode && !hasOpenDropdowns) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, isSchedulingMode, hasOpenDropdowns]);
+
+
 
   // Update the polling function to handle Twitter auth status
   const startTokenPolling = () => {
@@ -407,16 +414,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setIsPollingTokens(false);
   };
 
-  // Initial token check when modal opens
+  // Initial check when modal opens - unified with Twitter auth
   useEffect(() => {
     if (isOpen) {
       const initialCheck = async () => {
         setIsCheckingTokens(true);
         try {
-          const hasTokens = await checkTokensEndpoint();
-          setHasValidTokens(hasTokens);
+          await checkTwitterAuth(); // This now handles both auth check and hasValidTokens
         } catch (error) {
-          printLog(`Error during initial token check: ${error}`);
+          printLog(`Error during initial check: ${error}`);
           setHasValidTokens(false);
         } finally {
           setIsCheckingTokens(false);
@@ -464,12 +470,31 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   // Initialize content with default text and check for Nostr extension if needed
   useEffect(() => {
-    // No default content, empty textarea with just placeholder
-    setContent('');
+    if (isUpdateMode && updateContext) {
+      // Update mode: populate with existing scheduled post data
+      const scheduledPost = updateContext.scheduledPost;
+      setContent(scheduledPost.content.text || '');
+      // Start in non-scheduling mode when editing so all items are visible
+      setIsSchedulingMode(false);
+      setScheduledDate(new Date(scheduledPost.scheduledFor));
+      
+      // Set platform states based on the scheduled post's platform
+      if (scheduledPost.platform === 'twitter') {
+        setTwitterState(prev => ({ ...prev, enabled: true }));
+        setNostrState(prev => ({ ...prev, enabled: false }));
+      } else if (scheduledPost.platform === 'nostr') {
+        setTwitterState(prev => ({ ...prev, enabled: false }));
+        setNostrState(prev => ({ ...prev, enabled: true }));
+      }
+    } else {
+      // Create mode: empty content
+      setContent('');
+      setIsSchedulingMode(false);
+      setScheduledDate(undefined);
+    }
     
-    // Check both platforms
+    // Check Nostr platform
     checkNostrExtension();
-    checkTwitterAuth();
 
     // Initialize relay status
     const initialStatus: {[key: string]: string} = {};
@@ -490,7 +515,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         }
       });
     };
-  }, [fileUrl, itemName, isOpen]);
+  }, [fileUrl, itemName, isOpen, isUpdateMode, updateContext]);
 
   // Effect to check for Nostr extension when modal opens
   useEffect(() => {
@@ -572,21 +597,51 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
-  // Check Twitter authentication status
+  // Check Twitter authentication status (unified with token checking)
   const checkTwitterAuth = async () => {
     printLog('Checking Twitter auth status in SocialShareModal...');
     try {
-      const status = await AuthService.checkTwitterStatus();
-      printLog(`Twitter auth status: ${status.authenticated}`);
-      setTwitterState(prev => ({ 
-        ...prev, 
-        authenticated: status.authenticated,
-        available: true, // Always available for admin users
-        username: status.authenticated ? status.twitterUsername : undefined
-      }));
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        printLog('No auth token found for Twitter auth check');
+        setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/twitter/tokens`, {
+        method: 'POST',
+        headers: {
+          'Accept': '*/*',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin
+        },
+        credentials: 'include',
+        mode: 'cors'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        printLog(`Twitter auth check response: ${JSON.stringify(data)}`);
+        
+        setTwitterState(prev => ({ 
+          ...prev, 
+          authenticated: data.authenticated === true,
+          available: true,
+          username: data.authenticated ? data.twitterUsername : undefined
+        }));
+        
+        // Set hasValidTokens for the UI flow
+        setHasValidTokens(data.authenticated === true);
+      } else {
+        printLog(`Twitter auth check failed with status ${response.status}`);
+        setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
+        setHasValidTokens(false);
+      }
     } catch (error) {
-      printLog(`Error checking Twitter status: ${error}`);
-      setTwitterState(prev => ({ ...prev, authenticated: false }));
+      printLog(`Error checking Twitter auth: ${error}`);
+      setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
+      setHasValidTokens(false);
     }
   };
 
@@ -640,12 +695,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
-  // Initialize Twitter auth check when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      checkTwitterAuth();
-    }
-  }, [isOpen]);
+
 
   // Handle escape key to close mentions
   useEffect(() => {
@@ -780,11 +830,22 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     const signature = getUserSignature();
     const signaturePart = signature ? `\n\n${signature}` : '';
     
-    // Only include media URL for Nostr posts
+    // Only include media URL for Nostr posts (back to original behavior)
     const mediaUrlPart = platform === 'nostr' ? `\n\n${mediaUrl}` : '';
     const callToActionPart = platform === 'nostr' ? `\n\nShared via https://pullthatupjamie.ai` : '';
     
     return `${baseContent}${signaturePart}${mediaUrlPart}${callToActionPart}`;
+  };
+
+  // Unified helper to build a Nostr event: NO r-tag, media URL goes in content (original behavior)
+  const createNostrEventUnified = (text: string, media?: string) => {
+    const evt: any = {
+      kind: 1,
+      created_at: Math.floor(Date.now() / 1000),
+      content: text, // text already includes media URL via buildFinalContent
+      tags: [], // no r-tag
+    };
+    return evt;
   };
 
   const publishToNostr = async (): Promise<boolean> => {
@@ -809,16 +870,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       
       const mediaUrl = fileUrl || renderUrl || '';
       const finalContent = buildFinalContent(content, mediaUrl, 'nostr');
-      
-      const event = {
-        kind: 1,
-        content: finalContent,
-        tags: [],
-        created_at: Math.floor(Date.now() / 1000),
-        pubkey: await window.nostr.getPublicKey()
-      };
-
-      const signedEvent = await window.nostr.signEvent(event);
+      const eventToSign = createNostrEventUnified(finalContent, mediaUrl || undefined);
+      const signedEvent = await window.nostr.signEvent(eventToSign);
       printLog(`Successfully signed Nostr event: ${JSON.stringify(signedEvent)}`);
       
       const publishPromises = relayPool.map(relay => 
@@ -892,6 +945,193 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       printLog(`Error posting tweet: ${error}`);
       setTwitterState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: false, error: error instanceof Error ? error.message : 'Failed to post tweet' }));
       return false;
+    }
+  };
+
+
+  const handleSchedule = async () => {
+    if (!scheduledDate) {
+      setSchedulingError("Please select a date and time");
+      return;
+    }
+
+    // Check if scheduled date is in the future (user's perspective)
+    if (scheduledDate <= new Date()) {
+      setSchedulingError("Please select a future date and time");
+      return;
+    }
+
+    // Check if we have either content or media URL
+    const mediaUrl = fileUrl || renderUrl || '';
+    if (!content.trim() && !mediaUrl) {
+      setSchedulingError("Please enter some content or select media for your post");
+      return;
+    }
+
+    setIsScheduling(true);
+    setSchedulingError(null);
+
+    try {
+      if (isUpdateMode && updateContext) {
+        // Update existing scheduled post
+        const signature = getUserSignature();
+        const signaturePart = signature ? `\n\n${signature}` : "";
+        const finalContent = `${content}${signaturePart}`;
+
+        // Get the correct post ID (handles both postId and _id)
+        const postId = updateContext.scheduledPost.postId || updateContext.scheduledPost._id;
+        console.log('Update mode - Post ID:', postId, 'Post object:', updateContext.scheduledPost);
+
+        if (!postId) {
+          throw new Error('No valid post ID found for update');
+        }
+
+        let updateRequest: any = {
+          text: finalContent,
+          mediaUrl: mediaUrl,
+          scheduledFor: scheduledDate.toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+
+        // If this is a Nostr post, we need to re-sign the event with new content
+        if (updateContext.scheduledPost.platform === 'nostr') {
+          if (!window.nostr) {
+            throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
+          }
+
+          // Build the EXACT content that will be sent to backend
+          const fullContentWithMedia = buildFinalContent(content, mediaUrl || '', 'nostr');
+          
+          // Re-sign the event with the new content
+          const eventToSign = createNostrEventUnified(fullContentWithMedia, mediaUrl || undefined);
+          const signedEvent = await window.nostr.signEvent(eventToSign);
+
+          // Generate new Primal URL from new event ID
+          const bech32EventId = encodeBech32('nevent', signedEvent.id);
+          const primalUrl = `https://primal.net/e/${bech32EventId}`;
+
+          // Update the request to include new Nostr platform data
+          updateRequest.text = fullContentWithMedia;
+          updateRequest.platformData = {
+            nostrEventId: signedEvent.id,
+            nostrSignature: signedEvent.sig,
+            nostrPubkey: signedEvent.pubkey,
+            nostrCreatedAt: (signedEvent as any)?.created_at ?? eventToSign.created_at,
+            nostrRelays: relayPool,
+            nostrPostUrl: primalUrl,
+          };
+        }
+
+        const updatedPost = await ScheduledPostService.updateScheduledPost(postId, updateRequest);
+
+        printLog(`Successfully updated scheduled post: ${updatedPost.postId}`);
+        
+        // Call the update callback
+        updateContext.onUpdate(updatedPost);
+        
+        // Close modal
+        onClose();
+      } else {
+        // Create new scheduled post(s) - schedule Nostr first, then Twitter
+        const twitterEnabled = twitterState.enabled && twitterState.available;
+        const nostrEnabled = nostrState.enabled && nostrState.available && nostrState.authenticated;
+
+        if (!twitterEnabled && !nostrEnabled) {
+          setSchedulingError("Please enable at least one platform");
+          return;
+        }
+
+        const signature = getUserSignature();
+        const signaturePart = signature ? `\n\n${signature}` : "";
+        const finalContent = `${content}${signaturePart}`;
+
+        let nostrSucceeded = false;
+        let twitterSucceeded = false;
+
+        // Helper to create a minimal Nostr event for signature validation
+        // Use unified event construction for Nostr
+
+        // Schedule Nostr first if enabled
+        if (nostrEnabled) {
+          try {
+            if (!window.nostr) {
+              throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
+            }
+            
+            // Build the EXACT content that will be sent to backend
+            const fullContentWithMedia = buildFinalContent(content, mediaUrl || '', 'nostr');
+            
+            // Sign that EXACT content
+            const eventToSign = createNostrEventUnified(fullContentWithMedia, mediaUrl || undefined);
+            const signedEvent = await window.nostr.signEvent(eventToSign);
+            
+            // Generate Primal URL from event ID
+            const bech32EventId = encodeBech32('nevent', signedEvent.id);
+            const primalUrl = `https://primal.net/e/${bech32EventId}`;
+
+            const nostrRequest: CreateScheduledPostRequest = {
+              text: fullContentWithMedia, // Send the complete content including media URL
+              mediaUrl, // Still send mediaUrl for backend reference
+              scheduledFor: scheduledDate.toISOString(),
+              platforms: ["nostr"],
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              platformData: {
+                nostrEventId: signedEvent.id,
+                nostrSignature: signedEvent.sig,
+                nostrPubkey: signedEvent.pubkey,
+                nostrCreatedAt: (signedEvent as any)?.created_at ?? eventToSign.created_at,
+                nostrRelays: relayPool,
+                nostrPostUrl: primalUrl, // Include client-calculated Primal URL
+              },
+            };
+
+            const nostrResult = await ScheduledPostService.createScheduledPost(nostrRequest);
+            printLog(`Successfully scheduled ${nostrResult.length} Nostr post(s)`);
+            nostrSucceeded = true;
+          } catch (error: any) {
+            console.error("Error scheduling Nostr post:", error);
+            const message = (error instanceof Error ? error.message : String(error)) || '';
+            if (message.toLowerCase().includes('signature')) {
+              setSchedulingError('Nostr signature validation failed. Please confirm your Nostr extension is connected and try again.');
+            } else {
+              setSchedulingError(message || 'Failed to schedule Nostr post.');
+            }
+            // Do not proceed to Twitter scheduling if Nostr fails
+            return;
+          }
+        }
+
+        // Schedule Twitter second if enabled
+        if (twitterEnabled) {
+          try {
+            const twitterRequest: CreateScheduledPostRequest = {
+              text: finalContent,
+              mediaUrl,
+              scheduledFor: scheduledDate.toISOString(),
+              platforms: ["twitter"],
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+            const twitterResult = await ScheduledPostService.createScheduledPost(twitterRequest);
+            printLog(`Successfully scheduled ${twitterResult.length} Twitter post(s)`);
+            twitterSucceeded = true;
+          } catch (error: any) {
+            console.error('Error scheduling Twitter post:', error);
+            const message = (error instanceof Error ? error.message : String(error)) || '';
+            setSchedulingError(message || 'Failed to schedule Twitter post.');
+            // We intentionally do not early return here since Nostr already succeeded
+          }
+        }
+
+        // Show success if at least one platform scheduled successfully
+        if ((nostrEnabled && nostrSucceeded) || (twitterEnabled && twitterSucceeded)) {
+          setShowSuccessModal(true);
+        }
+      }
+    } catch (error) {
+      console.error("Error scheduling post:", error);
+      setSchedulingError(error instanceof Error ? error.message : "Failed to schedule post");
+    } finally {
+      setIsScheduling(false);
     }
   };
 
@@ -1336,30 +1576,33 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     // Main unified interface
     return (
       <>
-        <div className="flex items-center mb-3 sm:mb-4 px-2">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-800 mr-2 sm:mr-3 flex items-center justify-center overflow-hidden">
-            <img src="/twitter-nostr-crosspost.png" alt="Twitter and Nostr" className="w-8 h-8 object-cover" />
-          </div>
-          <div className="text-left flex-1">
-            <p className="text-white font-medium">Your Post</p>
-          </div>
-        </div>
-        
-        {/* Preview Section (between label and textarea) */}
-        <div
-          style={{
-            width: PREVIEW_WIDTH,
-            height: PREVIEW_HEIGHT,
-            position: 'relative',
-            background: '#222',
-            borderRadius: 8,
-            overflow: 'hidden',
-            margin: '0 auto 16px auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+        {/* Hide header and preview when in scheduling mode */}
+        {!isSchedulingMode && (
+          <>
+            <div className="flex items-center mb-3 sm:mb-4 px-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-800 mr-2 sm:mr-3 flex items-center justify-center overflow-hidden">
+                <img src="/twitter-nostr-crosspost.png" alt="Twitter and Nostr" className="w-8 h-8 object-cover" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-white font-medium">Your Post</p>
+              </div>
+            </div>
+            
+            {/* Preview Section (between label and textarea) */}
+            <div
+              style={{
+                width: PREVIEW_WIDTH,
+                height: PREVIEW_HEIGHT,
+                position: 'relative',
+                background: '#222',
+                borderRadius: 8,
+                overflow: 'hidden',
+                margin: '0 auto 16px auto',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
           {/* Shimmer while loading */}
           {!previewLoaded && !thumbnailFailed && (
             <div
@@ -1464,18 +1707,21 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               </svg>
             </div>
           )}
-        </div>
+          </div>
+        </>
+        )}
         
-        <div className="relative">
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={handleContentChange}
-            onKeyDown={handleTextareaKeyDown}
-            className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
-            placeholder={`Write about this ${itemName}...`}
-            style={{ resize: "none", height: "120px", minHeight: "100px" }}
-          />
+        {!isSchedulingMode && (
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={handleContentChange}
+              onKeyDown={handleTextareaKeyDown}
+              className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
+              placeholder={`Write about this ${itemName}...`}
+              style={{ resize: "none", height: "120px", minHeight: "100px" }}
+            />
           
                   {/* Mentions Lookup Overlay */}
         {showMentionsLookup && (
@@ -1527,24 +1773,27 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           isOpen={showPinManagement}
           onClose={() => setShowPinManagement(false)}
         />
-        </div>
-        
-        <div className="flex items-center justify-between mb-2 sm:mb-3">
-          <div className="text-gray-400 text-xs pl-1">
-            The link to your {itemName}, attribution, and a signature will be added automatically when you publish.
           </div>
-          <button
-            onClick={() => setShowPinManagement(true)}
-            className="flex items-center space-x-1 text-xs text-gray-400 hover:text-yellow-500 transition-colors"
-            title="Manage pinned mentions"
-          >
-            <Pin className="w-3 h-3" />
-            <span>Pins</span>
-          </button>
-        </div>
+        )}
         
-        {/* Platform Selection with Checkboxes */}
-        <div className="mb-6">
+        {!isSchedulingMode && (
+          <>
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <div className="text-gray-400 text-xs pl-1">
+                The link to your {itemName}, attribution, and a signature will be added automatically when you publish.
+              </div>
+              <button
+                onClick={() => setShowPinManagement(true)}
+                className="flex items-center space-x-1 text-xs text-gray-400 hover:text-yellow-500 transition-colors"
+                title="Manage pinned mentions"
+              >
+                <Pin className="w-3 h-3" />
+                <span>Pins</span>
+              </button>
+            </div>
+            
+            {/* Platform Selection with Checkboxes */}
+            <div className="mb-6">
           <div className="space-y-3">
             {/* Twitter Platform */}
             <div className="flex items-center justify-between p-3 bg-gray-900/60 border border-gray-700 rounded-lg">
@@ -1660,10 +1909,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               </div>
             </div>
           </div>
-        </div>
-        
-        {/* Jamie Assist Advanced Preferences */}
-        <div className="mb-4 sm:mb-6">
+            </div>
+            
+            {/* Jamie Assist Advanced Preferences */}
+            <div className="mb-4 sm:mb-6">
           <button 
             onClick={() => setShowAdvancedPrefs(!showAdvancedPrefs)}
             className="flex items-center text-gray-400 hover:text-white text-sm mb-1 sm:mb-2"
@@ -1694,7 +1943,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               </div>
             </div>
           )}
-        </div>
+            </div>
+          </>
+        )}
         
         {/* Publishing status for enabled platforms */}
         {isPublishing && (
@@ -1712,36 +1963,93 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         )}
         
         {/* Jamie Assist button and info button */}
-        <div className="flex justify-center mb-3">
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleJamieAssist}
-              disabled={isGeneratingContent || isPublishing || !lookupHash}
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
-                ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
-            >
-              {isGeneratingContent ? (
-                <span className="flex items-center">
-                  <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                  Generating...
-                </span>
-              ) : (
-                <span className="flex items-center">
-                  <Sparkles className="w-4 h-4 mr-1 sm:mr-2" />
-                  Jamie Assist
+        {!isSchedulingMode && (
+          <div className="flex justify-center mb-3">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleJamieAssist}
+                disabled={isGeneratingContent || isPublishing || !lookupHash}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
+                  ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
+              >
+                {isGeneratingContent ? (
+                  <span className="flex items-center">
+                    <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                    Generating...
+                  </span>
+                ) : (
+                  <span className="flex items-center">
+                    <Sparkles className="w-4 h-4 mr-1 sm:mr-2" />
+                    Jamie Assist
+                  </span>
+                )}
+              </button>
+              
+              <button
+                onClick={() => setShowInfoModal(true)}
+                className="flex items-center space-x-1 px-2 py-1 rounded-full border border-gray-700 group hover:bg-gray-800 hover:border-amber-500/30 transition-colors"
+                title="About Jamie Assist"
+                aria-label="Learn more about Jamie Assist"
+              >
+                <Info className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-500" />
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* Scheduling Section */}
+        <div className="mb-4 sm:mb-6">
+          <div className="flex flex-col items-center mb-3">
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => {
+                  if (!isSchedulingMode) {
+                    setPendingScheduledDate(scheduledDate);
+                  }
+                  setIsSchedulingMode(!isSchedulingMode);
+                }}
+                disabled={isGeneratingContent || isPublishing}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium flex items-center
+                  ${isSchedulingMode 
+                    ? "bg-white text-black hover:bg-gray-100" 
+                    : "bg-black border border-white text-white hover:bg-gray-900"}
+                  ${(isGeneratingContent || isPublishing) ? ' opacity-50 cursor-not-allowed' : ' transition-colors'}`}
+              >
+                <Clock className="w-4 h-4 mr-1 sm:mr-2" />
+                {isSchedulingMode ? 'Close Scheduler' : 'Schedule'}
+              </button>
+              {!isSchedulingMode && scheduledDate && (
+                <span className="text-xs text-gray-400">
+                  Scheduled for {formatScheduledDate(scheduledDate)}
                 </span>
               )}
-            </button>
-            
-            <button
-              onClick={() => setShowInfoModal(true)}
-              className="flex items-center space-x-1 px-2 py-1 rounded-full border border-gray-700 group hover:bg-gray-800 hover:border-amber-500/30 transition-colors"
-              title="About Jamie Assist"
-              aria-label="Learn more about Jamie Assist"
-            >
-              <Info className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-500" />
-            </button>
+            </div>
           </div>
+          {isSchedulingMode && (
+            <div className="text-center mb-3">
+              <span className="text-xs text-gray-400">
+                {isUpdateMode ? 'Edit scheduled time' : 'Choose when to publish this post'}
+              </span>
+            </div>
+          )}
+          
+          {isSchedulingMode && (
+            <div className="space-y-3">
+              <DateTimePicker
+                value={pendingScheduledDate ?? scheduledDate}
+                onChange={setPendingScheduledDate}
+                placeholder="Select date and time"
+                className=""
+                onDropdownStateChange={setHasOpenDropdowns}
+              />
+              
+              {schedulingError && (
+                <div className="px-3 py-2 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300">
+                  {schedulingError}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Jamie Assist Error Message */}
@@ -1759,28 +2067,70 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         )}
         
         <div className="flex space-x-3 sm:space-x-4 justify-center">
-          <button
-            onClick={onClose}
-            disabled={isPublishing || isGeneratingContent}
-            className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-gray-700 text-gray-300 
-              ${(isPublishing || isGeneratingContent) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handlePublish}
-            disabled={isPublishing || isGeneratingContent || content.trim().length === 0 || (!twitterState.enabled && !nostrState.enabled)}
-            className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-white text-black font-medium 
-              ${(isPublishing || isGeneratingContent || content.trim().length === 0 || (!twitterState.enabled && !nostrState.enabled)) ? 
-                'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 transition-colors'}`}
-          >
-            {isPublishing ? (
-              <span className="flex items-center">
-                <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                Publishing...
-              </span>
-            ) : 'Post'}
-          </button>
+          {isSchedulingMode ? (
+            <>
+              <button
+                onClick={() => {
+                  setPendingScheduledDate(scheduledDate);
+                  setIsSchedulingMode(false);
+                }}
+                disabled={isPublishing || isGeneratingContent}
+                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-gray-700 text-gray-300 
+                  ${(isPublishing || isGeneratingContent) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={() => {
+                  setScheduledDate(pendingScheduledDate);
+                  setIsSchedulingMode(false);
+                }}
+                disabled={!pendingScheduledDate || isPublishing || isGeneratingContent}
+                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-black border border-white text-white font-medium 
+                  ${(!pendingScheduledDate || isPublishing || isGeneratingContent) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-900 transition-colors'}`}
+              >
+                Confirm Time
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={onClose}
+                disabled={isPublishing || isGeneratingContent || isScheduling}
+                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-gray-700 text-gray-300 
+                  ${(isPublishing || isGeneratingContent || isScheduling) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (scheduledDate) {
+                    // Directly schedule (create or update) when a time exists
+                    handleSchedule();
+                  } else {
+                    handlePublish();
+                  }
+                }}
+                disabled={
+                  scheduledDate
+                    ? (isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate)
+                    : (isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled))
+                }
+                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg ${scheduledDate ? 'bg-white text-black' : 'bg-white text-black'} font-medium 
+                  ${scheduledDate
+                    ? ((isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100')
+                    : ((isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled)) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100')
+                  } transition-colors`}
+              >
+                {isPublishing ? (
+                  <span className="flex items-center">
+                    <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                    {scheduledDate ? 'Scheduling...' : 'Publishing...'}
+                  </span>
+                ) : scheduledDate ? 'Schedule' : 'Post Now'}
+              </button>
+            </>
+          )}
         </div>
         
         <div className="text-gray-500 text-xs mt-2 sm:mt-4 text-center">
@@ -1798,7 +2148,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             <X className="w-6 h-6" />
           </button>
           
-          <div className="overflow-y-auto flex-1 pr-2 mt-8" 
+          <div 
+            className={`flex-1 pr-2 mt-8 ${(isSchedulingMode && !hasOpenDropdowns) ? 'overflow-hidden' : 'overflow-y-auto'}`}
             style={{ 
               scrollbarWidth: 'thin',
               scrollbarColor: '#ffffff #374151',
