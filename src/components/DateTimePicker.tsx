@@ -53,7 +53,8 @@ const findNextAvailableTimeSlot = (date: string): string | null => {
   }
   
   const now = new Date();
-  const selectedDate = new Date(date + 'T00:00:00');
+  const [year, month, day] = date.split('-').map(Number);
+  const selectedDate = new Date(year, month - 1, day);
   const isToday = selectedDate.toDateString() === now.toDateString();
   
   printLog('📅 Date comparison: now=' + now.toDateString() + ', selected=' + selectedDate.toDateString() + ', isToday=' + isToday);
@@ -162,8 +163,12 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     if (value) {
       isInitializingRef.current = true;
       
-      // Work with user's local time directly
-      const dateStr = value.toISOString().split('T')[0];
+      // Work with user's local time directly - avoid toISOString() timezone shift
+      const year = value.getFullYear();
+      const month = (value.getMonth() + 1).toString().padStart(2, '0');
+      const day = value.getDate().toString().padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
       const hours = value.getHours().toString().padStart(2, '0');
       const minutes = value.getMinutes().toString().padStart(2, '0');
       
@@ -193,7 +198,11 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   useEffect(() => {
     if (!value && !selectedDate && !isInitializingRef.current) {
       printLog('🔄 No initial value, setting today and auto-selecting time...');
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const day = now.getDate().toString().padStart(2, '0');
+      const today = `${year}-${month}-${day}`;
       setSelectedDate(today);
       // Time will be auto-selected by the effect above
     }
@@ -338,7 +347,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     
     printLog('✅ Date wheel proceeding with change');
     
-    const currentDate = selectedDate ? new Date(selectedDate + 'T00:00:00') : new Date();
+    const currentDate = selectedDate ? (() => {
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    })() : new Date();
     const direction = e.deltaY > 0 ? 1 : -1; // Scroll down = next day, scroll up = previous day
     
     const newDate = new Date(currentDate);
@@ -346,7 +358,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     
     // Don't go before minDate
     if (newDate >= minDate) {
-      const newDateStr = newDate.toISOString().split('T')[0];
+      const year = newDate.getFullYear();
+      const month = (newDate.getMonth() + 1).toString().padStart(2, '0');
+      const day = newDate.getDate().toString().padStart(2, '0');
+      const newDateStr = `${year}-${month}-${day}`;
       setSelectedDate(newDateStr);
       
       // Auto-adjust time if current time is now in the past for the new date
@@ -374,7 +389,9 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     const hour12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
     const ampm = hours >= 12 ? 'PM' : 'AM';
     
-    const date = new Date(selectedDate);
+    // Parse date components to avoid timezone conversion
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     const dateStr = formatShortDate(date);
     
     return `${dateStr} at ${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
@@ -407,17 +424,24 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
                      disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800 transition-colors"
             style={{ touchAction: 'none' }}
           >
-            {selectedDate ? (
-              formatShortDate(new Date(selectedDate + 'T00:00:00'))
-            ) : (
-              <span className="text-gray-400">Select date</span>
-            )}
+                      {selectedDate ? (
+            (() => {
+              const [year, month, day] = selectedDate.split('-').map(Number);
+              const date = new Date(year, month - 1, day);
+              return formatShortDate(date);
+            })()
+          ) : (
+            <span className="text-gray-400">Select date</span>
+          )}
           </button>
           
           {/* Custom Calendar */}
           {showCalendar && (
             <CustomCalendar
-              selectedDate={selectedDate ? new Date(selectedDate + 'T00:00:00') : undefined}
+              selectedDate={selectedDate ? (() => {
+                const [year, month, day] = selectedDate.split('-').map(Number);
+                return new Date(year, month - 1, day);
+              })() : undefined}
               onDateSelect={handleCustomDateSelect}
               minDate={minDate}
               onClose={handleCalendarClose}
