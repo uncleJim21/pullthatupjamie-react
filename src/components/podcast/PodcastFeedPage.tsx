@@ -27,6 +27,7 @@ import TutorialModal from '../TutorialModal.tsx';
 import WelcomeModal from '../WelcomeModal.tsx';
 import ScheduledPostsList from '../ScheduledPostsList.tsx';
 import { useUserSettings } from '../../hooks/useUserSettings.ts';
+import ScheduledPostSlots from '../ScheduledPostSlots.tsx';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -135,7 +136,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const autoShare = userSettings.autoStartCrosspost || false;
     const settingsData = {
         autoStartCrosspost: userSettings.autoStartCrosspost || false,
-        crosspostSignature: userSettings.crosspostSignature || ''
+        crosspostSignature: userSettings.crosspostSignature || '',
+        scheduledPostSlots: userSettings.scheduledPostSlots || []
     };
 
     // Settings handlers
@@ -146,6 +148,10 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
     const handleCrosspostSignatureChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         await updateSetting('crosspostSignature', e.target.value);
+    };
+
+    const handleScheduledSlotsChange = async (slots: any[]) => {
+        await updateSetting('scheduledPostSlots', slots);
     };
 
     // Add these handlers:
@@ -1082,6 +1088,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                             placeholder="Enter your crosspost signature..."
                             className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent resize-none"
                             rows={3}
+                          />
+                        </div>
+
+                        {/* Scheduled Post Slots Setting */}
+                        <div className="border-t border-gray-800 pt-6">
+                          <ScheduledPostSlots
+                            slots={settingsData.scheduledPostSlots}
+                            onSlotsChange={handleScheduledSlotsChange}
+                            maxSlots={10}
+                            isSelectable={false}
                           />
                         </div>
                       </div>

@@ -3,8 +3,16 @@ import { API_URL } from '../constants/constants.ts';
 export interface UserPreferences {
   autoStartCrosspost?: boolean;
   crosspostSignature?: string;
+  scheduledPostSlots?: ScheduledSlot[];
   // Add other user preferences as needed
   [key: string]: any;
+}
+
+export interface ScheduledSlot {
+  id: string;
+  dayOfWeek: number; // 0-6 (Sunday = 0)
+  time: string; // HH:MM format in user's timezone
+  enabled: boolean;
 }
 
 export interface PreferencesResponse {

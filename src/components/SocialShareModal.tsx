@@ -14,6 +14,8 @@ import { useStreamingMentionSearch } from '../hooks/useStreamingMentionSearch.ts
 import ScheduledPostService from '../services/scheduledPostService.ts';
 import { CreateScheduledPostRequest, ScheduledPost } from '../types/scheduledPost.ts';
 import { formatScheduledDate } from '../utils/time.ts';
+import ScheduledPostSlots from './ScheduledPostSlots.tsx';
+import { useUserSettings } from '../hooks/useUserSettings.ts';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -276,6 +278,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Check if we're in update mode
   const isUpdateMode = !!updateContext;
 
+  // User settings for scheduled slots
+  const {
+    settings: userSettings,
+    updateSetting: updateUserSetting
+  } = useUserSettings({
+    enableCloudSync: false, // Don't need cloud sync in modal
+    autoLoadOnMount: true
+  });
+
   // Add state for mentions lookup
   const [showMentionsLookup, setShowMentionsLookup] = useState(false);
   const [mentionSearchQuery, setMentionSearchQuery] = useState('');
@@ -318,6 +329,38 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   useEffect(() => {
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
+
+  // Auto-select next slot when scheduling mode opens
+  useEffect(() => {
+    if (isSchedulingMode && !pendingScheduledDate && userSettings.scheduledPostSlots) {
+      const enabledSlots = userSettings.scheduledPostSlots.filter((slot: any) => slot.enabled);
+      if (enabledSlots.length > 0) {
+        // Find the next upcoming slot
+        const now = new Date();
+        const currentDayOfWeek = now.getDay();
+        const currentTimeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+        const slotsWithDistance = enabledSlots.map((slot: any) => {
+          let dayDiff = (slot.dayOfWeek - currentDayOfWeek + 7) % 7;
+          if (dayDiff === 0 && slot.time <= currentTimeString) {
+            dayDiff = 7;
+          }
+          return { ...slot, distance: dayDiff };
+        });
+
+        slotsWithDistance.sort((a, b) => {
+          if (a.distance !== b.distance) {
+            return a.distance - b.distance;
+          }
+          return a.time.localeCompare(b.time);
+        });
+
+        if (slotsWithDistance.length > 0) {
+          handleSlotSelect(slotsWithDistance[0]);
+        }
+      }
+    }
+  }, [isSchedulingMode, userSettings.scheduledPostSlots]);
 
   // Notify parent of scheduling mode and dropdown state changes
   useEffect(() => {
@@ -989,8 +1032,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         let updateRequest: any = {
           text: finalContent,
           mediaUrl: mediaUrl,
-          scheduledFor: scheduledDate.toISOString(),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          scheduledFor: convertToChicagoTime(scheduledDate).toISOString(),
+          timezone: "America/Chicago"
         };
 
         // If this is a Nostr post, we need to re-sign the event with new content
@@ -1072,9 +1115,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             const nostrRequest: CreateScheduledPostRequest = {
               text: fullContentWithMedia, // Send the complete content including media URL
               mediaUrl, // Still send mediaUrl for backend reference
-              scheduledFor: scheduledDate.toISOString(),
+              scheduledFor: convertToChicagoTime(scheduledDate).toISOString(),
               platforms: ["nostr"],
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              timezone: "America/Chicago",
               platformData: {
                 nostrEventId: signedEvent.id,
                 nostrSignature: signedEvent.sig,
@@ -1107,9 +1150,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             const twitterRequest: CreateScheduledPostRequest = {
               text: finalContent,
               mediaUrl,
-              scheduledFor: scheduledDate.toISOString(),
+              scheduledFor: convertToChicagoTime(scheduledDate).toISOString(),
               platforms: ["twitter"],
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+              timezone: "America/Chicago"
             };
             const twitterResult = await ScheduledPostService.createScheduledPost(twitterRequest);
             printLog(`Successfully scheduled ${twitterResult.length} Twitter post(s)`);
@@ -1517,6 +1560,41 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setMentionSearchQuery('');
     setMentionStartIndex(-1);
     setSelectedMentionIndex(-1);
+  };
+
+  // Handler for scheduled slots changes
+  const handleScheduledSlotsChange = async (slots: any[]) => {
+    await updateUserSetting('scheduledPostSlots', slots);
+  };
+
+  // Handler for selecting a time slot
+  const handleSlotSelect = (slot: any) => {
+    // Calculate the next occurrence of this day/time in user's timezone
+    const now = new Date();
+    const [hours, minutes] = slot.time.split(':').map(Number);
+    
+    // Find the next occurrence of this day of week
+    let targetDate = new Date(now);
+    const dayDiff = (slot.dayOfWeek - now.getDay() + 7) % 7;
+    
+    // If it's the same day but the time has passed, move to next week
+    if (dayDiff === 0 && (hours < now.getHours() || (hours === now.getHours() && minutes <= now.getMinutes()))) {
+      targetDate.setDate(now.getDate() + 7);
+    } else {
+      targetDate.setDate(now.getDate() + dayDiff);
+    }
+    
+    targetDate.setHours(hours, minutes, 0, 0);
+    
+    setPendingScheduledDate(targetDate);
+  };
+
+  // Helper function to convert user's local time to Chicago time for backend
+  const convertToChicagoTime = (localDate: Date): Date => {
+    // Create a date representing the same "wall clock" time in Chicago
+    // This maintains the user's intended scheduling time but in Chicago timezone
+    const chicagoTimeString = localDate.toLocaleString("en-CA", {timeZone: "America/Chicago"});
+    return new Date(chicagoTimeString);
   };
 
   if (!isOpen || !fileUrl) return null;
@@ -2034,7 +2112,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           )}
           
           {isSchedulingMode && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <DateTimePicker
                 value={pendingScheduledDate ?? scheduledDate}
                 onChange={setPendingScheduledDate}
@@ -2042,6 +2120,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 className=""
                 onDropdownStateChange={setHasOpenDropdowns}
               />
+              
+              {/* Scheduled Post Slots */}
+              <div className="border-t border-gray-800 pt-4">
+                <ScheduledPostSlots
+                  slots={userSettings.scheduledPostSlots || []}
+                  onSlotsChange={handleScheduledSlotsChange}
+                  onSlotSelect={handleSlotSelect}
+                  maxSlots={10}
+                  isSelectable={true}
+                />
+              </div>
               
               {schedulingError && (
                 <div className="px-3 py-2 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300">
