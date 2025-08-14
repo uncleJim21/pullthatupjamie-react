@@ -65,10 +65,10 @@ const findNextAvailableTimeSlot = (date: string): string | null => {
     return timeOptions[0].value;
   }
   
-  // For today, find the next available time slot (at least 5 minutes from now)
-  const nowPlusFive = new Date(now.getTime() + 5 * 60 * 1000); // Add 5 minutes
-  const currentHour = nowPlusFive.getHours();
-  const currentMinute = nowPlusFive.getMinutes();
+  // For today, find the next available time slot (at least 1 minute from now)
+  const nowPlusOne = new Date(now.getTime() + 60 * 1000); // Add 1 minute
+  const currentHour = nowPlusOne.getHours();
+  const currentMinute = nowPlusOne.getMinutes();
   
   // Round up to next 5-minute interval
   const nextBucketMinute = Math.ceil(currentMinute / 5) * 5;
@@ -113,7 +113,7 @@ const getUserTimezone = (): string => {
 
 const SERVER_TIMEZONE = 'America/Chicago';
 
-// Simple helper to check if a date/time is in the past
+// Simple helper to check if a date/time is in the past (with 1 minute buffer)
 const isDateTimeInPast = (date: string, time: string): boolean => {
   if (!date || !time) return false;
   
@@ -122,13 +122,20 @@ const isDateTimeInPast = (date: string, time: string): boolean => {
   const [year, month, day] = date.split('-').map(Number);
   const selectedDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
   
-  return selectedDateTime < new Date();
+  // Allow times that are at least 1 minute in the future
+  const now = new Date();
+  const minAllowedTime = new Date(now.getTime() + 60 * 1000); // 1 minute from now
+  
+  return selectedDateTime < minAllowedTime;
 };
 
 const DateTimePicker: React.FC<DateTimePickerProps> = ({
   value,
   onChange,
-  minDate = new Date(),
+  minDate = (() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  })(),
   placeholder = "Select date and time",
   disabled = false,
   className = "",
@@ -136,7 +143,8 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
-  const [showTimeDropdown, setShowTimeDropdown] = useState(false);
+  const [showTimeDropdown, setShowTimeDropdown] = useState<string | false>(false);
+  const [editingValue, setEditingValue] = useState<string>('');
   const [showCalendar, setShowCalendar] = useState(false);
   const [isCalendarClosing, setIsCalendarClosing] = useState(false);
   const [userTimezone] = useState(getUserTimezone());
@@ -253,7 +261,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   // Notify parent of dropdown state changes
   useEffect(() => {
     if (onDropdownStateChange) {
-      const hasOpenDropdowns = showCalendar || showTimeDropdown;
+      const hasOpenDropdowns = showCalendar || !!showTimeDropdown;
       onDropdownStateChange(hasOpenDropdowns);
     }
   }, [showCalendar, showTimeDropdown, onDropdownStateChange]);
@@ -397,12 +405,15 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     return `${dateStr} at ${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   };
 
-  // Check if datetime is valid using pure local timezone logic
+  // Check if datetime is valid using proper time validation
   const isValidDateTime = selectedDate && selectedTime && (() => {
-    const [hours, minutes] = selectedTime.split(':').map(Number);
+    // Check if the date is valid (not before minDate)
     const [year, month, day] = selectedDate.split('-').map(Number);
-    const userDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
-    return userDateTime > minDate;
+    const selectedDateObj = new Date(year, month - 1, day);
+    if (selectedDateObj < minDate) return false;
+    
+    // Check if the time is valid (not in the past for today)
+    return !isDateTimeInPast(selectedDate, selectedTime);
   })();
 
   return (
@@ -450,59 +461,190 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
           )}
         </div>
 
-        {/* Time Input */}
+        {/* Time Input with Direct Typing like Scheduled Slots */}
         <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
             <Clock className="w-4 h-4 text-gray-400" />
           </div>
-          <button
-            type="button"
-            onClick={() => setShowTimeDropdown(!showTimeDropdown)}
-            onWheel={handleTimeWheel}
-            onWheelCapture={handleTimeWheel}
-            disabled={disabled || !selectedDate}
-            className="w-full bg-gray-900 text-white border border-gray-700 rounded-lg pl-10 pr-10 py-3 
-                     text-left focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500
-                     disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800 transition-colors"
-            style={{ touchAction: 'none' }}
-          >
-            {selectedTime ? (
-              timeOptions.find(opt => opt.value === selectedTime)?.label || selectedTime
-            ) : (
-              <span className="text-gray-400">Select time</span>
-            )}
-          </button>
-          <ChevronDown 
-            className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 
-                       transition-transform ${showTimeDropdown ? 'rotate-180' : ''}`}
-          />
           
-          {/* Time Dropdown */}
-          {showTimeDropdown && (
-            <div 
-              ref={timeDropdownRef}
-              className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 
-                          rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
-              {timeOptions.map((option) => {
-                const isPastTime = selectedDate && isDateTimeInPast(selectedDate, option.value);
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handleTimeSelect(option.value)}
-                    disabled={isPastTime}
-                    className={`w-full text-left px-4 py-2 text-sm transition-colors
-                             first:rounded-t-lg last:rounded-b-lg
-                             ${isPastTime 
-                               ? 'text-gray-500 cursor-not-allowed opacity-50' 
-                               : 'text-white hover:bg-gray-800 focus:bg-gray-800 focus:outline-none'
-                             }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
+          {selectedTime ? (
+            <div className="w-full bg-gray-900 text-white border border-gray-700 rounded-lg pl-10 pr-4 py-3 
+                          focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500">
+              <div className="flex items-center space-x-1">
+                {(() => {
+                  const [hours24, minutes] = selectedTime.split(':').map(Number);
+                  const hour12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
+                  const ampm = hours24 >= 12 ? 'PM' : 'AM';
+                  
+                  return (
+                    <>
+                      {/* Hour Input */}
+                      {showTimeDropdown === 'hour' ? (
+                        <input
+                          type="text"
+                          value={editingValue}
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            setEditingValue(inputValue);
+                          }}
+                          onBlur={(e) => {
+                            // Validate and fix on blur
+                            const inputValue = e.target.value;
+                            let finalHour = parseInt(inputValue);
+                            
+                            // If invalid, default to 12
+                            if (isNaN(finalHour) || finalHour < 1 || finalHour > 12) {
+                              finalHour = 12;
+                            }
+                            
+                            let newHours24 = finalHour === 12 ? 0 : finalHour;
+                            if (ampm === 'PM' && finalHour !== 12) newHours24 += 12;
+                            if (ampm === 'AM' && finalHour === 12) newHours24 = 0;
+                            const newTime = `${newHours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                            setSelectedTime(newTime);
+                            setShowTimeDropdown(false);
+                            setEditingValue('');
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === 'Tab') {
+                              // Validate and fix on enter/tab
+                              const inputValue = e.currentTarget.value;
+                              let finalHour = parseInt(inputValue);
+                              
+                              // If invalid, default to 12
+                              if (isNaN(finalHour) || finalHour < 1 || finalHour > 12) {
+                                finalHour = 12;
+                              }
+                              
+                              let newHours24 = finalHour === 12 ? 0 : finalHour;
+                              if (ampm === 'PM' && finalHour !== 12) newHours24 += 12;
+                              if (ampm === 'AM' && finalHour === 12) newHours24 = 0;
+                              const newTime = `${newHours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                              setSelectedTime(newTime);
+                              setShowTimeDropdown(false);
+                              setEditingValue('');
+                            }
+                          }}
+                          className="w-8 px-1 py-1 text-sm bg-gray-800 border border-gray-600 rounded text-white text-center focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          autoFocus
+                          maxLength={2}
+                          placeholder={hour12.toString().padStart(2, '0')}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={disabled || !selectedDate}
+                          onClick={() => {
+                            setEditingValue('');
+                            setShowTimeDropdown('hour');
+                          }}
+                          className="px-2 py-1 text-sm bg-gray-800 border border-gray-600 rounded text-white hover:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+                        >
+                          {hour12.toString().padStart(2, '0')}
+                        </button>
+                      )}
+                      
+                      <span className="text-gray-400">:</span>
+                      
+                      {/* Minutes Input */}
+                      {showTimeDropdown === 'minutes' ? (
+                        <input
+                          type="text"
+                          value={editingValue}
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            setEditingValue(inputValue);
+                          }}
+                          onBlur={(e) => {
+                            // Validate and fix on blur
+                            const inputValue = e.target.value;
+                            let finalMinutes = parseInt(inputValue);
+                            
+                            // If invalid, default to 00
+                            if (isNaN(finalMinutes) || finalMinutes < 0 || finalMinutes > 59) {
+                              finalMinutes = 0;
+                            }
+                            
+                            const newTime = `${hours24.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}`;
+                            setSelectedTime(newTime);
+                            setShowTimeDropdown(false);
+                            setEditingValue('');
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === 'Tab') {
+                              // Validate and fix on enter/tab
+                              const inputValue = e.currentTarget.value;
+                              let finalMinutes = parseInt(inputValue);
+                              
+                              // If invalid, default to 00
+                              if (isNaN(finalMinutes) || finalMinutes < 0 || finalMinutes > 59) {
+                                finalMinutes = 0;
+                              }
+                              
+                              const newTime = `${hours24.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}`;
+                              setSelectedTime(newTime);
+                              setShowTimeDropdown(false);
+                              setEditingValue('');
+                            }
+                          }}
+                          className="w-8 px-1 py-1 text-sm bg-gray-800 border border-gray-600 rounded text-white text-center focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          autoFocus
+                          maxLength={2}
+                          placeholder={minutes.toString().padStart(2, '0')}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={disabled || !selectedDate}
+                          onClick={() => {
+                            setEditingValue('');
+                            setShowTimeDropdown('minutes');
+                          }}
+                          className="px-2 py-1 text-sm bg-gray-800 border border-gray-600 rounded text-white hover:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+                        >
+                          {minutes.toString().padStart(2, '0')}
+                        </button>
+                      )}
+                      
+                      {/* AM/PM Toggle */}
+                      <button
+                        type="button"
+                        disabled={disabled || !selectedDate}
+                        onClick={() => {
+                          const newAmpm = ampm === 'AM' ? 'PM' : 'AM';
+                          let newHours24 = hour12;
+                          if (newAmpm === 'PM' && hour12 !== 12) newHours24 += 12;
+                          if (newAmpm === 'AM' && hour12 === 12) newHours24 = 0;
+                          const newTime = `${newHours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                          setSelectedTime(newTime);
+                        }}
+                        className="px-2 py-1 text-sm bg-gray-800 border border-gray-600 rounded text-white hover:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+                      >
+                        {ampm}
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedDate) {
+                  const nextAvailableTime = findNextAvailableTimeSlot(selectedDate);
+                  if (nextAvailableTime) {
+                    setSelectedTime(nextAvailableTime);
+                  }
+                }
+              }}
+              disabled={disabled || !selectedDate}
+              className="w-full bg-gray-900 text-gray-400 border border-gray-700 rounded-lg pl-10 pr-4 py-3 
+                       text-left focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500
+                       disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800 transition-colors"
+            >
+              Select time
+            </button>
           )}
         </div>
       </div>
@@ -524,13 +666,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
         </div>
       )}
 
-      {/* Click outside handler */}
-      {showTimeDropdown && (
-        <div 
-          className="fixed inset-0 z-40" 
-          onClick={() => setShowTimeDropdown(false)}
-        />
-      )}
+
     </div>
   );
 };

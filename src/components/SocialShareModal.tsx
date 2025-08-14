@@ -998,9 +998,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       return;
     }
 
-    // Check if scheduled date is in the future (user's perspective)
-    if (scheduledDate <= new Date()) {
-      setSchedulingError("Please select a future date and time");
+    // Check if scheduled date is in the future (with a 1-minute buffer)
+    const now = new Date();
+    const minScheduleTime = new Date(now.getTime() + 60 * 1000); // 1 minute from now
+    if (scheduledDate <= minScheduleTime) {
+      setSchedulingError("Please select a time at least 1 minute in the future");
       return;
     }
 
@@ -1597,10 +1599,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   // Helper function to convert user's local time to Chicago time for backend
   const convertToChicagoTime = (localDate: Date): Date => {
-    // Create a date representing the same "wall clock" time in Chicago
-    // This maintains the user's intended scheduling time but in Chicago timezone
-    const chicagoTimeString = localDate.toLocaleString("en-CA", {timeZone: "America/Chicago"});
-    return new Date(chicagoTimeString);
+    // Simply return the date as-is since the backend expects UTC timestamps
+    // The timezone field ("America/Chicago") tells the backend how to interpret it
+    return localDate;
   };
 
   // Helper function to randomize post time using white noise
@@ -1614,7 +1615,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     const randomOffset = whiteNoise * 10 * 60 * 1000;
     
     // Apply the offset to the date
-    return new Date(date.getTime() + randomOffset);
+    const randomizedDate = new Date(date.getTime() + randomOffset);
+    
+    // Ensure the randomized time is at least 1 minute from now
+    const now = new Date();
+    const minTime = new Date(now.getTime() + 60 * 1000); // now + 1 minute
+    
+    // If the randomized time is in the past or too close to now, use the minimum time
+    if (randomizedDate < minTime) {
+      return minTime;
+    }
+    
+    return randomizedDate;
   };
 
   if (!isOpen || !fileUrl) return null;
@@ -2131,58 +2143,58 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             </div>
           )}
           
-          {isSchedulingMode && (
-            <div className="space-y-4">
-              <DateTimePicker
-                value={pendingScheduledDate ?? scheduledDate}
-                onChange={setPendingScheduledDate}
-                placeholder="Select date and time"
-                className=""
-                onDropdownStateChange={setHasOpenDropdowns}
-              />
-              
-              {/* Randomize Post Time Option */}
-              <div className="border-t border-gray-800 pt-4">
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={userSettings.randomizePostTime ?? true}
-                    onChange={(e) => updateUserSetting('randomizePostTime', e.target.checked)}
-                    className="sr-only"
-                  />
-                  <div className={`w-4 h-4 border-2 rounded-sm mr-3 flex items-center justify-center transition-colors ${
-                    (userSettings.randomizePostTime ?? true)
-                      ? 'bg-white border-white' 
-                      : 'border-gray-400 bg-transparent'
-                  }`}>
-                    {(userSettings.randomizePostTime ?? true) && (
-                      <svg className="w-2.5 h-2.5 text-black" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                  <span className="text-white text-sm">Randomize post time (±10 min)</span>
-                </label>
-              </div>
-
-              {/* Scheduled Post Slots */}
-              <div className="border-t border-gray-800 pt-4 max-h-80 overflow-y-auto">
-                <ScheduledPostSlots
-                  slots={userSettings.scheduledPostSlots || []}
-                  onSlotsChange={handleScheduledSlotsChange}
-                  onSlotSelect={handleSlotSelect}
-                  maxSlots={10}
-                  isSelectable={true}
+                      {isSchedulingMode && (
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                <DateTimePicker
+                  value={pendingScheduledDate ?? scheduledDate}
+                  onChange={setPendingScheduledDate}
+                  placeholder="Select date and time"
+                  className=""
+                  onDropdownStateChange={setHasOpenDropdowns}
                 />
-              </div>
-              
-              {schedulingError && (
-                <div className="px-3 py-2 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300">
-                  {schedulingError}
+                
+                {/* Randomize Post Time Option */}
+                <div className="border-t border-gray-800 pt-4">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={userSettings.randomizePostTime ?? true}
+                      onChange={(e) => updateUserSetting('randomizePostTime', e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={`w-4 h-4 border-2 rounded-sm mr-3 flex items-center justify-center transition-colors ${
+                      (userSettings.randomizePostTime ?? true)
+                        ? 'bg-white border-white' 
+                        : 'border-gray-400 bg-transparent'
+                    }`}>
+                      {(userSettings.randomizePostTime ?? true) && (
+                        <svg className="w-2.5 h-2.5 text-black" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-white text-sm">Randomize post time (±10 min)</span>
+                  </label>
                 </div>
-              )}
-            </div>
-          )}
+
+                {/* Scheduled Post Slots */}
+                <div className="border-t border-gray-800 pt-4">
+                  <ScheduledPostSlots
+                    slots={userSettings.scheduledPostSlots || []}
+                    onSlotsChange={handleScheduledSlotsChange}
+                    onSlotSelect={handleSlotSelect}
+                    maxSlots={10}
+                    isSelectable={true}
+                  />
+                </div>
+                
+                {schedulingError && (
+                  <div className="px-3 py-2 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300">
+                    {schedulingError}
+                  </div>
+                )}
+              </div>
+            )}
         </div>
         
         {/* Jamie Assist Error Message */}
