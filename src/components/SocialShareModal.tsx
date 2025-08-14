@@ -1029,10 +1029,13 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           throw new Error('No valid post ID found for update');
         }
 
+        // Apply randomization if enabled
+        const finalScheduledDate = randomizeTime(scheduledDate, userSettings.randomizePostTime ?? true);
+        
         let updateRequest: any = {
           text: finalContent,
           mediaUrl: mediaUrl,
-          scheduledFor: convertToChicagoTime(scheduledDate).toISOString(),
+          scheduledFor: convertToChicagoTime(finalScheduledDate).toISOString(),
           timezone: "America/Chicago"
         };
 
@@ -1094,6 +1097,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         // Helper to create a minimal Nostr event for signature validation
         // Use unified event construction for Nostr
 
+        // Apply randomization if enabled (only for new posts, not updates)
+        const finalScheduledDate = randomizeTime(scheduledDate, userSettings.randomizePostTime ?? true);
+
         // Schedule Nostr first if enabled
         if (nostrEnabled) {
           try {
@@ -1115,7 +1121,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             const nostrRequest: CreateScheduledPostRequest = {
               text: fullContentWithMedia, // Send the complete content including media URL
               mediaUrl, // Still send mediaUrl for backend reference
-              scheduledFor: convertToChicagoTime(scheduledDate).toISOString(),
+              scheduledFor: convertToChicagoTime(finalScheduledDate).toISOString(),
               platforms: ["nostr"],
               timezone: "America/Chicago",
               platformData: {
@@ -1150,7 +1156,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             const twitterRequest: CreateScheduledPostRequest = {
               text: finalContent,
               mediaUrl,
-              scheduledFor: convertToChicagoTime(scheduledDate).toISOString(),
+              scheduledFor: convertToChicagoTime(finalScheduledDate).toISOString(),
               platforms: ["twitter"],
               timezone: "America/Chicago"
             };
@@ -1595,6 +1601,20 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     // This maintains the user's intended scheduling time but in Chicago timezone
     const chicagoTimeString = localDate.toLocaleString("en-CA", {timeZone: "America/Chicago"});
     return new Date(chicagoTimeString);
+  };
+
+  // Helper function to randomize post time using white noise
+  const randomizeTime = (date: Date, shouldRandomize: boolean): Date => {
+    if (!shouldRandomize) return date;
+    
+    // Generate white noise: random value between -1 and 1
+    const whiteNoise = (Math.random() * 2) - 1;
+    
+    // Multiply by 10 minutes (600,000 milliseconds)
+    const randomOffset = whiteNoise * 10 * 60 * 1000;
+    
+    // Apply the offset to the date
+    return new Date(date.getTime() + randomOffset);
   };
 
   if (!isOpen || !fileUrl) return null;
@@ -2121,8 +2141,32 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 onDropdownStateChange={setHasOpenDropdowns}
               />
               
-              {/* Scheduled Post Slots */}
+              {/* Randomize Post Time Option */}
               <div className="border-t border-gray-800 pt-4">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={userSettings.randomizePostTime ?? true}
+                    onChange={(e) => updateUserSetting('randomizePostTime', e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`w-4 h-4 border-2 rounded-sm mr-3 flex items-center justify-center transition-colors ${
+                    (userSettings.randomizePostTime ?? true)
+                      ? 'bg-white border-white' 
+                      : 'border-gray-400 bg-transparent'
+                  }`}>
+                    {(userSettings.randomizePostTime ?? true) && (
+                      <svg className="w-2.5 h-2.5 text-black" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-white text-sm">Randomize post time (±10 min)</span>
+                </label>
+              </div>
+
+              {/* Scheduled Post Slots */}
+              <div className="border-t border-gray-800 pt-4 max-h-80 overflow-y-auto">
                 <ScheduledPostSlots
                   slots={userSettings.scheduledPostSlots || []}
                   onSlotsChange={handleScheduledSlotsChange}

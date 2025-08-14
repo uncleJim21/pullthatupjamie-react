@@ -4,6 +4,7 @@ export interface UserPreferences {
   autoStartCrosspost?: boolean;
   crosspostSignature?: string;
   scheduledPostSlots?: ScheduledSlot[];
+  randomizePostTime?: boolean;
   // Add other user preferences as needed
   [key: string]: any;
 }
@@ -26,6 +27,34 @@ export interface PreferencesRequest {
 }
 
 const CURRENT_SCHEMA_VERSION = 20250812001;
+
+/**
+ * Generate default scheduled slots (9:45 AM and 4:45 PM, Monday-Friday)
+ */
+export function generateDefaultScheduledSlots(): ScheduledSlot[] {
+  const slots: ScheduledSlot[] = [];
+  
+  // Monday through Friday (1-5)
+  for (let day = 1; day <= 5; day++) {
+    // Morning slot: 9:45 AM
+    slots.push({
+      id: `default-${day}-morning`,
+      dayOfWeek: day,
+      time: '09:45',
+      enabled: true
+    });
+    
+    // Afternoon slot: 4:45 PM
+    slots.push({
+      id: `default-${day}-afternoon`,
+      dayOfWeek: day,
+      time: '16:45',
+      enabled: true
+    });
+  }
+  
+  return slots;
+}
 
 class PreferencesService {
   private static readonly BASE_URL = API_URL;

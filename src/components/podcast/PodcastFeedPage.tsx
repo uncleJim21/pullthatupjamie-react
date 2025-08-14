@@ -137,7 +137,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const settingsData = {
         autoStartCrosspost: userSettings.autoStartCrosspost || false,
         crosspostSignature: userSettings.crosspostSignature || '',
-        scheduledPostSlots: userSettings.scheduledPostSlots || []
+        scheduledPostSlots: userSettings.scheduledPostSlots || [],
+        randomizePostTime: userSettings.randomizePostTime ?? true
     };
 
     // Settings handlers
@@ -1089,6 +1090,35 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                             className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent resize-none"
                             rows={3}
                           />
+                        </div>
+
+                        {/* Randomize Post Time Setting */}
+                        <div className="border-t border-gray-800 pt-6">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={settingsData.randomizePostTime ?? true}
+                              onChange={(e) => updateSetting('randomizePostTime', e.target.checked)}
+                              className="sr-only"
+                            />
+                            <div className={`w-5 h-5 border-2 rounded-sm mr-3 flex items-center justify-center transition-colors ${
+                              (settingsData.randomizePostTime ?? true)
+                                ? 'bg-white border-white' 
+                                : 'border-gray-400 bg-transparent'
+                            }`}>
+                              {(settingsData.randomizePostTime ?? true) && (
+                                <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                            <div>
+                              <span className="text-white font-medium">Randomize Post Time</span>
+                              <p className="text-gray-400 text-sm mt-1">
+                                Slightly randomize scheduled post times (±10 minutes) to appear more natural
+                              </p>
+                            </div>
+                          </label>
                         </div>
 
                         {/* Scheduled Post Slots Setting */}

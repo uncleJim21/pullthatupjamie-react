@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import PreferencesService, { UserPreferences } from '../services/preferencesService.ts';
+import PreferencesService, { UserPreferences, generateDefaultScheduledSlots } from '../services/preferencesService.ts';
 
 interface UseUserSettingsOptions {
   enableCloudSync?: boolean; // Enable cloud sync for admin users
@@ -30,10 +30,25 @@ export const useUserSettings = (options: UseUserSettingsOptions = {}): UseUserSe
     // Initialize from localStorage
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : {};
+      const parsed = stored ? JSON.parse(stored) : {};
+      
+      // Set default scheduled slots if none exist
+      if (!parsed.scheduledPostSlots || parsed.scheduledPostSlots.length === 0) {
+        parsed.scheduledPostSlots = generateDefaultScheduledSlots();
+      }
+      
+      // Set default randomizePostTime if not set
+      if (parsed.randomizePostTime === undefined) {
+        parsed.randomizePostTime = true;
+      }
+      
+      return parsed;
     } catch (error) {
       console.error('Error parsing stored user settings:', error);
-      return {};
+      return {
+        scheduledPostSlots: generateDefaultScheduledSlots(),
+        randomizePostTime: true
+      };
     }
   });
   
@@ -134,6 +149,17 @@ export const useUserSettings = (options: UseUserSettingsOptions = {}): UseUserSe
         // Cloud has settings - merge with local settings (cloud takes precedence)
         setSettings(prevSettings => {
           const mergedSettings = { ...prevSettings, ...cloudSettings };
+          
+          // Ensure default slots exist if none are set
+          if (!mergedSettings.scheduledPostSlots || mergedSettings.scheduledPostSlots.length === 0) {
+            mergedSettings.scheduledPostSlots = generateDefaultScheduledSlots();
+          }
+          
+          // Ensure randomizePostTime is set
+          if (mergedSettings.randomizePostTime === undefined) {
+            mergedSettings.randomizePostTime = true;
+          }
+          
           saveToLocalStorage(mergedSettings);
           return mergedSettings;
         });
@@ -244,6 +270,17 @@ export const useUserSettings = (options: UseUserSettingsOptions = {}): UseUserSe
           // Cloud has settings - merge with local settings (cloud takes precedence)
           setSettings(prevSettings => {
             const mergedSettings = { ...prevSettings, ...cloudSettings };
+            
+            // Ensure default slots exist if none are set
+            if (!mergedSettings.scheduledPostSlots || mergedSettings.scheduledPostSlots.length === 0) {
+              mergedSettings.scheduledPostSlots = generateDefaultScheduledSlots();
+            }
+            
+            // Ensure randomizePostTime is set
+            if (mergedSettings.randomizePostTime === undefined) {
+              mergedSettings.randomizePostTime = true;
+            }
+            
             try {
               localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mergedSettings));
             } catch (error) {
