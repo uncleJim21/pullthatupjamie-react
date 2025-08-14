@@ -244,7 +244,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Add state for admin privileges and toggle
   const [adminFeedId, setAdminFeedId] = useState<string | null>(null);
-  const [podcastSearchMode, setPodcastSearchMode] = useState<'global' | 'my-pod'>('global');
+  const [podcastSearchMode, setPodcastSearchMode] = useState<'global' | 'my-pod'>('my-pod');
   
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const clipId = searchParams.get('clip');
