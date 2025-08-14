@@ -14,6 +14,8 @@ import { useStreamingMentionSearch } from '../hooks/useStreamingMentionSearch.ts
 import ScheduledPostService from '../services/scheduledPostService.ts';
 import { CreateScheduledPostRequest, ScheduledPost } from '../types/scheduledPost.ts';
 import { formatScheduledDate } from '../utils/time.ts';
+import ScheduledPostSlots from './ScheduledPostSlots.tsx';
+import { useUserSettings } from '../hooks/useUserSettings.ts';
 
 // Define relay pool for Nostr
 export const relayPool = [
@@ -276,6 +278,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Check if we're in update mode
   const isUpdateMode = !!updateContext;
 
+  // User settings for scheduled slots
+  const {
+    settings: userSettings,
+    updateSetting: updateUserSetting
+  } = useUserSettings({
+    enableCloudSync: false, // Don't need cloud sync in modal
+    autoLoadOnMount: true
+  });
+
   // Add state for mentions lookup
   const [showMentionsLookup, setShowMentionsLookup] = useState(false);
   const [mentionSearchQuery, setMentionSearchQuery] = useState('');
@@ -318,6 +329,38 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   useEffect(() => {
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
+
+  // Auto-select next slot when scheduling mode opens
+  useEffect(() => {
+    if (isSchedulingMode && !pendingScheduledDate && userSettings.scheduledPostSlots) {
+      const enabledSlots = userSettings.scheduledPostSlots.filter((slot: any) => slot.enabled);
+      if (enabledSlots.length > 0) {
+        // Find the next upcoming slot
+        const now = new Date();
+        const currentDayOfWeek = now.getDay();
+        const currentTimeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+        const slotsWithDistance = enabledSlots.map((slot: any) => {
+          let dayDiff = (slot.dayOfWeek - currentDayOfWeek + 7) % 7;
+          if (dayDiff === 0 && slot.time <= currentTimeString) {
+            dayDiff = 7;
+          }
+          return { ...slot, distance: dayDiff };
+        });
+
+        slotsWithDistance.sort((a, b) => {
+          if (a.distance !== b.distance) {
+            return a.distance - b.distance;
+          }
+          return a.time.localeCompare(b.time);
+        });
+
+        if (slotsWithDistance.length > 0) {
+          handleSlotSelect(slotsWithDistance[0]);
+        }
+      }
+    }
+  }, [isSchedulingMode, userSettings.scheduledPostSlots]);
 
   // Notify parent of scheduling mode and dropdown state changes
   useEffect(() => {
@@ -955,9 +998,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       return;
     }
 
-    // Check if scheduled date is in the future (user's perspective)
-    if (scheduledDate <= new Date()) {
-      setSchedulingError("Please select a future date and time");
+    // Check if scheduled date is in the future (with a 1-minute buffer)
+    const now = new Date();
+    const minScheduleTime = new Date(now.getTime() + 60 * 1000); // 1 minute from now
+    if (scheduledDate <= minScheduleTime) {
+      setSchedulingError("Please select a time at least 1 minute in the future");
       return;
     }
 
@@ -986,11 +1031,14 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           throw new Error('No valid post ID found for update');
         }
 
+        // Apply randomization if enabled
+        const finalScheduledDate = randomizeTime(scheduledDate, userSettings.randomizePostTime ?? true);
+        
         let updateRequest: any = {
           text: finalContent,
           mediaUrl: mediaUrl,
-          scheduledFor: scheduledDate.toISOString(),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          scheduledFor: convertToChicagoTime(finalScheduledDate).toISOString(),
+          timezone: "America/Chicago"
         };
 
         // If this is a Nostr post, we need to re-sign the event with new content
@@ -1051,6 +1099,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         // Helper to create a minimal Nostr event for signature validation
         // Use unified event construction for Nostr
 
+        // Apply randomization if enabled (only for new posts, not updates)
+        const finalScheduledDate = randomizeTime(scheduledDate, userSettings.randomizePostTime ?? true);
+
         // Schedule Nostr first if enabled
         if (nostrEnabled) {
           try {
@@ -1072,9 +1123,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             const nostrRequest: CreateScheduledPostRequest = {
               text: fullContentWithMedia, // Send the complete content including media URL
               mediaUrl, // Still send mediaUrl for backend reference
-              scheduledFor: scheduledDate.toISOString(),
+              scheduledFor: convertToChicagoTime(finalScheduledDate).toISOString(),
               platforms: ["nostr"],
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              timezone: "America/Chicago",
               platformData: {
                 nostrEventId: signedEvent.id,
                 nostrSignature: signedEvent.sig,
@@ -1107,9 +1158,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             const twitterRequest: CreateScheduledPostRequest = {
               text: finalContent,
               mediaUrl,
-              scheduledFor: scheduledDate.toISOString(),
+              scheduledFor: convertToChicagoTime(finalScheduledDate).toISOString(),
               platforms: ["twitter"],
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+              timezone: "America/Chicago"
             };
             const twitterResult = await ScheduledPostService.createScheduledPost(twitterRequest);
             printLog(`Successfully scheduled ${twitterResult.length} Twitter post(s)`);
@@ -1517,6 +1568,65 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setMentionSearchQuery('');
     setMentionStartIndex(-1);
     setSelectedMentionIndex(-1);
+  };
+
+  // Handler for scheduled slots changes
+  const handleScheduledSlotsChange = async (slots: any[]) => {
+    await updateUserSetting('scheduledPostSlots', slots);
+  };
+
+  // Handler for selecting a time slot
+  const handleSlotSelect = (slot: any) => {
+    // Calculate the next occurrence of this day/time in user's timezone
+    const now = new Date();
+    const [hours, minutes] = slot.time.split(':').map(Number);
+    
+    // Find the next occurrence of this day of week
+    let targetDate = new Date(now);
+    const dayDiff = (slot.dayOfWeek - now.getDay() + 7) % 7;
+    
+    // If it's the same day but the time has passed, move to next week
+    if (dayDiff === 0 && (hours < now.getHours() || (hours === now.getHours() && minutes <= now.getMinutes()))) {
+      targetDate.setDate(now.getDate() + 7);
+    } else {
+      targetDate.setDate(now.getDate() + dayDiff);
+    }
+    
+    targetDate.setHours(hours, minutes, 0, 0);
+    
+    setPendingScheduledDate(targetDate);
+  };
+
+  // Helper function to convert user's local time to Chicago time for backend
+  const convertToChicagoTime = (localDate: Date): Date => {
+    // Simply return the date as-is since the backend expects UTC timestamps
+    // The timezone field ("America/Chicago") tells the backend how to interpret it
+    return localDate;
+  };
+
+  // Helper function to randomize post time using white noise
+  const randomizeTime = (date: Date, shouldRandomize: boolean): Date => {
+    if (!shouldRandomize) return date;
+    
+    // Generate white noise: random value between -1 and 1
+    const whiteNoise = (Math.random() * 2) - 1;
+    
+    // Multiply by 10 minutes (600,000 milliseconds)
+    const randomOffset = whiteNoise * 10 * 60 * 1000;
+    
+    // Apply the offset to the date
+    const randomizedDate = new Date(date.getTime() + randomOffset);
+    
+    // Ensure the randomized time is at least 1 minute from now
+    const now = new Date();
+    const minTime = new Date(now.getTime() + 60 * 1000); // now + 1 minute
+    
+    // If the randomized time is in the past or too close to now, use the minimum time
+    if (randomizedDate < minTime) {
+      return minTime;
+    }
+    
+    return randomizedDate;
   };
 
   if (!isOpen || !fileUrl) return null;
@@ -2033,23 +2143,58 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             </div>
           )}
           
-          {isSchedulingMode && (
-            <div className="space-y-3">
-              <DateTimePicker
-                value={pendingScheduledDate ?? scheduledDate}
-                onChange={setPendingScheduledDate}
-                placeholder="Select date and time"
-                className=""
-                onDropdownStateChange={setHasOpenDropdowns}
-              />
-              
-              {schedulingError && (
-                <div className="px-3 py-2 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300">
-                  {schedulingError}
+                      {isSchedulingMode && (
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                <DateTimePicker
+                  value={pendingScheduledDate ?? scheduledDate}
+                  onChange={setPendingScheduledDate}
+                  placeholder="Select date and time"
+                  className=""
+                  onDropdownStateChange={setHasOpenDropdowns}
+                />
+                
+                {/* Randomize Post Time Option */}
+                <div className="border-t border-gray-800 pt-4">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={userSettings.randomizePostTime ?? true}
+                      onChange={(e) => updateUserSetting('randomizePostTime', e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={`w-4 h-4 border-2 rounded-sm mr-3 flex items-center justify-center transition-colors ${
+                      (userSettings.randomizePostTime ?? true)
+                        ? 'bg-white border-white' 
+                        : 'border-gray-400 bg-transparent'
+                    }`}>
+                      {(userSettings.randomizePostTime ?? true) && (
+                        <svg className="w-2.5 h-2.5 text-black" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-white text-sm">Randomize post time (±10 min)</span>
+                  </label>
                 </div>
-              )}
-            </div>
-          )}
+
+                {/* Scheduled Post Slots */}
+                <div className="border-t border-gray-800 pt-4">
+                  <ScheduledPostSlots
+                    slots={userSettings.scheduledPostSlots || []}
+                    onSlotsChange={handleScheduledSlotsChange}
+                    onSlotSelect={handleSlotSelect}
+                    maxSlots={10}
+                    isSelectable={true}
+                  />
+                </div>
+                
+                {schedulingError && (
+                  <div className="px-3 py-2 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300">
+                    {schedulingError}
+                  </div>
+                )}
+              </div>
+            )}
         </div>
         
         {/* Jamie Assist Error Message */}

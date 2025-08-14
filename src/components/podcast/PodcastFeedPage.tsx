@@ -26,6 +26,8 @@ import SocialShareModal from '../SocialShareModal.tsx';
 import TutorialModal from '../TutorialModal.tsx';
 import WelcomeModal from '../WelcomeModal.tsx';
 import ScheduledPostsList from '../ScheduledPostsList.tsx';
+import { useUserSettings } from '../../hooks/useUserSettings.ts';
+import ScheduledPostSlots from '../ScheduledPostSlots.tsx';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -111,45 +113,46 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isProDashboardModalOpen, setIsProDashboardModalOpen] = useState(false);
     const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
     const [isTutorialOpen, setIsTutorialOpen] = useState(false);
-    const [autoShare, setAutoShare] = useState(() => {
-        const settings = localStorage.getItem('userSettings');
-        return settings ? JSON.parse(settings).autoStartCrosspost : false;
-    });
     const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
     const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
 
-    // Settings state
-    const [settingsData, setSettingsData] = useState(() => {
-        const settings = localStorage.getItem('userSettings');
-        const parsed = settings ? JSON.parse(settings) : {};
-        return {
-            autoStartCrosspost: parsed.autoStartCrosspost || false,
-            crosspostSignature: parsed.crosspostSignature || ''
-        };
+    // Use the new userSettings hook with cloud sync for admin users
+    const {
+        settings: userSettings,
+        isLoading: isSettingsLoading,
+        error: settingsError,
+        updateSetting,
+        updateSettings,
+        syncWithCloud,
+        flushPendingChanges,
+        clearError: clearSettingsError
+    } = useUserSettings({
+        enableCloudSync: isAdmin, // Enable cloud sync for admin users
+        autoLoadOnMount: true,
+        debounceDelay: 1500 // Wait 1.5 seconds after user stops typing before syncing
     });
 
+    // Derived state for backward compatibility
+    const autoShare = userSettings.autoStartCrosspost || false;
+    const settingsData = {
+        autoStartCrosspost: userSettings.autoStartCrosspost || false,
+        crosspostSignature: userSettings.crosspostSignature || '',
+        scheduledPostSlots: userSettings.scheduledPostSlots || [],
+        randomizePostTime: userSettings.randomizePostTime ?? true
+    };
+
     // Settings handlers
-    const handleSettingChange = (key: string, value: boolean | string) => {
-        const newSettings = { ...settingsData, [key]: value };
-        setSettingsData(newSettings);
-        
-        // Update localStorage
-        const existingSettings = localStorage.getItem('userSettings');
-        const currentSettings = existingSettings ? JSON.parse(existingSettings) : {};
-        localStorage.setItem('userSettings', JSON.stringify({
-            ...currentSettings,
-            ...newSettings
-        }));
-    };
-
-    const handleAutoShareChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAutoShareChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const newValue = e.target.checked;
-        setAutoShare(newValue);
-        handleSettingChange('autoStartCrosspost', newValue);
+        await updateSetting('autoStartCrosspost', newValue);
     };
 
-    const handleCrosspostSignatureChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        handleSettingChange('crosspostSignature', e.target.value);
+    const handleCrosspostSignatureChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        await updateSetting('crosspostSignature', e.target.value);
+    };
+
+    const handleScheduledSlotsChange = async (slots: any[]) => {
+        await updateSetting('scheduledPostSlots', slots);
     };
 
     // Add these handlers:
@@ -514,7 +517,23 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     } else {
       setIsAdmin(false);
     }
-  }, [feedId, isUserSignedIn]); 
+  }, [feedId, isUserSignedIn]);
+
+  // Note: Initial sync is handled by useUserSettings hook automatically when enableCloudSync becomes true
+
+  // Flush pending changes when user leaves the page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      flushPendingChanges();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Also flush on unmount
+      flushPendingChanges();
+    };
+  }, [flushPendingChanges]); 
 
   // Handle URL parameter for showing Pro Dashboard modal
   useEffect(() => {
@@ -556,8 +575,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   };
 
   const handleUploadShare = (fileUrl: string) => {
-    const settings = localStorage.getItem('userSettings');
-    const autoCrosspost = settings ? JSON.parse(settings).autoStartCrosspost : false;
+    const autoCrosspost = userSettings.autoStartCrosspost || false;
     setCurrentShareUrl(fileUrl);
     if (autoCrosspost) {
       setIsSocialShareModalOpen(true);
@@ -1018,8 +1036,24 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   </div>
                 ) : jamieProView === 'settings' ? (
                   <div className="max-w-2xl mx-auto">
+                    {settingsError && (
+                      <div className="mb-4 p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-400 flex justify-between items-center">
+                        <span>{settingsError}</span>
+                        <button 
+                          onClick={clearSettingsError}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
                     <div className="bg-[#111111] border border-gray-800 rounded-lg p-6">
-                      <h3 className="text-xl font-bold text-white mb-6">Settings</h3>
+                      <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-xl font-bold text-white">Settings</h3>
+                        {isSettingsLoading && (
+                          <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                        )}
+                      </div>
                       
                       <div className="space-y-6">
                         {/* Auto Start Crosspost Setting */}
@@ -1055,6 +1089,45 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                             placeholder="Enter your crosspost signature..."
                             className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent resize-none"
                             rows={3}
+                          />
+                        </div>
+
+                        {/* Randomize Post Time Setting */}
+                        <div className="border-t border-gray-800 pt-6">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={settingsData.randomizePostTime ?? true}
+                              onChange={(e) => updateSetting('randomizePostTime', e.target.checked)}
+                              className="sr-only"
+                            />
+                            <div className={`w-5 h-5 border-2 rounded-sm mr-3 flex items-center justify-center transition-colors ${
+                              (settingsData.randomizePostTime ?? true)
+                                ? 'bg-white border-white' 
+                                : 'border-gray-400 bg-transparent'
+                            }`}>
+                              {(settingsData.randomizePostTime ?? true) && (
+                                <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                            <div>
+                              <span className="text-white font-medium">Randomize Post Time</span>
+                              <p className="text-gray-400 text-sm mt-1">
+                                Slightly randomize scheduled post times (±10 minutes) to appear more natural
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+
+                        {/* Scheduled Post Slots Setting */}
+                        <div className="border-t border-gray-800 pt-6">
+                          <ScheduledPostSlots
+                            slots={settingsData.scheduledPostSlots}
+                            onSlotsChange={handleScheduledSlotsChange}
+                            maxSlots={10}
+                            isSelectable={false}
                           />
                         </div>
                       </div>
