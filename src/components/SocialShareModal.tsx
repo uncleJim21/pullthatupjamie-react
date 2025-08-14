@@ -267,6 +267,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [thumbnailRetry, setThumbnailRetry] = useState(false);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
+  // User settings hook for managing preferences including jamieAssistDefaults
+  const { settings: jamieSettings, updateSetting: updateJamieSetting } = useUserSettings();
+
+  // Load Jamie Assist preferences when userSettings change
+  useEffect(() => {
+    if (jamieSettings.jamieAssistDefaults && additionalPrefs !== jamieSettings.jamieAssistDefaults) {
+      setAdditionalPrefs(jamieSettings.jamieAssistDefaults);
+      printLog('Jamie Assist preferences loaded from userSettings');
+    }
+  }, [jamieSettings.jamieAssistDefaults, additionalPrefs]);
+
   // Add state for scheduling functionality
   const [isSchedulingMode, setIsSchedulingMode] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
@@ -481,10 +492,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     };
   }, [isOpen]);
 
-  // Function to save preferences to localStorage
+  // Function to save preferences to userSettings
   const saveJamieAssistPreferences = () => {
     try {
-      localStorage.setItem('jamieAssistDefaults', additionalPrefs);
+      updateJamieSetting('jamieAssistDefaults', additionalPrefs);
       setPrefsSuccessfullySaved(true);
       
       // Reset the success indicator after 2 seconds
@@ -492,24 +503,13 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         setPrefsSuccessfullySaved(false);
       }, 2000);
       
-      printLog('Jamie Assist preferences saved to localStorage');
+      printLog('Jamie Assist preferences saved to userSettings');
     } catch (error) {
       console.error('Error saving Jamie Assist preferences:', error);
     }
   };
   
-  // Function to load preferences from localStorage
-  const loadJamieAssistPreferences = () => {
-    try {
-      const savedPrefs = localStorage.getItem('jamieAssistDefaults');
-      if (savedPrefs) {
-        setAdditionalPrefs(savedPrefs);
-        printLog('Jamie Assist preferences loaded from localStorage');
-      }
-    } catch (error) {
-      console.error('Error loading Jamie Assist preferences:', error);
-    }
-  };
+
 
   // Initialize content with default text and check for Nostr extension if needed
   useEffect(() => {
@@ -546,8 +546,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     });
     setPublishStatus(initialStatus);
 
-    // Load any saved Jamie Assist preferences
-    loadJamieAssistPreferences();
+    // Jamie Assist preferences are now loaded automatically via useEffect
 
     return () => {
       // Clean up WebSocket connections when component unmounts
