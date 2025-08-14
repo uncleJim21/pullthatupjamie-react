@@ -5,6 +5,7 @@ export interface UserPreferences {
   crosspostSignature?: string;
   scheduledPostSlots?: ScheduledSlot[];
   randomizePostTime?: boolean;
+  jamieAssistDefaults?: string; // Jamie Assist preferences (tone, style, hashtags, etc.)
   // Add other user preferences as needed
   [key: string]: any;
 }

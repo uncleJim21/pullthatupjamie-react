@@ -42,6 +42,19 @@ export const useUserSettings = (options: UseUserSettingsOptions = {}): UseUserSe
         parsed.randomizePostTime = true;
       }
       
+      // Migrate jamieAssistDefaults from old localStorage location if not already in userSettings
+      if (!parsed.jamieAssistDefaults) {
+        try {
+          const oldJamieAssistDefaults = localStorage.getItem('jamieAssistDefaults');
+          if (oldJamieAssistDefaults) {
+            parsed.jamieAssistDefaults = oldJamieAssistDefaults;
+            console.log('Migrated jamieAssistDefaults to userSettings');
+          }
+        } catch (migrationError) {
+          console.error('Error migrating jamieAssistDefaults:', migrationError);
+        }
+      }
+      
       return parsed;
     } catch (error) {
       console.error('Error parsing stored user settings:', error);
@@ -60,6 +73,7 @@ export const useUserSettings = (options: UseUserSettingsOptions = {}): UseUserSe
   const pendingSettingsRef = useRef<UserPreferences | null>(null);
   const hasInitializedRef = useRef<boolean>(false);
   const prevEnableCloudSyncRef = useRef<boolean>(enableCloudSync);
+  const migrationCleanupRef = useRef<boolean>(false);
 
   /**
    * Save settings to localStorage
@@ -67,6 +81,17 @@ export const useUserSettings = (options: UseUserSettingsOptions = {}): UseUserSe
   const saveToLocalStorage = useCallback((newSettings: UserPreferences) => {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newSettings));
+      
+      // Clean up old jamieAssistDefaults localStorage entry after successful migration
+      if (!migrationCleanupRef.current && newSettings.jamieAssistDefaults) {
+        try {
+          localStorage.removeItem('jamieAssistDefaults');
+          migrationCleanupRef.current = true;
+          console.log('Cleaned up old jamieAssistDefaults from localStorage');
+        } catch (cleanupError) {
+          console.error('Error cleaning up old jamieAssistDefaults:', cleanupError);
+        }
+      }
     } catch (error) {
       console.error('Error saving settings to localStorage:', error);
     }
