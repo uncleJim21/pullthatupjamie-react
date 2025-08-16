@@ -267,16 +267,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [thumbnailRetry, setThumbnailRetry] = useState(false);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
-  // User settings hook for managing preferences including jamieAssistDefaults
-  const { settings: jamieSettings, updateSetting: updateJamieSetting } = useUserSettings();
+  // User settings hook for managing preferences including jamieAssistDefaults with cloud sync enabled
+  const { settings: jamieSettings, updateSetting: updateJamieSetting, flushPendingChanges } = useUserSettings({
+    enableCloudSync: true
+  });
 
-  // Load Jamie Assist preferences when userSettings change
+  // Load Jamie Assist preferences only on mount
   useEffect(() => {
-    if (jamieSettings.jamieAssistDefaults && additionalPrefs !== jamieSettings.jamieAssistDefaults) {
+    if (jamieSettings.jamieAssistDefaults && !additionalPrefs) {
       setAdditionalPrefs(jamieSettings.jamieAssistDefaults);
-      printLog('Jamie Assist preferences loaded from userSettings');
+      printLog('Jamie Assist preferences loaded from userSettings on mount');
     }
-  }, [jamieSettings.jamieAssistDefaults, additionalPrefs]);
+  }, [jamieSettings.jamieAssistDefaults]); // Remove additionalPrefs from dependencies
 
   // Add state for scheduling functionality
   const [isSchedulingMode, setIsSchedulingMode] = useState(false);
@@ -492,10 +494,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     };
   }, [isOpen]);
 
-  // Function to save preferences to userSettings
-  const saveJamieAssistPreferences = () => {
+  // Function to save preferences to userSettings and sync to cloud
+  const saveJamieAssistPreferences = async () => {
     try {
-      updateJamieSetting('jamieAssistDefaults', additionalPrefs);
+      // Update the setting locally and trigger cloud sync
+      await updateJamieSetting('jamieAssistDefaults', additionalPrefs);
+      
+      // Force immediate sync to cloud (bypasses debouncing)
+      await flushPendingChanges();
+      
       setPrefsSuccessfullySaved(true);
       
       // Reset the success indicator after 2 seconds
@@ -503,11 +510,14 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         setPrefsSuccessfullySaved(false);
       }, 2000);
       
-      printLog('Jamie Assist preferences saved to userSettings');
+      printLog('Jamie Assist preferences saved to userSettings and synced to cloud');
     } catch (error) {
       console.error('Error saving Jamie Assist preferences:', error);
+      // You might want to show an error state here
     }
   };
+
+
   
 
 
