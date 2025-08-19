@@ -244,7 +244,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Add state for admin privileges and toggle
   const [adminFeedId, setAdminFeedId] = useState<string | null>(null);
-  const [podcastSearchMode, setPodcastSearchMode] = useState<'global' | 'my-pod'>('my-pod');
+  const [podcastSearchMode, setPodcastSearchMode] = useState<'global' | 'my-pod'>('global');
   
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const clipId = searchParams.get('clip');
@@ -864,6 +864,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     printLog(`searchMode: ${searchMode}`);
     printLog(`hasSearchedInMode(searchMode): ${hasSearchedInMode(searchMode)}`);
   }, [adminFeedId, searchMode]);
+
+  // Auto-switch to 'my-pod' mode for users with admin privileges
+  useEffect(() => {
+    if (adminFeedId && podcastSearchMode === 'global') {
+      setPodcastSearchMode('my-pod');
+      printLog(`Auto-switched to 'my-pod' mode for admin user with feedId: ${adminFeedId}`);
+    }
+  }, [adminFeedId]);
 
   // Add useEffect for fetching podcast stats
   useEffect(() => {
@@ -1576,7 +1584,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             <div>
               <form onSubmit={handleSearch} className="relative">
             {/* Filter button and toggle - desktop version (outside search bar) */}
-            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
+            {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
               <div className="absolute -right-14 top-0 z-10 hidden md:block">
                 <button
                   onClick={handleFilterClick}
@@ -1588,7 +1596,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               </div>
             )}
             {/* Filter button - mobile version (inside search bar) */}
-            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
+            {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
               <div className="absolute right-2 top-2 z-10 md:hidden">
                 <button
                   onClick={handleFilterClick}
@@ -1852,7 +1860,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-40">
           <form onSubmit={handleSearch} className="relative">
             {/* Filter button and toggle - desktop version (outside search bar) */}
-            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
+            {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
               <div className="absolute -right-14 top-0 z-10 hidden md:block">
                 <button
                   onClick={handleFilterClick}
@@ -1864,7 +1872,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               </div>
             )}
             {/* Filter button - mobile version (inside search bar) */}
-            {searchMode === 'podcast-search' && podcastSearchMode !== 'my-pod' && (
+            {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
               <div className="absolute right-2 top-2 z-10 md:hidden">
                 <button
                   onClick={handleFilterClick}
