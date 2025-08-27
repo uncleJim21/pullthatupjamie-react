@@ -1239,6 +1239,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           itemName="upload"
           onComplete={() => setIsSocialShareModalOpen(false)}
           platform={SocialPlatform.Twitter}
+          auth={localStorage.getItem('admin_privs') === 'true' ? { type: 'admin' } : undefined}
         />
       )}
 
