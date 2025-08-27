@@ -309,6 +309,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(-1);
   const [lastSearchQuery, setLastSearchQuery] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const jamieAssistTextareaRef = useRef<HTMLTextAreaElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Streaming mention search hook
@@ -617,6 +618,42 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       }
     };
   }, []);
+
+  // Helper function to adjust textarea height based on screen size
+  const adjustTextareaHeight = useCallback((textarea: HTMLTextAreaElement) => {
+    textarea.style.height = 'auto';
+    const lineHeight = 24; // 1.5rem = 24px
+    const defaultLines = window.innerWidth >= 640 ? 3.5 : 2.5;
+    const defaultHeight = defaultLines * lineHeight;
+    
+    // Use the larger of default height or content height (expandable)
+    const contentHeight = textarea.scrollHeight;
+    textarea.style.height = Math.max(defaultHeight, contentHeight) + 'px';
+  }, []);
+
+  // Handle window resize for responsive line clamping and initial setup
+  useEffect(() => {
+    const handleResize = () => {
+      if (jamieAssistTextareaRef.current) {
+        adjustTextareaHeight(jamieAssistTextareaRef.current);
+      }
+    };
+
+    // Set initial height when component mounts
+    if (jamieAssistTextareaRef.current) {
+      adjustTextareaHeight(jamieAssistTextareaRef.current);
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [adjustTextareaHeight]);
+
+  // Adjust height when additionalPrefs changes
+  useEffect(() => {
+    if (jamieAssistTextareaRef.current) {
+      adjustTextareaHeight(jamieAssistTextareaRef.current);
+    }
+  }, [additionalPrefs, adjustTextareaHeight]);
 
   const checkNostrExtension = async () => {
     try {
@@ -1473,7 +1510,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             <ol className="list-decimal list-inside text-gray-300 space-y-1.5 mb-4 ml-1">
               <li>Optionally start writing your post</li>
               <li>Click "Jamie Assist" to generate content</li>
-              <li>Use "Advanced Preferences" to specify tone or style</li>
+              <li>Use "Jamie Assist Prompt" to specify tone or style</li>
               <li>Edit the generated text as needed before sharing</li>
             </ol>
             
@@ -2036,7 +2073,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             onClick={() => setShowAdvancedPrefs(!showAdvancedPrefs)}
             className="flex items-center text-gray-400 hover:text-white text-sm mb-1 sm:mb-2"
           >
-            Advanced Preferences {showAdvancedPrefs ? <ChevronUp className="ml-1 w-4 h-4" /> : <ChevronRight className="ml-1 w-4 h-4" />}
+            Jamie Assist Prompt {showAdvancedPrefs ? <ChevronUp className="ml-1 w-4 h-4" /> : <ChevronRight className="ml-1 w-4 h-4" />}
           </button>
           
           {showAdvancedPrefs && (
@@ -2045,11 +2082,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 Specify tone, style or preferred hashtags:
               </label>
               <textarea
+                ref={jamieAssistTextareaRef}
                 value={additionalPrefs}
                 onChange={(e) => setAdditionalPrefs(e.target.value)}
-                className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg p-2 sm:p-3 text-sm mb-2 sm:mb-3"
+                className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg p-2 sm:p-3 text-sm mb-2 sm:mb-3 resize-none overflow-y-auto leading-6"
                 placeholder="E.g.: Professional tone, include hashtags #podcast #JRE"
-                rows={1}
+                rows={3}
+                style={{
+                  minHeight: window.innerWidth >= 640 ? '5.25rem' : '3.75rem', // 3.5 lines on large, 2.5 lines on small (1.5rem line height)
+                  height: window.innerWidth >= 640 ? '5.25rem' : '3.75rem'
+                }}
+                onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
               />
               <div className="flex justify-end">
                 <button
