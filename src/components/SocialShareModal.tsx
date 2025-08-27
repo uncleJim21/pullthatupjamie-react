@@ -1709,7 +1709,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
 
     // Show register modal prompt if no valid tokens and no auth
-    if (!hasValidTokens && !auth) {
+    // Exception: If user has auth_token and admin_privs, let them through
+    const hasAuthToken = !!localStorage.getItem('auth_token');
+    const isAdminPrivs = localStorage.getItem('admin_privs') === 'true';
+    
+    if (!hasValidTokens && !auth && !(hasAuthToken && isAdminPrivs)) {
       return (
         <div className="text-center py-8 px-4">
           <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
