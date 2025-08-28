@@ -2,11 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Twitter, Loader2, Pin, PinOff } from 'lucide-react';
 import { mentionService } from '../services/mentionService.ts';
 import { MentionResult, TwitterResult, NostrResult } from '../types/mention.ts';
+import { API_URL } from '../constants/constants.ts';
 
-enum Platform {
+export enum Platform {
   Twitter = 'twitter',
   Nostr = 'nostr'
 }
+
+// Utility function to detect npub format
+const isNpubQuery = (query: string): boolean => {
+  return /^npub1[a-z0-9]{58}$/.test(query.trim());
+};
 
 interface MentionsLookupViewProps {
   onMentionSelect?: (mention: MentionResult, platform: Platform) => void;
@@ -18,6 +24,8 @@ interface MentionsLookupViewProps {
   onMentionResultsChange?: (results: MentionResult[]) => void;
   isLoading?: boolean;
   error?: string | null;
+  onPlatformChange?: (platform: Platform) => void;
+  initialPlatform?: Platform;
 }
 
 const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
@@ -29,15 +37,21 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   mentionResults: externalMentionResults = [],
   onMentionResultsChange,
   isLoading: externalIsLoading = false,
-  error: externalError = null
+  error: externalError = null,
+  onPlatformChange,
+  initialPlatform = Platform.Twitter
 }) => {
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(Platform.Twitter);
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatform);
   const [pinningStates, setPinningStates] = useState<{[key: string]: boolean}>({});
+  const [npubLookupLoading, setNpubLookupLoading] = useState(false);
 
   // Always use external results and states (no internal search anymore)
   const displayResults = externalMentionResults;
   const isLoading = externalIsLoading;
   const error = externalError;
+
+  // Check if current search query is an npub for direct lookup
+  const isNpubSearch = searchQuery && isNpubQuery(searchQuery);
 
   // Fetch mentions when searchQuery changes
   // DISABLED: Now using streaming search from parent component
@@ -49,15 +63,39 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   // Filter results by selected platform
   const filteredResults = displayResults.filter(result => result.platform === selectedPlatform);
 
+  // For Nostr, if it's an npub query but no results, show a message to trigger direct lookup
+  const shouldShowNpubLookup = selectedPlatform === Platform.Nostr && 
+                               isNpubSearch && 
+                               filteredResults.length === 0 && 
+                               !isLoading;
+
   // Notify parent of first mention changes for Tab key functionality
   useEffect(() => {
     const firstMention = filteredResults.length > 0 ? filteredResults[0] : null;
     onFirstMentionChange?.(firstMention);
   }, [filteredResults, onFirstMentionChange]);
 
+  // Auto-trigger npub lookup when npub is detected
+  useEffect(() => {
+    if (selectedPlatform === Platform.Nostr && 
+        searchQuery && 
+        isNpubQuery(searchQuery) && 
+        filteredResults.length === 0 && 
+        !isLoading && 
+        !npubLookupLoading) {
+      // Automatically trigger npub lookup
+      handleNpubLookup(searchQuery);
+    }
+  }, [selectedPlatform, searchQuery, filteredResults.length, isLoading, npubLookupLoading]);
+
   const handleMentionClick = (mention: MentionResult) => {
     onMentionSelect?.(mention, selectedPlatform);
     onClose?.();
+  };
+
+  const handlePlatformChange = (platform: Platform) => {
+    setSelectedPlatform(platform);
+    onPlatformChange?.(platform);
   };
 
   const handlePinToggle = async (mention: MentionResult, e: React.MouseEvent) => {
@@ -93,6 +131,64 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
     }
   };
 
+  // Handle direct npub lookup
+  const handleNpubLookup = async (npub: string) => {
+    if (!npub || !isNpubQuery(npub)) return;
+
+    setNpubLookupLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/nostr/user/${npub}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+      
+      if (result.success && result.profile) {
+        // Create a NostrResult from the profile data
+        const nostrResult: NostrResult = {
+          platform: 'nostr',
+          npub: result.profile.npub,
+          nprofile: result.profile.nprofile,
+          pubkey: result.profile.pubkey,
+          displayName: result.profile.displayName || result.profile.name,
+          name: result.profile.name,
+          nip05: result.profile.nip05,
+          about: result.profile.about,
+          picture: result.profile.picture,
+          banner: result.profile.banner,
+          website: result.profile.website,
+          lud16: result.profile.lud16,
+          isPinned: false,
+          pinId: undefined,
+          lastUsed: undefined,
+          crossPlatformMapping: undefined,
+          isPersonalPin: false,
+          personalPin: null
+        };
+
+        // Add to results if not already present
+        if (onMentionResultsChange) {
+          const existingResults = displayResults || [];
+          const isAlreadyPresent = existingResults.some(r => 
+            r.platform === 'nostr' && (r as NostrResult).npub === npub
+          );
+          
+          if (!isAlreadyPresent) {
+            onMentionResultsChange([...existingResults, nostrResult]);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error looking up npub:', error);
+    } finally {
+      setNpubLookupLoading(false);
+    }
+  };
+
   const formatFollowerCount = (count: number) => {
     if (count >= 1000000) {
       return `${(count / 1000000).toFixed(1)}M`;
@@ -102,7 +198,8 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
     return count.toString();
   };
 
-  const truncateMiddle = (str: string, maxLength: number = 14) => {
+  const truncateMiddle = (str: string | undefined, maxLength: number = 14) => {
+    if (!str) return '';
     if (str.length <= maxLength) return str;
     
     const ellipsis = '...';
@@ -193,10 +290,23 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
     );
   };
 
+  // Helper to get effective profile data (prefer nostr_data from backend)
+  const getEffectiveNostrData = (result: NostrResult) => {
+    const nostrData = result.nostr_data;
+    return {
+      displayName: nostrData?.displayName || nostrData?.name || result.displayName || result.name,
+      picture: nostrData?.picture || result.picture,
+      nip05: nostrData?.nip05 || result.nip05,
+      npub: nostrData?.npub || result.npub,
+      nprofile: nostrData?.nprofile || result.nprofile
+    };
+  };
+
   const renderNostrResult = (result: NostrResult, index: number) => {
     const mentionKey = `nostr-${result.npub}`;
     const isPinning = pinningStates[mentionKey];
     const isSelected = index === selectedIndex;
+    const effectiveData = getEffectiveNostrData(result);
     
     return (
       <div
@@ -208,10 +318,10 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
       >
         {/* Profile Image */}
         <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
-          {result.picture ? (
+          {effectiveData.picture ? (
             <img 
-              src={result.picture} 
-              alt={result.displayName || 'Nostr User'}
+              src={effectiveData.picture} 
+              alt={effectiveData.displayName || 'Nostr User'}
               className="w-8 h-8 object-cover"
             />
           ) : (
@@ -228,9 +338,9 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
         <div className="min-w-0 flex items-center space-x-2">
           <div className="flex items-center space-x-1">
             <span className={`font-medium text-xs ${isSelected ? 'text-purple-300' : 'text-white'}`}>
-              {truncateMiddle(result.displayName || 'Unknown')}
+              {truncateMiddle(effectiveData.displayName || 'Unknown')}
             </span>
-            {result.nip05 && (
+            {effectiveData.nip05 && (
               <div className="w-3 h-3 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
                 <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -249,7 +359,7 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
             )}
           </div>
           <div className={`text-xs ${isSelected ? 'text-purple-300' : 'text-gray-400'}`}>
-            {result.nip05 || `${truncateMiddle(result.npub, 12)}...`}
+            {effectiveData.nip05 || `${truncateMiddle(effectiveData.npub, 12)}...`}
           </div>
         </div>
 
@@ -281,7 +391,7 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
       {/* Compact Header with Platform Tabs */}
       <div className="flex bg-gray-900 border-b border-gray-700">
         <button
-          onClick={() => setSelectedPlatform(Platform.Twitter)}
+          onClick={() => handlePlatformChange(Platform.Twitter)}
           className={`flex-1 flex items-center justify-center py-2 px-3 text-xs font-medium transition-all ${
             selectedPlatform === Platform.Twitter
               ? 'bg-blue-600 text-white'
@@ -297,7 +407,7 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
           )}
         </button>
         <button
-          onClick={() => setSelectedPlatform(Platform.Nostr)}
+          onClick={() => handlePlatformChange(Platform.Nostr)}
           className={`flex-1 flex items-center justify-center py-2 px-3 text-xs font-medium transition-all ${
             selectedPlatform === Platform.Nostr
               ? 'bg-purple-600 text-white'
@@ -322,13 +432,7 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
       {/* Content */}
       <div className="max-h-48 overflow-y-auto">
         <div className="divide-y divide-gray-800">
-          {selectedPlatform === Platform.Nostr ? (
-            <div className="px-3 py-8 text-center text-purple-300 italic opacity-80">
-              <img src="/nostr-logo-square.png" alt="Nostr" className="w-6 h-6 mx-auto mb-2 opacity-70" style={{ filter: 'brightness(1.2)' }} />
-              <div className="text-base font-semibold mb-1">Nostr: Coming Soon</div>
-              <div className="text-xs text-gray-400">Nostr mention search is in development and will be available soon.</div>
-            </div>
-          ) : isLoading ? (
+          {isLoading ? (
             <div className="px-3 py-4 text-center text-gray-400">
               <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
               <p className="text-xs">Loading...</p>
@@ -336,6 +440,18 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
           ) : error ? (
             <div className="px-3 py-4 text-center text-gray-400">
               <p className="text-xs text-red-400">{error}</p>
+            </div>
+          ) : shouldShowNpubLookup || npubLookupLoading ? (
+            <div className="px-3 py-4 text-center">
+              <div className="mb-2">
+                <img src="/nostr-logo-square.png" alt="Nostr" className="w-6 h-6 mx-auto opacity-70" style={{ filter: 'brightness(1.2)' }} />
+              </div>
+              <p className="text-xs text-purple-300 mb-2">
+                {npubLookupLoading ? 'Looking up Nostr profile...' : 'Valid npub detected'}
+              </p>
+              {npubLookupLoading && (
+                <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+              )}
             </div>
           ) : filteredResults.length > 0 ? (
             filteredResults.map((result, index) => 
@@ -345,7 +461,12 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
             )
           ) : (
             <div className="px-3 py-4 text-center text-gray-400">
-              <p className="text-xs">No results found</p>
+              <p className="text-xs">
+                {selectedPlatform === Platform.Nostr 
+                  ? 'No Nostr profiles found. Try searching by name or entering a full npub.'
+                  : 'No results found'
+                }
+              </p>
             </div>
           )}
         </div>

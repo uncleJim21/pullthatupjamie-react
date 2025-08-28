@@ -9,7 +9,8 @@ import SocialShareSuccessModal from './SocialShareSuccessModal.tsx';
 import MentionsLookupView from './MentionsLookupView.tsx';
 import MentionPinManagement from './MentionPinManagement.tsx';
 import DateTimePicker from './DateTimePicker.tsx';
-import { MentionResult } from '../types/mention.ts';
+import { MentionResult, TwitterResult, NostrResult } from '../types/mention.ts';
+import { Platform } from './MentionsLookupView.tsx';
 import { useStreamingMentionSearch } from '../hooks/useStreamingMentionSearch.ts';
 import ScheduledPostService from '../services/scheduledPostService.ts';
 import { CreateScheduledPostRequest, ScheduledPost } from '../types/scheduledPost.ts';
@@ -308,9 +309,50 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [showPinManagement, setShowPinManagement] = useState(false);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(-1);
   const [lastSearchQuery, setLastSearchQuery] = useState('');
+  
+  // Platform-specific search state for independent @ handling
+  const [platformSearchState, setPlatformSearchState] = useState<{
+    twitter: { query: string; hasResults: boolean };
+    nostr: { query: string; hasResults: boolean };
+  }>({
+    twitter: { query: '', hasResults: false },
+    nostr: { query: '', hasResults: false }
+  });
+  const [currentMentionPlatform, setCurrentMentionPlatform] = useState<Platform>(Platform.Twitter);
+  
+  // Track selected mentions for proper formatting during posting
+  const [selectedMentions, setSelectedMentions] = useState<Array<{
+    displayText: string;
+    actualText: string;
+    platform: string;
+    position: number;
+  }>>([]);
+  
+  // Unified platform mode - single source of truth for current platform
+  const [platformMode, setPlatformMode] = useState<'twitter' | 'nostr'>('twitter');
+  
+  // Separate text variables for each platform
+  const [twitterText, setTwitterText] = useState<string>('');
+  const [nostrText, setNostrText] = useState<string>('');
+  
+  // Unified platform mode handler
+  const handlePlatformModeChange = (newMode: 'twitter' | 'nostr') => {
+    setPlatformMode(newMode);
+    setCurrentMentionPlatform(newMode === 'twitter' ? Platform.Twitter : Platform.Nostr);
+  };
+
+  // Sync platformMode with currentMentionPlatform on initial load
+  useEffect(() => {
+    const initialMode = currentMentionPlatform === Platform.Twitter ? 'twitter' : 'nostr';
+    if (platformMode !== initialMode) {
+      setPlatformMode(initialMode);
+    }
+  }, [currentMentionPlatform, platformMode]);
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const jamieAssistTextareaRef = useRef<HTMLTextAreaElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const highlightLayerRef = useRef<HTMLDivElement>(null);
 
   // Streaming mention search hook
   const {
@@ -914,8 +956,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     return null;
   };
 
-  // Helper function to build final content with signature
+  // Helper function to build final content with signature and proper mention formatting
   const buildFinalContent = (baseContent: string, mediaUrl: string, platform: 'twitter' | 'nostr'): string => {
+    // First, apply platform-specific mention formatting
+    const contentWithMentions = buildFinalContentForPlatform(platform);
+    
     const signature = getUserSignature();
     const signaturePart = signature ? `\n\n${signature}` : '';
     
@@ -923,7 +968,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     const mediaUrlPart = platform === 'nostr' ? `\n\n${mediaUrl}` : '';
     const callToActionPart = platform === 'nostr' ? `\n\nShared via https://pullthatupjamie.ai` : '';
     
-    return `${baseContent}${signaturePart}${mediaUrlPart}${callToActionPart}`;
+    return `${contentWithMentions}${signaturePart}${mediaUrlPart}${callToActionPart}`;
   };
 
   // Unified helper to build a Nostr event: NO r-tag, media URL goes in content (original behavior)
@@ -1373,18 +1418,42 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     searchTimeoutRef.current = setTimeout(() => {
       if (query.length >= 2) {
         setLastSearchQuery(query);
-        performMentionSearch(query, {
-          platforms: ['twitter', 'nostr'],
-          includePersonalPins: true,
-          includeCrossPlatformMappings: true,
-          limit: 10
-        });
+        
+        // Update platform-specific state
+        const platformKey = currentMentionPlatform === Platform.Twitter ? 'twitter' : 'nostr';
+        setPlatformSearchState(prev => ({
+          ...prev,
+          [platformKey]: { query, hasResults: false }
+        }));
+        
+        // Check if it's an npub query - if so, don't use streaming search
+        const isNpub = /^npub1[a-z0-9]{58}$/.test(query.trim());
+        if (isNpub && currentMentionPlatform === Platform.Nostr) {
+          // For npub queries, clear search results and trigger automatic lookup
+          clearMentionSearch();
+          // Don't auto-lookup here since MentionsLookupView handles it
+        } else {
+          // For regular queries, use streaming search
+          performMentionSearch(query, {
+            platforms: [currentMentionPlatform === Platform.Twitter ? 'twitter' : 'nostr'], // Search only the current platform
+            includePersonalPins: true,
+            includeCrossPlatformMappings: true,
+            limit: 10
+          });
+        }
       } else {
         setLastSearchQuery('');
         clearMentionSearch();
+        
+        // Clear platform state
+        const platformKey = currentMentionPlatform === Platform.Twitter ? 'twitter' : 'nostr';
+        setPlatformSearchState(prev => ({
+          ...prev,
+          [platformKey]: { query: '', hasResults: false }
+        }));
       }
     }, 300); // 300ms debounce
-  }, [lastSearchQuery, performMentionSearch, clearMentionSearch]);
+  }, [lastSearchQuery, performMentionSearch, clearMentionSearch, currentMentionPlatform]);
 
   // Function to handle content changes and track user edits
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -1565,23 +1634,67 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const handleMentionSelect = (mention: MentionResult, platform: string) => {
     if (mentionStartIndex === -1) return;
     
-    // Extract the appropriate identifier based on platform
-    let mentionIdentifier: string;
+    // Extract the appropriate identifier and actual posting text based on platform
+    let displayName: string;
+    let actualPostingText: string;
+    
     if (mention.platform === 'twitter') {
-      mentionIdentifier = mention.username;
+      const twitterMention = mention as TwitterResult;
+      displayName = twitterMention.username;
+      actualPostingText = `@${twitterMention.username}`;
     } else if (mention.platform === 'nostr') {
-      // For Nostr, use nip05 if available, otherwise use shortened npub
-      mentionIdentifier = mention.nip05 || mention.npub.slice(0, 16) + '...';
+      const nostrMention = mention as NostrResult;
+      
+      // Get effective data (prefer nostr_data from backend)
+      // Note: username field might contain npub for backend results
+      const npub = nostrMention.nostr_data?.npub || nostrMention.npub || (nostrMention as any).username;
+      const nprofile = nostrMention.nostr_data?.nprofile || nostrMention.nprofile;
+      const displayNameFromData = nostrMention.nostr_data?.displayName || 
+                                  nostrMention.nostr_data?.name || 
+                                  nostrMention.displayName || 
+                                  nostrMention.name ||
+                                  'Unknown';
+      const nip05 = nostrMention.nostr_data?.nip05 || nostrMention.nip05;
+      
+      // For display in the textarea: show the name
+      displayName = displayNameFromData;
+      
+      // For actual posting: use nprofile format for Nostr
+      if (nprofile) {
+        actualPostingText = `nostr:${nprofile}`;
+      } else if (npub) {
+        // Fallback to npub if no nprofile available
+        actualPostingText = `nostr:${npub}`;
+      } else {
+        // Last resort fallback
+        actualPostingText = `@${displayNameFromData}`;
+      }
     } else {
-      mentionIdentifier = 'unknown';
+      displayName = 'unknown';
+      actualPostingText = '@unknown';
     }
     
-    const mentionText = `@${mentionIdentifier} `; // Add space after identifier
+    // Create the display text for the textarea using backticks for mentions
+    const mentionText = `\`@${displayName}\` `;
     
     // Replace the @ and search text with the selected mention
     const beforeMention = content.substring(0, mentionStartIndex);
     const afterMention = content.substring(mentionStartIndex + 1 + mentionSearchQuery.length);
     const newContent = beforeMention + mentionText + afterMention;
+    
+    // Store the mention data for proper formatting during posting
+    const newMention = {
+      displayText: `@${displayName}`, // Store without backticks for lookup
+      actualText: actualPostingText,
+      platform: mention.platform,
+      position: mentionStartIndex
+    };
+    
+    // Update selected mentions (remove any existing mention at the same position and add new one)
+    setSelectedMentions(prev => {
+      const filtered = prev.filter(m => m.position !== mentionStartIndex);
+      return [...filtered, newMention].sort((a, b) => a.position - b.position);
+    });
     
     setContent(newContent);
     
@@ -1605,7 +1718,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       }
     }, 10);
     
-    printLog(`Selected mention: @${mentionIdentifier} on ${platform}`);
+    printLog(`Selected mention: @${displayName} on ${mention.platform}`);
   };
 
   // Handler to close mentions popup
@@ -1614,6 +1727,236 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setMentionSearchQuery('');
     setMentionStartIndex(-1);
     setSelectedMentionIndex(-1);
+  };
+
+  // Handler for platform changes in mention lookup
+  const handleMentionPlatformChange = (platform: Platform) => {
+    // Update both the current mention platform and the unified platform mode
+    const platformKey = platform === Platform.Twitter ? 'twitter' : 'nostr';
+    handlePlatformModeChange(platformKey);
+    
+    // Update search query to show platform-specific state
+    const currentState = platformSearchState[platformKey];
+    if (currentState.hasResults) {
+      // If this platform has previous results, show that query
+      setMentionSearchQuery(currentState.query);
+    } else {
+      // Otherwise, clear to show just @
+      setMentionSearchQuery('');
+    }
+    
+    // Re-trigger search if we have a query
+    if (currentState.query && currentState.query.length >= 2) {
+      setLastSearchQuery(currentState.query);
+      
+      // Check if it's an npub query
+      const isNpub = /^npub1[a-z0-9]{58}$/.test(currentState.query.trim());
+      if (isNpub && platform === Platform.Nostr) {
+        // For npub queries, clear search results and let MentionsLookupView auto-lookup
+        clearMentionSearch();
+      } else {
+        // For regular queries, use streaming search
+        performMentionSearch(currentState.query, {
+          platforms: [platform === Platform.Twitter ? 'twitter' : 'nostr'], // Search only the selected platform
+          includePersonalPins: true,
+          includeCrossPlatformMappings: true,
+          limit: 10
+        });
+      }
+    } else {
+      clearMentionSearch();
+    }
+  };
+
+  // Track when mention results change to update platform state
+  useEffect(() => {
+    if (mentionResults.length > 0 && mentionSearchQuery) {
+      const platformKey = currentMentionPlatform === Platform.Twitter ? 'twitter' : 'nostr';
+      setPlatformSearchState(prev => ({
+        ...prev,
+        [platformKey]: { 
+          query: mentionSearchQuery, 
+          hasResults: true 
+        }
+      }));
+    }
+  }, [mentionResults, mentionSearchQuery, currentMentionPlatform]);
+
+  // Update platform-specific text variables when content or mentions change
+  useEffect(() => {
+    setTwitterText(buildPlatformText('twitter'));
+    setNostrText(buildPlatformText('nostr'));
+  }, [content, selectedMentions]);
+
+  // Function to get highlighted content for display overlay using backtick parsing
+  const getHighlightedContent = (): string => {
+    if (!content) return '';
+    
+    console.log('getHighlightedContent - processing content:', content);
+    console.log('getHighlightedContent - selectedMentions:', selectedMentions);
+    
+    // Split content into parts and handle each part
+    const parts: string[] = [];
+    let lastIndex = 0;
+    
+    // Parse content to find mentions using backticks `@username` format
+    const mentionRegex = /`(@[^`]+)`/g;
+    let match;
+    
+    while ((match = mentionRegex.exec(content)) !== null) {
+      const fullMatch = match[0]; // `@username`
+      const mentionText = match[1]; // @username
+      
+      console.log('Found mention:', fullMatch, 'extracted:', mentionText);
+      
+      // Add text before the mention (escaped)
+      if (match.index > lastIndex) {
+        const beforeText = content.substring(lastIndex, match.index);
+        parts.push(escapeHtml(beforeText));
+      }
+      
+      // Find the platform data for this mention
+      const mentionData = selectedMentions.find(m => 
+        m.displayText === mentionText || m.displayText === mentionText.replace('@', '')
+      );
+      
+      const platform = mentionData?.platform || 'twitter';
+      const highlightColor = platform === 'nostr' 
+        ? 'rgba(139, 92, 246, 0.5)' 
+        : 'rgba(29, 161, 242, 0.5)';
+      
+      console.log('Mention platform:', platform, 'color:', highlightColor);
+      
+      // Add highlighted mention (unescaped HTML)
+      const highlightedSpan = `<mark style="background-color: ${highlightColor}; color: white; border-radius: 4px; padding: 1px 3px; font-weight: 500; margin: 0;">${escapeHtml(mentionText)}</mark>`;
+      parts.push(highlightedSpan);
+      
+      lastIndex = match.index + fullMatch.length;
+    }
+    
+    // Add remaining text after the last mention
+    if (lastIndex < content.length) {
+      const remainingText = content.substring(lastIndex);
+      parts.push(escapeHtml(remainingText));
+    }
+    
+    // Join all parts and convert newlines and spaces
+    const result = parts.join('').replace(/\n/g, '<br/>').replace(/ /g, '&nbsp;');
+    
+    console.log('getHighlightedContent result:', result);
+    return result;
+  };
+
+  // Helper function to escape HTML
+  const escapeHtml = (text: string): string => {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  };
+
+  // Handle clicks on textarea to detect mention clicks and open lookup
+  const handleTextareaClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    const textarea = e.currentTarget;
+    const cursorPosition = textarea.selectionStart;
+    
+    // Check if click is on a mention
+    for (const mention of selectedMentions) {
+      const mentionStart = content.indexOf(mention.displayText);
+      const mentionEnd = mentionStart + mention.displayText.length;
+      
+      if (cursorPosition >= mentionStart && cursorPosition <= mentionEnd) {
+        // Click was on a mention - open lookup view with this mention's platform
+        const mentionPlatform = mention.platform === 'twitter' ? Platform.Twitter : Platform.Nostr;
+        setCurrentMentionPlatform(mentionPlatform);
+        setMentionStartIndex(mentionStart);
+        setMentionSearchQuery(mention.displayText.replace('@', ''));
+        setShowMentionsLookup(true);
+        
+        // Set cursor position
+        setTimeout(() => {
+          textarea.setSelectionRange(mentionEnd, mentionEnd);
+        }, 10);
+        
+        return;
+      }
+    }
+    
+    // Normal click - check for @ symbol to trigger mention search
+    const beforeCursor = content.substring(0, cursorPosition);
+    const lastAtIndex = beforeCursor.lastIndexOf('@');
+    
+    if (lastAtIndex !== -1) {
+      const textAfterAt = content.substring(lastAtIndex + 1, cursorPosition);
+      if (textAfterAt.length >= 0 && !textAfterAt.includes(' ')) {
+        // Start mention search
+        setMentionStartIndex(lastAtIndex);
+        setMentionSearchQuery(textAfterAt);
+        setShowMentionsLookup(true);
+      }
+    }
+  };
+
+  // Function to build platform-specific text from backtick content
+  const buildPlatformText = (targetPlatform: 'twitter' | 'nostr'): string => {
+    if (!content) return '';
+    
+    // Parse content to find mentions using backticks `@username` format
+    const mentionRegex = /`(@[^`]+)`/g;
+    let processedContent = content;
+    let match;
+    const replacements: Array<{ original: string; replacement: string }> = [];
+    
+    // Find all mentions and prepare replacements
+    while ((match = mentionRegex.exec(content)) !== null) {
+      const fullMatch = match[0]; // `@username`
+      const mentionText = match[1]; // @username
+      
+      // Find the platform data for this mention
+      const mentionData = selectedMentions.find(m => 
+        m.displayText === mentionText || m.displayText === mentionText.replace('@', '')
+      );
+      
+      if (mentionData) {
+        let replacementText: string;
+        
+        if (targetPlatform === 'twitter') {
+          // For Twitter: use @username format for all mentions
+          if (mentionData.platform === 'twitter') {
+            replacementText = mentionData.actualText; // Already @username format
+          } else {
+            // For Nostr mentions on Twitter, use the display name
+            replacementText = mentionData.displayText;
+          }
+        } else {
+          // For Nostr: use nostr:nprofile format for Nostr mentions, @username for Twitter
+          if (mentionData.platform === 'nostr') {
+            replacementText = mentionData.actualText; // nostr:nprofile format
+          } else {
+            replacementText = mentionData.actualText; // @username format
+          }
+        }
+        
+        replacements.push({ original: fullMatch, replacement: replacementText });
+      } else {
+        // If no mention data found, just remove backticks
+        replacements.push({ original: fullMatch, replacement: mentionText });
+      }
+    }
+    
+    // Apply all replacements
+    for (const { original, replacement } of replacements) {
+      processedContent = processedContent.replace(original, replacement);
+    }
+    
+    return processedContent;
+  };
+  
+  // Function to build final content with proper mention formatting for specific platform
+  const buildFinalContentForPlatform = (targetPlatform: 'twitter' | 'nostr'): string => {
+    return buildPlatformText(targetPlatform);
   };
 
   // Handler for scheduled slots changes
@@ -1873,15 +2216,115 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         {!isSchedulingMode && (
           <div className="relative">
+            {/* Backdrop container for highlighting */}
+            <div 
+              className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none"
+              style={{ 
+                height: "120px", 
+                minHeight: "100px",
+                zIndex: 1
+              }}
+            >
+              {/* Background layer */}
+              <div 
+                className="absolute inset-0 bg-gray-900 border border-gray-700 rounded-xl"
+              />
+              
+              {/* Highlighted content layer */}
+              <div 
+                ref={highlightLayerRef}
+                className="absolute inset-0 p-3 sm:p-4 text-base whitespace-pre-wrap break-words overflow-hidden"
+                style={{ 
+                  height: "120px", 
+                  minHeight: "100px",
+                  lineHeight: '1.5',
+                  fontFamily: 'inherit',
+                  fontSize: 'inherit',
+                  color: 'transparent'
+                }}
+                dangerouslySetInnerHTML={{ __html: getHighlightedContent() }}
+              />
+            </div>
+            
             <textarea
               ref={textareaRef}
               value={content}
               onChange={handleContentChange}
               onKeyDown={handleTextareaKeyDown}
-              className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
+              onClick={handleTextareaClick}
+              onScroll={(e) => {
+                // Synchronize scroll position with highlight layer
+                if (highlightLayerRef.current) {
+                  const target = e.target as HTMLTextAreaElement;
+                  highlightLayerRef.current.scrollTop = target.scrollTop;
+                  highlightLayerRef.current.scrollLeft = target.scrollLeft;
+                }
+              }}
+              className="relative w-full border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none text-white"
               placeholder={`Write about this ${itemName}...`}
-              style={{ resize: "none", height: "120px", minHeight: "100px" }}
+              style={{ 
+                resize: "none", 
+                height: "120px", 
+                minHeight: "100px",
+                background: 'transparent',
+                color: 'rgba(255, 255, 255, 0.9)',
+                zIndex: 2,
+                lineHeight: '1.5'
+              }}
             />
+            
+            {/* Mode Switcher Toggle - Bottom Right Corner */}
+            <div className="absolute bottom-3 right-3 z-10">
+              <button
+                onClick={() => handlePlatformModeChange(platformMode === 'twitter' ? 'nostr' : 'twitter')}
+                className={`relative w-16 h-8 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 hover:scale-105 ${
+                  platformMode === 'twitter' 
+                    ? 'bg-blue-500 hover:bg-blue-400 focus:ring-blue-500' 
+                    : 'bg-purple-500 hover:bg-purple-400 focus:ring-purple-500'
+                }`}
+                title={`Currently: ${platformMode === 'twitter' ? 'Twitter' : 'Nostr'} mode - Click to switch to ${platformMode === 'twitter' ? 'Nostr' : 'Twitter'} mode`}
+              >
+                {/* Track background with platform icons */}
+                <div className="absolute inset-0 flex items-center justify-between px-2">
+                  <Twitter 
+                    className={`w-3 h-3 transition-opacity duration-300 ${
+                      platformMode === 'twitter' ? 'text-blue-500 opacity-100' : 'text-white opacity-0'
+                    }`} 
+                  />
+                  <div 
+                    className={`w-3 h-3 transition-opacity duration-300 ${
+                      platformMode === 'nostr' ? 'opacity-100' : 'opacity-0'
+                    }`}
+                    style={{
+                      backgroundColor: '#8B5CF6',
+                      mask: 'url(/nostr-logo-square.png) center/contain no-repeat',
+                      WebkitMask: 'url(/nostr-logo-square.png) center/contain no-repeat'
+                    }}
+                  />
+                </div>
+                
+                {/* Sliding thumb */}
+                <div
+                  className={`absolute top-1 w-6 h-6 bg-black rounded-full shadow-lg transform transition-all duration-300 ease-in-out flex items-center justify-center ${
+                    platformMode === 'twitter' ? 'translate-x-1' : 'translate-x-9'
+                  }`}
+                >
+                  {/* Active icon in thumb */}
+                  {platformMode === 'twitter' ? (
+                    <Twitter className="w-3 h-3 text-blue-500" />
+                  ) : (
+                    <div 
+                      className="w-3 h-3"
+                      style={{
+                        backgroundColor: '#8B5CF6',
+                        mask: 'url(/nostr-logo-square.png) center/contain no-repeat',
+                        WebkitMask: 'url(/nostr-logo-square.png) center/contain no-repeat'
+                      }}
+                    />
+                  )}
+                </div>
+              </button>
+            </div>
           
                   {/* Mentions Lookup Overlay */}
         {showMentionsLookup && (
@@ -1922,6 +2365,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   onMentionResultsChange={updateMentionResults}
                   isLoading={mentionSearchLoading}
                   error={mentionSearchError}
+                  onPlatformChange={handleMentionPlatformChange}
+                  initialPlatform={currentMentionPlatform}
                 />
               </div>
             )}
