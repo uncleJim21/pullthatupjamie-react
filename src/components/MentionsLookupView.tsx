@@ -360,10 +360,8 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
                   onClick={(e) => handleLinkClick(result, e)}
                   className={`p-1 rounded-full transition-colors ${
                     result.crossPlatformMapping 
-                      ? (result.platform as string) === 'twitter' 
-                        ? 'text-purple-400 hover:text-purple-300' // Twitter linked to Nostr = purple
-                        : 'text-blue-400 hover:text-blue-300'     // Nostr linked to Twitter = blue
-                      : 'text-gray-400 hover:text-green-400'     // Not linked = green hover
+                      ? 'text-green-500 hover:text-green-400'    // Cross-platform mapping available = bright green
+                      : 'text-gray-400 hover:text-green-400'     // Not linked = gray with green hover
                   }`}
                   title={`${result.crossPlatformMapping ? 'Manage link with' : 'Link with'} ${(result.platform as string) === 'twitter' ? 'Nostr' : 'Twitter'} profile`}
                 >
@@ -505,10 +503,8 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
                   onClick={(e) => handleLinkClick(result, e)}
                   className={`p-1 rounded-full transition-colors ${
                     result.crossPlatformMapping 
-                      ? (result.platform as string) === 'twitter' 
-                        ? 'text-purple-400 hover:text-purple-300' // Twitter linked to Nostr = purple
-                        : 'text-blue-400 hover:text-blue-300'     // Nostr linked to Twitter = blue
-                      : 'text-gray-400 hover:text-green-400'     // Not linked = green hover
+                      ? 'text-green-500 hover:text-green-400'    // Cross-platform mapping available = bright green
+                      : 'text-gray-400 hover:text-green-400'     // Not linked = gray with green hover
                   }`}
                   title={`${result.crossPlatformMapping ? 'Manage link with' : 'Link with'} ${(result.platform as string) === 'twitter' ? 'Nostr' : 'Twitter'} profile`}
                 >

@@ -605,10 +605,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       : ((mention as NostrResult).nostr_data?.displayName || (mention as NostrResult).displayName || 'user');
     setMentionSearchQuery(sourceUsername);
     
-    // Trigger search for the source username on the target platform
+    // Trigger search for the source username on BOTH platforms to detect cross-platform mappings
     if (sourceUsername.length >= 2) {
       performMentionSearch(sourceUsername, {
-        platforms: [targetPlatform],
+        platforms: ['twitter', 'nostr'], // Search both platforms to find cross-platform mappings
         includePersonalPins: true,
         includeCrossPlatformMappings: true,
         limit: 10
@@ -1710,9 +1710,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           clearMentionSearch();
           // Don't auto-lookup here since MentionsLookupView handles it
         } else {
-          // For regular queries, use streaming search
+          // For regular queries, use streaming search on BOTH platforms to detect cross-platform mappings
           performMentionSearch(query, {
-            platforms: [currentMentionPlatform === Platform.Twitter ? 'twitter' : 'nostr'], // Search only the current platform
+            platforms: ['twitter', 'nostr'], // Always search both platforms to find cross-platform mappings
             includePersonalPins: true,
             includeCrossPlatformMappings: true,
             limit: 10
@@ -1907,13 +1907,29 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     onClose(); // Close the main modal after success modal is dismissed
   };
 
+  // Helper function to detect if search query is an npub
+  const isNpubQuery = (query: string): boolean => {
+    return /^npub1[a-z0-9]{58}$/.test(query.trim());
+  };
+
   // Handler for mention selection
   const handleMentionSelect = (mention: MentionResult, platform: string) => {
+    printLog('=== MENTION SELECT START ===');
+    printLog(`Selected mention: ${JSON.stringify(mention, null, 2)}`);
+    printLog(`All mentionResults: ${JSON.stringify(mentionResults, null, 2)}`);
+    printLog(`Current mentionSearchQuery: "${mentionSearchQuery}"`);
+    printLog(`Platform parameter: "${platform}"`);
+    printLog(`mentionStartIndex: ${mentionStartIndex}`);
+    
     if (mentionStartIndex === -1) return;
     
     let displayName: string;
     let dictionaryKey: string;
     let dictionaryEntry: any;
+    
+    // Check if user searched by npub and we're selecting a Nostr profile
+    const wasNpubSearch = isNpubQuery(mentionSearchQuery);
+    printLog(`handleMentionSelect - npub detection: searchQuery="${mentionSearchQuery}", wasNpubSearch=${wasNpubSearch}, platform=${mention.platform}`);
     
     if (mention.platform === 'twitter') {
       const twitterMention = mention as TwitterResult;
@@ -1921,21 +1937,49 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       dictionaryKey = displayName;
       
       // Check if this mention has cross-platform mapping (Twitter + Nostr)
-      if (twitterMention.crossPlatformMapping?.hasNostrMapping) {
-        // Ensure we use nprofile format for cross-platform mapping (fallback to npub if no nprofile)
-        const nostrNprofile = twitterMention.crossPlatformMapping.nostrNpub ? `nostr:${twitterMention.crossPlatformMapping.nostrNpub}` : '';
+      // Handle both string format (from API) and object format (from type)
+      const hasCrossPlatformMapping = 
+        (typeof twitterMention.crossPlatformMapping === 'string' && (twitterMention.crossPlatformMapping as string).includes('Nostr')) ||
+        (typeof twitterMention.crossPlatformMapping === 'object' && twitterMention.crossPlatformMapping?.hasNostrMapping);
+      
+      printLog(`Twitter crossPlatformMapping detection: raw=${JSON.stringify(twitterMention.crossPlatformMapping)}, type=${typeof twitterMention.crossPlatformMapping}, hasCrossPlatformMapping=${hasCrossPlatformMapping}`);
+      
+      if (hasCrossPlatformMapping) {
+        // For string format, try to find the linked Nostr profile from the same search results
+        let nostrNprofile = '';
+        let nostrDisplayName = displayName;
+        
+        if (typeof twitterMention.crossPlatformMapping === 'object') {
+          // Object format
+          nostrNprofile = twitterMention.crossPlatformMapping.nostrNpub ? `nostr:${twitterMention.crossPlatformMapping.nostrNpub}` : '';
+          nostrDisplayName = twitterMention.crossPlatformMapping.nostrDisplayName || displayName;
+        } else {
+          // String format - find the corresponding Nostr profile from search results
+          const linkedNostrProfile = mentionResults.find(result => 
+            result.platform === 'nostr' && 
+            result.pinId === twitterMention.pinId && // Same pinId indicates linked profiles
+            result.isPinned
+          ) as NostrResult | undefined;
+          
+          if (linkedNostrProfile) {
+            const nprofile = linkedNostrProfile.nostr_data?.nprofile || linkedNostrProfile.nprofile;
+            nostrNprofile = nprofile ? `nostr:${nprofile}` : `@${linkedNostrProfile.nostr_data?.displayName || linkedNostrProfile.displayName || displayName}`;
+            nostrDisplayName = linkedNostrProfile.nostr_data?.displayName || linkedNostrProfile.displayName || displayName;
+            printLog(`Found linked Nostr profile: nprofile=${nprofile}, nostrNprofile=${nostrNprofile}, nostrDisplayName=${nostrDisplayName}`);
+          } else {
+            nostrNprofile = `@${displayName}`; // Fallback
+            printLog('No linked Nostr profile found, using fallback');
+          }
+        }
+        
         dictionaryEntry = {
           twitterHandle: `@${twitterMention.username}`,
           nostrNprofile: nostrNprofile,
-          nostrDisplayName: twitterMention.crossPlatformMapping.nostrDisplayName || displayName,
+          nostrDisplayName: nostrDisplayName,
           platform: 'both' as const
         };
         
-        console.log('Cross-platform Twitter mention detected:', {
-          twitter: `@${twitterMention.username}`,
-          nostr: nostrNprofile,
-          displayName: twitterMention.crossPlatformMapping.nostrDisplayName
-        });
+        printLog(`Cross-platform Twitter mention detected: twitter=@${twitterMention.username}, nostr=${nostrNprofile}, displayName=${nostrDisplayName}, willPopulateBothPlatforms=true, mappingFormat=${typeof twitterMention.crossPlatformMapping}`);
       } else {
         // Twitter-only mention
         dictionaryEntry = {
@@ -1955,8 +1999,19 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                                   nostrMention.name ||
                                   'Unknown';
       
-      displayName = displayNameFromData;
-      dictionaryKey = displayName;
+      // For npub searches, use display name in textarea but keep npub in dictionary key for lookup
+      if (wasNpubSearch && mention.platform === 'nostr') {
+        displayName = displayNameFromData; // Use human-readable name for display
+        dictionaryKey = mentionSearchQuery; // Use the npub as dictionary key since that's what user typed
+        console.log('NPub search detected - using display name for UI:', {
+          npub: mentionSearchQuery,
+          displayName: displayNameFromData,
+          dictionaryKey: mentionSearchQuery
+        });
+      } else {
+        displayName = displayNameFromData;
+        dictionaryKey = displayName;
+      }
       
       // Check if this mention has cross-platform mapping (Nostr + Twitter)
       if (nostrMention.crossPlatformMapping?.hasTwitterMapping) {
@@ -1970,7 +2025,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         console.log('Cross-platform Nostr mention detected:', {
           twitter: `@${nostrMention.crossPlatformMapping.twitterUsername}`,
           nostr: nprofile ? `nostr:${nprofile}` : `nostr:${npub}`,
-          displayName: displayNameFromData
+          displayName: displayNameFromData,
+          wasNpubSearch,
+          willPopulateBothPlatforms: true
         });
       } else {
         // Nostr-only mention
@@ -1979,6 +2036,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           nostrDisplayName: displayNameFromData,
           platform: 'nostr' as const
         };
+      }
+      
+      // For npub searches, also add an entry for the display name to handle future searches by name
+      if (wasNpubSearch && displayNameFromData !== mentionSearchQuery) {
+        console.log('Adding secondary dictionary entry for display name:', displayNameFromData);
       }
     } else {
       displayName = 'unknown';
@@ -1990,10 +2052,26 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
     
     // Update the mention dictionary
-    setMentionDictionary(prev => ({
-      ...prev,
-      [dictionaryKey]: dictionaryEntry
-    }));
+    printLog(`=== UPDATING MENTION DICTIONARY ===`);
+    printLog(`dictionaryKey: "${dictionaryKey}"`);
+    printLog(`dictionaryEntry: ${JSON.stringify(dictionaryEntry, null, 2)}`);
+    
+    setMentionDictionary(prev => {
+      const newDict = {
+        ...prev,
+        [dictionaryKey]: dictionaryEntry
+      };
+      
+      printLog(`Updated mention dictionary: ${JSON.stringify(newDict, null, 2)}`);
+      
+      // For npub searches, also add an entry for the display name to handle future searches by name
+      if (wasNpubSearch && mention.platform === 'nostr' && displayName !== mentionSearchQuery) {
+        newDict[displayName] = dictionaryEntry;
+        printLog(`Added secondary dictionary entry for display name: displayName="${displayName}", npubKey="${mentionSearchQuery}"`);
+      }
+      
+      return newDict;
+    });
     
     // Determine display text based on current platform mode
     let currentDisplayName: string;
@@ -2014,11 +2092,37 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     const mentionText = `\`@${currentDisplayName}\` `;
     
     // Replace the @ and search text with the selected mention
+    // For npub searches, we need to replace the entire npub, not just @npub
+    let replaceLength: number;
+    if (wasNpubSearch && mention.platform === 'nostr') {
+      // Replace the entire npub (no @ prefix for npub searches)
+      replaceLength = mentionSearchQuery.length;
+      printLog(`NPub replacement - replacing entire npub: searchQuery="${mentionSearchQuery}", replaceLength=${replaceLength}, newDisplayText="${mentionText}"`);
+    } else {
+      // Normal case: replace @ + search query
+      replaceLength = 1 + mentionSearchQuery.length;
+    }
+    
     const beforeMention = content.substring(0, mentionStartIndex);
-    const afterMention = content.substring(mentionStartIndex + 1 + mentionSearchQuery.length);
+    const afterMention = content.substring(mentionStartIndex + replaceLength);
     const newContent = beforeMention + mentionText + afterMention;
     
     setContent(newContent);
+    
+    // If this is a cross-platform mention, immediately update platform-specific texts
+    if (dictionaryEntry.platform === 'both') {
+      printLog('Cross-platform mention selected - triggering platform text updates');
+      // Force immediate re-evaluation of platform texts
+      setTimeout(() => {
+        const newTwitterText = buildPlatformText('twitter');
+        const newNostrText = buildPlatformText('nostr');
+        setTwitterText(newTwitterText);
+        setNostrText(newNostrText);
+        printLog(`Platform texts updated after cross-platform mention: twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
+      }, 100); // Small delay to ensure state updates have propagated
+    }
+    
+    printLog('=== MENTION SELECT END ===');
     
     // Calculate cursor position after insertion
     const cursorPosition = mentionStartIndex + mentionText.length;
@@ -2085,9 +2189,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         // For npub queries, clear search results and let MentionsLookupView auto-lookup
         clearMentionSearch();
       } else {
-        // For regular queries, use streaming search
+        // For regular queries, use streaming search on BOTH platforms to detect cross-platform mappings
         performMentionSearch(currentState.query, {
-          platforms: [platform === Platform.Twitter ? 'twitter' : 'nostr'], // Search only the selected platform
+          platforms: ['twitter', 'nostr'], // Always search both platforms to find cross-platform mappings
           includePersonalPins: true,
           includeCrossPlatformMappings: true,
           limit: 10
