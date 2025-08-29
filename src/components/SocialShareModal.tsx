@@ -380,28 +380,91 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       const nprofile = nostrMention.nostr_data?.nprofile || nostrMention.nprofile;
       const displayName = nostrMention.nostr_data?.displayName || nostrMention.displayName || sourceUsername;
       
-      setMentionDictionary(prev => ({
-        ...prev,
-        [sourceUsername]: {
-          twitterHandle: `@${sourceUsername}`,
-          nostrNprofile: nprofile ? `nostr:${nprofile}` : `@${displayName}`,
-          nostrDisplayName: displayName,
-          platform: 'both' as const
-        }
-      }));
-    } else if (sourcePin.platform === 'nostr' && targetMention.platform === 'twitter') {
-      // Nostr → Twitter pairing
-      const twitterMention = targetMention as TwitterResult;
+      // Create bidirectional dictionary entries
+      const dictionaryEntry = {
+        twitterHandle: `@${sourceUsername}`,
+        nostrNprofile: nprofile ? `nostr:${nprofile}` : `@${displayName}`,
+        nostrDisplayName: displayName,
+        platform: 'both' as const
+      };
       
       setMentionDictionary(prev => ({
         ...prev,
-        [sourceUsername]: {
-          twitterHandle: `@${twitterMention.username}`,
-          nostrNprofile: `nostr:${sourcePin.username}`, // Assuming sourcePin.username is npub/nprofile
-          nostrDisplayName: sourceUsername,
-          platform: 'both' as const
-        }
+        [sourceUsername]: dictionaryEntry, // Map Twitter username -> cross-platform entry
+        [displayName]: dictionaryEntry // Map Nostr display name -> cross-platform entry  
       }));
+      
+      // Add nprofile to display name mapping
+      if (nprofile) {
+        setNprofileToDisplayName(prev => ({
+          ...prev,
+          [`nostr:${nprofile}`]: displayName
+        }));
+      }
+      
+      console.log(`Twitter→Nostr pairing: sourceUsername="${sourceUsername}", displayName="${displayName}"`);
+      
+      // If we're currently showing the npub in content, replace @npub with `@displayName`
+      const currentContent = content;
+      const npub = nostrMention.nostr_data?.npub || nostrMention.npub || nostrMention.username;
+      if (currentContent.includes(`@${npub}`)) {
+        const newContent = currentContent.replace(`@${npub}`, `\`@${displayName}\``);
+        setContent(newContent);
+        console.log(`Content replaced: "${currentContent}" -> "${newContent}"`);
+        
+        // Force immediate platform text updates with new content
+        setTimeout(() => {
+          const newTwitterText = buildPlatformTextWithContent(newContent, 'twitter');  
+          const newNostrText = buildPlatformTextWithContent(newContent, 'nostr');
+          setTwitterText(newTwitterText);
+          setNostrText(newNostrText);
+          console.log(`Platform texts updated after pairing: twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
+        }, 100);
+      }
+      
+    } else if (sourcePin.platform === 'nostr' && targetMention.platform === 'twitter') {
+      // Nostr → Twitter pairing
+      const twitterMention = targetMention as TwitterResult;
+      const nostrDisplayName = sourcePin.displayName || sourcePin.name || 'unknown';
+      
+      // Create bidirectional dictionary entries
+      const dictionaryEntry = {
+        twitterHandle: `@${twitterMention.username}`,
+        nostrNprofile: `nostr:${sourcePin.username}`, // sourcePin.username is the npub/nprofile
+        nostrDisplayName: nostrDisplayName,
+        platform: 'both' as const
+      };
+      
+      setMentionDictionary(prev => ({
+        ...prev,
+        [nostrDisplayName]: dictionaryEntry, // Map display name -> cross-platform entry
+        [twitterMention.username]: dictionaryEntry // Map Twitter username -> cross-platform entry  
+      }));
+      
+      // Add nprofile to display name mapping
+      setNprofileToDisplayName(prev => ({
+        ...prev,
+        [`nostr:${sourcePin.username}`]: nostrDisplayName
+      }));
+      
+      console.log(`Nostr→Twitter pairing: npub="${sourcePin.username}", displayName="${nostrDisplayName}", twitterUsername="${twitterMention.username}"`);
+      
+      // Replace @npub in content with `@displayName`
+      const currentContent = content;
+      if (currentContent.includes(`@${sourcePin.username}`)) {
+        const newContent = currentContent.replace(`@${sourcePin.username}`, `\`@${nostrDisplayName}\``);
+        setContent(newContent);
+        console.log(`Content replaced: "${currentContent}" -> "${newContent}"`);
+        
+        // Force immediate platform text updates with new content
+        setTimeout(() => {
+          const newTwitterText = buildPlatformTextWithContent(newContent, 'twitter');  
+          const newNostrText = buildPlatformTextWithContent(newContent, 'nostr');
+          setTwitterText(newTwitterText);
+          setNostrText(newNostrText);
+          console.log(`Platform texts updated after pairing: twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
+        }, 100);
+      }
     }
     
     console.log('Content updated after pairing - mention dictionary updated for cross-platform mapping');
@@ -497,9 +560,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             setSuccessMessage('Successfully paired profiles!');
             setTimeout(() => setSuccessMessage(null), 3000);
             
-            // Close mentions modal and update content with cross-platform pairing
-            setShowMentionsLookup(false);
+            // Update content with cross-platform pairing and close modal
             updateContentAfterPairing(linkingMode.sourcePin, targetMention);
+            setShowMentionsLookup(false);
           } else {
             console.error('Failed to link Nostr pin to Twitter:', result.error);
           }
@@ -529,9 +592,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             setSuccessMessage('Successfully paired profiles!');
             setTimeout(() => setSuccessMessage(null), 3000);
             
-            // Close mentions modal and update content with cross-platform pairing
-            setShowMentionsLookup(false);
+            // Update content with cross-platform pairing and close modal
             updateContentAfterPairing(linkingMode.sourcePin, targetMention);
+            setShowMentionsLookup(false);
           } else {
             console.error('Failed to link Twitter pin to Nostr:', result.error);
           }
