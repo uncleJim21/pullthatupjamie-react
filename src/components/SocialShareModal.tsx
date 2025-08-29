@@ -346,6 +346,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     platform: 'twitter' | 'nostr' | 'both';  // Which platforms this mention supports
   }}>({});
 
+  // Simple mapping: nprofile -> display name for Twitter→Nostr transitions
+  const [nprofileToDisplayName, setNprofileToDisplayName] = useState<{[nprofile: string]: string}>({});
+
   // Cross-platform linking state
   const [linkingMode, setLinkingMode] = useState<{
     isActive: boolean;
@@ -1964,7 +1967,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           if (linkedNostrProfile) {
             const nprofile = linkedNostrProfile.nostr_data?.nprofile || linkedNostrProfile.nprofile;
             nostrNprofile = nprofile ? `nostr:${nprofile}` : `@${linkedNostrProfile.nostr_data?.displayName || linkedNostrProfile.displayName || displayName}`;
-            nostrDisplayName = linkedNostrProfile.nostr_data?.displayName || linkedNostrProfile.displayName || displayName;
+            // USE THE ACTUAL NOSTR NAME, NOT THE TWITTER NAME!
+            nostrDisplayName = linkedNostrProfile.nostr_data?.displayName || linkedNostrProfile.nostr_data?.name || linkedNostrProfile.displayName || linkedNostrProfile.name || 'walker';
             printLog(`Found linked Nostr profile: nprofile=${nprofile}, nostrNprofile=${nostrNprofile}, nostrDisplayName=${nostrDisplayName}`);
           } else {
             nostrNprofile = `@${displayName}`; // Fallback
@@ -2095,16 +2099,38 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         [dictionaryKey]: dictionaryEntry
       };
       
-      printLog(`Updated mention dictionary: ${JSON.stringify(newDict, null, 2)}`);
-      
-      // For npub searches, also add an entry for the display name to handle future searches by name
-      if (wasNpubSearch && mention.platform === 'nostr' && displayName !== mentionSearchQuery) {
-        newDict[displayName] = dictionaryEntry;
-        printLog(`Added secondary dictionary entry for display name: displayName="${displayName}", npubKey="${mentionSearchQuery}"`);
+      // Add bidirectional entries for cross-platform mentions
+      if (dictionaryEntry.platform === 'both') {
+        const twitterUsername = dictionaryEntry.twitterHandle?.replace('@', '');
+        const nostrDisplayName = dictionaryEntry.nostrDisplayName;
+        
+        if (twitterUsername && twitterUsername !== dictionaryKey) {
+          newDict[twitterUsername] = dictionaryEntry;
+        }
+        if (nostrDisplayName && nostrDisplayName !== dictionaryKey) {
+          newDict[nostrDisplayName] = dictionaryEntry;
+        }
       }
       
       return newDict;
     });
+    
+    // For cross-platform mentions, add nprofile → display name mapping
+    if (dictionaryEntry.platform === 'both' && dictionaryEntry.nostrNprofile && dictionaryEntry.nostrDisplayName) {
+      setNprofileToDisplayName(prev => ({
+        ...prev,
+        [dictionaryEntry.nostrNprofile]: dictionaryEntry.nostrDisplayName
+      }));
+      printLog(`Added nprofile mapping: "${dictionaryEntry.nostrNprofile}" -> "${dictionaryEntry.nostrDisplayName}"`);
+    }
+    
+    // For npub searches, also add the npub key mapping
+    if (wasNpubSearch && mention.platform === 'nostr' && displayName !== mentionSearchQuery) {
+      setMentionDictionary(prev => ({
+        ...prev,
+        [mentionSearchQuery]: dictionaryEntry
+      }));
+    }
     
     // Determine display text based on current platform mode
     let currentDisplayName: string;
@@ -2145,10 +2171,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     // If this is a cross-platform mention, immediately update platform-specific texts
     if (dictionaryEntry.platform === 'both') {
       printLog('Cross-platform mention selected - triggering platform text updates');
-      // Force immediate re-evaluation of platform texts
+      // Force immediate re-evaluation of platform texts using the new content
       setTimeout(() => {
-        const newTwitterText = buildPlatformText('twitter');
-        const newNostrText = buildPlatformText('nostr');
+        const newTwitterText = buildPlatformTextWithContent(newContent, 'twitter');
+        const newNostrText = buildPlatformTextWithContent(newContent, 'nostr');
         setTwitterText(newTwitterText);
         setNostrText(newNostrText);
         printLog(`Platform texts updated after cross-platform mention: twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
@@ -2387,16 +2413,21 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   // Function to build platform-specific text using mention dictionary
   const buildPlatformText = (targetPlatform: 'twitter' | 'nostr'): string => {
-    if (!content) return '';
+    return buildPlatformTextWithContent(content, targetPlatform);
+  };
+
+  // Helper function that takes content as a parameter (for immediate updates)
+  const buildPlatformTextWithContent = (sourceContent: string, targetPlatform: 'twitter' | 'nostr'): string => {
+    if (!sourceContent) return '';
     
     // Parse content to find mentions using backticks `@username` format
     const mentionRegex = /`(@[^`]+)`/g;
-    let processedContent = content;
+    let processedContent = sourceContent;
     let match;
     const replacements: Array<{ original: string; replacement: string }> = [];
     
     // Find all mentions and prepare replacements using dictionary
-    while ((match = mentionRegex.exec(content)) !== null) {
+    while ((match = mentionRegex.exec(sourceContent)) !== null) {
       const fullMatch = match[0]; // `@username`
       const mentionText = match[1].replace('@', ''); // username (clean)
       
@@ -2443,7 +2474,40 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const updateContentForPlatformMode = (): string => {
     if (!content) return '';
     
-    // Parse content to find mentions and update their display based on current platform mode
+    if (platformMode === 'nostr') {
+      // Twitter→Nostr: Use nostrText to find nprofiles and map back to display names
+      const nprofileRegex = /nostr:(nprofile[a-z0-9]+)/g;
+      let match;
+      const nprofileMatches: string[] = [];
+      
+      while ((match = nprofileRegex.exec(nostrText)) !== null) {
+        nprofileMatches.push(`nostr:${match[1]}`);
+      }
+      
+      if (nprofileMatches.length > 0) {
+        let updatedContent = content;
+        const mentionRegex = /`(@[^`]+)`/g;
+        let mentionMatch;
+        let mentionIndex = 0;
+        
+        while ((mentionMatch = mentionRegex.exec(content)) !== null) {
+          if (mentionIndex < nprofileMatches.length) {
+            const nprofile = nprofileMatches[mentionIndex];
+            const displayName = nprofileToDisplayName[nprofile];
+            
+            if (displayName) {
+              updatedContent = updatedContent.replace(mentionMatch[0], `\`@${displayName}\``);
+              printLog(`Twitter→Nostr: Mapped ${nprofile} -> @${displayName}`);
+            }
+            mentionIndex++;
+          }
+        }
+        
+        return updatedContent;
+      }
+    }
+    
+    // Nostr→Twitter: Use existing dictionary logic
     const mentionRegex = /`(@[^`]+)`/g;
     let updatedContent = content;
     let match;
