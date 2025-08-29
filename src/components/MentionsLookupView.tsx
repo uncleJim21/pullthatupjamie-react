@@ -36,6 +36,7 @@ interface MentionsLookupViewProps {
   onPairProfile?: (mention: MentionResult) => void;
   onCancelLinking?: () => void;
   onLinkProfile?: (mention: MentionResult) => void;
+  onMentionPinned?: (mention: MentionResult, wasNpubLookup: boolean) => void;
 }
 
 const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
@@ -53,11 +54,13 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   linkingMode,
   onPairProfile,
   onCancelLinking,
-  onLinkProfile
+  onLinkProfile,
+  onMentionPinned
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatform);
   const [pinningStates, setPinningStates] = useState<{[key: string]: boolean}>({});
   const [npubLookupLoading, setNpubLookupLoading] = useState(false);
+  const [recentNpubLookups, setRecentNpubLookups] = useState<Set<string>>(new Set());
 
   // Sync internal platform state with parent when initialPlatform changes
   useEffect(() => {
@@ -183,6 +186,22 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
           if (onMentionResultsChange) {
             onMentionResultsChange(updatedResults);
           }
+          
+          // If this mention was just pinned (not unpinned) and was from npub lookup, notify parent
+          if (!mention.isPinned && result.success && onMentionPinned) {
+            const mentionNpub = mention.platform === 'nostr' ? (mention as NostrResult).npub : null;
+            const wasNpubLookup = mentionNpub ? recentNpubLookups.has(mentionNpub) : false;
+            onMentionPinned(mention, wasNpubLookup);
+            
+            // Clean up the tracking after use
+            if (wasNpubLookup && mentionNpub) {
+              setRecentNpubLookups(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(mentionNpub);
+                return newSet;
+              });
+            }
+          }
         } else {
         console.error('Failed to toggle pin:', result.error);
       }
@@ -241,6 +260,8 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
           
           if (!isAlreadyPresent) {
             onMentionResultsChange([...existingResults, nostrResult]);
+            // Track this npub as a recent lookup
+            setRecentNpubLookups(prev => new Set([...prev, npub]));
           }
         }
       }

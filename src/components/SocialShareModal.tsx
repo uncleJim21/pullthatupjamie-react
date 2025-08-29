@@ -406,7 +406,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       
       // If we're currently showing the npub in content, replace @npub with `@displayName`
       const currentContent = content;
-      const npub = nostrMention.nostr_data?.npub || nostrMention.npub || nostrMention.username;
+      const npub = nostrMention.nostr_data?.npub || nostrMention.npub;
       if (currentContent.includes(`@${npub}`)) {
         const newContent = currentContent.replace(`@${npub}`, `\`@${displayName}\``);
         setContent(newContent);
@@ -449,8 +449,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       
       console.log(`Nostr→Twitter pairing: npub="${sourcePin.username}", displayName="${nostrDisplayName}", twitterUsername="${twitterMention.username}"`);
       
-      // Replace @npub in content with `@displayName`
+      // Debug: Log the current content and what we're looking for
       const currentContent = content;
+      console.log(`DEBUG - Content replacement check:`, {
+        currentContent: currentContent,
+        lookingFor: `@${sourcePin.username}`,
+        containsNpub: currentContent.includes(`@${sourcePin.username}`),
+        sourcePin: sourcePin,
+        nostrDisplayName: nostrDisplayName
+      });
+      
+      // Replace @npub in content with `@displayName`
       if (currentContent.includes(`@${sourcePin.username}`)) {
         const newContent = currentContent.replace(`@${sourcePin.username}`, `\`@${nostrDisplayName}\``);
         setContent(newContent);
@@ -464,10 +473,63 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           setNostrText(newNostrText);
           console.log(`Platform texts updated after pairing: twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
         }, 100);
+      } else {
+        console.log(`DEBUG - No content replacement: npub "${sourcePin.username}" not found in content "${currentContent}"`);
+        
+        // Even if we can't replace content, we should still update the dictionary for future use
+        console.log(`DEBUG - Dictionary entry created:`, dictionaryEntry);
+        
+        // Force platform text update anyway to see if dictionary is working
+        setTimeout(() => {
+          const newTwitterText = buildPlatformTextWithContent(currentContent, 'twitter');  
+          const newNostrText = buildPlatformTextWithContent(currentContent, 'nostr');
+          setTwitterText(newTwitterText);
+          setNostrText(newNostrText);
+          console.log(`Platform texts updated after pairing (no content change): twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
+          console.log(`Current dictionary:`, mentionDictionary);
+        }, 100);
       }
     }
     
     console.log('Content updated after pairing - mention dictionary updated for cross-platform mapping');
+  };
+
+  // Handler for when a mention gets pinned, especially from npub lookup
+  const handleMentionPinned = (mention: MentionResult, wasNpubLookup: boolean) => {
+    if (wasNpubLookup && mention.platform === 'nostr') {
+      const nostrMention = mention as NostrResult;
+      const npub = nostrMention.nostr_data?.npub || nostrMention.npub;
+      const displayName = nostrMention.nostr_data?.displayName || nostrMention.displayName || nostrMention.name || 'Unknown';
+      
+      // Check if the current content has the npub and replace it with display name
+      if (npub && content.includes(`@${npub}`)) {
+        const newContent = content.replace(`@${npub}`, `\`@${displayName}\``);
+        setContent(newContent);
+        console.log(`NPub pinned - Content replaced: "@${npub}" -> "\`@${displayName}\`"`);
+        
+        // Add to mention dictionary for future use
+        const dictionaryEntry = {
+          nostrNprofile: nostrMention.nprofile ? `nostr:${nostrMention.nprofile}` : `nostr:${npub}`,
+          nostrDisplayName: displayName,
+          platform: 'nostr' as const
+        };
+        
+        setMentionDictionary(prev => ({
+          ...prev,
+          [npub]: dictionaryEntry, // Map npub -> entry
+          [displayName]: dictionaryEntry // Map display name -> entry
+        }));
+        
+        // Force platform text updates
+        setTimeout(() => {
+          const newTwitterText = buildPlatformTextWithContent(newContent, 'twitter');
+          const newNostrText = buildPlatformTextWithContent(newContent, 'nostr');
+          setTwitterText(newTwitterText);
+          setNostrText(newNostrText);
+          console.log(`Platform texts updated after npub pinning: twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
+        }, 100);
+      }
+    }
   };
 
   // Cross-platform linking handlers
@@ -640,7 +702,16 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           platform: mention.platform,
           username: mention.platform === 'twitter' 
             ? (mention as TwitterResult).username 
-            : ((mention as NostrResult).nostr_data?.npub || (mention as NostrResult).npub || 'unknown')
+            : ((mention as NostrResult).nostr_data?.npub || (mention as NostrResult).npub || 'unknown'),
+          displayName: mention.platform === 'twitter'
+            ? (mention as TwitterResult).name
+            : ((mention as NostrResult).nostr_data?.displayName || (mention as NostrResult).displayName || (mention as NostrResult).name),
+          name: mention.platform === 'twitter'
+            ? (mention as TwitterResult).name
+            : ((mention as NostrResult).nostr_data?.name || (mention as NostrResult).name),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          usageCount: 0
         } as PersonalPin,
         targetPlatform,
         isUnpairMode: true
@@ -654,7 +725,16 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           platform: mention.platform,
           username: mention.platform === 'twitter' 
             ? (mention as TwitterResult).username 
-            : ((mention as NostrResult).nostr_data?.npub || (mention as NostrResult).npub || 'unknown')
+            : ((mention as NostrResult).nostr_data?.npub || (mention as NostrResult).npub || 'unknown'),
+          displayName: mention.platform === 'twitter'
+            ? (mention as TwitterResult).name
+            : ((mention as NostrResult).nostr_data?.displayName || (mention as NostrResult).displayName || (mention as NostrResult).name),
+          name: mention.platform === 'twitter'
+            ? (mention as TwitterResult).name
+            : ((mention as NostrResult).nostr_data?.name || (mention as NostrResult).name),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          usageCount: 0
         } as PersonalPin,
         targetPlatform,
         isUnpairMode: false
@@ -705,7 +785,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     error: mentionSearchError,
     streamSearch: performMentionSearch,
     clearSearch: clearMentionSearch,
-    updateResults: updateMentionResults
+    updateResults: updateMentionResults,
+    warnings: mentionSearchWarnings
   } = useStreamingMentionSearch();
 
   // Computed state for overall publishing status
@@ -2108,7 +2189,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             printLog(`Found linked Twitter profile: username=${linkedTwitterProfile.username}, twitterHandle=${twitterHandle}`);
           } else {
             // Fallback: extract from string format if possible
-            const match = (nostrMention.crossPlatformMapping as string).match(/@(\w+)/);
+            const match = (nostrMention.crossPlatformMapping as string | undefined)?.match(/@(\w+)/);
             twitterHandle = match ? `@${match[1]}` : `@${displayNameFromData}`;
             printLog('No linked Twitter profile found, using fallback extraction');
           }
@@ -3000,7 +3081,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   </div>
                 )}
                 
-                {/* Error Display */}
+                {/* Warning Display for Rate Limits/Partial Failures */}
+                {Object.keys(mentionSearchWarnings).length > 0 && (
+                  <div className="mb-2 px-2 py-1 bg-yellow-900/30 border border-yellow-700 rounded text-xs">
+                    {Object.entries(mentionSearchWarnings).map(([source, warning]) => (
+                      <div key={source} className="text-yellow-300 mb-1 last:mb-0">
+                        <span className="font-semibold capitalize">{source}:</span> {warning}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Error Display for Complete Failures */}
                 {mentionSearchError && (
                   <div className="mb-2 px-2 py-1 bg-red-900/30 border border-red-800 rounded text-xs text-red-300">
                     {mentionSearchError}
@@ -3023,6 +3115,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   onPairProfile={handlePairProfile}
                   onCancelLinking={handleCancelLinking}
                   onLinkProfile={handleLinkProfile}
+                  onMentionPinned={handleMentionPinned}
                 />
               </div>
             )}
