@@ -2014,20 +2014,53 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       }
       
       // Check if this mention has cross-platform mapping (Nostr + Twitter)
-      if (nostrMention.crossPlatformMapping?.hasTwitterMapping) {
+      // Handle both string format (from API) and object format (from type)
+      const hasCrossPlatformMapping = 
+        (typeof nostrMention.crossPlatformMapping === 'string' && (nostrMention.crossPlatformMapping as string).includes('Twitter')) ||
+        (typeof nostrMention.crossPlatformMapping === 'object' && nostrMention.crossPlatformMapping?.hasTwitterMapping);
+      
+      printLog(`Nostr crossPlatformMapping detection: raw=${JSON.stringify(nostrMention.crossPlatformMapping)}, type=${typeof nostrMention.crossPlatformMapping}, hasCrossPlatformMapping=${hasCrossPlatformMapping}`);
+      
+      if (hasCrossPlatformMapping) {
+        // For string format, try to find the linked Twitter profile from the same search results
+        let twitterHandle = '';
+        
+        if (typeof nostrMention.crossPlatformMapping === 'object') {
+          // Object format
+          twitterHandle = `@${nostrMention.crossPlatformMapping.twitterUsername}`;
+        } else {
+          // String format - find the corresponding Twitter profile from search results
+          const linkedTwitterProfile = mentionResults.find(result => 
+            result.platform === 'twitter' && 
+            result.pinId === nostrMention.pinId && // Same pinId indicates linked profiles
+            result.isPinned
+          ) as TwitterResult | undefined;
+          
+          if (linkedTwitterProfile) {
+            twitterHandle = `@${linkedTwitterProfile.username}`;
+            printLog(`Found linked Twitter profile: username=${linkedTwitterProfile.username}, twitterHandle=${twitterHandle}`);
+          } else {
+            // Fallback: extract from string format if possible
+            const match = (nostrMention.crossPlatformMapping as string).match(/@(\w+)/);
+            twitterHandle = match ? `@${match[1]}` : `@${displayNameFromData}`;
+            printLog('No linked Twitter profile found, using fallback extraction');
+          }
+        }
+        
         dictionaryEntry = {
-          twitterHandle: `@${nostrMention.crossPlatformMapping.twitterUsername}`,
+          twitterHandle: twitterHandle,
           nostrNprofile: nprofile ? `nostr:${nprofile}` : (npub ? `nostr:${npub}` : `@${displayNameFromData}`),
           nostrDisplayName: displayNameFromData,
           platform: 'both' as const
         };
         
         console.log('Cross-platform Nostr mention detected:', {
-          twitter: `@${nostrMention.crossPlatformMapping.twitterUsername}`,
+          twitter: twitterHandle,
           nostr: nprofile ? `nostr:${nprofile}` : `nostr:${npub}`,
           displayName: displayNameFromData,
           wasNpubSearch,
-          willPopulateBothPlatforms: true
+          willPopulateBothPlatforms: true,
+          mappingFormat: typeof nostrMention.crossPlatformMapping
         });
       } else {
         // Nostr-only mention
