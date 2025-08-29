@@ -358,6 +358,162 @@ export const mentionService = {
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
+  },
+
+  // Link Nostr profile to existing pin
+  linkNostrProfile: async (pinId: string, npub: string): Promise<PinServiceResponse> => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
+
+      if (!npub) {
+        throw new Error('npub is required');
+      }
+
+      const requestBody = { npub };
+      printLog(`Linking Nostr profile to pin ${pinId}: ${npub}`);
+      printLog(`Request body: ${JSON.stringify(requestBody)}`);
+      
+      const response = await fetch(`${MENTION_API_BASE}/pins/${pinId}/link-nostr`, {
+        method: 'POST',
+        headers: {
+          'Accept': '*/*',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin
+        },
+        body: JSON.stringify(requestBody),
+        credentials: 'include',
+        mode: 'cors'
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        printLog(`Link Nostr profile failed: ${JSON.stringify(data)}`);
+        return {
+          success: false,
+          error: data.error || 'Failed to link Nostr profile',
+          message: data.message || `HTTP ${response.status}`
+        };
+      }
+      
+      printLog(`Link Nostr profile response: ${JSON.stringify(data)}`);
+      
+      return {
+        success: true,
+        data: data.pin,
+        message: data.message
+      };
+    } catch (error) {
+      printLog(`Error linking Nostr profile: ${error}`);
+      console.error('Error linking Nostr profile:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  },
+
+  // Unlink Nostr profile from pin
+  unlinkNostrProfile: async (pinId: string): Promise<PinServiceResponse> => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
+
+      printLog(`Unlinking Nostr profile from pin ${pinId}`);
+      
+      const response = await fetch(`${MENTION_API_BASE}/pins/${pinId}/unlink-nostr`, {
+        method: 'POST',
+        headers: {
+          'Accept': '*/*',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin
+        },
+        credentials: 'include',
+        mode: 'cors'
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        printLog(`Unlink Nostr profile failed: ${JSON.stringify(data)}`);
+        return {
+          success: false,
+          error: data.error || 'Failed to unlink Nostr profile',
+          message: data.message || `HTTP ${response.status}`
+        };
+      }
+      
+      printLog(`Unlink Nostr profile response: ${JSON.stringify(data)}`);
+      
+      return {
+        success: true,
+        data: data.pin,
+        message: data.message
+      };
+    } catch (error) {
+      printLog(`Error unlinking Nostr profile: ${error}`);
+      console.error('Error unlinking Nostr profile:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  },
+
+  // Get Nostr profile suggestions for a pin
+  suggestNostrProfile: async (pinId: string): Promise<PinServiceResponse> => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
+
+      printLog(`Getting Nostr profile suggestions for pin ${pinId}`);
+      
+      const response = await fetch(`${MENTION_API_BASE}/pins/${pinId}/suggest-nostr`, {
+        method: 'GET',
+        headers: {
+          'Accept': '*/*',
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin
+        },
+        credentials: 'include',
+        mode: 'cors'
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        printLog(`Suggest Nostr profile failed: ${JSON.stringify(data)}`);
+        return {
+          success: false,
+          error: data.error || 'Failed to get Nostr suggestions',
+          message: data.message || `HTTP ${response.status}`
+        };
+      }
+      
+      printLog(`Suggest Nostr profile response: ${JSON.stringify(data)}`);
+      
+      return {
+        success: true,
+        data: data,
+        message: data.message
+      };
+    } catch (error) {
+      printLog(`Error getting Nostr suggestions: ${error}`);
+      console.error('Error getting Nostr suggestions:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
   }
 };
 

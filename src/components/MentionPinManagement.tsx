@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Pin, PinOff, Edit, Trash2, Loader2, Plus, Twitter } from 'lucide-react';
+import { Pin, PinOff, Edit, Trash2, Loader2, Plus, Twitter, Link, X } from 'lucide-react';
 import { mentionService } from '../services/mentionService.ts';
 import { PersonalPin, TwitterProfileData, NostrProfileData } from '../types/mention.ts';
 
 interface MentionPinManagementProps {
   isOpen: boolean;
   onClose: () => void;
+  onStartLinking?: (pin: PersonalPin) => void; // Callback to start linking mode
 }
 
 const MentionPinManagement: React.FC<MentionPinManagementProps> = ({
   isOpen,
-  onClose
+  onClose,
+  onStartLinking
 }) => {
   const [pins, setPins] = useState<PersonalPin[]>([]);
   const [loading, setLoading] = useState(false);
@@ -72,6 +74,11 @@ const MentionPinManagement: React.FC<MentionPinManagementProps> = ({
     } catch (error) {
       setError('Failed to update pin');
     }
+  };
+
+  const handleStartLinking = (pin: PersonalPin) => {
+    onStartLinking?.(pin);
+    onClose(); // Close the pin management modal to start linking
   };
 
   const formatDate = (dateString: string) => {
@@ -214,6 +221,15 @@ const MentionPinManagement: React.FC<MentionPinManagementProps> = ({
                       >
                         <Edit className="w-4 h-4" />
                       </button>
+                      {!isCrossPlatformMapping(pin) && onStartLinking && (
+                        <button
+                          onClick={() => handleStartLinking(pin)}
+                          className="p-1 text-gray-400 hover:text-green-400 transition-colors"
+                          title={`Link with ${pin.platform === 'twitter' ? 'Nostr' : 'Twitter'} profile`}
+                        >
+                          <Link className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDeletePin(pin.id)}
                         className="p-1 text-gray-400 hover:text-red-400 transition-colors"

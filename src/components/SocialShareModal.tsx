@@ -9,13 +9,14 @@ import SocialShareSuccessModal from './SocialShareSuccessModal.tsx';
 import MentionsLookupView from './MentionsLookupView.tsx';
 import MentionPinManagement from './MentionPinManagement.tsx';
 import DateTimePicker from './DateTimePicker.tsx';
-import { MentionResult, TwitterResult, NostrResult } from '../types/mention.ts';
+import { MentionResult, TwitterResult, NostrResult, PersonalPin } from '../types/mention.ts';
 import { Platform } from './MentionsLookupView.tsx';
 import { useStreamingMentionSearch } from '../hooks/useStreamingMentionSearch.ts';
 import ScheduledPostService from '../services/scheduledPostService.ts';
 import { CreateScheduledPostRequest, ScheduledPost } from '../types/scheduledPost.ts';
 import { formatScheduledDate } from '../utils/time.ts';
 import ScheduledPostSlots from './ScheduledPostSlots.tsx';
+import { mentionService } from '../services/mentionService.ts';
 import { useUserSettings } from '../hooks/useUserSettings.ts';
 
 // Define relay pool for Nostr
@@ -303,6 +304,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   // Add state for mentions lookup
   const [showMentionsLookup, setShowMentionsLookup] = useState(false);
+  
+
   const [mentionSearchQuery, setMentionSearchQuery] = useState('');
   const [mentionStartIndex, setMentionStartIndex] = useState(-1);
   const [firstMention, setFirstMention] = useState<MentionResult | null>(null);
@@ -342,11 +345,277 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     nostrDisplayName?: string;   // Human readable name for Nostr
     platform: 'twitter' | 'nostr' | 'both';  // Which platforms this mention supports
   }}>({});
+
+  // Cross-platform linking state
+  const [linkingMode, setLinkingMode] = useState<{
+    isActive: boolean;
+    sourcePin?: PersonalPin;
+    targetPlatform?: 'twitter' | 'nostr';
+    isUnpairMode?: boolean;
+    isPairing?: boolean;
+  }>({ isActive: false });
+
+  // Success notification state
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // Unified platform mode handler
   const handlePlatformModeChange = (newMode: 'twitter' | 'nostr') => {
     setPlatformMode(newMode);
     setCurrentMentionPlatform(newMode === 'twitter' ? Platform.Twitter : Platform.Nostr);
+  };
+
+  // Helper function to update content after successful pairing
+  const updateContentAfterPairing = (sourcePin: any, targetMention: MentionResult) => {
+    // Update the mention dictionary with the new cross-platform mapping
+    const sourceUsername = sourcePin.platform === 'twitter' 
+      ? sourcePin.username 
+      : sourcePin.username; // Adjust as needed for display name
+    
+    if (sourcePin.platform === 'twitter' && targetMention.platform === 'nostr') {
+      // Twitter → Nostr pairing
+      const nostrMention = targetMention as NostrResult;
+      const nprofile = nostrMention.nostr_data?.nprofile || nostrMention.nprofile;
+      const displayName = nostrMention.nostr_data?.displayName || nostrMention.displayName || sourceUsername;
+      
+      setMentionDictionary(prev => ({
+        ...prev,
+        [sourceUsername]: {
+          twitterHandle: `@${sourceUsername}`,
+          nostrNprofile: nprofile ? `nostr:${nprofile}` : `@${displayName}`,
+          nostrDisplayName: displayName,
+          platform: 'both' as const
+        }
+      }));
+    } else if (sourcePin.platform === 'nostr' && targetMention.platform === 'twitter') {
+      // Nostr → Twitter pairing
+      const twitterMention = targetMention as TwitterResult;
+      
+      setMentionDictionary(prev => ({
+        ...prev,
+        [sourceUsername]: {
+          twitterHandle: `@${twitterMention.username}`,
+          nostrNprofile: `nostr:${sourcePin.username}`, // Assuming sourcePin.username is npub/nprofile
+          nostrDisplayName: sourceUsername,
+          platform: 'both' as const
+        }
+      }));
+    }
+    
+    console.log('Content updated after pairing - mention dictionary updated for cross-platform mapping');
+  };
+
+  // Cross-platform linking handlers
+  const handleStartLinking = (sourcePin: PersonalPin) => {
+    const targetPlatform = sourcePin.platform === 'twitter' ? 'nostr' : 'twitter';
+    setLinkingMode({
+      isActive: true,
+      sourcePin,
+      targetPlatform
+    });
+    // Switch to the target platform for searching
+    handlePlatformModeChange(targetPlatform);
+    setShowMentionsLookup(true);
+  };
+
+  const handleCancelLinking = () => {
+    setLinkingMode({ isActive: false });
+    // Keep modal open unless user explicitly closes it
+    // setShowMentionsLookup(false);
+  };
+
+  const handlePairProfile = async (targetMention: MentionResult) => {
+    if (!linkingMode.sourcePin || !linkingMode.isActive) return;
+
+    // Set pairing loading state
+    setLinkingMode(prev => ({ ...prev, isPairing: true }));
+
+    try {
+      if (linkingMode.isUnpairMode) {
+        // UNPAIR mode - unlink the profiles
+        if (linkingMode.sourcePin.platform === 'nostr') {
+          // Unlink Nostr profile from pin
+          const result = await mentionService.unlinkNostrProfile(linkingMode.sourcePin.id);
+          
+          if (result.success) {
+            console.log('Successfully unlinked Nostr profile from pin:', linkingMode.sourcePin.id);
+            
+            // Show success feedback
+            setSuccessMessage('Successfully unpaired profiles!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            
+            // Reset linking mode but keep modal open for continued interaction
+            setLinkingMode({ isActive: false });
+            // setShowMentionsLookup(false); // Keep modal open
+            
+            // TODO: Refresh the mention results to show updated state
+          } else {
+            console.error('Failed to unlink Nostr profile:', result.error);
+            // TODO: Show error feedback
+          }
+        } else {
+          // For Twitter pins, we update to remove the cross-platform link
+          const updateData = {
+            targetPlatform: undefined,
+            targetUsername: undefined,
+            notes: `Unlinked cross-platform mapping for ${linkingMode.sourcePin.platform} @${linkingMode.sourcePin.username}`
+          };
+
+          const result = await mentionService.updatePin(linkingMode.sourcePin.id, updateData);
+          
+          if (result.success) {
+            console.log('Successfully unlinked Twitter pin:', linkingMode.sourcePin.id);
+            
+            // Show success feedback
+            setSuccessMessage('Successfully unpaired profiles!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            
+            // Reset linking mode but keep modal open for continued interaction
+            setLinkingMode({ isActive: false });
+            // setShowMentionsLookup(false); // Keep modal open
+          } else {
+            console.error('Failed to unlink Twitter pin:', result.error);
+            // TODO: Show error feedback
+          }
+        }
+      } else {
+        // PAIR mode - link the profiles
+        if (linkingMode.sourcePin.platform === 'nostr' && targetMention.platform === 'twitter') {
+          // Link Nostr pin with Twitter profile using updatePin
+          const updateData = {
+            targetPlatform: 'twitter' as const,
+            targetUsername: targetMention.username,
+            notes: `Cross-platform link: nostr @${linkingMode.sourcePin.username} ↔ twitter @${targetMention.username}`
+          };
+
+          const result = await mentionService.updatePin(linkingMode.sourcePin.id, updateData);
+          
+          if (result.success) {
+            console.log('Successfully linked Nostr pin to Twitter profile');
+            setSuccessMessage('Successfully paired profiles!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            
+            // Close mentions modal and update content with cross-platform pairing
+            setShowMentionsLookup(false);
+            updateContentAfterPairing(linkingMode.sourcePin, targetMention);
+          } else {
+            console.error('Failed to link Nostr pin to Twitter:', result.error);
+          }
+        } else if (linkingMode.sourcePin.platform === 'twitter' && targetMention.platform === 'nostr') {
+          // Link Twitter pin with Nostr profile using linkNostrProfile
+          const nostrMention = targetMention as NostrResult;
+          // Get npub from nostr_data or fallback to direct npub field
+          const npub = nostrMention.nostr_data?.npub || nostrMention.npub;
+          
+          console.log('Linking Twitter pin to Nostr profile:', {
+            pinId: linkingMode.sourcePin.id,
+            npub: npub,
+            nostr_data_npub: nostrMention.nostr_data?.npub,
+            direct_npub: nostrMention.npub,
+            targetMention: targetMention
+          });
+          
+          if (!npub) {
+            console.error('No npub found for Nostr mention:', targetMention);
+            return;
+          }
+          
+          const result = await mentionService.linkNostrProfile(linkingMode.sourcePin.id, npub);
+          
+          if (result.success) {
+            console.log('Successfully linked Twitter pin to Nostr profile');
+            setSuccessMessage('Successfully paired profiles!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            
+            // Close mentions modal and update content with cross-platform pairing
+            setShowMentionsLookup(false);
+            updateContentAfterPairing(linkingMode.sourcePin, targetMention);
+          } else {
+            console.error('Failed to link Twitter pin to Nostr:', result.error);
+          }
+        }
+        
+        // Reset linking mode but keep modal open for continued interaction
+        setLinkingMode({ isActive: false });
+        // setShowMentionsLookup(false); // Keep modal open
+        
+        // TODO: Refresh the mention results to show updated state
+        // TODO: Show success feedback
+      }
+    } catch (error) {
+      console.error('Error in pair/unpair operation:', error);
+      // TODO: Show error feedback
+    } finally {
+      // Clear pairing loading state
+      setLinkingMode(prev => ({ ...prev, isPairing: false }));
+    }
+  };
+
+  const handleLinkProfile = async (mention: MentionResult) => {
+
+    if (!mention.pinId) {
+      console.error('No pinId found for mention:', mention);
+      return;
+    }
+
+    // Check if this is already linked (has cross-platform mapping)
+    const isAlreadyLinked = mention.crossPlatformMapping && (
+      (mention.platform === 'twitter' && mention.crossPlatformMapping.hasNostrMapping) ||
+      (mention.platform === 'nostr' && mention.crossPlatformMapping.hasTwitterMapping)
+    );
+
+    const targetPlatform = mention.platform === 'twitter' ? 'nostr' : 'twitter';
+
+    if (isAlreadyLinked) {
+      // Already linked - set up for UNPAIR mode
+      setLinkingMode({
+        isActive: true,
+        sourcePin: {
+          id: mention.pinId,
+          platform: mention.platform,
+          username: mention.platform === 'twitter' 
+            ? (mention as TwitterResult).username 
+            : ((mention as NostrResult).nostr_data?.npub || (mention as NostrResult).npub || 'unknown')
+        } as PersonalPin,
+        targetPlatform,
+        isUnpairMode: true
+      });
+    } else {
+      // Not linked - set up for PAIR mode
+      setLinkingMode({
+        isActive: true,
+        sourcePin: {
+          id: mention.pinId,
+          platform: mention.platform,
+          username: mention.platform === 'twitter' 
+            ? (mention as TwitterResult).username 
+            : ((mention as NostrResult).nostr_data?.npub || (mention as NostrResult).npub || 'unknown')
+        } as PersonalPin,
+        targetPlatform,
+        isUnpairMode: false
+      });
+    }
+
+    // Switch to target platform mode (keep modal open)
+    handlePlatformModeChange(targetPlatform);
+
+    // Ensure modal stays open and set search query to source username for context
+    setShowMentionsLookup(true);
+    const sourceUsername = mention.platform === 'twitter' 
+      ? (mention as TwitterResult).username 
+      : ((mention as NostrResult).nostr_data?.displayName || (mention as NostrResult).displayName || 'user');
+    setMentionSearchQuery(sourceUsername);
+    
+    // Trigger search for the source username on the target platform
+    if (sourceUsername.length >= 2) {
+      performMentionSearch(sourceUsername, {
+        platforms: [targetPlatform],
+        includePersonalPins: true,
+        includeCrossPlatformMappings: true,
+        limit: 10
+      });
+    }
+    
+
   };
 
   // Sync platformMode with currentMentionPlatform on initial load
@@ -1653,15 +1922,20 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       
       // Check if this mention has cross-platform mapping (Twitter + Nostr)
       if (twitterMention.crossPlatformMapping?.hasNostrMapping) {
-        // Ensure we use nprofile format for cross-platform mapping
-        const nostrNprofile = twitterMention.crossPlatformMapping.nostrNprofile || 
-                             (twitterMention.crossPlatformMapping.nostrNpub ? `nostr:${twitterMention.crossPlatformMapping.nostrNpub}` : '');
+        // Ensure we use nprofile format for cross-platform mapping (fallback to npub if no nprofile)
+        const nostrNprofile = twitterMention.crossPlatformMapping.nostrNpub ? `nostr:${twitterMention.crossPlatformMapping.nostrNpub}` : '';
         dictionaryEntry = {
           twitterHandle: `@${twitterMention.username}`,
           nostrNprofile: nostrNprofile,
           nostrDisplayName: twitterMention.crossPlatformMapping.nostrDisplayName || displayName,
           platform: 'both' as const
         };
+        
+        console.log('Cross-platform Twitter mention detected:', {
+          twitter: `@${twitterMention.username}`,
+          nostr: nostrNprofile,
+          displayName: twitterMention.crossPlatformMapping.nostrDisplayName
+        });
       } else {
         // Twitter-only mention
         dictionaryEntry = {
@@ -1692,6 +1966,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           nostrDisplayName: displayNameFromData,
           platform: 'both' as const
         };
+        
+        console.log('Cross-platform Nostr mention detected:', {
+          twitter: `@${nostrMention.crossPlatformMapping.twitterUsername}`,
+          nostr: nprofile ? `nostr:${nprofile}` : `nostr:${npub}`,
+          displayName: displayNameFromData
+        });
       } else {
         // Nostr-only mention
         dictionaryEntry = {
@@ -1861,8 +2141,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const getHighlightedContent = (): string => {
     if (!content) return '';
     
-    console.log('getHighlightedContent - processing content:', content);
-    console.log('getHighlightedContent - selectedMentions:', selectedMentions);
+    // console.log('getHighlightedContent - processing content:', content);
+    // console.log('getHighlightedContent - selectedMentions:', selectedMentions);
     
     // Split content into parts and handle each part
     const parts: string[] = [];
@@ -1912,7 +2192,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     // Join all parts and convert newlines and spaces
     const result = parts.join('').replace(/\n/g, '<br/>').replace(/ /g, '&nbsp;');
     
-    console.log('getHighlightedContent result:', result);
+    // console.log('getHighlightedContent result:', result);
     return result;
   };
 
@@ -2475,9 +2755,25 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   error={mentionSearchError}
                   onPlatformChange={handleMentionPlatformChange}
                   initialPlatform={currentMentionPlatform}
+                  linkingMode={linkingMode}
+                  onPairProfile={handlePairProfile}
+                  onCancelLinking={handleCancelLinking}
+                  onLinkProfile={handleLinkProfile}
                 />
               </div>
             )}
+          </div>
+        )}
+
+        {/* Success Notification */}
+        {successMessage && (
+          <div className="fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center space-x-2">
+            <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+              <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <span className="text-sm">{successMessage}</span>
           </div>
         )}
 
@@ -2485,6 +2781,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         <MentionPinManagement
           isOpen={showPinManagement}
           onClose={() => setShowPinManagement(false)}
+          onStartLinking={handleStartLinking}
         />
           </div>
         )}

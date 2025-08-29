@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Twitter, Loader2, Pin, PinOff } from 'lucide-react';
+import { Twitter, Loader2, Pin, PinOff, Users, X, Link } from 'lucide-react';
 import { mentionService } from '../services/mentionService.ts';
 import { MentionResult, TwitterResult, NostrResult } from '../types/mention.ts';
 import { API_URL } from '../constants/constants.ts';
@@ -26,6 +26,16 @@ interface MentionsLookupViewProps {
   error?: string | null;
   onPlatformChange?: (platform: Platform) => void;
   initialPlatform?: Platform;
+  linkingMode?: {
+    isActive: boolean;
+    sourcePin?: any; // PersonalPin type
+    targetPlatform?: 'twitter' | 'nostr';
+    isUnpairMode?: boolean;
+    isPairing?: boolean;
+  };
+  onPairProfile?: (mention: MentionResult) => void;
+  onCancelLinking?: () => void;
+  onLinkProfile?: (mention: MentionResult) => void;
 }
 
 const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
@@ -39,11 +49,20 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   isLoading: externalIsLoading = false,
   error: externalError = null,
   onPlatformChange,
-  initialPlatform = Platform.Twitter
+  initialPlatform = Platform.Twitter,
+  linkingMode,
+  onPairProfile,
+  onCancelLinking,
+  onLinkProfile
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatform);
   const [pinningStates, setPinningStates] = useState<{[key: string]: boolean}>({});
   const [npubLookupLoading, setNpubLookupLoading] = useState(false);
+
+  // Sync internal platform state with parent when initialPlatform changes
+  useEffect(() => {
+    setSelectedPlatform(initialPlatform);
+  }, [initialPlatform]);
 
   // Always use external results and states (no internal search anymore)
   const displayResults = externalMentionResults;
@@ -89,8 +108,30 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   }, [selectedPlatform, searchQuery, filteredResults.length, isLoading, npubLookupLoading]);
 
   const handleMentionClick = (mention: MentionResult) => {
+    if (linkingMode?.isActive) {
+      // In linking mode, don't close - let the pair button handle the action
+      return;
+    }
     onMentionSelect?.(mention, selectedPlatform);
     onClose?.();
+  };
+
+  const handlePairClick = (mention: MentionResult, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onPairProfile?.(mention);
+  };
+
+  const handleLinkClick = (mention: MentionResult, e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log('Link button clicked for mention:', {
+      platform: mention.platform,
+      username: mention.platform === 'twitter' 
+        ? (mention as TwitterResult).username 
+        : ((mention as NostrResult).nostr_data?.npub || (mention as NostrResult).npub || 'unknown'),
+      pinId: mention.pinId,
+      isPinned: mention.isPinned
+    });
+    onLinkProfile?.(mention);
   };
 
   const handlePlatformChange = (platform: Platform) => {
@@ -288,25 +329,70 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
           <div className={`text-xs ${isSelected ? 'text-blue-300' : 'text-gray-400'}`}>@{truncateMiddle(result.username)}</div>
         </div>
 
-        {/* Pin Toggle Button */}
-        <button
-          onClick={(e) => handlePinToggle(result, e)}
-          disabled={isPinning}
-          className={`p-1 rounded-full transition-colors ${
-            result.isPinned 
-              ? 'text-yellow-500 hover:text-yellow-400' 
-              : 'text-gray-400 hover:text-yellow-500'
-          } ${isPinning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-          title={result.isPinned ? 'Unpin user' : 'Pin user'}
-        >
-          {isPinning ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : result.isPinned ? (
-            <PinOff className="w-3 h-3" />
+        {/* Action Buttons */}
+        <div className="flex items-center space-x-1">
+          {linkingMode?.isActive ? (
+            <button
+              onClick={(e) => handlePairClick(result, e)}
+              disabled={linkingMode.isPairing}
+              className={`px-2 py-1 text-xs text-white rounded transition-colors ${
+                linkingMode.isUnpairMode 
+                  ? 'bg-red-600 hover:bg-red-500' 
+                  : 'bg-green-600 hover:bg-green-500'
+              } ${linkingMode.isPairing ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={`${linkingMode.isUnpairMode ? 'Unpair from' : 'Pair with'} ${linkingMode.sourcePin?.platform === 'twitter' ? 'Twitter' : 'Nostr'} profile`}
+            >
+              {linkingMode.isPairing ? (
+                <Loader2 className="w-3 h-3 animate-spin inline mr-1" />
+              ) : (
+                <Users className="w-3 h-3 inline mr-1" />
+              )}
+              {linkingMode.isPairing 
+                ? 'Pairing...' 
+                : linkingMode.isUnpairMode ? 'Unpair' : 'Pair'
+              }
+            </button>
           ) : (
-            <Pin className="w-3 h-3" />
+            <>
+              {/* Link Button - Show for pinned items (green if no link, colored if linked) */}
+              {result.isPinned && result.pinId && (
+                <button
+                  onClick={(e) => handleLinkClick(result, e)}
+                  className={`p-1 rounded-full transition-colors ${
+                    result.crossPlatformMapping 
+                      ? (result.platform as string) === 'twitter' 
+                        ? 'text-purple-400 hover:text-purple-300' // Twitter linked to Nostr = purple
+                        : 'text-blue-400 hover:text-blue-300'     // Nostr linked to Twitter = blue
+                      : 'text-gray-400 hover:text-green-400'     // Not linked = green hover
+                  }`}
+                  title={`${result.crossPlatformMapping ? 'Manage link with' : 'Link with'} ${(result.platform as string) === 'twitter' ? 'Nostr' : 'Twitter'} profile`}
+                >
+                  <Link className="w-3 h-3" />
+                </button>
+              )}
+              
+              {/* Pin Toggle Button */}
+              <button
+                onClick={(e) => handlePinToggle(result, e)}
+                disabled={isPinning}
+                className={`p-1 rounded-full transition-colors ${
+                  result.isPinned 
+                    ? 'text-yellow-500 hover:text-yellow-400' 
+                    : 'text-gray-400 hover:text-yellow-500'
+                } ${isPinning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                title={result.isPinned ? 'Unpin user' : 'Pin user'}
+              >
+                {isPinning ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : result.isPinned ? (
+                  <PinOff className="w-3 h-3" />
+                ) : (
+                  <Pin className="w-3 h-3" />
+                )}
+              </button>
+            </>
           )}
-        </button>
+        </div>
       </div>
     );
   };
@@ -388,31 +474,103 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
           </div>
         </div>
 
-        {/* Pin Toggle Button */}
-        <button
-          onClick={(e) => handlePinToggle(result, e)}
-          disabled={isPinning}
-          className={`p-1 rounded-full transition-colors ${
-            result.isPinned 
-              ? 'text-yellow-500 hover:text-yellow-400' 
-              : 'text-gray-400 hover:text-yellow-500'
-          } ${isPinning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-          title={result.isPinned ? 'Unpin user' : 'Pin user'}
-        >
-          {isPinning ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : result.isPinned ? (
-            <PinOff className="w-3 h-3" />
+        {/* Action Buttons */}
+        <div className="flex items-center space-x-1">
+          {linkingMode?.isActive ? (
+            <button
+              onClick={(e) => handlePairClick(result, e)}
+              disabled={linkingMode.isPairing}
+              className={`px-2 py-1 text-xs text-white rounded transition-colors ${
+                linkingMode.isUnpairMode 
+                  ? 'bg-red-600 hover:bg-red-500' 
+                  : 'bg-green-600 hover:bg-green-500'
+              } ${linkingMode.isPairing ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={`${linkingMode.isUnpairMode ? 'Unpair from' : 'Pair with'} ${linkingMode.sourcePin?.platform === 'twitter' ? 'Twitter' : 'Nostr'} profile`}
+            >
+              {linkingMode.isPairing ? (
+                <Loader2 className="w-3 h-3 animate-spin inline mr-1" />
+              ) : (
+                <Users className="w-3 h-3 inline mr-1" />
+              )}
+              {linkingMode.isPairing 
+                ? 'Pairing...' 
+                : linkingMode.isUnpairMode ? 'Unpair' : 'Pair'
+              }
+            </button>
           ) : (
-            <Pin className="w-3 h-3" />
+            <>
+              {/* Link Button - Show for pinned items (green if no link, colored if linked) */}
+              {result.isPinned && result.pinId && (
+                <button
+                  onClick={(e) => handleLinkClick(result, e)}
+                  className={`p-1 rounded-full transition-colors ${
+                    result.crossPlatformMapping 
+                      ? (result.platform as string) === 'twitter' 
+                        ? 'text-purple-400 hover:text-purple-300' // Twitter linked to Nostr = purple
+                        : 'text-blue-400 hover:text-blue-300'     // Nostr linked to Twitter = blue
+                      : 'text-gray-400 hover:text-green-400'     // Not linked = green hover
+                  }`}
+                  title={`${result.crossPlatformMapping ? 'Manage link with' : 'Link with'} ${(result.platform as string) === 'twitter' ? 'Nostr' : 'Twitter'} profile`}
+                >
+                  <Link className="w-3 h-3" />
+                </button>
+              )}
+              
+              {/* Pin Toggle Button */}
+              <button
+                onClick={(e) => handlePinToggle(result, e)}
+                disabled={isPinning}
+                className={`p-1 rounded-full transition-colors ${
+                  result.isPinned 
+                    ? 'text-yellow-500 hover:text-yellow-400' 
+                    : 'text-gray-400 hover:text-yellow-500'
+                } ${isPinning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                title={result.isPinned ? 'Unpin user' : 'Pin user'}
+              >
+                {isPinning ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : result.isPinned ? (
+                  <PinOff className="w-3 h-3" />
+                ) : (
+                  <Pin className="w-3 h-3" />
+                )}
+              </button>
+            </>
           )}
-        </button>
+        </div>
       </div>
     );
   };
 
   return (
     <div className="w-72 sm:w-80 mx-2 sm:mx-0 bg-black border border-gray-700 rounded-lg shadow-xl overflow-hidden">
+      {/* Linking Mode Header */}
+      {linkingMode?.isActive && (
+        <div className="bg-green-900/30 border-b border-green-700 p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Users className="w-4 h-4 text-green-400" />
+              <span className="text-sm text-green-300">
+                Linking with {linkingMode.sourcePin?.platform === 'twitter' ? 'Twitter' : 'Nostr'} @{linkingMode.sourcePin?.username}
+              </span>
+            </div>
+            <button
+              onClick={onCancelLinking}
+              className="p-1 text-gray-400 hover:text-white transition-colors"
+              title="Cancel linking"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="text-xs text-green-400 mt-1">
+            {linkingMode.isUnpairMode 
+              ? `Select the linked ${linkingMode.targetPlatform} profile to unpair`
+              : `Select a ${linkingMode.targetPlatform} profile to pair with`
+            }
+          </div>
+        </div>
+      )}
+      
       {/* Compact Header with Platform Tabs */}
       <div className="flex bg-gray-900 border-b border-gray-700">
         <button
