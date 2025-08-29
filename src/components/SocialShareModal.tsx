@@ -2103,21 +2103,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         printLog(`Added secondary dictionary entry for display name: displayName="${displayName}", npubKey="${mentionSearchQuery}"`);
       }
       
-      // For cross-platform mentions, add dictionary entries for both platform-specific display names
-      if (dictionaryEntry.platform === 'both') {
-        if (dictionaryEntry.twitterHandle) {
-          const twitterUsername = dictionaryEntry.twitterHandle.replace('@', '');
-          if (twitterUsername !== dictionaryKey) {
-            newDict[twitterUsername] = dictionaryEntry;
-            printLog(`Added cross-platform dictionary entry for Twitter username: "${twitterUsername}"`);
-          }
-        }
-        if (dictionaryEntry.nostrDisplayName && dictionaryEntry.nostrDisplayName !== dictionaryKey) {
-          newDict[dictionaryEntry.nostrDisplayName] = dictionaryEntry;
-          printLog(`Added cross-platform dictionary entry for Nostr display name: "${dictionaryEntry.nostrDisplayName}"`);
-        }
-      }
-      
       return newDict;
     });
     
@@ -2143,9 +2128,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     // For npub searches, we need to replace the entire npub, not just @npub
     let replaceLength: number;
     if (wasNpubSearch && mention.platform === 'nostr') {
-      // Replace the entire npub (no @ prefix for npub searches)
-      replaceLength = mentionSearchQuery.length;
-      printLog(`NPub replacement - replacing entire npub: searchQuery="${mentionSearchQuery}", replaceLength=${replaceLength}, newDisplayText="${mentionText}"`);
+      // Replace @ + the entire npub (user typed npub but we detected @ + npub)
+      replaceLength = 1 + mentionSearchQuery.length;
+      printLog(`NPub replacement - replacing @ + npub: searchQuery="${mentionSearchQuery}", replaceLength=${replaceLength}, newDisplayText="${mentionText}"`);
     } else {
       // Normal case: replace @ + search query
       replaceLength = 1 + mentionSearchQuery.length;
