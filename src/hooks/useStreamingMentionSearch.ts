@@ -7,6 +7,7 @@ interface StreamingSearchState {
   loading: boolean;
   completedSources: string[];
   error: string | null;
+  warnings: {[source: string]: string};
 }
 
 interface SearchOptions {
@@ -32,10 +33,12 @@ export const useStreamingMentionSearch = () => {
     results: [],
     loading: false,
     completedSources: [],
-    error: null
+    error: null,
+    warnings: {}
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const currentSearchParamsRef = useRef<SearchOptions | null>(null);
 
   const getAuthToken = () => {
     return localStorage.getItem('auth_token');
@@ -85,10 +88,35 @@ export const useStreamingMentionSearch = () => {
             }
           }
           
+          const partialCompletedSources = data.meta?.completedSources || prevState.completedSources;
+          
+          // Check if all expected sources are now complete
+          // Expected sources: Only the ones that have actually been attempted (are in completedSources)
+          // Plus: pins, mappings (always expected)
+          const partialExpectedSources = ['mappings', 'pins'];
+          
+          // Add any platform sources that have already completed
+          partialCompletedSources.forEach(source => {
+            if (!partialExpectedSources.includes(source)) {
+              partialExpectedSources.push(source);
+            }
+          });
+          
+          const partialAllSourcesComplete = partialExpectedSources.every(source => 
+            partialCompletedSources.includes(source)
+          );
+          
+          printLog(`DEBUG Partial completion check:`);
+          printLog(`- Source: ${data.source}`);
+          printLog(`- Expected sources: [${partialExpectedSources.join(', ')}]`);
+          printLog(`- Completed sources: [${partialCompletedSources.join(', ')}]`);
+          printLog(`- All sources complete: ${partialAllSourcesComplete}`);
+          
           return {
             ...prevState,
             results: updatedResults,
-            completedSources: data.meta?.completedSources || prevState.completedSources
+            completedSources: partialCompletedSources,
+            loading: partialAllSourcesComplete ? false : prevState.loading
           };
           
         case 'complete':
@@ -101,10 +129,58 @@ export const useStreamingMentionSearch = () => {
           
         case 'error':
           console.error(`Search error from ${data.source}:`, data.error);
+          
+          // Create user-friendly error message
+          let friendlyError = data.error || 'Search error occurred';
+          if (data.error?.includes('429')) {
+            friendlyError = `${data.source === 'twitter' ? 'Twitter' : data.source} rate limit reached. Showing local results only.`;
+          }
+          
+          // Add warning for this source but don't fail the entire search
+          const newWarnings = {
+            ...prevState.warnings,
+            [data.source || 'unknown']: friendlyError
+          };
+          
+          const errorCompletedSources = data.completedSources || prevState.completedSources;
+          
+          // Check if all expected sources are now complete (including this error)
+          // Expected sources: Only the ones that have actually been attempted (are in completedSources)
+          // Plus: pins, mappings (always expected)
+          const errorExpectedSources = ['mappings', 'pins'];
+          
+          // Add any platform sources that have already completed or are completing now
+          errorCompletedSources.forEach(source => {
+            if (!errorExpectedSources.includes(source)) {
+              errorExpectedSources.push(source);
+            }
+          });
+          
+          const errorAllSourcesComplete = errorExpectedSources.every(source => 
+            errorCompletedSources.includes(source)
+          );
+          
+          printLog(`DEBUG Error completion check:`);
+          printLog(`- Source: ${data.source}`);
+          printLog(`- Expected sources: [${errorExpectedSources.join(', ')}]`);
+          printLog(`- Completed sources: [${errorCompletedSources.join(', ')}]`);
+          printLog(`- Dynamic expected sources based on completed sources`);
+          printLog(`- All sources complete: ${errorAllSourcesComplete}`);
+          
+          // Debug each source check
+          errorExpectedSources.forEach(source => {
+            const isComplete = errorCompletedSources.includes(source);
+            printLog(`- ${source}: ${isComplete ? '✅' : '❌'} ${isComplete ? 'complete' : 'missing'}`);
+          });
+          
+          console.log(`Error from ${data.source}. Completed sources: [${errorCompletedSources.join(', ')}]. All complete: ${errorAllSourcesComplete}`);
+          
           return {
             ...prevState,
-            completedSources: data.completedSources || prevState.completedSources,
-            error: data.error || 'Search error occurred'
+            completedSources: errorCompletedSources,
+            warnings: newWarnings,
+            loading: errorAllSourcesComplete ? false : prevState.loading
+            // Note: NOT setting error here - that would stop the whole search
           };
           
         default:
@@ -121,12 +197,16 @@ export const useStreamingMentionSearch = () => {
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
+    
+    // Store search parameters for completion checking
+    currentSearchParamsRef.current = options;
 
     setState({
       results: [],
       loading: true,
       completedSources: [],
-      error: null
+      error: null,
+      warnings: {}
     });
 
     const token = getAuthToken();
@@ -267,7 +347,8 @@ export const useStreamingMentionSearch = () => {
       results: [],
       loading: false,
       completedSources: [],
-      error: null
+      error: null,
+      warnings: {}
     });
   }, []);
 
@@ -285,6 +366,7 @@ export const useStreamingMentionSearch = () => {
     error: state.error,
     streamSearch,
     clearSearch,
-    updateResults
+    updateResults,
+    warnings: state.warnings
   };
 }; 

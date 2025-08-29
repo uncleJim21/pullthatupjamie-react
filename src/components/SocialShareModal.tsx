@@ -9,12 +9,14 @@ import SocialShareSuccessModal from './SocialShareSuccessModal.tsx';
 import MentionsLookupView from './MentionsLookupView.tsx';
 import MentionPinManagement from './MentionPinManagement.tsx';
 import DateTimePicker from './DateTimePicker.tsx';
-import { MentionResult } from '../types/mention.ts';
+import { MentionResult, TwitterResult, NostrResult, PersonalPin } from '../types/mention.ts';
+import { Platform } from './MentionsLookupView.tsx';
 import { useStreamingMentionSearch } from '../hooks/useStreamingMentionSearch.ts';
 import ScheduledPostService from '../services/scheduledPostService.ts';
 import { CreateScheduledPostRequest, ScheduledPost } from '../types/scheduledPost.ts';
 import { formatScheduledDate } from '../utils/time.ts';
 import ScheduledPostSlots from './ScheduledPostSlots.tsx';
+import { mentionService } from '../services/mentionService.ts';
 import { useUserSettings } from '../hooks/useUserSettings.ts';
 
 // Define relay pool for Nostr
@@ -194,7 +196,7 @@ const ASPECT_RATIO = 16 / 9;
 const PREVIEW_WIDTH = 240; // px, adjust as needed
 const PREVIEW_HEIGHT = PREVIEW_WIDTH / ASPECT_RATIO;
 
-const MENTION_MIN_CHARS = 2;
+const MENTION_MIN_CHARS = 4;
 
 const SocialShareModal: React.FC<SocialShareModalProps> = ({
   isOpen,
@@ -302,15 +304,478 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   // Add state for mentions lookup
   const [showMentionsLookup, setShowMentionsLookup] = useState(false);
+  
+
   const [mentionSearchQuery, setMentionSearchQuery] = useState('');
   const [mentionStartIndex, setMentionStartIndex] = useState(-1);
   const [firstMention, setFirstMention] = useState<MentionResult | null>(null);
   const [showPinManagement, setShowPinManagement] = useState(false);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(-1);
   const [lastSearchQuery, setLastSearchQuery] = useState('');
+  
+  // Platform-specific search state for independent @ handling
+  const [platformSearchState, setPlatformSearchState] = useState<{
+    twitter: { query: string; hasResults: boolean };
+    nostr: { query: string; hasResults: boolean };
+  }>({
+    twitter: { query: '', hasResults: false },
+    nostr: { query: '', hasResults: false }
+  });
+  const [currentMentionPlatform, setCurrentMentionPlatform] = useState<Platform>(Platform.Twitter);
+  
+  // Legacy: keeping for compatibility during transition
+  const [selectedMentions, setSelectedMentions] = useState<Array<{
+    displayText: string;
+    actualText: string;
+    platform: string;
+    position: number;
+  }>>([]);
+  
+  // Unified platform mode - single source of truth for current platform
+  const [platformMode, setPlatformMode] = useState<'twitter' | 'nostr'>('twitter');
+  
+  // Separate text variables for each platform
+  const [twitterText, setTwitterText] = useState<string>('');
+  const [nostrText, setNostrText] = useState<string>('');
+  
+  // Mention dictionary: maps display name to posting format and metadata
+  const [mentionDictionary, setMentionDictionary] = useState<{[displayName: string]: {
+    twitterHandle?: string;      // @username for Twitter
+    nostrNprofile?: string;      // nostr:nprofile... for Nostr
+    nostrDisplayName?: string;   // Human readable name for Nostr
+    platform: 'twitter' | 'nostr' | 'both';  // Which platforms this mention supports
+  }}>({});
+
+  // Simple mapping: nprofile -> display name for Twitter→Nostr transitions
+  const [nprofileToDisplayName, setNprofileToDisplayName] = useState<{[nprofile: string]: string}>({});
+
+  // Cross-platform linking state
+  const [linkingMode, setLinkingMode] = useState<{
+    isActive: boolean;
+    sourcePin?: PersonalPin;
+    targetPlatform?: 'twitter' | 'nostr';
+    isUnpairMode?: boolean;
+    isPairing?: boolean;
+  }>({ isActive: false });
+
+  // Success notification state
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // Unified platform mode handler
+  const handlePlatformModeChange = (newMode: 'twitter' | 'nostr') => {
+    setPlatformMode(newMode);
+    setCurrentMentionPlatform(newMode === 'twitter' ? Platform.Twitter : Platform.Nostr);
+  };
+
+  // Helper function to update content after successful pairing
+  const updateContentAfterPairing = (sourcePin: any, targetMention: MentionResult) => {
+    // Update the mention dictionary with the new cross-platform mapping
+    const sourceUsername = sourcePin.platform === 'twitter' 
+      ? sourcePin.username 
+      : sourcePin.username; // Adjust as needed for display name
+    
+    if (sourcePin.platform === 'twitter' && targetMention.platform === 'nostr') {
+      // Twitter → Nostr pairing
+      const nostrMention = targetMention as NostrResult;
+      const nprofile = nostrMention.nostr_data?.nprofile || nostrMention.nprofile;
+      const displayName = nostrMention.nostr_data?.displayName || nostrMention.displayName || sourceUsername;
+      
+      // Create bidirectional dictionary entries
+      const dictionaryEntry = {
+        twitterHandle: `@${sourceUsername}`,
+        nostrNprofile: nprofile ? `nostr:${nprofile}` : `@${displayName}`,
+        nostrDisplayName: displayName,
+        platform: 'both' as const
+      };
+      
+      setMentionDictionary(prev => ({
+        ...prev,
+        [sourceUsername]: dictionaryEntry, // Map Twitter username -> cross-platform entry
+        [displayName]: dictionaryEntry // Map Nostr display name -> cross-platform entry  
+      }));
+      
+      // Add nprofile to display name mapping
+      if (nprofile) {
+        setNprofileToDisplayName(prev => ({
+          ...prev,
+          [`nostr:${nprofile}`]: displayName
+        }));
+      }
+      
+      console.log(`Twitter→Nostr pairing: sourceUsername="${sourceUsername}", displayName="${displayName}"`);
+      
+      // If we're currently showing the npub in content, replace @npub with `@displayName`
+      const currentContent = content;
+      const npub = nostrMention.nostr_data?.npub || nostrMention.npub;
+      if (currentContent.includes(`@${npub}`)) {
+        const newContent = currentContent.replace(`@${npub}`, `\`@${displayName}\``);
+        setContent(newContent);
+        console.log(`Content replaced: "${currentContent}" -> "${newContent}"`);
+        
+        // Force immediate platform text updates with new content
+        setTimeout(() => {
+          const newTwitterText = buildPlatformTextWithContent(newContent, 'twitter');  
+          const newNostrText = buildPlatformTextWithContent(newContent, 'nostr');
+          setTwitterText(newTwitterText);
+          setNostrText(newNostrText);
+          console.log(`Platform texts updated after pairing: twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
+        }, 100);
+      }
+      
+    } else if (sourcePin.platform === 'nostr' && targetMention.platform === 'twitter') {
+      // Nostr → Twitter pairing
+      const twitterMention = targetMention as TwitterResult;
+      const nostrDisplayName = sourcePin.displayName || sourcePin.name || 'unknown';
+      
+      // Create bidirectional dictionary entries
+      const dictionaryEntry = {
+        twitterHandle: `@${twitterMention.username}`,
+        nostrNprofile: `nostr:${sourcePin.username}`, // sourcePin.username is the npub/nprofile
+        nostrDisplayName: nostrDisplayName,
+        platform: 'both' as const
+      };
+      
+      setMentionDictionary(prev => ({
+        ...prev,
+        [nostrDisplayName]: dictionaryEntry, // Map display name -> cross-platform entry
+        [twitterMention.username]: dictionaryEntry // Map Twitter username -> cross-platform entry  
+      }));
+      
+      // Add nprofile to display name mapping
+      setNprofileToDisplayName(prev => ({
+        ...prev,
+        [`nostr:${sourcePin.username}`]: nostrDisplayName
+      }));
+      
+      console.log(`Nostr→Twitter pairing: npub="${sourcePin.username}", displayName="${nostrDisplayName}", twitterUsername="${twitterMention.username}"`);
+      
+      // Debug: Log the current content and what we're looking for
+      const currentContent = content;
+      console.log(`DEBUG - Content replacement check:`, {
+        currentContent: currentContent,
+        lookingFor: `@${sourcePin.username}`,
+        containsNpub: currentContent.includes(`@${sourcePin.username}`),
+        sourcePin: sourcePin,
+        nostrDisplayName: nostrDisplayName
+      });
+      
+      // Replace @npub in content with `@displayName`
+      if (currentContent.includes(`@${sourcePin.username}`)) {
+        const newContent = currentContent.replace(`@${sourcePin.username}`, `\`@${nostrDisplayName}\``);
+        setContent(newContent);
+        console.log(`Content replaced: "${currentContent}" -> "${newContent}"`);
+        
+        // Force immediate platform text updates with new content
+        setTimeout(() => {
+          const newTwitterText = buildPlatformTextWithContent(newContent, 'twitter');  
+          const newNostrText = buildPlatformTextWithContent(newContent, 'nostr');
+          setTwitterText(newTwitterText);
+          setNostrText(newNostrText);
+          console.log(`Platform texts updated after pairing: twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
+        }, 100);
+      } else {
+        console.log(`DEBUG - No content replacement: npub "${sourcePin.username}" not found in content "${currentContent}"`);
+        
+        // Even if we can't replace content, we should still update the dictionary for future use
+        console.log(`DEBUG - Dictionary entry created:`, dictionaryEntry);
+        
+        // Force platform text update anyway to see if dictionary is working
+        setTimeout(() => {
+          const newTwitterText = buildPlatformTextWithContent(currentContent, 'twitter');  
+          const newNostrText = buildPlatformTextWithContent(currentContent, 'nostr');
+          setTwitterText(newTwitterText);
+          setNostrText(newNostrText);
+          console.log(`Platform texts updated after pairing (no content change): twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
+          console.log(`Current dictionary:`, mentionDictionary);
+        }, 100);
+      }
+    }
+    
+    console.log('Content updated after pairing - mention dictionary updated for cross-platform mapping');
+  };
+
+  // Handler for when a mention gets pinned, especially from npub lookup
+  const handleMentionPinned = (mention: MentionResult, wasNpubLookup: boolean) => {
+    if (wasNpubLookup && mention.platform === 'nostr') {
+      const nostrMention = mention as NostrResult;
+      const npub = nostrMention.nostr_data?.npub || nostrMention.npub;
+      const displayName = nostrMention.nostr_data?.displayName || nostrMention.displayName || nostrMention.name || 'Unknown';
+      
+      // Check if the current content has the npub and replace it with display name
+      if (npub && content.includes(`@${npub}`)) {
+        const newContent = content.replace(`@${npub}`, `\`@${displayName}\``);
+        setContent(newContent);
+        console.log(`NPub pinned - Content replaced: "@${npub}" -> "\`@${displayName}\`"`);
+        
+        // Add to mention dictionary for future use
+        const dictionaryEntry = {
+          nostrNprofile: nostrMention.nprofile ? `nostr:${nostrMention.nprofile}` : `nostr:${npub}`,
+          nostrDisplayName: displayName,
+          platform: 'nostr' as const
+        };
+        
+        setMentionDictionary(prev => ({
+          ...prev,
+          [npub]: dictionaryEntry, // Map npub -> entry
+          [displayName]: dictionaryEntry // Map display name -> entry
+        }));
+        
+        // Force platform text updates
+        setTimeout(() => {
+          const newTwitterText = buildPlatformTextWithContent(newContent, 'twitter');
+          const newNostrText = buildPlatformTextWithContent(newContent, 'nostr');
+          setTwitterText(newTwitterText);
+          setNostrText(newNostrText);
+          console.log(`Platform texts updated after npub pinning: twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
+        }, 100);
+      }
+    }
+  };
+
+  // Cross-platform linking handlers
+  const handleStartLinking = (sourcePin: PersonalPin) => {
+    const targetPlatform = sourcePin.platform === 'twitter' ? 'nostr' : 'twitter';
+    setLinkingMode({
+      isActive: true,
+      sourcePin,
+      targetPlatform
+    });
+    // Switch to the target platform for searching
+    handlePlatformModeChange(targetPlatform);
+    setShowMentionsLookup(true);
+  };
+
+  const handleCancelLinking = () => {
+    setLinkingMode({ isActive: false });
+    // Keep modal open unless user explicitly closes it
+    // setShowMentionsLookup(false);
+  };
+
+  const handlePairProfile = async (targetMention: MentionResult) => {
+    if (!linkingMode.sourcePin || !linkingMode.isActive) return;
+
+    // Set pairing loading state
+    setLinkingMode(prev => ({ ...prev, isPairing: true }));
+
+    try {
+      if (linkingMode.isUnpairMode) {
+        // UNPAIR mode - unlink the profiles
+        if (linkingMode.sourcePin.platform === 'nostr') {
+          // Unlink Nostr profile from pin
+          const result = await mentionService.unlinkNostrProfile(linkingMode.sourcePin.id);
+          
+          if (result.success) {
+            console.log('Successfully unlinked Nostr profile from pin:', linkingMode.sourcePin.id);
+            
+            // Show success feedback
+            setSuccessMessage('Successfully unpaired profiles!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            
+            // Reset linking mode but keep modal open for continued interaction
+            setLinkingMode({ isActive: false });
+            // setShowMentionsLookup(false); // Keep modal open
+            
+            // TODO: Refresh the mention results to show updated state
+          } else {
+            console.error('Failed to unlink Nostr profile:', result.error);
+            // TODO: Show error feedback
+          }
+        } else {
+          // For Twitter pins, we update to remove the cross-platform link
+          const updateData = {
+            targetPlatform: undefined,
+            targetUsername: undefined,
+            notes: `Unlinked cross-platform mapping for ${linkingMode.sourcePin.platform} @${linkingMode.sourcePin.username}`
+          };
+
+          const result = await mentionService.updatePin(linkingMode.sourcePin.id, updateData);
+          
+          if (result.success) {
+            console.log('Successfully unlinked Twitter pin:', linkingMode.sourcePin.id);
+            
+            // Show success feedback
+            setSuccessMessage('Successfully unpaired profiles!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            
+            // Reset linking mode but keep modal open for continued interaction
+            setLinkingMode({ isActive: false });
+            // setShowMentionsLookup(false); // Keep modal open
+          } else {
+            console.error('Failed to unlink Twitter pin:', result.error);
+            // TODO: Show error feedback
+          }
+        }
+      } else {
+        // PAIR mode - link the profiles
+        if (linkingMode.sourcePin.platform === 'nostr' && targetMention.platform === 'twitter') {
+          // Link Nostr pin with Twitter profile using updatePin
+          const updateData = {
+            targetPlatform: 'twitter' as const,
+            targetUsername: targetMention.username,
+            notes: `Cross-platform link: nostr @${linkingMode.sourcePin.username} ↔ twitter @${targetMention.username}`
+          };
+
+          const result = await mentionService.updatePin(linkingMode.sourcePin.id, updateData);
+          
+          if (result.success) {
+            console.log('Successfully linked Nostr pin to Twitter profile');
+            setSuccessMessage('Successfully paired profiles!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            
+            // Update content with cross-platform pairing and close modal
+            updateContentAfterPairing(linkingMode.sourcePin, targetMention);
+            setShowMentionsLookup(false);
+          } else {
+            console.error('Failed to link Nostr pin to Twitter:', result.error);
+          }
+        } else if (linkingMode.sourcePin.platform === 'twitter' && targetMention.platform === 'nostr') {
+          // Link Twitter pin with Nostr profile using linkNostrProfile
+          const nostrMention = targetMention as NostrResult;
+          // Get npub from nostr_data or fallback to direct npub field
+          const npub = nostrMention.nostr_data?.npub || nostrMention.npub;
+          
+          console.log('Linking Twitter pin to Nostr profile:', {
+            pinId: linkingMode.sourcePin.id,
+            npub: npub,
+            nostr_data_npub: nostrMention.nostr_data?.npub,
+            direct_npub: nostrMention.npub,
+            targetMention: targetMention
+          });
+          
+          if (!npub) {
+            console.error('No npub found for Nostr mention:', targetMention);
+            return;
+          }
+          
+          const result = await mentionService.linkNostrProfile(linkingMode.sourcePin.id, npub);
+          
+          if (result.success) {
+            console.log('Successfully linked Twitter pin to Nostr profile');
+            setSuccessMessage('Successfully paired profiles!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            
+            // Update content with cross-platform pairing and close modal
+            updateContentAfterPairing(linkingMode.sourcePin, targetMention);
+            setShowMentionsLookup(false);
+          } else {
+            console.error('Failed to link Twitter pin to Nostr:', result.error);
+          }
+        }
+        
+        // Reset linking mode but keep modal open for continued interaction
+        setLinkingMode({ isActive: false });
+        // setShowMentionsLookup(false); // Keep modal open
+        
+        // TODO: Refresh the mention results to show updated state
+        // TODO: Show success feedback
+      }
+    } catch (error) {
+      console.error('Error in pair/unpair operation:', error);
+      // TODO: Show error feedback
+    } finally {
+      // Clear pairing loading state
+      setLinkingMode(prev => ({ ...prev, isPairing: false }));
+    }
+  };
+
+  const handleLinkProfile = async (mention: MentionResult) => {
+
+    if (!mention.pinId) {
+      console.error('No pinId found for mention:', mention);
+      return;
+    }
+
+    // Check if this is already linked (has cross-platform mapping)
+    const isAlreadyLinked = mention.crossPlatformMapping && (
+      (mention.platform === 'twitter' && mention.crossPlatformMapping.hasNostrMapping) ||
+      (mention.platform === 'nostr' && mention.crossPlatformMapping.hasTwitterMapping)
+    );
+
+    const targetPlatform = mention.platform === 'twitter' ? 'nostr' : 'twitter';
+
+    if (isAlreadyLinked) {
+      // Already linked - set up for UNPAIR mode
+      setLinkingMode({
+        isActive: true,
+        sourcePin: {
+          id: mention.pinId,
+          platform: mention.platform,
+          username: mention.platform === 'twitter' 
+            ? (mention as TwitterResult).username 
+            : ((mention as NostrResult).nostr_data?.npub || (mention as NostrResult).npub || 'unknown'),
+          displayName: mention.platform === 'twitter'
+            ? (mention as TwitterResult).name
+            : ((mention as NostrResult).nostr_data?.displayName || (mention as NostrResult).displayName || (mention as NostrResult).name),
+          name: mention.platform === 'twitter'
+            ? (mention as TwitterResult).name
+            : ((mention as NostrResult).nostr_data?.name || (mention as NostrResult).name),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          usageCount: 0
+        } as PersonalPin,
+        targetPlatform,
+        isUnpairMode: true
+      });
+    } else {
+      // Not linked - set up for PAIR mode
+      setLinkingMode({
+        isActive: true,
+        sourcePin: {
+          id: mention.pinId,
+          platform: mention.platform,
+          username: mention.platform === 'twitter' 
+            ? (mention as TwitterResult).username 
+            : ((mention as NostrResult).nostr_data?.npub || (mention as NostrResult).npub || 'unknown'),
+          displayName: mention.platform === 'twitter'
+            ? (mention as TwitterResult).name
+            : ((mention as NostrResult).nostr_data?.displayName || (mention as NostrResult).displayName || (mention as NostrResult).name),
+          name: mention.platform === 'twitter'
+            ? (mention as TwitterResult).name
+            : ((mention as NostrResult).nostr_data?.name || (mention as NostrResult).name),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          usageCount: 0
+        } as PersonalPin,
+        targetPlatform,
+        isUnpairMode: false
+      });
+    }
+
+    // Switch to target platform mode (keep modal open)
+    handlePlatformModeChange(targetPlatform);
+
+    // Ensure modal stays open and set search query to source username for context
+    setShowMentionsLookup(true);
+    const sourceUsername = mention.platform === 'twitter' 
+      ? (mention as TwitterResult).username 
+      : ((mention as NostrResult).nostr_data?.displayName || (mention as NostrResult).displayName || 'user');
+    setMentionSearchQuery(sourceUsername);
+    
+    // Trigger search for the source username on BOTH platforms to detect cross-platform mappings
+    if (sourceUsername.length >= 2) {
+      performMentionSearch(sourceUsername, {
+        platforms: ['twitter', 'nostr'], // Search both platforms to find cross-platform mappings
+        includePersonalPins: true,
+        includeCrossPlatformMappings: true,
+        limit: 10
+      });
+    }
+    
+
+  };
+
+  // Sync platformMode with currentMentionPlatform on initial load
+  useEffect(() => {
+    const initialMode = currentMentionPlatform === Platform.Twitter ? 'twitter' : 'nostr';
+    if (platformMode !== initialMode) {
+      setPlatformMode(initialMode);
+    }
+  }, [currentMentionPlatform, platformMode]);
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const jamieAssistTextareaRef = useRef<HTMLTextAreaElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const highlightLayerRef = useRef<HTMLDivElement>(null);
 
   // Streaming mention search hook
   const {
@@ -320,7 +785,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     error: mentionSearchError,
     streamSearch: performMentionSearch,
     clearSearch: clearMentionSearch,
-    updateResults: updateMentionResults
+    updateResults: updateMentionResults,
+    warnings: mentionSearchWarnings
   } = useStreamingMentionSearch();
 
   // Computed state for overall publishing status
@@ -914,8 +1380,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     return null;
   };
 
-  // Helper function to build final content with signature
+  // Helper function to build final content with signature and proper mention formatting
   const buildFinalContent = (baseContent: string, mediaUrl: string, platform: 'twitter' | 'nostr'): string => {
+    // First, apply platform-specific mention formatting
+    const contentWithMentions = buildFinalContentForPlatform(platform);
+    
     const signature = getUserSignature();
     const signaturePart = signature ? `\n\n${signature}` : '';
     
@@ -923,7 +1392,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     const mediaUrlPart = platform === 'nostr' ? `\n\n${mediaUrl}` : '';
     const callToActionPart = platform === 'nostr' ? `\n\nShared via https://pullthatupjamie.ai` : '';
     
-    return `${baseContent}${signaturePart}${mediaUrlPart}${callToActionPart}`;
+    return `${contentWithMentions}${signaturePart}${mediaUrlPart}${callToActionPart}`;
   };
 
   // Unified helper to build a Nostr event: NO r-tag, media URL goes in content (original behavior)
@@ -1373,18 +1842,42 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     searchTimeoutRef.current = setTimeout(() => {
       if (query.length >= 2) {
         setLastSearchQuery(query);
-        performMentionSearch(query, {
-          platforms: ['twitter', 'nostr'],
-          includePersonalPins: true,
-          includeCrossPlatformMappings: true,
-          limit: 10
-        });
+        
+        // Update platform-specific state
+        const platformKey = currentMentionPlatform === Platform.Twitter ? 'twitter' : 'nostr';
+        setPlatformSearchState(prev => ({
+          ...prev,
+          [platformKey]: { query, hasResults: false }
+        }));
+        
+        // Check if it's an npub query - if so, don't use streaming search
+        const isNpub = /^npub1[a-z0-9]{58}$/.test(query.trim());
+        if (isNpub && currentMentionPlatform === Platform.Nostr) {
+          // For npub queries, clear search results and trigger automatic lookup
+          clearMentionSearch();
+          // Don't auto-lookup here since MentionsLookupView handles it
+        } else {
+          // For regular queries, use streaming search on BOTH platforms to detect cross-platform mappings
+          performMentionSearch(query, {
+            platforms: ['twitter', 'nostr'], // Always search both platforms to find cross-platform mappings
+            includePersonalPins: true,
+            includeCrossPlatformMappings: true,
+            limit: 10
+          });
+        }
       } else {
         setLastSearchQuery('');
         clearMentionSearch();
+        
+        // Clear platform state
+        const platformKey = currentMentionPlatform === Platform.Twitter ? 'twitter' : 'nostr';
+        setPlatformSearchState(prev => ({
+          ...prev,
+          [platformKey]: { query: '', hasResults: false }
+        }));
       }
     }, 300); // 300ms debounce
-  }, [lastSearchQuery, performMentionSearch, clearMentionSearch]);
+  }, [lastSearchQuery, performMentionSearch, clearMentionSearch, currentMentionPlatform]);
 
   // Function to handle content changes and track user edits
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -1561,29 +2054,278 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     onClose(); // Close the main modal after success modal is dismissed
   };
 
+  // Helper function to detect if search query is an npub
+  const isNpubQuery = (query: string): boolean => {
+    return /^npub1[a-z0-9]{58}$/.test(query.trim());
+  };
+
   // Handler for mention selection
   const handleMentionSelect = (mention: MentionResult, platform: string) => {
+    printLog('=== MENTION SELECT START ===');
+    printLog(`Selected mention: ${JSON.stringify(mention, null, 2)}`);
+    printLog(`All mentionResults: ${JSON.stringify(mentionResults, null, 2)}`);
+    printLog(`Current mentionSearchQuery: "${mentionSearchQuery}"`);
+    printLog(`Platform parameter: "${platform}"`);
+    printLog(`mentionStartIndex: ${mentionStartIndex}`);
+    
     if (mentionStartIndex === -1) return;
     
-    // Extract the appropriate identifier based on platform
-    let mentionIdentifier: string;
+    let displayName: string;
+    let dictionaryKey: string;
+    let dictionaryEntry: any;
+    
+    // Check if user searched by npub and we're selecting a Nostr profile
+    const wasNpubSearch = isNpubQuery(mentionSearchQuery);
+    printLog(`handleMentionSelect - npub detection: searchQuery="${mentionSearchQuery}", wasNpubSearch=${wasNpubSearch}, platform=${mention.platform}`);
+    
     if (mention.platform === 'twitter') {
-      mentionIdentifier = mention.username;
+      const twitterMention = mention as TwitterResult;
+      displayName = twitterMention.username;
+      dictionaryKey = displayName;
+      
+      // Check if this mention has cross-platform mapping (Twitter + Nostr)
+      // Handle both string format (from API) and object format (from type)
+      const hasCrossPlatformMapping = 
+        (typeof twitterMention.crossPlatformMapping === 'string' && (twitterMention.crossPlatformMapping as string).includes('Nostr')) ||
+        (typeof twitterMention.crossPlatformMapping === 'object' && twitterMention.crossPlatformMapping?.hasNostrMapping);
+      
+      printLog(`Twitter crossPlatformMapping detection: raw=${JSON.stringify(twitterMention.crossPlatformMapping)}, type=${typeof twitterMention.crossPlatformMapping}, hasCrossPlatformMapping=${hasCrossPlatformMapping}`);
+      
+      if (hasCrossPlatformMapping) {
+        // For string format, try to find the linked Nostr profile from the same search results
+        let nostrNprofile = '';
+        let nostrDisplayName = displayName;
+        
+        if (typeof twitterMention.crossPlatformMapping === 'object') {
+          // Object format
+          nostrNprofile = twitterMention.crossPlatformMapping.nostrNpub ? `nostr:${twitterMention.crossPlatformMapping.nostrNpub}` : '';
+          nostrDisplayName = twitterMention.crossPlatformMapping.nostrDisplayName || displayName;
+        } else {
+          // String format - find the corresponding Nostr profile from search results
+          const linkedNostrProfile = mentionResults.find(result => 
+            result.platform === 'nostr' && 
+            result.pinId === twitterMention.pinId && // Same pinId indicates linked profiles
+            result.isPinned
+          ) as NostrResult | undefined;
+          
+          if (linkedNostrProfile) {
+            const nprofile = linkedNostrProfile.nostr_data?.nprofile || linkedNostrProfile.nprofile;
+            nostrNprofile = nprofile ? `nostr:${nprofile}` : `@${linkedNostrProfile.nostr_data?.displayName || linkedNostrProfile.displayName || displayName}`;
+            // USE THE ACTUAL NOSTR NAME, NOT THE TWITTER NAME!
+            nostrDisplayName = linkedNostrProfile.nostr_data?.displayName || linkedNostrProfile.nostr_data?.name || linkedNostrProfile.displayName || linkedNostrProfile.name || 'walker';
+            printLog(`Found linked Nostr profile: nprofile=${nprofile}, nostrNprofile=${nostrNprofile}, nostrDisplayName=${nostrDisplayName}`);
+          } else {
+            nostrNprofile = `@${displayName}`; // Fallback
+            printLog('No linked Nostr profile found, using fallback');
+          }
+        }
+        
+        dictionaryEntry = {
+          twitterHandle: `@${twitterMention.username}`,
+          nostrNprofile: nostrNprofile,
+          nostrDisplayName: nostrDisplayName,
+          platform: 'both' as const
+        };
+        
+        printLog(`Cross-platform Twitter mention detected: twitter=@${twitterMention.username}, nostr=${nostrNprofile}, displayName=${nostrDisplayName}, willPopulateBothPlatforms=true, mappingFormat=${typeof twitterMention.crossPlatformMapping}`);
+      } else {
+        // Twitter-only mention
+        dictionaryEntry = {
+          twitterHandle: `@${twitterMention.username}`,
+          platform: 'twitter' as const
+        };
+      }
     } else if (mention.platform === 'nostr') {
-      // For Nostr, use nip05 if available, otherwise use shortened npub
-      mentionIdentifier = mention.nip05 || mention.npub.slice(0, 16) + '...';
+      const nostrMention = mention as NostrResult;
+      
+      // Get effective data (prefer nostr_data from backend)
+      const npub = nostrMention.nostr_data?.npub || nostrMention.npub || (nostrMention as any).username;
+      const nprofile = nostrMention.nostr_data?.nprofile || nostrMention.nprofile;
+      const displayNameFromData = nostrMention.nostr_data?.displayName || 
+                                  nostrMention.nostr_data?.name || 
+                                  nostrMention.displayName || 
+                                  nostrMention.name ||
+                                  'Unknown';
+      
+      // For npub searches, use display name in textarea but keep npub in dictionary key for lookup
+      if (wasNpubSearch && mention.platform === 'nostr') {
+        displayName = displayNameFromData; // Use human-readable name for display
+        dictionaryKey = mentionSearchQuery; // Use the npub as dictionary key since that's what user typed
+        console.log('NPub search detected - using display name for UI:', {
+          npub: mentionSearchQuery,
+          displayName: displayNameFromData,
+          dictionaryKey: mentionSearchQuery
+        });
+      } else {
+        displayName = displayNameFromData;
+        dictionaryKey = displayName;
+      }
+      
+      // Check if this mention has cross-platform mapping (Nostr + Twitter)
+      // Handle both string format (from API) and object format (from type)
+      const hasCrossPlatformMapping = 
+        (typeof nostrMention.crossPlatformMapping === 'string' && (nostrMention.crossPlatformMapping as string).includes('Twitter')) ||
+        (typeof nostrMention.crossPlatformMapping === 'object' && nostrMention.crossPlatformMapping?.hasTwitterMapping);
+      
+      printLog(`Nostr crossPlatformMapping detection: raw=${JSON.stringify(nostrMention.crossPlatformMapping)}, type=${typeof nostrMention.crossPlatformMapping}, hasCrossPlatformMapping=${hasCrossPlatformMapping}`);
+      
+      if (hasCrossPlatformMapping) {
+        // For string format, try to find the linked Twitter profile from the same search results
+        let twitterHandle = '';
+        
+        if (typeof nostrMention.crossPlatformMapping === 'object') {
+          // Object format
+          twitterHandle = `@${nostrMention.crossPlatformMapping.twitterUsername}`;
+        } else {
+          // String format - find the corresponding Twitter profile from search results
+          const linkedTwitterProfile = mentionResults.find(result => 
+            result.platform === 'twitter' && 
+            result.pinId === nostrMention.pinId && // Same pinId indicates linked profiles
+            result.isPinned
+          ) as TwitterResult | undefined;
+          
+          if (linkedTwitterProfile) {
+            twitterHandle = `@${linkedTwitterProfile.username}`;
+            printLog(`Found linked Twitter profile: username=${linkedTwitterProfile.username}, twitterHandle=${twitterHandle}`);
+          } else {
+            // Fallback: extract from string format if possible
+            const match = (nostrMention.crossPlatformMapping as string | undefined)?.match(/@(\w+)/);
+            twitterHandle = match ? `@${match[1]}` : `@${displayNameFromData}`;
+            printLog('No linked Twitter profile found, using fallback extraction');
+          }
+        }
+        
+        dictionaryEntry = {
+          twitterHandle: twitterHandle,
+          nostrNprofile: nprofile ? `nostr:${nprofile}` : (npub ? `nostr:${npub}` : `@${displayNameFromData}`),
+          nostrDisplayName: displayNameFromData,
+          platform: 'both' as const
+        };
+        
+        console.log('Cross-platform Nostr mention detected:', {
+          twitter: twitterHandle,
+          nostr: nprofile ? `nostr:${nprofile}` : `nostr:${npub}`,
+          displayName: displayNameFromData,
+          wasNpubSearch,
+          willPopulateBothPlatforms: true,
+          mappingFormat: typeof nostrMention.crossPlatformMapping
+        });
+      } else {
+        // Nostr-only mention
+        dictionaryEntry = {
+          nostrNprofile: nprofile ? `nostr:${nprofile}` : (npub ? `nostr:${npub}` : `@${displayNameFromData}`),
+          nostrDisplayName: displayNameFromData,
+          platform: 'nostr' as const
+        };
+      }
+      
+      // For npub searches, also add an entry for the display name to handle future searches by name
+      if (wasNpubSearch && displayNameFromData !== mentionSearchQuery) {
+        console.log('Adding secondary dictionary entry for display name:', displayNameFromData);
+      }
     } else {
-      mentionIdentifier = 'unknown';
+      displayName = 'unknown';
+      dictionaryKey = 'unknown';
+      dictionaryEntry = {
+        twitterHandle: '@unknown',
+        platform: 'twitter' as const
+      };
     }
     
-    const mentionText = `@${mentionIdentifier} `; // Add space after identifier
+    // Update the mention dictionary
+    printLog(`=== UPDATING MENTION DICTIONARY ===`);
+    printLog(`dictionaryKey: "${dictionaryKey}"`);
+    printLog(`dictionaryEntry: ${JSON.stringify(dictionaryEntry, null, 2)}`);
+    
+    setMentionDictionary(prev => {
+      const newDict = {
+        ...prev,
+        [dictionaryKey]: dictionaryEntry
+      };
+      
+      // Add bidirectional entries for cross-platform mentions
+      if (dictionaryEntry.platform === 'both') {
+        const twitterUsername = dictionaryEntry.twitterHandle?.replace('@', '');
+        const nostrDisplayName = dictionaryEntry.nostrDisplayName;
+        
+        if (twitterUsername && twitterUsername !== dictionaryKey) {
+          newDict[twitterUsername] = dictionaryEntry;
+        }
+        if (nostrDisplayName && nostrDisplayName !== dictionaryKey) {
+          newDict[nostrDisplayName] = dictionaryEntry;
+        }
+      }
+      
+      return newDict;
+    });
+    
+    // For cross-platform mentions, add nprofile → display name mapping
+    if (dictionaryEntry.platform === 'both' && dictionaryEntry.nostrNprofile && dictionaryEntry.nostrDisplayName) {
+      setNprofileToDisplayName(prev => ({
+        ...prev,
+        [dictionaryEntry.nostrNprofile]: dictionaryEntry.nostrDisplayName
+      }));
+      printLog(`Added nprofile mapping: "${dictionaryEntry.nostrNprofile}" -> "${dictionaryEntry.nostrDisplayName}"`);
+    }
+    
+    // For npub searches, also add the npub key mapping
+    if (wasNpubSearch && mention.platform === 'nostr' && displayName !== mentionSearchQuery) {
+      setMentionDictionary(prev => ({
+        ...prev,
+        [mentionSearchQuery]: dictionaryEntry
+      }));
+    }
+    
+    // Determine display text based on current platform mode
+    let currentDisplayName: string;
+    if (dictionaryEntry.platform === 'both') {
+      // Cross-platform mention: show appropriate name based on mode
+      currentDisplayName = platformMode === 'twitter' ? 
+        dictionaryEntry.twitterHandle.replace('@', '') : 
+        dictionaryEntry.nostrDisplayName;
+    } else if (dictionaryEntry.platform === 'twitter') {
+      // Twitter-only: always show Twitter handle
+      currentDisplayName = dictionaryEntry.twitterHandle.replace('@', '');
+    } else {
+      // Nostr-only: always show Nostr display name
+      currentDisplayName = dictionaryEntry.nostrDisplayName;
+    }
+    
+    // Create the display text for the textarea using backticks
+    const mentionText = `\`@${currentDisplayName}\` `;
     
     // Replace the @ and search text with the selected mention
+    // For npub searches, we need to replace the entire npub, not just @npub
+    let replaceLength: number;
+    if (wasNpubSearch && mention.platform === 'nostr') {
+      // Replace @ + the entire npub (user typed npub but we detected @ + npub)
+      replaceLength = 1 + mentionSearchQuery.length;
+      printLog(`NPub replacement - replacing @ + npub: searchQuery="${mentionSearchQuery}", replaceLength=${replaceLength}, newDisplayText="${mentionText}"`);
+    } else {
+      // Normal case: replace @ + search query
+      replaceLength = 1 + mentionSearchQuery.length;
+    }
+    
     const beforeMention = content.substring(0, mentionStartIndex);
-    const afterMention = content.substring(mentionStartIndex + 1 + mentionSearchQuery.length);
+    const afterMention = content.substring(mentionStartIndex + replaceLength);
     const newContent = beforeMention + mentionText + afterMention;
     
     setContent(newContent);
+    
+    // If this is a cross-platform mention, immediately update platform-specific texts
+    if (dictionaryEntry.platform === 'both') {
+      printLog('Cross-platform mention selected - triggering platform text updates');
+      // Force immediate re-evaluation of platform texts using the new content
+      setTimeout(() => {
+        const newTwitterText = buildPlatformTextWithContent(newContent, 'twitter');
+        const newNostrText = buildPlatformTextWithContent(newContent, 'nostr');
+        setTwitterText(newTwitterText);
+        setNostrText(newNostrText);
+        printLog(`Platform texts updated after cross-platform mention: twitterText="${newTwitterText}", nostrText="${newNostrText}"`);
+      }, 100); // Small delay to ensure state updates have propagated
+    }
+    
+    printLog('=== MENTION SELECT END ===');
     
     // Calculate cursor position after insertion
     const cursorPosition = mentionStartIndex + mentionText.length;
@@ -1605,7 +2347,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       }
     }, 10);
     
-    printLog(`Selected mention: @${mentionIdentifier} on ${platform}`);
+    console.log('Mention Dictionary Updated:', {
+      key: dictionaryKey,
+      entry: dictionaryEntry,
+      currentPlatformMode: platformMode,
+      displayName: currentDisplayName,
+      fullDictionary: { ...mentionDictionary, [dictionaryKey]: dictionaryEntry }
+    });
+    
+    printLog(`Selected mention: @${currentDisplayName} (${dictionaryEntry.platform}) - Dictionary updated`);
   };
 
   // Handler to close mentions popup
@@ -1614,6 +2364,332 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setMentionSearchQuery('');
     setMentionStartIndex(-1);
     setSelectedMentionIndex(-1);
+  };
+
+  // Handler for platform changes in mention lookup
+  const handleMentionPlatformChange = (platform: Platform) => {
+    // Update both the current mention platform and the unified platform mode
+    const platformKey = platform === Platform.Twitter ? 'twitter' : 'nostr';
+    handlePlatformModeChange(platformKey);
+    
+    // Update search query to show platform-specific state
+    const currentState = platformSearchState[platformKey];
+    if (currentState.hasResults) {
+      // If this platform has previous results, show that query
+      setMentionSearchQuery(currentState.query);
+    } else {
+      // Otherwise, clear to show just @
+      setMentionSearchQuery('');
+    }
+    
+    // Re-trigger search if we have a query
+    if (currentState.query && currentState.query.length >= 2) {
+      setLastSearchQuery(currentState.query);
+      
+      // Check if it's an npub query
+      const isNpub = /^npub1[a-z0-9]{58}$/.test(currentState.query.trim());
+      if (isNpub && platform === Platform.Nostr) {
+        // For npub queries, clear search results and let MentionsLookupView auto-lookup
+        clearMentionSearch();
+      } else {
+        // For regular queries, use streaming search on BOTH platforms to detect cross-platform mappings
+        performMentionSearch(currentState.query, {
+          platforms: ['twitter', 'nostr'], // Always search both platforms to find cross-platform mappings
+          includePersonalPins: true,
+          includeCrossPlatformMappings: true,
+          limit: 10
+        });
+      }
+    } else {
+      clearMentionSearch();
+    }
+  };
+
+  // Track when mention results change to update platform state
+  useEffect(() => {
+    if (mentionResults.length > 0 && mentionSearchQuery) {
+      const platformKey = currentMentionPlatform === Platform.Twitter ? 'twitter' : 'nostr';
+      setPlatformSearchState(prev => ({
+        ...prev,
+        [platformKey]: { 
+          query: mentionSearchQuery, 
+          hasResults: true 
+        }
+      }));
+    }
+  }, [mentionResults, mentionSearchQuery, currentMentionPlatform]);
+
+  // Update platform-specific text variables when content or dictionary changes
+  useEffect(() => {
+    const newTwitterText = buildPlatformText('twitter');
+    const newNostrText = buildPlatformText('nostr');
+    
+    console.log('Text Transformation Update:', {
+      content,
+      dictionary: mentionDictionary,
+      twitterText: newTwitterText,
+      nostrText: newNostrText
+    });
+    
+    setTwitterText(newTwitterText);
+    setNostrText(newNostrText);
+  }, [content, mentionDictionary]);
+
+  // Update content display when platform mode changes (for cross-platform mentions)
+  useEffect(() => {
+    const updatedContent = updateContentForPlatformMode();
+    if (updatedContent !== content) {
+      console.log('Platform mode changed - updating content:', updatedContent);
+      setContent(updatedContent);
+    }
+  }, [platformMode]); // Only depend on platformMode to avoid infinite loops
+
+  // Function to get highlighted content for display overlay using backtick parsing
+  const getHighlightedContent = (): string => {
+    if (!content) return '';
+    
+    // console.log('getHighlightedContent - processing content:', content);
+    // console.log('getHighlightedContent - selectedMentions:', selectedMentions);
+    
+    // Split content into parts and handle each part
+    const parts: string[] = [];
+    let lastIndex = 0;
+    
+    // Parse content to find mentions using backticks `@username` format
+    const mentionRegex = /`(@[^`]+)`/g;
+    let match;
+    
+    while ((match = mentionRegex.exec(content)) !== null) {
+      const fullMatch = match[0]; // `@username`
+      const mentionText = match[1]; // @username
+      
+      console.log('Found mention:', fullMatch, 'extracted:', mentionText);
+      
+      // Add text before the mention (escaped)
+      if (match.index > lastIndex) {
+        const beforeText = content.substring(lastIndex, match.index);
+        parts.push(escapeHtml(beforeText));
+      }
+      
+      // Find the platform data for this mention
+      const mentionData = selectedMentions.find(m => 
+        m.displayText === mentionText || m.displayText === mentionText.replace('@', '')
+      );
+      
+      const platform = mentionData?.platform || 'twitter';
+      const highlightColor = platform === 'nostr' 
+        ? 'rgba(139, 92, 246, 0.5)' 
+        : 'rgba(29, 161, 242, 0.5)';
+      
+      console.log('Mention platform:', platform, 'color:', highlightColor);
+      
+      // Add highlighted mention (unescaped HTML)
+      const highlightedSpan = `<mark style="background-color: ${highlightColor}; color: white; border-radius: 4px; padding: 1px 3px; font-weight: 500; margin: 0;">${escapeHtml(mentionText)}</mark>`;
+      parts.push(highlightedSpan);
+      
+      lastIndex = match.index + fullMatch.length;
+    }
+    
+    // Add remaining text after the last mention
+    if (lastIndex < content.length) {
+      const remainingText = content.substring(lastIndex);
+      parts.push(escapeHtml(remainingText));
+    }
+    
+    // Join all parts and convert newlines and spaces
+    const result = parts.join('').replace(/\n/g, '<br/>').replace(/ /g, '&nbsp;');
+    
+    // console.log('getHighlightedContent result:', result);
+    return result;
+  };
+
+  // Helper function to escape HTML
+  const escapeHtml = (text: string): string => {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  };
+
+  // Handle clicks on textarea to detect mention clicks and open lookup
+  const handleTextareaClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    const textarea = e.currentTarget;
+    const cursorPosition = textarea.selectionStart;
+    
+    // Check if click is on a mention
+    for (const mention of selectedMentions) {
+      const mentionStart = content.indexOf(mention.displayText);
+      const mentionEnd = mentionStart + mention.displayText.length;
+      
+      if (cursorPosition >= mentionStart && cursorPosition <= mentionEnd) {
+        // Click was on a mention - open lookup view with this mention's platform
+        const mentionPlatform = mention.platform === 'twitter' ? Platform.Twitter : Platform.Nostr;
+        setCurrentMentionPlatform(mentionPlatform);
+        setMentionStartIndex(mentionStart);
+        setMentionSearchQuery(mention.displayText.replace('@', ''));
+        setShowMentionsLookup(true);
+        
+        // Set cursor position
+        setTimeout(() => {
+          textarea.setSelectionRange(mentionEnd, mentionEnd);
+        }, 10);
+        
+        return;
+      }
+    }
+    
+    // Normal click - check for @ symbol to trigger mention search
+    const beforeCursor = content.substring(0, cursorPosition);
+    const lastAtIndex = beforeCursor.lastIndexOf('@');
+    
+    if (lastAtIndex !== -1) {
+      const textAfterAt = content.substring(lastAtIndex + 1, cursorPosition);
+      if (textAfterAt.length >= 0 && !textAfterAt.includes(' ')) {
+        // Start mention search
+        setMentionStartIndex(lastAtIndex);
+        setMentionSearchQuery(textAfterAt);
+        setShowMentionsLookup(true);
+      }
+    }
+  };
+
+  // Function to build platform-specific text using mention dictionary
+  const buildPlatformText = (targetPlatform: 'twitter' | 'nostr'): string => {
+    return buildPlatformTextWithContent(content, targetPlatform);
+  };
+
+  // Helper function that takes content as a parameter (for immediate updates)
+  const buildPlatformTextWithContent = (sourceContent: string, targetPlatform: 'twitter' | 'nostr'): string => {
+    if (!sourceContent) return '';
+    
+    // Parse content to find mentions using backticks `@username` format
+    const mentionRegex = /`(@[^`]+)`/g;
+    let processedContent = sourceContent;
+    let match;
+    const replacements: Array<{ original: string; replacement: string }> = [];
+    
+    // Find all mentions and prepare replacements using dictionary
+    while ((match = mentionRegex.exec(sourceContent)) !== null) {
+      const fullMatch = match[0]; // `@username`
+      const mentionText = match[1].replace('@', ''); // username (clean)
+      
+      // Look up in mention dictionary
+      const dictionaryEntry = mentionDictionary[mentionText];
+      
+      if (dictionaryEntry) {
+        let replacementText: string;
+        
+        if (targetPlatform === 'twitter') {
+          // For Twitter posting
+          if (dictionaryEntry.platform === 'twitter' || dictionaryEntry.platform === 'both') {
+            replacementText = dictionaryEntry.twitterHandle || `@${mentionText}`;
+          } else {
+            // Nostr-only mention: use display name as plain text
+            replacementText = `@${dictionaryEntry.nostrDisplayName || mentionText}`;
+          }
+        } else {
+          // For Nostr posting
+          if (dictionaryEntry.platform === 'nostr' || dictionaryEntry.platform === 'both') {
+            replacementText = dictionaryEntry.nostrNprofile || `@${mentionText}`;
+          } else {
+            // Twitter-only mention: use Twitter handle as plain text
+            replacementText = dictionaryEntry.twitterHandle || `@${mentionText}`;
+          }
+        }
+        
+        replacements.push({ original: fullMatch, replacement: replacementText });
+      } else {
+        // If no dictionary entry found, just remove backticks
+        replacements.push({ original: fullMatch, replacement: `@${mentionText}` });
+      }
+    }
+    
+    // Apply all replacements
+    for (const { original, replacement } of replacements) {
+      processedContent = processedContent.replace(original, replacement);
+    }
+    
+    return processedContent;
+  };
+  
+  // Function to update content display based on platform mode
+  const updateContentForPlatformMode = (): string => {
+    if (!content) return '';
+    
+    if (platformMode === 'nostr') {
+      // Twitter→Nostr: Use nostrText to find nprofiles and map back to display names
+      const nprofileRegex = /nostr:(nprofile[a-z0-9]+)/g;
+      let match;
+      const nprofileMatches: string[] = [];
+      
+      while ((match = nprofileRegex.exec(nostrText)) !== null) {
+        nprofileMatches.push(`nostr:${match[1]}`);
+      }
+      
+      if (nprofileMatches.length > 0) {
+        let updatedContent = content;
+        const mentionRegex = /`(@[^`]+)`/g;
+        let mentionMatch;
+        let mentionIndex = 0;
+        
+        while ((mentionMatch = mentionRegex.exec(content)) !== null) {
+          if (mentionIndex < nprofileMatches.length) {
+            const nprofile = nprofileMatches[mentionIndex];
+            const displayName = nprofileToDisplayName[nprofile];
+            
+            if (displayName) {
+              updatedContent = updatedContent.replace(mentionMatch[0], `\`@${displayName}\``);
+              printLog(`Twitter→Nostr: Mapped ${nprofile} -> @${displayName}`);
+            }
+            mentionIndex++;
+          }
+        }
+        
+        return updatedContent;
+      }
+    }
+    
+    // Nostr→Twitter: Use existing dictionary logic
+    const mentionRegex = /`(@[^`]+)`/g;
+    let updatedContent = content;
+    let match;
+    const replacements: Array<{ original: string; replacement: string }> = [];
+    
+    while ((match = mentionRegex.exec(content)) !== null) {
+      const fullMatch = match[0]; // `@username`
+      const mentionText = match[1].replace('@', ''); // username (clean)
+      
+      // Look up in mention dictionary
+      const dictionaryEntry = mentionDictionary[mentionText];
+      
+      if (dictionaryEntry && dictionaryEntry.platform === 'both') {
+        // Cross-platform mention: update display based on current mode
+        const newDisplayName = platformMode === 'twitter' ? 
+          dictionaryEntry.twitterHandle?.replace('@', '') : 
+          dictionaryEntry.nostrDisplayName;
+        
+        if (newDisplayName && newDisplayName !== mentionText) {
+          replacements.push({ 
+            original: fullMatch, 
+            replacement: `\`@${newDisplayName}\`` 
+          });
+        }
+      }
+    }
+    
+    // Apply replacements
+    for (const { original, replacement } of replacements) {
+      updatedContent = updatedContent.replace(original, replacement);
+    }
+    
+    return updatedContent;
+  };
+  
+  // Function to build final content with proper mention formatting for specific platform
+  const buildFinalContentForPlatform = (targetPlatform: 'twitter' | 'nostr'): string => {
+    return buildPlatformText(targetPlatform);
   };
 
   // Handler for scheduled slots changes
@@ -1873,15 +2949,115 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         {!isSchedulingMode && (
           <div className="relative">
+            {/* Backdrop container for highlighting */}
+            <div 
+              className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none"
+              style={{ 
+                height: "120px", 
+                minHeight: "100px",
+                zIndex: 1
+              }}
+            >
+              {/* Background layer */}
+              <div 
+                className="absolute inset-0 bg-gray-900 border border-gray-700 rounded-xl"
+              />
+              
+              {/* Highlighted content layer */}
+              <div 
+                ref={highlightLayerRef}
+                className="absolute inset-0 p-3 sm:p-4 text-base whitespace-pre-wrap break-words overflow-hidden"
+                style={{ 
+                  height: "120px", 
+                  minHeight: "100px",
+                  lineHeight: '1.5',
+                  fontFamily: 'inherit',
+                  fontSize: 'inherit',
+                  color: 'transparent'
+                }}
+                dangerouslySetInnerHTML={{ __html: getHighlightedContent() }}
+              />
+            </div>
+            
             <textarea
               ref={textareaRef}
               value={content}
               onChange={handleContentChange}
               onKeyDown={handleTextareaKeyDown}
-              className="w-full bg-gray-900 text-white border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none"
+              onClick={handleTextareaClick}
+              onScroll={(e) => {
+                // Synchronize scroll position with highlight layer
+                if (highlightLayerRef.current) {
+                  const target = e.target as HTMLTextAreaElement;
+                  highlightLayerRef.current.scrollTop = target.scrollTop;
+                  highlightLayerRef.current.scrollLeft = target.scrollLeft;
+                }
+              }}
+              className="relative w-full border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none text-white"
               placeholder={`Write about this ${itemName}...`}
-              style={{ resize: "none", height: "120px", minHeight: "100px" }}
+              style={{ 
+                resize: "none", 
+                height: "120px", 
+                minHeight: "100px",
+                background: 'transparent',
+                color: 'rgba(255, 255, 255, 0.9)',
+                zIndex: 2,
+                lineHeight: '1.5'
+              }}
             />
+            
+            {/* Mode Switcher Toggle - Bottom Right Corner */}
+            <div className="absolute bottom-3 right-3 z-10">
+              <button
+                onClick={() => handlePlatformModeChange(platformMode === 'twitter' ? 'nostr' : 'twitter')}
+                className={`relative w-16 h-8 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 hover:scale-105 ${
+                  platformMode === 'twitter' 
+                    ? 'bg-blue-500 hover:bg-blue-400 focus:ring-blue-500' 
+                    : 'bg-purple-500 hover:bg-purple-400 focus:ring-purple-500'
+                }`}
+                title={`Currently: ${platformMode === 'twitter' ? 'Twitter' : 'Nostr'} mode - Click to switch to ${platformMode === 'twitter' ? 'Nostr' : 'Twitter'} mode`}
+              >
+                {/* Track background with platform icons */}
+                <div className="absolute inset-0 flex items-center justify-between px-2">
+                  <Twitter 
+                    className={`w-3 h-3 transition-opacity duration-300 ${
+                      platformMode === 'twitter' ? 'text-blue-500 opacity-100' : 'text-white opacity-0'
+                    }`} 
+                  />
+                  <div 
+                    className={`w-3 h-3 transition-opacity duration-300 ${
+                      platformMode === 'nostr' ? 'opacity-100' : 'opacity-0'
+                    }`}
+                    style={{
+                      backgroundColor: '#8B5CF6',
+                      mask: 'url(/nostr-logo-square.png) center/contain no-repeat',
+                      WebkitMask: 'url(/nostr-logo-square.png) center/contain no-repeat'
+                    }}
+                  />
+                </div>
+                
+                {/* Sliding thumb */}
+                <div
+                  className={`absolute top-1 w-6 h-6 bg-black rounded-full shadow-lg transform transition-all duration-300 ease-in-out flex items-center justify-center ${
+                    platformMode === 'twitter' ? 'translate-x-1' : 'translate-x-9'
+                  }`}
+                >
+                  {/* Active icon in thumb */}
+                  {platformMode === 'twitter' ? (
+                    <Twitter className="w-3 h-3 text-blue-500" />
+                  ) : (
+                    <div 
+                      className="w-3 h-3"
+                      style={{
+                        backgroundColor: '#8B5CF6',
+                        mask: 'url(/nostr-logo-square.png) center/contain no-repeat',
+                        WebkitMask: 'url(/nostr-logo-square.png) center/contain no-repeat'
+                      }}
+                    />
+                  )}
+                </div>
+              </button>
+            </div>
           
                   {/* Mentions Lookup Overlay */}
         {showMentionsLookup && (
@@ -1905,7 +3081,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   </div>
                 )}
                 
-                {/* Error Display */}
+                {/* Warning Display for Rate Limits/Partial Failures */}
+                {Object.keys(mentionSearchWarnings).length > 0 && (
+                  <div className="mb-2 px-2 py-1 bg-yellow-900/30 border border-yellow-700 rounded text-xs">
+                    {Object.entries(mentionSearchWarnings).map(([source, warning]) => (
+                      <div key={source} className="text-yellow-300 mb-1 last:mb-0">
+                        <span className="font-semibold capitalize">{source}:</span> {warning}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Error Display for Complete Failures */}
                 {mentionSearchError && (
                   <div className="mb-2 px-2 py-1 bg-red-900/30 border border-red-800 rounded text-xs text-red-300">
                     {mentionSearchError}
@@ -1922,9 +3109,28 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   onMentionResultsChange={updateMentionResults}
                   isLoading={mentionSearchLoading}
                   error={mentionSearchError}
+                  onPlatformChange={handleMentionPlatformChange}
+                  initialPlatform={currentMentionPlatform}
+                  linkingMode={linkingMode}
+                  onPairProfile={handlePairProfile}
+                  onCancelLinking={handleCancelLinking}
+                  onLinkProfile={handleLinkProfile}
+                  onMentionPinned={handleMentionPinned}
                 />
               </div>
             )}
+          </div>
+        )}
+
+        {/* Success Notification */}
+        {successMessage && (
+          <div className="fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center space-x-2">
+            <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+              <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <span className="text-sm">{successMessage}</span>
           </div>
         )}
 
@@ -1932,6 +3138,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         <MentionPinManagement
           isOpen={showPinManagement}
           onClose={() => setShowPinManagement(false)}
+          onStartLinking={handleStartLinking}
         />
           </div>
         )}
