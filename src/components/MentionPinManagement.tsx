@@ -107,7 +107,8 @@ const MentionPinManagement: React.FC<MentionPinManagementProps> = ({
         return twitterData.profile_image_url;
       } else {
         const nostrData = pin.profileData as NostrProfileData;
-        return nostrData.picture;
+        // Use profile_image_url if available (mapped field), otherwise fallback to picture
+        return nostrData.profile_image_url || nostrData.picture;
       }
     }
     return null;

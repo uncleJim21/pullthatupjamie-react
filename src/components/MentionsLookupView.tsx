@@ -102,6 +102,27 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
     e.stopPropagation();
     const mentionKey = `${mention.platform}-${mention.platform === 'twitter' ? mention.username : mention.npub}`;
     setPinningStates(prev => ({ ...prev, [mentionKey]: true }));
+    
+    // Debug: Log mention data being pinned
+    console.log('Pinning mention data:', {
+      platform: mention.platform,
+      npub: mention.platform === 'nostr' ? mention.npub : undefined,
+      nprofile: mention.platform === 'nostr' ? mention.nprofile : undefined,
+      picture: mention.platform === 'nostr' ? mention.picture : undefined,
+      profile_image_url: mention.platform === 'nostr' ? mention.profile_image_url : undefined,
+      imageUrlPriority: mention.platform === 'nostr' ? {
+        fromResult: mention.profile_image_url,
+        fromNostrData: mention.nostr_data?.profile_image_url,
+        fromNostrDataPicture: mention.nostr_data?.picture,
+        fromResultPicture: mention.picture
+      } : undefined,
+      willBeMappedTo: mention.platform === 'nostr' ? {
+        profile_image_url: mention.profile_image_url || mention.picture, // Updated mapping logic
+        nprofile: mention.nprofile
+      } : undefined,
+      fullMention: mention
+    });
+    
     try {
       const result = await mentionService.togglePin(mention);
               if (result.success) {
@@ -152,7 +173,7 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
         const nostrResult: NostrResult = {
           platform: 'nostr',
           npub: result.profile.npub,
-          nprofile: result.profile.nprofile,
+          nprofile: result.profile.nprofile, // This is crucial for proper mentions!
           pubkey: result.profile.pubkey,
           displayName: result.profile.displayName || result.profile.name,
           name: result.profile.name,
@@ -293,9 +314,13 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
   // Helper to get effective profile data (prefer nostr_data from backend)
   const getEffectiveNostrData = (result: NostrResult) => {
     const nostrData = result.nostr_data;
+    // Priority: profile_image_url (from API/DB) > picture (from nostr_data) > picture (from result)
+    const imageUrl = result.profile_image_url || nostrData?.profile_image_url || nostrData?.picture || result.picture;
+    
     return {
       displayName: nostrData?.displayName || nostrData?.name || result.displayName || result.name,
-      picture: nostrData?.picture || result.picture,
+      picture: imageUrl, // Use the best available image URL
+      profile_image_url: imageUrl, // Keep both for compatibility
       nip05: nostrData?.nip05 || result.nip05,
       npub: nostrData?.npub || result.npub,
       nprofile: nostrData?.nprofile || result.nprofile

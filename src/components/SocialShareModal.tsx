@@ -320,7 +320,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   });
   const [currentMentionPlatform, setCurrentMentionPlatform] = useState<Platform>(Platform.Twitter);
   
-  // Track selected mentions for proper formatting during posting
+  // Legacy: keeping for compatibility during transition
   const [selectedMentions, setSelectedMentions] = useState<Array<{
     displayText: string;
     actualText: string;
@@ -334,6 +334,14 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Separate text variables for each platform
   const [twitterText, setTwitterText] = useState<string>('');
   const [nostrText, setNostrText] = useState<string>('');
+  
+  // Mention dictionary: maps display name to posting format and metadata
+  const [mentionDictionary, setMentionDictionary] = useState<{[displayName: string]: {
+    twitterHandle?: string;      // @username for Twitter
+    nostrNprofile?: string;      // nostr:nprofile... for Nostr
+    nostrDisplayName?: string;   // Human readable name for Nostr
+    platform: 'twitter' | 'nostr' | 'both';  // Which platforms this mention supports
+  }}>({});
   
   // Unified platform mode handler
   const handlePlatformModeChange = (newMode: 'twitter' | 'nostr') => {
@@ -1634,19 +1642,37 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const handleMentionSelect = (mention: MentionResult, platform: string) => {
     if (mentionStartIndex === -1) return;
     
-    // Extract the appropriate identifier and actual posting text based on platform
     let displayName: string;
-    let actualPostingText: string;
+    let dictionaryKey: string;
+    let dictionaryEntry: any;
     
     if (mention.platform === 'twitter') {
       const twitterMention = mention as TwitterResult;
       displayName = twitterMention.username;
-      actualPostingText = `@${twitterMention.username}`;
+      dictionaryKey = displayName;
+      
+      // Check if this mention has cross-platform mapping (Twitter + Nostr)
+      if (twitterMention.crossPlatformMapping?.hasNostrMapping) {
+        // Ensure we use nprofile format for cross-platform mapping
+        const nostrNprofile = twitterMention.crossPlatformMapping.nostrNprofile || 
+                             (twitterMention.crossPlatformMapping.nostrNpub ? `nostr:${twitterMention.crossPlatformMapping.nostrNpub}` : '');
+        dictionaryEntry = {
+          twitterHandle: `@${twitterMention.username}`,
+          nostrNprofile: nostrNprofile,
+          nostrDisplayName: twitterMention.crossPlatformMapping.nostrDisplayName || displayName,
+          platform: 'both' as const
+        };
+      } else {
+        // Twitter-only mention
+        dictionaryEntry = {
+          twitterHandle: `@${twitterMention.username}`,
+          platform: 'twitter' as const
+        };
+      }
     } else if (mention.platform === 'nostr') {
       const nostrMention = mention as NostrResult;
       
       // Get effective data (prefer nostr_data from backend)
-      // Note: username field might contain npub for backend results
       const npub = nostrMention.nostr_data?.npub || nostrMention.npub || (nostrMention as any).username;
       const nprofile = nostrMention.nostr_data?.nprofile || nostrMention.nprofile;
       const displayNameFromData = nostrMention.nostr_data?.displayName || 
@@ -1654,47 +1680,63 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                                   nostrMention.displayName || 
                                   nostrMention.name ||
                                   'Unknown';
-      const nip05 = nostrMention.nostr_data?.nip05 || nostrMention.nip05;
       
-      // For display in the textarea: show the name
       displayName = displayNameFromData;
+      dictionaryKey = displayName;
       
-      // For actual posting: use nprofile format for Nostr
-      if (nprofile) {
-        actualPostingText = `nostr:${nprofile}`;
-      } else if (npub) {
-        // Fallback to npub if no nprofile available
-        actualPostingText = `nostr:${npub}`;
+      // Check if this mention has cross-platform mapping (Nostr + Twitter)
+      if (nostrMention.crossPlatformMapping?.hasTwitterMapping) {
+        dictionaryEntry = {
+          twitterHandle: `@${nostrMention.crossPlatformMapping.twitterUsername}`,
+          nostrNprofile: nprofile ? `nostr:${nprofile}` : (npub ? `nostr:${npub}` : `@${displayNameFromData}`),
+          nostrDisplayName: displayNameFromData,
+          platform: 'both' as const
+        };
       } else {
-        // Last resort fallback
-        actualPostingText = `@${displayNameFromData}`;
+        // Nostr-only mention
+        dictionaryEntry = {
+          nostrNprofile: nprofile ? `nostr:${nprofile}` : (npub ? `nostr:${npub}` : `@${displayNameFromData}`),
+          nostrDisplayName: displayNameFromData,
+          platform: 'nostr' as const
+        };
       }
     } else {
       displayName = 'unknown';
-      actualPostingText = '@unknown';
+      dictionaryKey = 'unknown';
+      dictionaryEntry = {
+        twitterHandle: '@unknown',
+        platform: 'twitter' as const
+      };
     }
     
-    // Create the display text for the textarea using backticks for mentions
-    const mentionText = `\`@${displayName}\` `;
+    // Update the mention dictionary
+    setMentionDictionary(prev => ({
+      ...prev,
+      [dictionaryKey]: dictionaryEntry
+    }));
+    
+    // Determine display text based on current platform mode
+    let currentDisplayName: string;
+    if (dictionaryEntry.platform === 'both') {
+      // Cross-platform mention: show appropriate name based on mode
+      currentDisplayName = platformMode === 'twitter' ? 
+        dictionaryEntry.twitterHandle.replace('@', '') : 
+        dictionaryEntry.nostrDisplayName;
+    } else if (dictionaryEntry.platform === 'twitter') {
+      // Twitter-only: always show Twitter handle
+      currentDisplayName = dictionaryEntry.twitterHandle.replace('@', '');
+    } else {
+      // Nostr-only: always show Nostr display name
+      currentDisplayName = dictionaryEntry.nostrDisplayName;
+    }
+    
+    // Create the display text for the textarea using backticks
+    const mentionText = `\`@${currentDisplayName}\` `;
     
     // Replace the @ and search text with the selected mention
     const beforeMention = content.substring(0, mentionStartIndex);
     const afterMention = content.substring(mentionStartIndex + 1 + mentionSearchQuery.length);
     const newContent = beforeMention + mentionText + afterMention;
-    
-    // Store the mention data for proper formatting during posting
-    const newMention = {
-      displayText: `@${displayName}`, // Store without backticks for lookup
-      actualText: actualPostingText,
-      platform: mention.platform,
-      position: mentionStartIndex
-    };
-    
-    // Update selected mentions (remove any existing mention at the same position and add new one)
-    setSelectedMentions(prev => {
-      const filtered = prev.filter(m => m.position !== mentionStartIndex);
-      return [...filtered, newMention].sort((a, b) => a.position - b.position);
-    });
     
     setContent(newContent);
     
@@ -1718,7 +1760,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       }
     }, 10);
     
-    printLog(`Selected mention: @${displayName} on ${mention.platform}`);
+    console.log('Mention Dictionary Updated:', {
+      key: dictionaryKey,
+      entry: dictionaryEntry,
+      currentPlatformMode: platformMode,
+      displayName: currentDisplayName,
+      fullDictionary: { ...mentionDictionary, [dictionaryKey]: dictionaryEntry }
+    });
+    
+    printLog(`Selected mention: @${currentDisplayName} (${dictionaryEntry.platform}) - Dictionary updated`);
   };
 
   // Handler to close mentions popup
@@ -1782,11 +1832,30 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   }, [mentionResults, mentionSearchQuery, currentMentionPlatform]);
 
-  // Update platform-specific text variables when content or mentions change
+  // Update platform-specific text variables when content or dictionary changes
   useEffect(() => {
-    setTwitterText(buildPlatformText('twitter'));
-    setNostrText(buildPlatformText('nostr'));
-  }, [content, selectedMentions]);
+    const newTwitterText = buildPlatformText('twitter');
+    const newNostrText = buildPlatformText('nostr');
+    
+    console.log('Text Transformation Update:', {
+      content,
+      dictionary: mentionDictionary,
+      twitterText: newTwitterText,
+      nostrText: newNostrText
+    });
+    
+    setTwitterText(newTwitterText);
+    setNostrText(newNostrText);
+  }, [content, mentionDictionary]);
+
+  // Update content display when platform mode changes (for cross-platform mentions)
+  useEffect(() => {
+    const updatedContent = updateContentForPlatformMode();
+    if (updatedContent !== content) {
+      console.log('Platform mode changed - updating content:', updatedContent);
+      setContent(updatedContent);
+    }
+  }, [platformMode]); // Only depend on platformMode to avoid infinite loops
 
   // Function to get highlighted content for display overlay using backtick parsing
   const getHighlightedContent = (): string => {
@@ -1899,7 +1968,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
-  // Function to build platform-specific text from backtick content
+  // Function to build platform-specific text using mention dictionary
   const buildPlatformText = (targetPlatform: 'twitter' | 'nostr'): string => {
     if (!content) return '';
     
@@ -1909,40 +1978,39 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     let match;
     const replacements: Array<{ original: string; replacement: string }> = [];
     
-    // Find all mentions and prepare replacements
+    // Find all mentions and prepare replacements using dictionary
     while ((match = mentionRegex.exec(content)) !== null) {
       const fullMatch = match[0]; // `@username`
-      const mentionText = match[1]; // @username
+      const mentionText = match[1].replace('@', ''); // username (clean)
       
-      // Find the platform data for this mention
-      const mentionData = selectedMentions.find(m => 
-        m.displayText === mentionText || m.displayText === mentionText.replace('@', '')
-      );
+      // Look up in mention dictionary
+      const dictionaryEntry = mentionDictionary[mentionText];
       
-      if (mentionData) {
+      if (dictionaryEntry) {
         let replacementText: string;
         
         if (targetPlatform === 'twitter') {
-          // For Twitter: use @username format for all mentions
-          if (mentionData.platform === 'twitter') {
-            replacementText = mentionData.actualText; // Already @username format
+          // For Twitter posting
+          if (dictionaryEntry.platform === 'twitter' || dictionaryEntry.platform === 'both') {
+            replacementText = dictionaryEntry.twitterHandle || `@${mentionText}`;
           } else {
-            // For Nostr mentions on Twitter, use the display name
-            replacementText = mentionData.displayText;
+            // Nostr-only mention: use display name as plain text
+            replacementText = `@${dictionaryEntry.nostrDisplayName || mentionText}`;
           }
         } else {
-          // For Nostr: use nostr:nprofile format for Nostr mentions, @username for Twitter
-          if (mentionData.platform === 'nostr') {
-            replacementText = mentionData.actualText; // nostr:nprofile format
+          // For Nostr posting
+          if (dictionaryEntry.platform === 'nostr' || dictionaryEntry.platform === 'both') {
+            replacementText = dictionaryEntry.nostrNprofile || `@${mentionText}`;
           } else {
-            replacementText = mentionData.actualText; // @username format
+            // Twitter-only mention: use Twitter handle as plain text
+            replacementText = dictionaryEntry.twitterHandle || `@${mentionText}`;
           }
         }
         
         replacements.push({ original: fullMatch, replacement: replacementText });
       } else {
-        // If no mention data found, just remove backticks
-        replacements.push({ original: fullMatch, replacement: mentionText });
+        // If no dictionary entry found, just remove backticks
+        replacements.push({ original: fullMatch, replacement: `@${mentionText}` });
       }
     }
     
@@ -1952,6 +2020,46 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
     
     return processedContent;
+  };
+  
+  // Function to update content display based on platform mode
+  const updateContentForPlatformMode = (): string => {
+    if (!content) return '';
+    
+    // Parse content to find mentions and update their display based on current platform mode
+    const mentionRegex = /`(@[^`]+)`/g;
+    let updatedContent = content;
+    let match;
+    const replacements: Array<{ original: string; replacement: string }> = [];
+    
+    while ((match = mentionRegex.exec(content)) !== null) {
+      const fullMatch = match[0]; // `@username`
+      const mentionText = match[1].replace('@', ''); // username (clean)
+      
+      // Look up in mention dictionary
+      const dictionaryEntry = mentionDictionary[mentionText];
+      
+      if (dictionaryEntry && dictionaryEntry.platform === 'both') {
+        // Cross-platform mention: update display based on current mode
+        const newDisplayName = platformMode === 'twitter' ? 
+          dictionaryEntry.twitterHandle?.replace('@', '') : 
+          dictionaryEntry.nostrDisplayName;
+        
+        if (newDisplayName && newDisplayName !== mentionText) {
+          replacements.push({ 
+            original: fullMatch, 
+            replacement: `\`@${newDisplayName}\`` 
+          });
+        }
+      }
+    }
+    
+    // Apply replacements
+    for (const { original, replacement } of replacements) {
+      updatedContent = updatedContent.replace(original, replacement);
+    }
+    
+    return updatedContent;
   };
   
   // Function to build final content with proper mention formatting for specific platform

@@ -335,10 +335,16 @@ export const mentionService = {
           protected: mention.protected
         } : {
           npub: mention.npub,
+          nprofile: mention.nprofile, // Include nprofile for proper mentions!
+          pubkey: mention.pubkey,
           displayName: mention.displayName,
+          name: mention.name,
           nip05: mention.nip05,
           about: mention.about,
-          picture: mention.picture
+          profile_image_url: mention.profile_image_url || mention.picture, // Priority: profile_image_url > picture
+          banner: mention.banner,
+          website: mention.website,
+          lud16: mention.lud16
         }
         // Note: targetPlatform and targetUsername are now optional and only needed for cross-platform mappings
       };

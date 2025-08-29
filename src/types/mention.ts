@@ -31,7 +31,8 @@ interface NostrProfileData {
   displayName?: string;
   nip05?: string;
   about?: string;
-  picture?: string;
+  picture?: string; // Raw field from Nostr data
+  profile_image_url?: string; // Mapped field for database consistency with Twitter
   banner?: string;
   website?: string;
   lud16?: string;
@@ -108,7 +109,8 @@ interface NostrResult {
   displayName?: string;
   nip05?: string;
   about?: string;
-  picture?: string;
+  picture?: string; // Raw field from API response
+  profile_image_url?: string; // Mapped field for consistency
   banner?: string;
   website?: string;
   lud16?: string;
