@@ -2103,6 +2103,21 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         printLog(`Added secondary dictionary entry for display name: displayName="${displayName}", npubKey="${mentionSearchQuery}"`);
       }
       
+      // For cross-platform mentions, add dictionary entries for both platform-specific display names
+      if (dictionaryEntry.platform === 'both') {
+        if (dictionaryEntry.twitterHandle) {
+          const twitterUsername = dictionaryEntry.twitterHandle.replace('@', '');
+          if (twitterUsername !== dictionaryKey) {
+            newDict[twitterUsername] = dictionaryEntry;
+            printLog(`Added cross-platform dictionary entry for Twitter username: "${twitterUsername}"`);
+          }
+        }
+        if (dictionaryEntry.nostrDisplayName && dictionaryEntry.nostrDisplayName !== dictionaryKey) {
+          newDict[dictionaryEntry.nostrDisplayName] = dictionaryEntry;
+          printLog(`Added cross-platform dictionary entry for Nostr display name: "${dictionaryEntry.nostrDisplayName}"`);
+        }
+      }
+      
       return newDict;
     });
     
