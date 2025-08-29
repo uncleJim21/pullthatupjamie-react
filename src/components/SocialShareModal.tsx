@@ -1534,10 +1534,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     try {
       if (isUpdateMode && updateContext) {
         // Update existing scheduled post
-        const signature = getUserSignature();
-        const signaturePart = signature ? `\n\n${signature}` : "";
-        const finalContent = `${content}${signaturePart}`;
-
         // Get the correct post ID (handles both postId and _id)
         const postId = updateContext.scheduledPost.postId || updateContext.scheduledPost._id;
         console.log('Update mode - Post ID:', postId, 'Post object:', updateContext.scheduledPost);
@@ -1548,6 +1544,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
         // Apply randomization if enabled
         const finalScheduledDate = randomizeTime(scheduledDate, userSettings.randomizePostTime ?? true);
+        
+        // Use content exactly as user typed it - no automatic additions
+        const finalContent = content;
         
         let updateRequest: any = {
           text: finalContent,
@@ -1562,11 +1561,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
           }
 
-          // Build the EXACT content that will be sent to backend
-          const fullContentWithMedia = buildFinalContent(content, mediaUrl || '', 'nostr');
-          
-          // Re-sign the event with the new content
-          const eventToSign = createNostrEventUnified(fullContentWithMedia, mediaUrl || undefined);
+          // Re-sign the event with the user's exact content (no automatic additions)
+          const eventToSign = createNostrEventUnified(finalContent, mediaUrl || undefined);
           const signedEvent = await window.nostr.signEvent(eventToSign);
 
           // Generate new Primal URL from new event ID
@@ -1574,7 +1570,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           const primalUrl = `https://primal.net/e/${bech32EventId}`;
 
           // Update the request to include new Nostr platform data
-          updateRequest.text = fullContentWithMedia;
+          updateRequest.text = finalContent;
           updateRequest.platformData = {
             nostrEventId: signedEvent.id,
             nostrSignature: signedEvent.sig,
@@ -1604,15 +1600,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           return;
         }
 
-        const signature = getUserSignature();
-        const signaturePart = signature ? `\n\n${signature}` : "";
-        const finalContent = `${content}${signaturePart}`;
-
         let nostrSucceeded = false;
         let twitterSucceeded = false;
-
-        // Helper to create a minimal Nostr event for signature validation
-        // Use unified event construction for Nostr
 
         // Apply randomization if enabled (only for new posts, not updates)
         const finalScheduledDate = randomizeTime(scheduledDate, userSettings.randomizePostTime ?? true);
@@ -1624,7 +1613,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
             }
             
-            // Build the EXACT content that will be sent to backend
+            // Build the EXACT content that will be sent to backend (includes signature)
             const fullContentWithMedia = buildFinalContent(content, mediaUrl || '', 'nostr');
             
             // Sign that EXACT content
@@ -1670,8 +1659,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         // Schedule Twitter second if enabled
         if (twitterEnabled) {
           try {
+            // Build final content with signature for Twitter
+            const twitterFinalContent = buildFinalContent(content, mediaUrl || '', 'twitter');
+            
             const twitterRequest: CreateScheduledPostRequest = {
-              text: finalContent,
+              text: twitterFinalContent,
               mediaUrl,
               scheduledFor: convertToChicagoTime(finalScheduledDate).toISOString(),
               platforms: ["twitter"],
