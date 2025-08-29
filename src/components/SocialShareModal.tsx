@@ -196,7 +196,7 @@ const ASPECT_RATIO = 16 / 9;
 const PREVIEW_WIDTH = 240; // px, adjust as needed
 const PREVIEW_HEIGHT = PREVIEW_WIDTH / ASPECT_RATIO;
 
-const MENTION_MIN_CHARS = 2;
+const MENTION_MIN_CHARS = 4;
 
 const SocialShareModal: React.FC<SocialShareModalProps> = ({
   isOpen,
