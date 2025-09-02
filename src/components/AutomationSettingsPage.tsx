@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ScheduledPostSlots from './ScheduledPostSlots.tsx';
 import { ScheduledSlot } from '../services/preferencesService.ts';
+import PageBanner from './PageBanner.tsx';
 
 // Automation wizard steps enum
 enum AutomationStep {
@@ -388,6 +389,11 @@ const AutomationSettingsPage: React.FC = () => {
 
             {/* Writing Style Text Box */}
             <div className="mb-8">
+              {isUsingDefault && (
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Default Prompt:
+                </label>
+              )}
               <textarea
                 value={writingStyle}
                 onFocus={handleWritingStyleFocus}
@@ -485,15 +491,42 @@ const AutomationSettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Jamie Pro Banner */}
-      <div className="flex flex-col items-center pt-8 pb-6">
-        <img
-          src="/jamie-pro-banner.png"
-          alt="Jamie Pro Banner"
-          className="max-w-full h-auto"
-        />
-        <p className="text-gray-400 text-xl font-medium mt-2">Automation Settings</p>
+    <div className="min-h-screen bg-black text-white relative pb-0.5">
+      {/* Page Banner */}
+      <PageBanner 
+        logoText="Pull That Up Jamie!" 
+        onConnect={() => {}}
+        onSignIn={() => {}}
+        onUpgrade={() => {}}
+        onSignOut={() => {}}
+        onTutorialClick={() => {}}
+        isUserSignedIn={false}
+        setIsUserSignedIn={() => {}}
+      />
+
+      {/* Back Arrow and Jamie Pro Banner */}
+      <div className="relative w-full max-w-4xl mx-auto">
+        <div className="flex justify-start md:block mb-4 md:mb-0">
+          <button 
+            onClick={() => window.location.href = `/app/feed/550168/jamieProHistory`} 
+            className="md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2 h-12 w-12 flex items-center justify-center bg-transparent text-white hover:text-gray-300 focus:outline-none z-10 ml-4 md:ml-0"
+            style={{
+              color: '#C0C0C0',
+              textShadow: '0 0 8px #C0C0C0',
+              fontSize: '32px'
+            }}
+          >
+            ←
+          </button>
+        </div>
+        <div className="flex flex-col items-center py-8">
+          <img
+            src="/jamie-pro-banner.png"
+            alt="Jamie Pro Banner"
+            className="max-w-full h-auto"
+          />
+          <p className="text-gray-400 text-xl font-medium mt-2">Automation Settings</p>
+        </div>
       </div>
       
       {/* Step Indicator */}
