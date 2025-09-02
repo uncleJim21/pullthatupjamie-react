@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ScheduledPostSlots from './ScheduledPostSlots.tsx';
 import { ScheduledSlot } from '../services/preferencesService.ts';
 import PageBanner from './PageBanner.tsx';
-import { API_URL } from '../constants/constants.ts';
+import { getAutomationSettings, saveAutomationSettings, AutomationSettings } from '../services/automationSettingsService.ts';
 
 // Automation wizard steps enum
 enum AutomationStep {
@@ -252,51 +252,33 @@ const AutomationSettingsPage: React.FC = () => {
     const loadAutomationSettings = async () => {
       try {
         setIsLoading(true);
-        const token = localStorage.getItem('auth_token');
         const feedId = '550168'; // Hardcoded feedId as shown in the curl example
         
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        };
+        const result = await getAutomationSettings(feedId);
         
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        const response = await fetch(`${API_URL}/api/automation-settings?feedId=${feedId}`, {
-          method: 'GET',
-          headers: headers
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.data) {
-            const { curationSettings, postingStyle, postingSchedule } = result.data;
-            
-            // Populate curation settings (topics)
-            if (curationSettings?.topics && Array.isArray(curationSettings.topics)) {
-              const loadedTopics = curationSettings.topics.length > 0 ? curationSettings.topics : [''];
-              setTopics(loadedTopics);
-            }
-            
-            // Populate posting style
-            if (postingStyle?.prompt && postingStyle.prompt.trim() !== '') {
-              setWritingStyle(postingStyle.prompt);
-              setIsUsingDefault(postingStyle.prompt === defaultWritingStylePrompt);
-            } else {
-              // If prompt is null, empty, or whitespace-only, use default
-              setWritingStyle(defaultWritingStylePrompt);
-              setIsUsingDefault(true);
-            }
-            
-            // Populate posting schedule
-            if (postingSchedule?.scheduledPostSlots && Array.isArray(postingSchedule.scheduledPostSlots)) {
-              setScheduledSlots(postingSchedule.scheduledPostSlots);
-            }
+        if (result.success && result.data) {
+          const { curationSettings, postingStyle, postingSchedule } = result.data;
+          
+          // Populate curation settings (topics)
+          if (curationSettings?.topics && Array.isArray(curationSettings.topics)) {
+            const loadedTopics = curationSettings.topics.length > 0 ? curationSettings.topics : [''];
+            setTopics(loadedTopics);
           }
-        } else {
-          console.error('Failed to load automation settings:', response.statusText);
+          
+          // Populate posting style
+          if (postingStyle?.prompt && postingStyle.prompt.trim() !== '') {
+            setWritingStyle(postingStyle.prompt);
+            setIsUsingDefault(postingStyle.prompt === defaultWritingStylePrompt);
+          } else {
+            // If prompt is null, empty, or whitespace-only, use default
+            setWritingStyle(defaultWritingStylePrompt);
+            setIsUsingDefault(true);
+          }
+          
+          // Populate posting schedule
+          if (postingSchedule?.scheduledPostSlots && Array.isArray(postingSchedule.scheduledPostSlots)) {
+            setScheduledSlots(postingSchedule.scheduledPostSlots);
+          }
         }
       } catch (error) {
         console.error('Error loading automation settings:', error);
@@ -312,19 +294,9 @@ const AutomationSettingsPage: React.FC = () => {
   const handleSaveSettings = async () => {
     try {
       setIsSaving(true);
-      const token = localStorage.getItem('auth_token');
       const feedId = '550168'; // Hardcoded feedId as shown in the curl example
       
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const requestBody = {
+      const settingsToSave: AutomationSettings = {
         curationSettings: {
           topics: topics.filter(topic => topic.trim() !== ''),
           feedId: feedId
@@ -339,22 +311,12 @@ const AutomationSettingsPage: React.FC = () => {
         automationEnabled: true // Enable automation when settings are saved
       };
       
-      const response = await fetch(`${API_URL}/api/automation-settings`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(requestBody)
-      });
+      const result = await saveAutomationSettings(settingsToSave);
       
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setShowSuccessModal(true);
-        } else {
-          console.error('Failed to save automation settings:', result.message || 'Unknown error');
-          alert('Failed to save settings. Please try again.');
-        }
+      if (result.success) {
+        setShowSuccessModal(true);
       } else {
-        console.error('Failed to save automation settings:', response.statusText);
+        console.error('Failed to save automation settings:', result.message || 'Unknown error');
         alert('Failed to save settings. Please try again.');
       }
     } catch (error) {
