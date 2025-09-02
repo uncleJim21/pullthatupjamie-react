@@ -3,6 +3,7 @@ import ScheduledPostSlots from './ScheduledPostSlots.tsx';
 import { ScheduledSlot } from '../services/preferencesService.ts';
 import PageBanner from './PageBanner.tsx';
 import { getAutomationSettings, saveAutomationSettings, AutomationSettings } from '../services/automationSettingsService.ts';
+import SignInModal from './SignInModal.tsx';
 
 // Automation wizard steps enum
 enum AutomationStep {
@@ -141,6 +142,43 @@ const SettingsSaveSuccessPopup = ({ onClose }: { onClose: () => void }) => (
   </div>
 );
 
+// Admin Access Required Modal
+interface AdminAccessRequiredModalProps {
+  onClose: () => void; 
+  onSignIn: () => void;
+  isUserSignedIn: boolean;
+}
+
+const AdminAccessRequiredModal = ({ onClose, onSignIn, isUserSignedIn }: AdminAccessRequiredModalProps) => (
+  <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+    <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+      <h2 className="text-white text-xl font-bold mb-4">
+        Admin Access Required
+      </h2>
+      <p className="text-gray-400 mb-6">
+        {isUserSignedIn 
+          ? "You need admin privileges to access automation settings. Please sign in with an admin account to configure podcast automation features."
+          : "You need to be signed in as an admin to access automation settings. Please sign in with an admin account to configure podcast automation features."
+        }
+      </p>
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <button
+          onClick={onClose}
+          className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onSignIn}
+          className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
+        >
+          {isUserSignedIn ? 'Sign In as Admin' : 'Sign In'}
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 const AutomationSettingsPage: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<AutomationStep>(AutomationStep.CURATION_SETTINGS);
   const [topics, setTopics] = useState<string[]>(['']);
@@ -149,6 +187,10 @@ const AutomationSettingsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+  const [isUserSignedIn, setIsUserSignedIn] = useState<boolean>(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [showAdminRequiredModal, setShowAdminRequiredModal] = useState<boolean>(false);
+  const [isSignInModalOpen, setIsSignInModalOpen] = useState<boolean>(false);
   const [scheduledSlots, setScheduledSlots] = useState<ScheduledSlot[]>(() => {
     // Generate default slots: 9:45 AM and 4:45 PM on weekdays (Monday-Friday)
     const defaultSlots: ScheduledSlot[] = [];
@@ -247,7 +289,32 @@ const AutomationSettingsPage: React.FC = () => {
   // Default writing style prompt
   const defaultWritingStylePrompt = "Pull out the most impactful verbatim quote from this clip then follow up with a carriage return and a call to action with the full podcast link";
 
-  // Load existing settings on component mount
+  // Load authentication state from localStorage
+  useEffect(() => {
+    const checkSignedIn = () => {
+      const hasToken = !!localStorage.getItem('auth_token');
+      const hasSquareId = !!localStorage.getItem('squareId');
+      const isUserSignedIn = hasToken && hasSquareId;
+      setIsUserSignedIn(isUserSignedIn);
+      
+      // Check admin privileges from localStorage
+      const adminPrivs = localStorage.getItem('admin_privs');
+      const isUserAdmin = adminPrivs === 'true' && isUserSignedIn; // Must be signed in AND have admin privs
+      setIsAdmin(isUserAdmin);
+      
+      // Show admin required modal if user is not signed in OR not admin
+      if (!isUserSignedIn || !isUserAdmin) {
+        setShowAdminRequiredModal(true);
+      }
+    };
+  
+    // Add a slight delay before checking localStorage
+    const timeout = setTimeout(checkSignedIn, 50); // 50ms delay
+  
+    return () => clearTimeout(timeout); // Cleanup timeout
+  }, []);
+
+  // Load existing settings on component mount (only if admin)
   useEffect(() => {
     const loadAutomationSettings = async () => {
       try {
@@ -287,8 +354,66 @@ const AutomationSettingsPage: React.FC = () => {
       }
     };
     
-    loadAutomationSettings();
-  }, []);
+    // Only load settings if user is admin
+    if (isAdmin) {
+      loadAutomationSettings();
+    } else {
+      setIsLoading(false);
+    }
+  }, [isAdmin]);
+
+  // Handle sign in modal open
+  const handleOpenSignInModal = () => {
+    setIsSignInModalOpen(true);
+  };
+
+  // Handle admin access modal actions
+  const handleAdminModalSignIn = () => {
+    setShowAdminRequiredModal(false);
+    setIsSignInModalOpen(true);
+  };
+
+  const handleAdminModalClose = () => {
+    setShowAdminRequiredModal(false);
+    // Redirect back to the main feed page
+    window.location.href = '/app/feed/550168/jamieProHistory';
+  };
+
+  // Handle sign in success
+  const handleSignInSuccess = () => {
+    setIsSignInModalOpen(false);
+    setIsUserSignedIn(true);
+    
+    // Recheck admin privileges after sign in
+    const adminPrivs = localStorage.getItem('admin_privs');
+    const isUserAdmin = adminPrivs === 'true';
+    setIsAdmin(isUserAdmin);
+    
+    if (!isUserAdmin) {
+      setShowAdminRequiredModal(true);
+    }
+  };
+  
+  // Handle sign out
+  const handleSignOut = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('squareId');
+    localStorage.removeItem('isSubscribed');
+    setIsUserSignedIn(false);
+    
+    // Redirect to main app after sign out
+    window.location.href = '/app';
+  };
+
+  const handleUpgrade = () => {
+    // For now, just redirect to the main app
+    window.location.href = '/app';
+  };
+
+  const handleTutorialClick = () => {
+    // For now, just redirect to the main app
+    window.location.href = '/app';
+  };
 
   // Handle save settings
   const handleSaveSettings = async () => {
@@ -598,13 +723,12 @@ const AutomationSettingsPage: React.FC = () => {
       {/* Page Banner */}
       <PageBanner 
         logoText="Pull That Up Jamie!" 
-        onConnect={() => {}}
-        onSignIn={() => {}}
-        onUpgrade={() => {}}
-        onSignOut={() => {}}
-        onTutorialClick={() => {}}
-        isUserSignedIn={false}
-        setIsUserSignedIn={() => {}}
+        onSignIn={handleOpenSignInModal}
+        onSignOut={handleSignOut}
+        onUpgrade={handleUpgrade}
+        onTutorialClick={handleTutorialClick}
+        isUserSignedIn={isUserSignedIn}
+        setIsUserSignedIn={setIsUserSignedIn}
       />
 
       {/* Back Arrow and Jamie Pro Banner */}
@@ -636,7 +760,7 @@ const AutomationSettingsPage: React.FC = () => {
       <StepIndicator currentStep={currentStep} />
       
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 pb-8">
+      <div className={`max-w-4xl mx-auto px-4 pb-8 ${!isAdmin ? 'opacity-50 pointer-events-none' : ''}`}>
         {renderStepContent()}
       </div>
       
@@ -660,6 +784,23 @@ const AutomationSettingsPage: React.FC = () => {
           }} 
         />
       )}
+
+      {/* Admin Access Required Modal */}
+      {showAdminRequiredModal && (
+        <AdminAccessRequiredModal
+          onClose={handleAdminModalClose}
+          onSignIn={handleAdminModalSignIn}
+          isUserSignedIn={isUserSignedIn}
+        />
+      )}
+
+      {/* Sign In Modal */}
+      <SignInModal 
+        isOpen={isSignInModalOpen} 
+        onClose={() => setIsSignInModalOpen(false)}
+        onSignInSuccess={handleSignInSuccess}
+        onSignUpSuccess={handleSignInSuccess}
+      />
     </div>
   );
 };
