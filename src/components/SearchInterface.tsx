@@ -1160,6 +1160,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     };
 
     if (isClipBatchPage && runId && feedId) {
+      setSearchState(prev => ({ ...prev, isLoading: true }));
       loadClipBatch();
     }
   }, [isClipBatchPage, runId, feedId]);
@@ -1833,7 +1834,70 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       )}
 
       {searchMode === 'podcast-search' && searchState.isLoading && (
-        <PodcastLoadingPlaceholder />
+        isClipBatchPage ? (
+          <div className="flex flex-col items-center justify-center w-full py-8">
+            <h2 className="text-gray-500 text-xl mb-8 text-center">
+              Loading your
+              <br />
+              pre-made clips...
+            </h2>
+            <div className="relative">
+              {/* Expanding rings */}
+              <div className="absolute inset-0 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite]">
+                <svg 
+                  width="120" 
+                  height="120" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="1.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                  className="text-gray-600 opacity-30"
+                >
+                  <circle cx="12" cy="12" r="1"/>
+                  <path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/>
+                  <path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/>
+                </svg>
+              </div>
+              <div className="absolute inset-0 animate-[ping_1s_cubic-bezier(0,0,0.2,1)_infinite_1s]">
+                <svg 
+                  width="120" 
+                  height="120" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="1.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                  className="text-gray-600 opacity-30"
+                >
+                  <circle cx="12" cy="12" r="1"/>
+                  <path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/>
+                  <path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/>
+                </svg>
+              </div>
+              {/* Main icon */}
+              <svg 
+                width="120" 
+                height="120" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="1.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className="text-gray-600 relative"
+              >
+                <circle cx="12" cy="12" r="1"/>
+                <path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/>
+                <path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/>
+              </svg>
+            </div>
+          </div>
+        ) : (
+          <PodcastLoadingPlaceholder />
+        )
       )}
 
       {searchMode === 'podcast-search' && !isAnyModalOpen() && (

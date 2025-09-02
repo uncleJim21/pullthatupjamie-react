@@ -1,6 +1,7 @@
 import { API_URL } from '../constants/constants.ts';
 
 export interface UserPreferences {
+  fullJamieAutoEnabled?: boolean;
   autoStartCrosspost?: boolean;
   crosspostSignature?: string;
   scheduledPostSlots?: ScheduledSlot[];

@@ -68,6 +68,42 @@ const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionS
   </div>
 );
 
+// Configure Automation Modal
+interface ConfigureAutomationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfigure: () => void;
+}
+
+const ConfigureAutomationModal = ({ isOpen, onClose, onConfigure }: ConfigureAutomationModalProps) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
+      <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+        <h2 className="text-white text-lg font-bold mb-4">Automation Configuration Required</h2>
+        <p className="text-gray-400 mb-6">
+          Specify clip curation, posting style and schedule to enable automation.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfigure}
+            className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history' | 'settings' | 'scheduled-posts';
 
@@ -115,6 +151,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isTutorialOpen, setIsTutorialOpen] = useState(false);
     const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
     const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
+    const [isConfigureAutomationModalOpen, setIsConfigureAutomationModalOpen] = useState(false);
 
     // Use the new userSettings hook with cloud sync for admin users
     const {
@@ -135,6 +172,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     // Derived state for backward compatibility
     const autoShare = userSettings.autoStartCrosspost || false;
     const settingsData = {
+        fullJamieAutoEnabled: userSettings.fullJamieAutoEnabled || false,
         autoStartCrosspost: userSettings.autoStartCrosspost || false,
         crosspostSignature: userSettings.crosspostSignature || '',
         scheduledPostSlots: userSettings.scheduledPostSlots || [],
@@ -153,6 +191,30 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
     const handleScheduledSlotsChange = async (slots: any[]) => {
         await updateSetting('scheduledPostSlots', slots);
+    };
+
+    const handleFullJamieAutoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newValue = e.target.checked;
+        
+        if (newValue && !settingsData.fullJamieAutoEnabled) {
+            // User is enabling automation for the first time, show configuration modal
+            setIsConfigureAutomationModalOpen(true);
+        } else {
+            // User is disabling automation or it was already enabled
+            await updateSetting('fullJamieAutoEnabled', newValue);
+        }
+    };
+
+    const handleConfigureAutomation = () => {
+        // Enable the setting and navigate to automation settings
+        updateSetting('fullJamieAutoEnabled', true);
+        setIsConfigureAutomationModalOpen(false);
+        window.open('/app/automation-settings', '_blank');
+    };
+
+    const handleCancelAutomation = () => {
+        // Keep the setting disabled and close modal
+        setIsConfigureAutomationModalOpen(false);
     };
 
     // Add these handlers:
@@ -1056,8 +1118,37 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       </div>
                       
                       <div className="space-y-6">
-                        {/* Auto Start Crosspost Setting */}
+                        {/* Full Jamie Auto (Beta) Setting */}
                         <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="text-white font-medium mb-1">Jamie - Full Auto (Beta)</h4>
+                            <p className="text-gray-400 text-sm">
+                              Enable fully automated content creation and posting workflows
+                            </p>
+                            {settingsData.fullJamieAutoEnabled && (
+                              <a
+                                href="/app/automation-settings"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center mt-2 text-sm text-blue-400 hover:text-blue-300 underline"
+                              >
+                                Advanced Settings Wizard →
+                              </a>
+                            )}
+                          </div>
+                          <div className="ml-4">
+                            <input
+                              type="checkbox"
+                              id="fullJamieAutoEnabled"
+                              checked={settingsData.fullJamieAutoEnabled || false}
+                              onChange={handleFullJamieAutoChange}
+                              className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white focus:ring-2"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Auto Start Crosspost Setting */}
+                        <div className="flex items-start justify-between border-t border-gray-800 pt-6">
                           <div className="flex-1">
                             <h4 className="text-white font-medium mb-1">Auto Start Crosspost</h4>
                             <p className="text-gray-400 text-sm">
@@ -1315,6 +1406,13 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         isOpen={isTutorialOpen}
         onClose={handleTutorialClose}
         defaultSection={2} // Jamie Pro section for dashboard pages
+      />
+
+      {/* Configure Automation Modal */}
+      <ConfigureAutomationModal
+        isOpen={isConfigureAutomationModalOpen}
+        onClose={handleCancelAutomation}
+        onConfigure={handleConfigureAutomation}
       />
     </div>
   );
