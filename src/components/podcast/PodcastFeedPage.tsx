@@ -135,6 +135,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     // Derived state for backward compatibility
     const autoShare = userSettings.autoStartCrosspost || false;
     const settingsData = {
+        fullJamieAutoEnabled: userSettings.fullJamieAutoEnabled || false,
         autoStartCrosspost: userSettings.autoStartCrosspost || false,
         crosspostSignature: userSettings.crosspostSignature || '',
         scheduledPostSlots: userSettings.scheduledPostSlots || [],
@@ -1056,8 +1057,37 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       </div>
                       
                       <div className="space-y-6">
-                        {/* Auto Start Crosspost Setting */}
+                        {/* Full Jamie Auto (Beta) Setting */}
                         <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="text-white font-medium mb-1">Full Jamie Auto (Beta)</h4>
+                            <p className="text-gray-400 text-sm">
+                              Enable fully automated content creation and posting workflows
+                            </p>
+                            {settingsData.fullJamieAutoEnabled && (
+                              <a
+                                href="/app/automation-settings"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center mt-2 text-sm text-blue-400 hover:text-blue-300 underline"
+                              >
+                                Advanced Settings Wizard →
+                              </a>
+                            )}
+                          </div>
+                          <div className="ml-4">
+                            <input
+                              type="checkbox"
+                              id="fullJamieAutoEnabled"
+                              checked={settingsData.fullJamieAutoEnabled || false}
+                              onChange={(e) => updateSetting('fullJamieAutoEnabled', e.target.checked)}
+                              className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white focus:ring-2"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Auto Start Crosspost Setting */}
+                        <div className="flex items-start justify-between border-t border-gray-800 pt-6">
                           <div className="flex-1">
                             <h4 className="text-white font-medium mb-1">Auto Start Crosspost</h4>
                             <p className="text-gray-400 text-sm">
