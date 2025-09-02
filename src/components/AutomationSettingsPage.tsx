@@ -130,7 +130,7 @@ const SettingsSaveSuccessPopup = ({ onClose }: { onClose: () => void }) => (
     <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
       <h2 className="text-white text-lg font-bold mb-4">Settings Saved Successfully!</h2>
       <p className="text-gray-400 mb-4">
-        Your Full Jamie Auto settings have been saved. Jamie will now automatically find and share content based on your preferences.
+        Your Jamie Full Auto settings have been saved. Jamie will now automatically find and share content based on your preferences.
       </p>
       <button
         onClick={onClose}
@@ -458,7 +458,7 @@ const AutomationSettingsPage: React.FC = () => {
     { 
       icon: <img src="/icons/bitcoin.png" alt="Bitcoin" className="w-16 h-16" />, 
       title: 'Bitcoin Economics',
-      query: 'bitcoin strategic reserve and macro implications'
+      query: 'bitcoin implications on macroeconomics, return to sound money and the effects of hyperbitcoinization'
     },
     { 
       emoji: '🏗️', 

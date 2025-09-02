@@ -1121,7 +1121,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         {/* Full Jamie Auto (Beta) Setting */}
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h4 className="text-white font-medium mb-1">Full Jamie Auto (Beta)</h4>
+                            <h4 className="text-white font-medium mb-1">Jamie - Full Auto (Beta)</h4>
                             <p className="text-gray-400 text-sm">
                               Enable fully automated content creation and posting workflows
                             </p>
