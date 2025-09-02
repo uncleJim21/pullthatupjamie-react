@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import ScheduledPostSlots from './ScheduledPostSlots.tsx';
+import { ScheduledSlot } from '../services/preferencesService.ts';
 
 // Automation wizard steps enum
 enum AutomationStep {
@@ -91,18 +93,27 @@ const TopicInputField: React.FC<TopicInputFieldProps> = ({
 
 // Suggested topic card component
 interface SuggestedTopicCardProps {
-  emoji: string;
+  emoji?: string;
+  icon?: React.ReactNode;
   title: string;
   onClick: () => void;
 }
 
-const SuggestedTopicCard: React.FC<SuggestedTopicCardProps> = ({ emoji, title, onClick }) => (
+const SuggestedTopicCard: React.FC<SuggestedTopicCardProps> = ({ emoji, icon, title, onClick }) => (
   <button
     onClick={onClick}
     className="flex flex-col items-center justify-center aspect-square bg-[#111111] border border-gray-800 rounded-lg hover:border-gray-700 transition-all duration-200 p-4"
   >
-    <div className="text-4xl mb-2 group-hover:scale-105 transition-transform duration-200">
-      {emoji}
+    <div className="mb-2 group-hover:scale-105 transition-transform duration-200">
+      {icon ? (
+        <div className="flex items-center justify-center">
+          {icon}
+        </div>
+      ) : (
+        <div className="text-4xl">
+          {emoji}
+        </div>
+      )}
     </div>
     <div className="text-sm font-medium text-white group-hover:text-gray-300 transition-colors text-center">
       {title}
@@ -113,6 +124,27 @@ const SuggestedTopicCard: React.FC<SuggestedTopicCardProps> = ({ emoji, title, o
 const AutomationSettingsPage: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<AutomationStep>(AutomationStep.CURATION_SETTINGS);
   const [topics, setTopics] = useState<string[]>(['', '', '']);
+  const [writingStyle, setWritingStyle] = useState<string>('Pull out the most impactful verbatim quote from this clip then follow up with a carriage return and a call to action with the full podcast link');
+  const [isUsingDefault, setIsUsingDefault] = useState<boolean>(true);
+  const [scheduledSlots, setScheduledSlots] = useState<ScheduledSlot[]>(() => {
+    // Generate default slots: 9:45 AM and 4:45 PM on weekdays (Monday-Friday)
+    const defaultSlots: ScheduledSlot[] = [];
+    for (let day = 1; day <= 5; day++) { // Monday = 1, Friday = 5
+      defaultSlots.push({
+        id: `slot_${day}_morning_${Date.now()}`,
+        dayOfWeek: day,
+        time: '09:45',
+        enabled: true
+      });
+      defaultSlots.push({
+        id: `slot_${day}_afternoon_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        dayOfWeek: day,
+        time: '16:45',
+        enabled: true
+      });
+    }
+    return defaultSlots;
+  });
 
   // Handle topic input changes
   const handleTopicChange = (index: number, value: string) => {
@@ -137,18 +169,39 @@ const AutomationSettingsPage: React.FC = () => {
   };
 
   // Handle suggested topic selection
-  const handleSuggestedTopicClick = (topicTitle: string) => {
+  const handleSuggestedTopicClick = (topicQuery: string) => {
     // Find the first empty topic field or add a new one
     const emptyIndex = topics.findIndex(topic => topic === '');
     if (emptyIndex !== -1) {
-      handleTopicChange(emptyIndex, topicTitle);
+      handleTopicChange(emptyIndex, topicQuery);
     } else if (topics.length < 5) {
-      setTopics([...topics, topicTitle]);
+      setTopics([...topics, topicQuery]);
     }
   };
 
   // Check if at least one topic is filled
   const hasValidTopics = topics.some(topic => topic.trim() !== '');
+
+  // Handle writing style changes
+  const handleWritingStyleFocus = () => {
+    if (isUsingDefault) {
+      setWritingStyle('');
+      setIsUsingDefault(false);
+    }
+  };
+
+  const handleWritingStyleChange = (value: string) => {
+    setWritingStyle(value);
+    setIsUsingDefault(false);
+  };
+
+  const handleUseDefault = () => {
+    setWritingStyle('Pull out the most impactful verbatim quote from this clip then follow up with a carriage return and a call to action with the full podcast link');
+    setIsUsingDefault(true);
+    if (currentStep < AutomationStep.POSTING_SCHEDULE) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
 
   // Navigation handlers
   const handleNext = () => {
@@ -163,17 +216,80 @@ const AutomationSettingsPage: React.FC = () => {
     }
   };
 
+  // Handle scheduled slots changes
+  const handleScheduledSlotsChange = (slots: ScheduledSlot[]) => {
+    setScheduledSlots(slots);
+  };
+
   // Suggested topics data
   const suggestedTopics = [
-    { emoji: '🥩', title: 'Personal Growth' },
-    { emoji: '💰', title: 'Corruption' },
-    { emoji: '🕵️', title: 'Conspiracies' },
-    { emoji: '🍎', title: 'Health' },
-    { emoji: '💪', title: 'Fitness' },
-    { emoji: '🧠', title: 'Psychology' },
-    { emoji: '📈', title: 'Economics' },
-    { emoji: '🏛️', title: 'Politics' },
-    { emoji: '🔬', title: 'Science' },
+    // Row 1: Bitcoin & Economics
+    { 
+      icon: <img src="/icons/bitcoin.png" alt="Bitcoin" className="w-16 h-16" />, 
+      title: 'Bitcoin Economics',
+      query: 'bitcoin strategic reserve and macro implications'
+    },
+    { 
+      emoji: '🏗️', 
+      title: 'Bitcoin Innovation',
+      query: 'novel bitcoin use cases and lightning network developments'
+    },
+    { 
+      icon: <img src="/icons/economics.png" alt="Economics" className="w-16 h-16" />, 
+      title: 'Austrian Economics',
+      query: 'Austrian school economics and macroeconomic analysis'
+    },
+    
+    // Row 2: Politics & Society
+    { 
+      icon: <img src="/icons/politics.png" alt="Politics" className="w-16 h-16" />, 
+      title: 'Political Corruption',
+      query: 'government corruption and civil liberties violations'
+    },
+    { 
+      emoji: '🕵️', 
+      title: 'Alternative Perspectives',
+      query: 'unconventional takes from veterans and intelligence people'
+    },
+    { 
+      emoji: '🤡🌍', 
+      title: 'Clown World',
+      query: 'satire on progressive politics and societal trends'
+    },
+    
+    // Row 3: Personal & Business
+    { 
+      icon: <img src="/icons/fitness.png" alt="Fitness" className="w-16 h-16" />, 
+      title: 'Personal Growth',
+      query: 'lessons learned from struggles and overcoming adversity'
+    },
+    { 
+      emoji: '🚀', 
+      title: 'Founder Stories',
+      query: 'background stories and what inspires startup founders, challenges they face'
+    },
+    { 
+      icon: <img src="/icons/tech.png" alt="Tech" className="w-16 h-16" />, 
+      title: 'Future Trends',
+      query: 'futurism and sociological developments affecting society'
+    },
+    
+    // Row 4: Technology & Freedom
+    { 
+      emoji: '🤖', 
+      title: 'AI & Tech',
+      query: 'artificial intelligence and surveillance state implications'
+    },
+    { 
+      emoji: '🛡️', 
+      title: 'Freedom Tech',
+      query: 'bitcoin, nostr, privacy and freedom tech developments'
+    },
+    { 
+      emoji: '🔍', 
+      title: 'Geopolitics',
+      query: 'geopolitical developments and their economic impacts'
+    },
   ];
 
   // Render step content
@@ -186,7 +302,7 @@ const AutomationSettingsPage: React.FC = () => {
             <div className="text-center mb-8">
               <h1 className="text-4xl font-bold mb-4">Configure Your Content Curation</h1>
               <p className="text-gray-400 text-lg">
-                Tell Jamie what topics you're passionate about and want to automatically find and share content for.
+                Tell Jamie in plain language what topics you're passionate about and want to automatically find and share content for.
               </p>
             </div>
 
@@ -249,8 +365,9 @@ const AutomationSettingsPage: React.FC = () => {
                   <SuggestedTopicCard
                     key={index}
                     emoji={topic.emoji}
+                    icon={topic.icon}
                     title={topic.title}
-                    onClick={() => handleSuggestedTopicClick(topic.title)}
+                    onClick={() => handleSuggestedTopicClick(topic.query)}
                   />
                 ))}
               </div>
@@ -261,8 +378,39 @@ const AutomationSettingsPage: React.FC = () => {
       case AutomationStep.POSTING_STYLE:
         return (
           <div className="max-w-2xl mx-auto">
+            {/* Header Text */}
             <div className="text-center mb-8">
-              <p className="text-gray-400">Posting Style configuration coming soon...</p>
+              <h1 className="text-4xl font-bold mb-4">Coach Jamie's Writing Style</h1>
+              <p className="text-gray-400 text-lg">
+                Instruct Jamie on how you want him to write text accompanying your video podcast clips.
+              </p>
+            </div>
+
+            {/* Writing Style Text Box */}
+            <div className="mb-8">
+              <textarea
+                value={writingStyle}
+                onFocus={handleWritingStyleFocus}
+                onChange={(e) => handleWritingStyleChange(e.target.value)}
+                className={`w-full px-4 py-3 bg-[#111111] border border-gray-800 rounded-lg focus:outline-none focus:border-gray-600 transition-colors resize-none ${
+                  isUsingDefault ? 'text-gray-400' : 'text-white'
+                }`}
+                rows={4}
+                placeholder="Describe how you want Jamie to write your social media posts..."
+              />
+              
+              {/* Example Output */}
+              <div className="mt-4 p-4 bg-gray-900 rounded-lg border border-gray-800">
+                <h4 className="text-white font-medium mb-2">Example Output:</h4>
+                <div className="text-gray-300 text-sm">
+                  <p className="mb-2">
+                    "Bitcoin is that ship, the ultimate tool for the entrepreneur, freeing us from the weight of the fiat system."
+                  </p>
+                  <p>
+                    Dive into the full conversation with MADEX on THE Bitcoin Podcast: https://fountain.fm/episode/5jHdICDe5fOX0xms74fI
+                  </p>
+                </div>
+              </div>
             </div>
             
             {/* Navigation Buttons */}
@@ -275,10 +423,10 @@ const AutomationSettingsPage: React.FC = () => {
               </button>
               
               <button
-                onClick={handleNext}
+                onClick={isUsingDefault ? handleUseDefault : handleNext}
                 className="px-6 py-3 rounded-lg font-medium transition-colors bg-white text-black hover:bg-gray-200"
               >
-                Next
+                {isUsingDefault ? 'Use Default' : 'Next'}
               </button>
             </div>
           </div>
@@ -287,8 +435,22 @@ const AutomationSettingsPage: React.FC = () => {
       case AutomationStep.POSTING_SCHEDULE:
         return (
           <div className="max-w-2xl mx-auto">
+            {/* Header Text */}
             <div className="text-center mb-8">
-              <p className="text-gray-400">Posting Schedule configuration coming soon...</p>
+              <h1 className="text-4xl font-bold mb-4">Choose Your Posting Slots</h1>
+              <p className="text-gray-400 text-lg">
+                Select the default time slots Jamie will choose when auto posting on your behalf
+              </p>
+            </div>
+
+            {/* Scheduled Post Slots */}
+            <div className="mb-8">
+              <ScheduledPostSlots
+                slots={scheduledSlots}
+                onSlotsChange={handleScheduledSlotsChange}
+                maxSlots={10}
+                isSelectable={false}
+              />
             </div>
             
             {/* Navigation Buttons */}
@@ -303,7 +465,11 @@ const AutomationSettingsPage: React.FC = () => {
               <button
                 onClick={() => {
                   // TODO: Save settings and close wizard
-                  console.log('Save automation settings');
+                  console.log('Save automation settings', {
+                    topics,
+                    writingStyle,
+                    scheduledSlots
+                  });
                 }}
                 className="px-6 py-3 rounded-lg font-medium transition-colors bg-white text-black hover:bg-gray-200"
               >
