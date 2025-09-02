@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ScheduledPostSlots from './ScheduledPostSlots.tsx';
 import { ScheduledSlot } from '../services/preferencesService.ts';
 import PageBanner from './PageBanner.tsx';
+import { API_URL } from '../constants/constants.ts';
 
 // Automation wizard steps enum
 enum AutomationStep {
@@ -122,11 +123,32 @@ const SuggestedTopicCard: React.FC<SuggestedTopicCardProps> = ({ emoji, icon, ti
   </button>
 );
 
+// Success Modal for Settings Save
+const SettingsSaveSuccessPopup = ({ onClose }: { onClose: () => void }) => (
+  <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
+    <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+      <h2 className="text-white text-lg font-bold mb-4">Settings Saved Successfully!</h2>
+      <p className="text-gray-400 mb-4">
+        Your Full Jamie Auto settings have been saved. Jamie will now automatically find and share content based on your preferences.
+      </p>
+      <button
+        onClick={onClose}
+        className="mt-4 px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors"
+      >
+        Continue
+      </button>
+    </div>
+  </div>
+);
+
 const AutomationSettingsPage: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<AutomationStep>(AutomationStep.CURATION_SETTINGS);
-  const [topics, setTopics] = useState<string[]>(['', '', '']);
-  const [writingStyle, setWritingStyle] = useState<string>('Pull out the most impactful verbatim quote from this clip then follow up with a carriage return and a call to action with the full podcast link');
+  const [topics, setTopics] = useState<string[]>(['']);
+  const [writingStyle, setWritingStyle] = useState<string>('');
   const [isUsingDefault, setIsUsingDefault] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [scheduledSlots, setScheduledSlots] = useState<ScheduledSlot[]>(() => {
     // Generate default slots: 9:45 AM and 4:45 PM on weekdays (Monday-Friday)
     const defaultSlots: ScheduledSlot[] = [];
@@ -197,7 +219,7 @@ const AutomationSettingsPage: React.FC = () => {
   };
 
   const handleUseDefault = () => {
-    setWritingStyle('Pull out the most impactful verbatim quote from this clip then follow up with a carriage return and a call to action with the full podcast link');
+    setWritingStyle(defaultWritingStylePrompt);
     setIsUsingDefault(true);
     if (currentStep < AutomationStep.POSTING_SCHEDULE) {
       setCurrentStep(currentStep + 1);
@@ -220,6 +242,127 @@ const AutomationSettingsPage: React.FC = () => {
   // Handle scheduled slots changes
   const handleScheduledSlotsChange = (slots: ScheduledSlot[]) => {
     setScheduledSlots(slots);
+  };
+
+  // Default writing style prompt
+  const defaultWritingStylePrompt = "Pull out the most impactful verbatim quote from this clip then follow up with a carriage return and a call to action with the full podcast link";
+
+  // Load existing settings on component mount
+  useEffect(() => {
+    const loadAutomationSettings = async () => {
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem('auth_token');
+        const feedId = '550168'; // Hardcoded feedId as shown in the curl example
+        
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(`${API_URL}/api/automation-settings?feedId=${feedId}`, {
+          method: 'GET',
+          headers: headers
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            const { curationSettings, postingStyle, postingSchedule } = result.data;
+            
+            // Populate curation settings (topics)
+            if (curationSettings?.topics && Array.isArray(curationSettings.topics)) {
+              const loadedTopics = curationSettings.topics.length > 0 ? curationSettings.topics : [''];
+              setTopics(loadedTopics);
+            }
+            
+            // Populate posting style
+            if (postingStyle?.prompt && postingStyle.prompt.trim() !== '') {
+              setWritingStyle(postingStyle.prompt);
+              setIsUsingDefault(postingStyle.prompt === defaultWritingStylePrompt);
+            } else {
+              // If prompt is null, empty, or whitespace-only, use default
+              setWritingStyle(defaultWritingStylePrompt);
+              setIsUsingDefault(true);
+            }
+            
+            // Populate posting schedule
+            if (postingSchedule?.scheduledPostSlots && Array.isArray(postingSchedule.scheduledPostSlots)) {
+              setScheduledSlots(postingSchedule.scheduledPostSlots);
+            }
+          }
+        } else {
+          console.error('Failed to load automation settings:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error loading automation settings:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadAutomationSettings();
+  }, []);
+
+  // Handle save settings
+  const handleSaveSettings = async () => {
+    try {
+      setIsSaving(true);
+      const token = localStorage.getItem('auth_token');
+      const feedId = '550168'; // Hardcoded feedId as shown in the curl example
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const requestBody = {
+        curationSettings: {
+          topics: topics.filter(topic => topic.trim() !== ''),
+          feedId: feedId
+        },
+        postingStyle: {
+          prompt: isUsingDefault ? defaultWritingStylePrompt : writingStyle
+        },
+        postingSchedule: {
+          scheduledPostSlots: scheduledSlots,
+          randomizePostTime: true // Default to true as shown in the API response
+        },
+        automationEnabled: true // Enable automation when settings are saved
+      };
+      
+      const response = await fetch(`${API_URL}/api/automation-settings`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(requestBody)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setShowSuccessModal(true);
+        } else {
+          console.error('Failed to save automation settings:', result.message || 'Unknown error');
+          alert('Failed to save settings. Please try again.');
+        }
+      } else {
+        console.error('Failed to save automation settings:', response.statusText);
+        alert('Failed to save settings. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error saving automation settings:', error);
+      alert('Failed to save settings. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Suggested topics data
@@ -469,17 +612,15 @@ const AutomationSettingsPage: React.FC = () => {
               </button>
               
               <button
-                onClick={() => {
-                  // TODO: Save settings and close wizard
-                  console.log('Save automation settings', {
-                    topics,
-                    writingStyle,
-                    scheduledSlots
-                  });
-                }}
-                className="px-6 py-3 rounded-lg font-medium transition-colors bg-white text-black hover:bg-gray-200"
+                onClick={handleSaveSettings}
+                disabled={isSaving}
+                className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                  isSaving 
+                    ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
+                    : 'bg-white text-black hover:bg-gray-200'
+                }`}
               >
-                Save Settings
+                {isSaving ? 'Saving...' : 'Save Settings'}
               </button>
             </div>
           </div>
@@ -536,6 +677,27 @@ const AutomationSettingsPage: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 pb-8">
         {renderStepContent()}
       </div>
+      
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40">
+          <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-white">Loading your settings...</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <SettingsSaveSuccessPopup 
+          onClose={() => {
+            setShowSuccessModal(false);
+            // Navigate back to Jamie Pro History page
+            window.location.href = '/app/feed/550168/jamieProHistory';
+          }} 
+        />
+      )}
     </div>
   );
 };
