@@ -43,7 +43,7 @@ export async function getAutomationSettings(feedId: string): Promise<AutomationS
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    const response = await fetch(`${API_URL}/api/automation-settings?feedId=${feedId}`, {
+    const response = await fetch(`${API_URL}/api/automation-settings`, {
       method: 'GET',
       headers: headers
     });
