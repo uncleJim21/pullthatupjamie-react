@@ -16,10 +16,16 @@ export interface PostingSchedule {
   randomizePostTime: boolean;
 }
 
+export interface PlatformAutomationSettings {
+  twitterOAuthEnabled: boolean;
+  nostrAutomationEnabled: boolean;
+}
+
 export interface AutomationSettings {
   curationSettings: CurationSettings;
   postingStyle: PostingStyle;
   postingSchedule: PostingSchedule;
+  automationSettings: PlatformAutomationSettings;
   automationEnabled: boolean;
 }
 

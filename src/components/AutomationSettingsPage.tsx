@@ -1,15 +1,33 @@
 import React, { useState, useEffect } from 'react';
+import { Twitter } from 'lucide-react';
 import ScheduledPostSlots from './ScheduledPostSlots.tsx';
 import { ScheduledSlot } from '../services/preferencesService.ts';
 import PageBanner from './PageBanner.tsx';
-import { getAutomationSettings, saveAutomationSettings, AutomationSettings } from '../services/automationSettingsService.ts';
+import { getAutomationSettings, saveAutomationSettings, AutomationSettings, PlatformAutomationSettings } from '../services/automationSettingsService.ts';
+import PlatformIntegrationService, { PlatformState } from '../services/platformIntegrationService.ts';
 import SignInModal from './SignInModal.tsx';
+import { API_URL, printLog } from '../constants/constants.ts';
+
+// Define type for Nostr window extension
+declare global {
+  interface Window {
+    nostr?: {
+      getPublicKey: () => Promise<string>;
+      signEvent: (event: any) => Promise<any>;
+      nip04?: {
+        encrypt?: (pubkey: string, plaintext: string) => Promise<string>;
+        decrypt?: (pubkey: string, ciphertext: string) => Promise<string>;
+      };
+    };
+  }
+}
 
 // Automation wizard steps enum
 enum AutomationStep {
   CURATION_SETTINGS = 1,
   POSTING_STYLE = 2,
-  POSTING_SCHEDULE = 3
+  POSTING_SCHEDULE = 3,
+  PLATFORM_INTEGRATION = 4
 }
 
 // Step indicator interface
@@ -22,6 +40,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {
     { number: 1, label: 'Curation Settings' },
     { number: 2, label: 'Posting Style' },
     { number: 3, label: 'Posting Schedule' },
+    { number: 4, label: 'Platform Integration' },
   ];
 
   return (
@@ -191,6 +210,17 @@ const AutomationSettingsPage: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [showAdminRequiredModal, setShowAdminRequiredModal] = useState<boolean>(false);
   const [isSignInModalOpen, setIsSignInModalOpen] = useState<boolean>(false);
+  const [platformStates, setPlatformStates] = useState<{
+    twitter: PlatformState;
+    nostr: PlatformState;
+  }>({
+    twitter: { enabled: false, available: true, authenticated: false },
+    nostr: { enabled: false, available: true, authenticated: false }
+  });
+  const [automationSettings, setAutomationSettings] = useState<PlatformAutomationSettings>({
+    twitterOAuthEnabled: false,
+    nostrAutomationEnabled: false
+  });
   const [scheduledSlots, setScheduledSlots] = useState<ScheduledSlot[]>(() => {
     // Generate default slots: 9:45 AM and 4:45 PM on weekdays (Monday-Friday)
     const defaultSlots: ScheduledSlot[] = [];
@@ -270,7 +300,7 @@ const AutomationSettingsPage: React.FC = () => {
 
   // Navigation handlers
   const handleNext = () => {
-    if (currentStep < AutomationStep.POSTING_SCHEDULE) {
+    if (currentStep < AutomationStep.PLATFORM_INTEGRATION) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -284,6 +314,90 @@ const AutomationSettingsPage: React.FC = () => {
   // Handle scheduled slots changes
   const handleScheduledSlotsChange = (slots: ScheduledSlot[]) => {
     setScheduledSlots(slots);
+  };
+
+  // Platform integration handlers
+  const handleTwitterConnect = async () => {
+    try {
+      const result = await PlatformIntegrationService.connectTwitter();
+      if (result.success) {
+        // Refresh platform status after connection
+        await loadPlatformStatus();
+      } else {
+        console.error('Twitter connection failed:', result.error);
+        alert('Failed to connect to Twitter. Please try again.');
+      }
+    } catch (error) {
+      console.error('Twitter connection error:', error);
+      alert('Failed to connect to Twitter. Please try again.');
+    }
+  };
+
+  const handleTwitterDisconnect = async () => {
+    try {
+      const result = await PlatformIntegrationService.disconnectTwitter();
+      if (result.success) {
+        // Refresh platform status after disconnection
+        await loadPlatformStatus();
+        // Disable automation if disconnected
+        setAutomationSettings(prev => ({ ...prev, twitterOAuthEnabled: false }));
+      } else {
+        console.error('Twitter disconnection failed:', result.error);
+        alert('Failed to disconnect from Twitter. Please try again.');
+      }
+    } catch (error) {
+      console.error('Twitter disconnection error:', error);
+      alert('Failed to disconnect from Twitter. Please try again.');
+    }
+  };
+
+  const handleAutomationSettingChange = (platform: 'twitter' | 'nostr', enabled: boolean) => {
+    setAutomationSettings(prev => ({
+      ...prev,
+      ...(platform === 'twitter' 
+        ? { twitterOAuthEnabled: enabled }
+        : { nostrAutomationEnabled: enabled }
+      )
+    }));
+  };
+
+  const loadPlatformStatus = async () => {
+    try {
+      const status = await PlatformIntegrationService.getPlatformStatus();
+      setPlatformStates(status);
+    } catch (error) {
+      console.error('Failed to load platform status:', error);
+    }
+  };
+
+  // Check platform status using shared service
+  const checkPlatformStatus = async () => {
+    try {
+      const [twitterState, nostrState] = await Promise.all([
+        PlatformIntegrationService.checkTwitterAuth(),
+        PlatformIntegrationService.checkNostrExtension()
+      ]);
+      
+      setPlatformStates({
+        twitter: twitterState,
+        nostr: nostrState
+      });
+    } catch (error) {
+      printLog(`Error checking platform status: ${error}`);
+    }
+  };
+
+  // Connect to Nostr extension using shared service
+  const connectNostrExtension = async () => {
+    try {
+      const nostrState = await PlatformIntegrationService.connectNostrExtension();
+      setPlatformStates(prev => ({
+        ...prev,
+        nostr: nostrState
+      }));
+    } catch (error) {
+      printLog(`Error connecting to Nostr: ${error}`);
+    }
   };
 
   // Default writing style prompt
@@ -346,6 +460,19 @@ const AutomationSettingsPage: React.FC = () => {
           if (postingSchedule?.scheduledPostSlots && Array.isArray(postingSchedule.scheduledPostSlots)) {
             setScheduledSlots(postingSchedule.scheduledPostSlots);
           }
+
+          // Load platform integration settings from userSettings
+          const userSettings = localStorage.getItem('userSettings');
+          if (userSettings) {
+            try {
+              const parsed = JSON.parse(userSettings);
+              if (parsed.automationSettings) {
+                setAutomationSettings(parsed.automationSettings);
+              }
+            } catch (e) {
+              console.error('Failed to parse userSettings:', e);
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading automation settings:', error);
@@ -361,6 +488,13 @@ const AutomationSettingsPage: React.FC = () => {
       setIsLoading(false);
     }
   }, [isAdmin]);
+
+  // Load platform status when reaching platform integration step
+  useEffect(() => {
+    if (currentStep === AutomationStep.PLATFORM_INTEGRATION && isAdmin) {
+      checkPlatformStatus();
+    }
+  }, [currentStep, isAdmin]);
 
   // Handle sign in modal open
   const handleOpenSignInModal = () => {
@@ -433,12 +567,22 @@ const AutomationSettingsPage: React.FC = () => {
           scheduledPostSlots: scheduledSlots,
           randomizePostTime: true // Default to true as shown in the API response
         },
+        automationSettings: {
+          twitterOAuthEnabled: automationSettings.twitterOAuthEnabled,
+          nostrAutomationEnabled: automationSettings.nostrAutomationEnabled
+        },
         automationEnabled: true // Enable automation when settings are saved
       };
       
       const result = await saveAutomationSettings(settingsToSave);
       
       if (result.success) {
+        // Save automation settings to userSettings
+        const userSettings = localStorage.getItem('userSettings');
+        const parsedSettings = userSettings ? JSON.parse(userSettings) : {};
+        parsedSettings.automationSettings = automationSettings;
+        localStorage.setItem('userSettings', JSON.stringify(parsedSettings));
+        
         setShowSuccessModal(true);
       } else {
         console.error('Failed to save automation settings:', result.message || 'Unknown error');
@@ -699,10 +843,133 @@ const AutomationSettingsPage: React.FC = () => {
               </button>
               
               <button
+                onClick={handleNext}
+                className="px-6 py-3 rounded-lg font-medium transition-colors bg-white text-black hover:bg-gray-200"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        );
+      
+      case AutomationStep.PLATFORM_INTEGRATION:
+        return (
+          <div className="max-w-2xl mx-auto">
+            {/* Header Text */}
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-bold mb-4">Platform Integration</h1>
+              <p className="text-gray-400 text-lg">
+                Connect your social media accounts and configure automation settings
+              </p>
+            </div>
+
+            {/* Platform Selection with Checkboxes */}
+            <div className="mb-6">
+              <div className="space-y-3">
+                {/* Twitter Platform */}
+                <div className="flex items-center justify-between p-3 bg-gray-900/60 border border-gray-700 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Twitter className="w-6 h-6 text-blue-400" />
+                    <div className="flex-1">
+                      {platformStates.twitter.authenticated ? (
+                        <p className="text-white text-sm">Signed in as @{platformStates.twitter.username}</p>
+                      ) : (
+                        <p className="text-white text-sm">Connect to enable automatic posting</p>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {platformStates.twitter.authenticated ? (
+                        <button
+                          onClick={handleTwitterDisconnect}
+                          className="px-3 py-1 text-xs bg-gray-700 text-white rounded hover:bg-gray-600"
+                        >
+                          Disconnect
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleTwitterConnect}
+                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500"
+                        >
+                          Connect
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 ml-2">
+                    <input
+                      type="checkbox"
+                      checked={automationSettings.twitterOAuthEnabled}
+                      onChange={(e) => handleAutomationSettingChange('twitter', e.target.checked)}
+                      disabled={!platformStates.twitter.authenticated}
+                      className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                {/* Nostr Platform */}
+                <div className="flex items-center justify-between p-3 bg-gray-900/60 border border-gray-700 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <img 
+                      src="/nostr-logo-square.png" 
+                      alt="Nostr" 
+                      className="w-6 h-6"
+                      style={{ filter: 'brightness(1.2)', mixBlendMode: 'screen', opacity: platformStates.nostr.available ? 1 : 0.5 }}
+                    />
+                    <div className="flex-1">
+                      {platformStates.nostr.available && platformStates.nostr.authenticated ? (
+                        <p className="text-white text-sm">Extension connected</p>
+                      ) : platformStates.nostr.available ? (
+                        <p className="text-white text-sm">Connect NIP07 Extension to enable automation</p>
+                      ) : (
+                        <div className="text-xs text-gray-400 italic opacity-70">Install a Nostr extension (like nos2x)</div>
+                      )}
+                    </div>
+                    {platformStates.nostr.available && !platformStates.nostr.authenticated && (
+                      <button
+                        onClick={connectNostrExtension}
+                        className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-500"
+                      >
+                        Connect
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2 ml-2">
+                    <input
+                      type="checkbox"
+                      checked={automationSettings.nostrAutomationEnabled}
+                      onChange={(e) => handleAutomationSettingChange('nostr', e.target.checked)}
+                      disabled={!platformStates.nostr.available || !platformStates.nostr.authenticated}
+                      className="w-4 h-4 text-purple-500 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Automation Settings Labels */}
+            <div className="mb-6 space-y-2">
+              <div className="text-sm text-gray-400">
+                <strong>Twitter:</strong> Automatically post to Twitter via @{platformStates.twitter.username || 'your account'}
+              </div>
+              <div className="text-sm text-gray-400">
+                <strong>Nostr:</strong> Receive emails when auto-generated Nostr notes are ready for signing
+              </div>
+            </div>
+            
+            {/* Navigation Buttons */}
+            <div className="flex justify-between items-center pt-6">
+              <button
+                onClick={handleBack}
+                className="px-6 py-3 rounded-lg font-medium transition-colors bg-gray-700 text-white hover:bg-gray-600"
+              >
+                Back
+              </button>
+              
+              <button
                 onClick={handleSaveSettings}
-                disabled={isSaving}
+                disabled={isSaving || (!automationSettings.twitterOAuthEnabled && !automationSettings.nostrAutomationEnabled)}
                 className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                  isSaving 
+                  isSaving || (!automationSettings.twitterOAuthEnabled && !automationSettings.nostrAutomationEnabled)
                     ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
                     : 'bg-white text-black hover:bg-gray-200'
                 }`}

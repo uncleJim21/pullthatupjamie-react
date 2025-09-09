@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin, Clock } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
+import PlatformIntegrationService from '../services/platformIntegrationService.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
 import AuthService from '../services/authService.ts';
@@ -1128,13 +1129,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   const checkNostrExtension = async () => {
     try {
-      if (window.nostr) {
-        setNostrState(prev => ({ ...prev, available: true }));
-        printLog("Nostr extension detected but not authenticated yet");
-        // Don't automatically request public key - only check availability
-      } else {
-        setNostrState(prev => ({ ...prev, available: false, authenticated: false }));
-      }
+      const nostrState = await PlatformIntegrationService.checkNostrExtension();
+      setNostrState(prev => ({
+        ...prev,
+        available: nostrState.available,
+        authenticated: nostrState.authenticated
+      }));
     } catch (error) {
       setNostrState(prev => ({ ...prev, available: false, authenticated: false }));
       console.error("Error checking for Nostr extension:", error);
@@ -1143,13 +1143,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   const connectNostrExtension = async () => {
     try {
-      if (window.nostr) {
-        const pubKey = await window.nostr.getPublicKey();
-        setNostrState(prev => ({ ...prev, authenticated: true }));
-        printLog(`Nostr extension connected with public key: ${pubKey}`);
-      } else {
-        setNostrState(prev => ({ ...prev, available: false, authenticated: false }));
-      }
+      const nostrState = await PlatformIntegrationService.connectNostrExtension();
+      setNostrState(prev => ({
+        ...prev,
+        available: nostrState.available,
+        authenticated: nostrState.authenticated
+      }));
     } catch (error) {
       printLog("Failed to connect to Nostr extension");
       setNostrState(prev => ({ ...prev, authenticated: false }));
@@ -1157,47 +1156,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
-  // Check Twitter authentication status (unified with token checking)
+  // Check Twitter authentication status using shared service
   const checkTwitterAuth = async () => {
-    printLog('Checking Twitter auth status in SocialShareModal...');
     try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        printLog('No auth token found for Twitter auth check');
-        setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
-        return;
-      }
-
-      const response = await fetch(`${API_URL}/api/twitter/tokens`, {
-        method: 'POST',
-        headers: {
-          'Accept': '*/*',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Origin': window.location.origin
-        },
-        credentials: 'include',
-        mode: 'cors'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        printLog(`Twitter auth check response: ${JSON.stringify(data)}`);
-        
-        setTwitterState(prev => ({ 
-          ...prev, 
-          authenticated: data.authenticated === true,
-          available: true,
-          username: data.authenticated ? data.twitterUsername : undefined
-        }));
-        
-        // Set hasValidTokens for the UI flow
-        setHasValidTokens(data.authenticated === true);
-      } else {
-        printLog(`Twitter auth check failed with status ${response.status}`);
-        setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
-        setHasValidTokens(false);
-      }
+      const twitterState = await PlatformIntegrationService.checkTwitterAuth();
+      setTwitterState(prev => ({
+        ...prev,
+        authenticated: twitterState.authenticated,
+        available: twitterState.available,
+        username: twitterState.username
+      }));
+      setHasValidTokens(twitterState.authenticated);
     } catch (error) {
       printLog(`Error checking Twitter auth: ${error}`);
       setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
