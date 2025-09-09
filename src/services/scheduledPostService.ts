@@ -228,6 +228,144 @@ export class ScheduledPostService {
       throw error;
     }
   }
+
+  /**
+   * Sign and promote an unsigned Nostr post to scheduled status
+   */
+  static async signAndPromotePost(
+    postId: string, 
+    signedEvent: any, 
+    newScheduledDate?: Date
+  ): Promise<ScheduledPost> {
+    try {
+      printLog(`Signing and promoting post: ${postId}`);
+      
+      // Create Primal URL using bech32-like encoding (simplified for now)
+      const primalUrl = `https://primal.net/e/note1${signedEvent.id.slice(0, 16)}...`;
+      
+      const requestBody: any = {
+        platformData: {
+          nostrEventId: signedEvent.id,
+          nostrSignature: signedEvent.sig,
+          nostrPubkey: signedEvent.pubkey,
+          nostrCreatedAt: signedEvent.created_at,
+          nostrRelays: [
+            "wss://relay.primal.net",
+            "wss://relay.damus.io", 
+            "wss://nos.lol"
+          ],
+          nostrPostUrl: primalUrl
+        }
+      };
+
+      if (newScheduledDate) {
+        requestBody.newScheduledDate = newScheduledDate.toISOString();
+        requestBody.timezone = "America/Chicago";
+      }
+
+      printLog(`Making PUT request to ${API_URL}/api/social/posts/${postId}`);
+      printLog(`Request body:`, JSON.stringify(requestBody, null, 2));
+      printLog(`Auth headers:`, this.getAuthHeaders());
+
+      const response = await fetch(`${API_URL}/api/social/posts/${postId}`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(requestBody),
+      });
+
+      printLog(`Response status: ${response.status}`);
+      printLog(`Response headers:`, Object.fromEntries(response.headers.entries()));
+
+      const data = await this.handleResponse<{ post: ScheduledPost }>(response);
+      printLog(`Successfully signed and promoted post: ${postId}`);
+      
+      return data.post;
+    } catch (error) {
+      printLog(`Error signing and promoting post ${postId}: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Batch sign and promote multiple unsigned Nostr posts
+   */
+  static async batchSignAndPromotePosts(
+    postsData: Array<{
+      postId: string;
+      signedEvent: any;
+      newScheduledDate?: Date;
+    }>
+  ): Promise<{
+    success: boolean;
+    message: string;
+    totalPosts: number;
+    successCount: number;
+    failureCount: number;
+    results: Array<{
+      success: boolean;
+      postId: string;
+      message: string;
+      eventId?: string;
+      primalUrl?: string;
+    }>;
+  }> {
+    try {
+      printLog(`Batch signing ${postsData.length} posts`);
+      
+      const requestBody = {
+        posts: postsData.map(({ postId, signedEvent, newScheduledDate }) => {
+          const primalUrl = `https://primal.net/e/note1${signedEvent.id.slice(0, 16)}...`;
+          
+          return {
+            postId,
+            platformData: {
+              nostrEventId: signedEvent.id,
+              nostrSignature: signedEvent.sig,
+              nostrPubkey: signedEvent.pubkey,
+              nostrCreatedAt: signedEvent.created_at,
+              nostrRelays: [
+                "wss://relay.primal.net",
+                "wss://relay.damus.io", 
+                "wss://nos.lol"
+              ],
+              nostrPostUrl: primalUrl
+            },
+            ...(newScheduledDate && {
+              newScheduledDate: newScheduledDate.toISOString(),
+              timezone: "America/Chicago"
+            })
+          };
+        })
+      };
+
+      const response = await fetch(`${API_URL}/api/social/posts/batch-sign`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await this.handleResponse<{
+        success: boolean;
+        message: string;
+        totalPosts: number;
+        successCount: number;
+        failureCount: number;
+        results: Array<{
+          success: boolean;
+          postId: string;
+          message: string;
+          eventId?: string;
+          primalUrl?: string;
+        }>;
+      }>(response);
+      
+      printLog(`Batch signing completed: ${data.successCount}/${data.totalPosts} successful`);
+      return data;
+    } catch (error) {
+      printLog(`Error in batch signing: ${error}`);
+      throw error;
+    }
+  }
 }
 
 export default ScheduledPostService;

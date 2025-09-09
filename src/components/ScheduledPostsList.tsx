@@ -7,6 +7,20 @@ import ScheduledPostService from '../services/scheduledPostService.ts';
 import { ScheduledPost, ScheduledPostsQuery } from '../types/scheduledPost.ts';
 import { formatScheduledDate, formatShortDate } from '../utils/time.ts';
 
+// Define type for Nostr window extension
+declare global {
+  interface Window {
+    nostr?: {
+      getPublicKey: () => Promise<string>;
+      signEvent: (event: any) => Promise<any>;
+      nip04?: {
+        encrypt?: (pubkey: string, plaintext: string) => Promise<string>;
+        decrypt?: (pubkey: string, ciphertext: string) => Promise<string>;
+      };
+    };
+  }
+}
+
 // Constants for preview sizing (matching SocialShareModal)
 const ASPECT_RATIO = 16 / 9;
 const PREVIEW_WIDTH = 160; // Smaller for list view
@@ -294,33 +308,65 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
       setCurrentPost(post);
       setShowSocialShareModal(true);
       
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check for cancellation again after delay
+      // Check for cancellation
       if (cancelSignAll) {
         printLog('Sign All process cancelled by user');
         break;
       }
       
-      // Determine scheduled date
-      let scheduledDate = new Date(post.scheduledFor);
-      const now = new Date();
-      
-      if (scheduledDate <= now) {
-        // Date is in the past, find next available slot
-        const nextSlot = getNextAvailableSlot(currentUsedSlots);
-        scheduledDate = nextSlot.date;
-        currentUsedSlots.add(nextSlot.slotKey);
-        printLog(`Post ${post.postId || post._id} rescheduled to ${scheduledDate.toISOString()} using slot ${nextSlot.slotKey}`);
-      } else {
-        printLog(`Post ${post.postId || post._id} keeping original date ${scheduledDate.toISOString()}`);
+      try {
+        // Check if Nostr extension is available
+        if (!window.nostr) {
+          throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
+        }
+        
+        // Build the content for signing (same logic as SocialShareModal)
+        const baseContent = post.content.text || '';
+        
+        // Create the Nostr event to sign
+        const eventToSign = {
+          kind: 1,
+          created_at: Math.floor(Date.now() / 1000),
+          content: baseContent, // Use the post content as-is
+          tags: [], // No special tags for now
+        };
+        
+        // Sign the event
+        const signedEvent = await window.nostr.signEvent(eventToSign);
+        printLog(`Successfully signed event for post ${post.postId || post._id}: ${signedEvent.id}`);
+        
+        // Determine scheduled date
+        let scheduledDate = new Date(post.scheduledFor);
+        const now = new Date();
+        
+        if (scheduledDate <= now) {
+          // Date is in the past, find next available slot
+          const nextSlot = getNextAvailableSlot(currentUsedSlots);
+          scheduledDate = nextSlot.date;
+          currentUsedSlots.add(nextSlot.slotKey);
+          printLog(`Post ${post.postId || post._id} rescheduled to ${scheduledDate.toISOString()} using slot ${nextSlot.slotKey}`);
+        } else {
+          printLog(`Post ${post.postId || post._id} keeping original date ${scheduledDate.toISOString()}`);
+        }
+        
+        // Sign and promote the post
+        printLog(`About to call API for post ${post.postId || post._id} with signed event:`, signedEvent);
+        
+        const result = await ScheduledPostService.signAndPromotePost(
+          post.postId || post._id,
+          signedEvent,
+          scheduledDate
+        );
+        
+        printLog(`API response for post ${post.postId || post._id}:`, result);
+        
+      } catch (error) {
+        console.error(`Error signing post ${post.postId || post._id}:`, error);
+        printLog(`Failed to sign post ${post.postId || post._id}: ${error}`);
+        // Continue with next post even if one fails
       }
       
-      // Mock API call to sign and schedule the post
-      printLog(`Mock API: Signing post ${post.postId || post._id} for ${scheduledDate.toISOString()}`);
-      
-      // Simulate API delay
+      // Small delay between posts
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     
@@ -335,6 +381,81 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
     
     // Refresh the list
     await loadPosts();
+  };
+
+  // Individual post signing handlers
+  const handleSignIndividualPost = async (post: ScheduledPost) => {
+    try {
+      const postId = getPostId(post);
+      printLog(`Starting individual sign for post: ${postId}`);
+      
+      // Check if Nostr extension is available
+      if (!window.nostr) {
+        throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
+      }
+      
+      // Build the content for signing
+      const baseContent = post.content.text || '';
+      
+      // Create the Nostr event to sign
+      const eventToSign = {
+        kind: 1,
+        created_at: Math.floor(Date.now() / 1000),
+        content: baseContent,
+        tags: [],
+      };
+      
+      // Sign the event
+      const signedEvent = await window.nostr.signEvent(eventToSign);
+      printLog(`Successfully signed event for post ${postId}: ${signedEvent.id}`);
+      
+      // Determine scheduled date
+      let scheduledDate = new Date(post.scheduledFor);
+      const now = new Date();
+      
+      if (scheduledDate <= now) {
+        // Date is in the past, use next available slot
+        const nextSlot = getNextAvailableSlot(new Set());
+        scheduledDate = nextSlot.date;
+        printLog(`Post ${postId} rescheduled to ${scheduledDate.toISOString()}`);
+      }
+      
+      // Sign and promote the post
+      const result = await ScheduledPostService.signAndPromotePost(
+        postId,
+        signedEvent,
+        scheduledDate
+      );
+      
+      printLog(`Successfully signed and promoted individual post: ${result.postId}`);
+      
+      // Refresh the list
+      await loadPosts();
+      
+    } catch (error) {
+      console.error(`Error signing individual post:`, error);
+      printLog(`Failed to sign individual post: ${error}`);
+    }
+  };
+
+  const handleRejectIndividualPost = async (post: ScheduledPost) => {
+    try {
+      const postId = getPostId(post);
+      printLog(`Rejecting individual post: ${postId}`);
+      
+      // For now, we'll delete the post (reject = delete)
+      // TODO: Update this if there's a specific "reject" status
+      await ScheduledPostService.deleteScheduledPost(postId);
+      
+      printLog(`Successfully rejected/deleted post: ${postId}`);
+      
+      // Refresh the list
+      await loadPosts();
+      
+    } catch (error) {
+      console.error(`Error rejecting individual post:`, error);
+      printLog(`Failed to reject individual post: ${error}`);
+    }
   };
 
   // Review Each navigation handlers
@@ -713,14 +834,14 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
                   {post.status === 'unsigned' && (
                     <>
                       <button
-                        onClick={() => printLog(`Sign individual post: ${getPostId(post)}`)}
+                        onClick={() => handleSignIndividualPost(post)}
                         className="p-2 rounded-lg bg-purple-600 hover:bg-purple-500 transition-colors"
                         title="Sign this post"
                       >
                         <PenTool className="w-4 h-4 text-white" />
                       </button>
                       <button
-                        onClick={() => printLog(`Reject individual post: ${getPostId(post)}`)}
+                        onClick={() => handleRejectIndividualPost(post)}
                         className="p-2 rounded-lg bg-red-600 hover:bg-red-500 transition-colors"
                         title="Reject this post"
                       >
