@@ -264,8 +264,8 @@ export class ScheduledPostService {
       }
 
       printLog(`Making PUT request to ${API_URL}/api/social/posts/${postId}`);
-      printLog(`Request body:`, JSON.stringify(requestBody, null, 2));
-      printLog(`Auth headers:`, this.getAuthHeaders());
+      printLog(`Request body: ${JSON.stringify(requestBody, null, 2)}`);
+      printLog(`Auth headers: ${JSON.stringify(this.getAuthHeaders())}`);
 
       const response = await fetch(`${API_URL}/api/social/posts/${postId}`, {
         method: 'PUT',
@@ -274,7 +274,7 @@ export class ScheduledPostService {
       });
 
       printLog(`Response status: ${response.status}`);
-      printLog(`Response headers:`, Object.fromEntries(response.headers.entries()));
+      printLog(`Response headers: ${JSON.stringify(Object.fromEntries(Array.from(response.headers.entries())))}`);
 
       const data = await this.handleResponse<{ post: ScheduledPost }>(response);
       printLog(`Successfully signed and promoted post: ${postId}`);
