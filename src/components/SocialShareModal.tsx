@@ -74,6 +74,9 @@ interface SocialShareModalProps {
     onUpdate: (updatedPost: ScheduledPost) => void;
   };
   onSchedulingModeChange?: (isScheduling: boolean, hasDropdowns: boolean) => void;
+  // Sign All progress overlay props
+  showSignAllOverlay?: boolean;
+  signAllProgress?: { current: number; total: number };
 }
 
 // Simplified unified state interface
@@ -210,7 +213,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   lookupHash,
   auth,
   updateContext,
-  onSchedulingModeChange
+  onSchedulingModeChange,
+  showSignAllOverlay = false,
+  signAllProgress = { current: 0, total: 0 }
 }) => {
   const [content, setContent] = useState<string>('');
   
@@ -3576,6 +3581,40 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           successUrls={successUrls}
         />
         
+        {/* Sign All Progress Overlay */}
+        {showSignAllOverlay && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm rounded-xl flex items-center justify-center z-50">
+            <div className="bg-gray-900 border border-purple-600 rounded-lg p-6 text-center max-w-sm mx-4">
+              <div className="w-16 h-16 mx-auto mb-4 relative">
+                <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div 
+                    className="w-6 h-6 rounded-full"
+                    style={{
+                      backgroundColor: '#8B5CF6',
+                      mask: 'url(/nostr-logo-square.png) center/contain no-repeat',
+                      WebkitMask: 'url(/nostr-logo-square.png) center/contain no-repeat'
+                    }}
+                  />
+                </div>
+              </div>
+              <h3 className="text-white font-semibold text-lg mb-2">Signing Nostr Post</h3>
+              <p className="text-purple-300 mb-4">
+                Processing post {signAllProgress.current} of {signAllProgress.total}
+              </p>
+              <div className="w-full bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${signAllProgress.total > 0 ? (signAllProgress.current / signAllProgress.total) * 100 : 0}%` }}
+                ></div>
+              </div>
+              <p className="text-gray-400 text-sm mt-3">
+                Please confirm signing in your Nostr extension
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Add global styles for the scrollbar */}
         <style>{`
           .overflow-y-auto::-webkit-scrollbar {

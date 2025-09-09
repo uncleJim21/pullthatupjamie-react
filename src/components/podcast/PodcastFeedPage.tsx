@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { DEBUG_MODE, FRONTEND_URL } from '../../constants/constants.ts';
+import { DEBUG_MODE, FRONTEND_URL, printLog } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
@@ -26,6 +26,7 @@ import SocialShareModal from '../SocialShareModal.tsx';
 import TutorialModal from '../TutorialModal.tsx';
 import WelcomeModal from '../WelcomeModal.tsx';
 import ScheduledPostsList from '../ScheduledPostsList.tsx';
+import ScheduledPostService from '../../services/scheduledPostService.ts';
 import { useUserSettings } from '../../hooks/useUserSettings.ts';
 import ScheduledPostSlots from '../ScheduledPostSlots.tsx';
 
@@ -152,6 +153,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
     const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
     const [isConfigureAutomationModalOpen, setIsConfigureAutomationModalOpen] = useState(false);
+    
 
     // Use the new userSettings hook with cloud sync for admin users
     const {
@@ -656,6 +658,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     setIsTutorialOpen(false);
   };
 
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -1048,7 +1051,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       }`}
                     >
                       <MessageSquare size={26} className="sm:mr-2.5 sm:!w-5 sm:!h-5" />
-                      <span className="hidden sm:inline">Chat with Jamie</span>
+                      <span className="hidden md:inline">Chat with Jamie</span>
                     </button>
                     <button
                       onClick={() => setJamieProView('history')}
@@ -1059,7 +1062,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       }`}
                     >
                       <History size={26} className="sm:mr-2.5 sm:!w-5 sm:!h-5" />
-                      <span className="hidden sm:inline">AI Curations</span>
+                      <span className="hidden md:inline">AI Curations</span>
                     </button>
                     <button
                       onClick={() => setJamieProView('scheduled-posts')}
@@ -1070,7 +1073,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       }`}
                     >
                       <Calendar size={26} className="sm:mr-2.5 sm:!w-5 sm:!h-5" />
-                      <span className="hidden sm:inline">Scheduled Posts</span>
+                      <span className="hidden md:inline">Scheduled Posts</span>
                     </button>
                     <button
                       onClick={() => setJamieProView('settings')}
@@ -1081,7 +1084,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       }`}
                     >
                       <Settings size={26} className="sm:mr-2.5 sm:!w-5 sm:!h-5" />
-                      <span className="hidden sm:inline">Settings</span>
+                      <span className="hidden md:inline">Settings</span>
                     </button>
                   </div>
                 </div>
