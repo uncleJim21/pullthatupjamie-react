@@ -1097,7 +1097,9 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   )
                 ) : jamieProView === 'scheduled-posts' ? (
                   <div className="max-w-4xl mx-auto">
-                    <ScheduledPostsList />
+                    <ScheduledPostsList 
+                      {...({ autoSignAll: searchParams.get('autoSignAll') === 'true' } as any)}
+                    />
                   </div>
                 ) : jamieProView === 'settings' ? (
                   <div className="max-w-2xl mx-auto">

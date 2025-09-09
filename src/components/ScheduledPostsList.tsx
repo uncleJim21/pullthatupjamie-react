@@ -28,9 +28,10 @@ const PREVIEW_HEIGHT = (PREVIEW_WIDTH / ASPECT_RATIO) * 1.3; // Increased by 30%
 
 interface ScheduledPostsListProps {
   className?: string;
+  autoSignAll?: boolean; // URL parameter to auto-navigate to unsigned and prompt Sign All
 }
 
-const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' }) => {
+const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '', autoSignAll = false }) => {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -166,6 +167,27 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '' 
   useEffect(() => {
     loadPosts();
   }, [filter]);
+
+  // Handle autoSignAll functionality
+  useEffect(() => {
+    if (autoSignAll && posts.length > 0) {
+      // Set filter to unsigned
+      setFilter('unsigned');
+      
+      // Check if there are unsigned posts
+      const unsignedPosts = posts.filter(post => post.status === 'unsigned');
+      
+      if (unsignedPosts.length > 0) {
+        // Small delay to ensure UI has updated
+        setTimeout(() => {
+          printLog(`Auto Sign All: Found ${unsignedPosts.length} unsigned posts, prompting user`);
+          setShowSignAllModal(true);
+        }, 500);
+      } else {
+        printLog('Auto Sign All: No unsigned posts found');
+      }
+    }
+  }, [autoSignAll, posts]);
 
   // Note: Using imported formatScheduledDate from utils/time.ts
 
