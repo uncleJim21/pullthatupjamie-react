@@ -153,6 +153,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
     const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
     const [isConfigureAutomationModalOpen, setIsConfigureAutomationModalOpen] = useState(false);
+    const [shouldAutoSignAll, setShouldAutoSignAll] = useState(false);
     
 
     // Use the new userSettings hook with cloud sync for admin users
@@ -610,6 +611,20 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       setSearchParams(newSearchParams, { replace: true });
     }
   }, [searchParams, isAdmin, setSearchParams]);
+
+  // Handle autoSignAll parameter only once on initial load
+  useEffect(() => {
+    const autoSignAll = searchParams.get('autoSignAll');
+    if (autoSignAll === 'true' && !shouldAutoSignAll && isAdmin) {
+      setShouldAutoSignAll(true);
+      setActiveTab('Jamie Pro');
+      setJamieProView('scheduled-posts');
+      // Clean up URL parameter after processing
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('autoSignAll');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [searchParams, shouldAutoSignAll, isAdmin, setSearchParams]);
 
   const handleProDashboardUpgrade = () => {
     setIsProDashboardModalOpen(false);
@@ -1098,7 +1113,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                 ) : jamieProView === 'scheduled-posts' ? (
                   <div className="max-w-4xl mx-auto">
                     <ScheduledPostsList 
-                      {...({ autoSignAll: searchParams.get('autoSignAll') === 'true' } as any)}
+                      {...({ autoSignAll: shouldAutoSignAll } as any)}
                     />
                   </div>
                 ) : jamieProView === 'settings' ? (

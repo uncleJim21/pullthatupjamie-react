@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Clock, Twitter, Edit, Trash2, RefreshCw, AlertCircle, CheckCircle, XCircle, PenTool, X } from 'lucide-react';
 import { printLog } from '../constants/constants.ts';
 import DeleteConfirmationModal from './DeleteConfirmationModal.tsx';
@@ -36,6 +36,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'posted' | 'failed' | 'unsigned'>('all');
+  const hasProcessedAutoSignAll = useRef(false);
   
   // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -170,7 +171,9 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
 
   // Handle autoSignAll functionality
   useEffect(() => {
-    if (autoSignAll && posts.length > 0) {
+    if (autoSignAll && posts.length > 0 && !hasProcessedAutoSignAll.current) {
+      hasProcessedAutoSignAll.current = true;
+      
       // Set filter to unsigned
       setFilter('unsigned');
       
@@ -290,10 +293,27 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
     }
   };
 
-  const handleRejectAllUnsigned = () => {
+  const handleRejectAllUnsigned = async () => {
     const unsignedPosts = posts.filter(post => post.status === 'unsigned');
-    printLog(`Reject All clicked - would reject ${unsignedPosts.length} unsigned posts`);
-    // TODO: Implement reject all functionality
+    printLog(`Reject All clicked - rejecting ${unsignedPosts.length} unsigned posts`);
+    
+    try {
+      // Delete all unsigned posts (reject = delete for now)
+      const deletePromises = unsignedPosts.map(post => 
+        ScheduledPostService.deleteScheduledPost(getPostId(post))
+      );
+      
+      await Promise.allSettled(deletePromises);
+      
+      printLog(`Successfully rejected/deleted ${unsignedPosts.length} unsigned posts`);
+      
+      // Refresh the list
+      await loadPosts();
+      
+    } catch (error) {
+      console.error('Error rejecting all unsigned posts:', error);
+      printLog(`Failed to reject all unsigned posts: ${error}`);
+    }
   };
 
   // Cancel Review Each process
