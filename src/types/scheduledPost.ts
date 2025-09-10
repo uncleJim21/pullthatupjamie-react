@@ -3,7 +3,7 @@ export interface ScheduledPost {
   _id?: string; // MongoDB ID field (for backend compatibility)
   adminEmail: string;
   platform: 'twitter' | 'nostr';
-  status: 'scheduled' | 'processing' | 'posted' | 'failed' | 'cancelled';
+  status: 'unsigned' | 'scheduled' | 'processing' | 'posted' | 'failed' | 'cancelled';
   scheduledFor: string; // ISO date string
   timezone: string;
   content: {
@@ -70,7 +70,7 @@ export interface ScheduledPostsResponse {
 }
 
 export interface ScheduledPostsQuery {
-  status?: 'scheduled' | 'processing' | 'posted' | 'failed' | 'cancelled';
+  status?: 'unsigned' | 'scheduled' | 'processing' | 'posted' | 'failed' | 'cancelled';
   platform?: 'twitter' | 'nostr';
   limit?: number;
   page?: number;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Trash2, AlertTriangle, PenTool } from 'lucide-react';
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean;
@@ -10,6 +10,13 @@ interface DeleteConfirmationModalProps {
   isDeleting?: boolean;
   deleteButtonText?: string;
   itemType?: string;
+  customStyling?: {
+    iconColor?: string;
+    iconBg?: string;
+    confirmButtonBg?: string;
+    confirmButtonText?: string;
+    useSignIcon?: boolean;
+  };
 }
 
 const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
@@ -20,7 +27,8 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
   message,
   isDeleting = false,
   deleteButtonText = "Delete",
-  itemType = "item"
+  itemType = "item",
+  customStyling
 }) => {
   if (!isOpen) return null;
 
@@ -48,8 +56,12 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
 
           {/* Icon and Title */}
           <div className="flex flex-col items-center text-center mb-6">
-            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
-              <AlertTriangle className="w-8 h-8 text-red-500" />
+            <div className={`w-16 h-16 ${customStyling?.iconBg || 'bg-red-500/10'} rounded-full flex items-center justify-center mb-4`}>
+              {customStyling?.useSignIcon ? (
+                <PenTool className={`w-8 h-8 ${customStyling?.iconColor || 'text-red-500'}`} />
+              ) : (
+                <AlertTriangle className={`w-8 h-8 ${customStyling?.iconColor || 'text-red-500'}`} />
+              )}
             </div>
             
             <h2 className="text-xl font-bold text-white mb-2">
@@ -74,7 +86,7 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
             <button
               onClick={handleConfirm}
               disabled={isDeleting}
-              className="flex-1 px-4 py-3 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              className={`flex-1 px-4 py-3 rounded-lg ${customStyling?.confirmButtonBg || 'bg-red-600 hover:bg-red-700'} ${customStyling?.confirmButtonText || 'text-white'} transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2`}
             >
               {isDeleting ? (
                 <>
@@ -83,7 +95,11 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
                 </>
               ) : (
                 <>
-                  <Trash2 className="w-4 h-4" />
+                  {customStyling?.useSignIcon ? (
+                    <PenTool className="w-4 h-4" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
                   <span>{deleteButtonText}</span>
                 </>
               )}

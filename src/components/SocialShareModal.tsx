@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin, Clock } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
+import PlatformIntegrationService from '../services/platformIntegrationService.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
 import AuthService from '../services/authService.ts';
@@ -74,6 +75,9 @@ interface SocialShareModalProps {
     onUpdate: (updatedPost: ScheduledPost) => void;
   };
   onSchedulingModeChange?: (isScheduling: boolean, hasDropdowns: boolean) => void;
+  // Sign All progress overlay props
+  showSignAllOverlay?: boolean;
+  signAllProgress?: { current: number; total: number };
 }
 
 // Simplified unified state interface
@@ -210,7 +214,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   lookupHash,
   auth,
   updateContext,
-  onSchedulingModeChange
+  onSchedulingModeChange,
+  showSignAllOverlay = false,
+  signAllProgress = { current: 0, total: 0 }
 }) => {
   const [content, setContent] = useState<string>('');
   
@@ -1123,13 +1129,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   const checkNostrExtension = async () => {
     try {
-      if (window.nostr) {
-        setNostrState(prev => ({ ...prev, available: true }));
-        printLog("Nostr extension detected but not authenticated yet");
-        // Don't automatically request public key - only check availability
-      } else {
-        setNostrState(prev => ({ ...prev, available: false, authenticated: false }));
-      }
+      const nostrState = await PlatformIntegrationService.checkNostrExtension();
+      setNostrState(prev => ({
+        ...prev,
+        available: nostrState.available,
+        authenticated: nostrState.authenticated
+      }));
     } catch (error) {
       setNostrState(prev => ({ ...prev, available: false, authenticated: false }));
       console.error("Error checking for Nostr extension:", error);
@@ -1138,13 +1143,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   const connectNostrExtension = async () => {
     try {
-      if (window.nostr) {
-        const pubKey = await window.nostr.getPublicKey();
-        setNostrState(prev => ({ ...prev, authenticated: true }));
-        printLog(`Nostr extension connected with public key: ${pubKey}`);
-      } else {
-        setNostrState(prev => ({ ...prev, available: false, authenticated: false }));
-      }
+      const nostrState = await PlatformIntegrationService.connectNostrExtension();
+      setNostrState(prev => ({
+        ...prev,
+        available: nostrState.available,
+        authenticated: nostrState.authenticated
+      }));
     } catch (error) {
       printLog("Failed to connect to Nostr extension");
       setNostrState(prev => ({ ...prev, authenticated: false }));
@@ -1152,47 +1156,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
-  // Check Twitter authentication status (unified with token checking)
+  // Check Twitter authentication status using shared service
   const checkTwitterAuth = async () => {
-    printLog('Checking Twitter auth status in SocialShareModal...');
     try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        printLog('No auth token found for Twitter auth check');
-        setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
-        return;
-      }
-
-      const response = await fetch(`${API_URL}/api/twitter/tokens`, {
-        method: 'POST',
-        headers: {
-          'Accept': '*/*',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Origin': window.location.origin
-        },
-        credentials: 'include',
-        mode: 'cors'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        printLog(`Twitter auth check response: ${JSON.stringify(data)}`);
-        
-        setTwitterState(prev => ({ 
-          ...prev, 
-          authenticated: data.authenticated === true,
-          available: true,
-          username: data.authenticated ? data.twitterUsername : undefined
-        }));
-        
-        // Set hasValidTokens for the UI flow
-        setHasValidTokens(data.authenticated === true);
-      } else {
-        printLog(`Twitter auth check failed with status ${response.status}`);
-        setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
-        setHasValidTokens(false);
-      }
+      const twitterState = await PlatformIntegrationService.checkTwitterAuth();
+      setTwitterState(prev => ({
+        ...prev,
+        authenticated: twitterState.authenticated,
+        available: twitterState.available,
+        username: twitterState.username
+      }));
+      setHasValidTokens(twitterState.authenticated);
     } catch (error) {
       printLog(`Error checking Twitter auth: ${error}`);
       setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
@@ -3576,6 +3550,40 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           successUrls={successUrls}
         />
         
+        {/* Sign All Progress Overlay */}
+        {showSignAllOverlay && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm rounded-xl flex items-center justify-center z-50">
+            <div className="bg-gray-900 border border-purple-600 rounded-lg p-6 text-center max-w-sm mx-4">
+              <div className="w-16 h-16 mx-auto mb-4 relative">
+                <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div 
+                    className="w-6 h-6 rounded-full"
+                    style={{
+                      backgroundColor: '#8B5CF6',
+                      mask: 'url(/nostr-logo-square.png) center/contain no-repeat',
+                      WebkitMask: 'url(/nostr-logo-square.png) center/contain no-repeat'
+                    }}
+                  />
+                </div>
+              </div>
+              <h3 className="text-white font-semibold text-lg mb-2">Signing Nostr Post</h3>
+              <p className="text-purple-300 mb-4">
+                Processing post {signAllProgress.current} of {signAllProgress.total}
+              </p>
+              <div className="w-full bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${signAllProgress.total > 0 ? (signAllProgress.current / signAllProgress.total) * 100 : 0}%` }}
+                ></div>
+              </div>
+              <p className="text-gray-400 text-sm mt-3">
+                Please confirm signing in your Nostr extension
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Add global styles for the scrollbar */}
         <style>{`
           .overflow-y-auto::-webkit-scrollbar {
