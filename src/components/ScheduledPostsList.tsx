@@ -945,9 +945,8 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
                     <>
                       <button
                         onClick={() => handleSignIndividualPost(post)}
-                        className="p-2 rounded-lg bg-red-600 hover:bg-red-500 transition-colors"
-                        title="Sign this post - NEW CODE RUNNING"
-                        style={{ backgroundColor: '#ff0000', border: '2px solid #ffff00' }}
+                        className="p-2 rounded-lg bg-purple-600 hover:bg-purple-500 transition-colors"
+                        title="Sign this post"
                       >
                         <PenTool className="w-4 h-4 text-white" />
                       </button>
