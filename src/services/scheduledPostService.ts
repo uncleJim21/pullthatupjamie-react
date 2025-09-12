@@ -7,6 +7,7 @@ import {
   ScheduledPostStats 
 } from '../types/scheduledPost';
 import { API_URL, printLog } from '../constants/constants.ts';
+import { generatePrimalUrl, relayPool } from '../utils/nostrUtils.ts';
 
 export class ScheduledPostService {
   private static getAuthHeaders(): HeadersInit {
@@ -249,8 +250,8 @@ export class ScheduledPostService {
       printLog(`Signed event received:`, JSON.stringify(signedEvent, null, 2));
       printLog(`New scheduled date: ${newScheduledDate?.toISOString()}`);
       
-      // Create Primal URL using full event ID
-      const primalUrl = `https://primal.net/e/note1${signedEvent.id}`;
+      // Create Primal URL using proper bech32 encoding (shared utility)
+      const primalUrl = generatePrimalUrl(signedEvent.id);
       printLog(`Generated Primal URL: ${primalUrl}`);
       
       // 4. Submit that in the PUT request as the "text" argument
@@ -263,11 +264,7 @@ export class ScheduledPostService {
           nostrSignature: signedEvent.sig,
           nostrPubkey: signedEvent.pubkey,
           nostrCreatedAt: signedEvent.created_at,
-          nostrRelays: [
-            "wss://relay.primal.net",
-            "wss://relay.damus.io", 
-            "wss://nos.lol"
-          ],
+          nostrRelays: relayPool,
           nostrPostUrl: primalUrl,
           signedEvent: signedEvent // Include complete signed event for backend validation
         }
@@ -335,7 +332,7 @@ export class ScheduledPostService {
       
       const requestBody = {
         posts: postsData.map(({ postId, signedEvent, newScheduledDate }) => {
-          const primalUrl = `https://primal.net/e/note1${signedEvent.id.slice(0, 16)}...`;
+          const primalUrl = generatePrimalUrl(signedEvent.id);
           
           return {
             postId,
@@ -344,11 +341,7 @@ export class ScheduledPostService {
               nostrSignature: signedEvent.sig,
               nostrPubkey: signedEvent.pubkey,
               nostrCreatedAt: signedEvent.created_at,
-              nostrRelays: [
-                "wss://relay.primal.net",
-                "wss://relay.damus.io", 
-                "wss://nos.lol"
-              ],
+              nostrRelays: relayPool,
               nostrPostUrl: primalUrl
             },
             ...(newScheduledDate && {
