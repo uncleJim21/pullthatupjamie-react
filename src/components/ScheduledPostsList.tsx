@@ -26,6 +26,53 @@ const ASPECT_RATIO = 16 / 9;
 const PREVIEW_WIDTH = 160; // Smaller for list view
 const PREVIEW_HEIGHT = (PREVIEW_WIDTH / ASPECT_RATIO) * 1.3; // Increased by 30%
 
+// Helper function to get user signature from localStorage
+const getUserSignature = (): string | null => {
+  try {
+    const settings = localStorage.getItem('userSettings');
+    if (settings) {
+      const parsed = JSON.parse(settings);
+      const signature = parsed.crosspostSignature;
+      
+      // Handle null, undefined, or empty string cases
+      if (signature == null || signature === '') {
+        return null;
+      }
+      
+      // Trim whitespace and check if it's effectively empty
+      const trimmedSignature = signature.trim();
+      return trimmedSignature.length > 0 ? trimmedSignature : null;
+    }
+  } catch (error) {
+    console.error('Error reading user signature from localStorage:', error);
+  }
+  return null;
+};
+
+// Helper function to build final content with signature and media URL for Nostr posts
+const buildFinalContentForNostr = (baseContent: string, mediaUrl: string): string => {
+  printLog(`=== buildFinalContentForNostr DEBUG ===`);
+  printLog(`Input baseContent: "${baseContent}"`);
+  printLog(`Input mediaUrl: "${mediaUrl}"`);
+  
+  const signature = getUserSignature();
+  printLog(`Retrieved signature: "${signature}"`);
+  
+  const signaturePart = signature ? `\n\n${signature}` : '';
+  const mediaUrlPart = mediaUrl ? `\n\n${mediaUrl}` : '';
+  const callToActionPart = `\n\nShared via https://pullthatupjamie.ai`;
+  
+  printLog(`Signature part: "${signaturePart}"`);
+  printLog(`Media URL part: "${mediaUrlPart}"`);
+  printLog(`Call to action part: "${callToActionPart}"`);
+  
+  const result = `${baseContent}${signaturePart}${mediaUrlPart}${callToActionPart}`;
+  printLog(`Final result: "${result}"`);
+  printLog(`=== buildFinalContentForNostr DEBUG END ===`);
+  
+  return result;
+};
+
 interface ScheduledPostsListProps {
   className?: string;
   autoSignAll?: boolean; // URL parameter to auto-navigate to unsigned and prompt Sign All
@@ -270,7 +317,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
       await loadPosts(); // Refresh list
     } catch (err) {
       console.error('Error retrying post:', err);
-      alert('Failed to retry post. Please try again.');
+      printLog('Failed to retry post. Please try again.');
     }
   };
 
@@ -362,20 +409,27 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
           throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
         }
         
-        // Build the content for signing (same logic as SocialShareModal)
+        // 1. Access both the text and media url
         const baseContent = post.content.text || '';
+        const mediaUrl = post.content.mediaUrl || '';
         
-        // Create the Nostr event to sign
+        printLog(`DEBUG: baseContent="${baseContent}"`);
+        printLog(`DEBUG: mediaUrl="${mediaUrl}"`);
+        
+        // 2. Append the mediaurl to the text
+        const finalContent = `${baseContent}\n\n${mediaUrl}`;
+        
+        printLog(`DEBUG: finalContent="${finalContent}"`);
+        
+        // 3. Sign using the user's extension assuming that that is the kind 1 event itself. Nothing else. Just that text
         const eventToSign = {
           kind: 1,
           created_at: Math.floor(Date.now() / 1000),
-          content: baseContent, // Use the post content as-is
-          tags: [], // No special tags for now
+          content: finalContent,
+          tags: []
         };
         
-        // Sign the event
         const signedEvent = await window.nostr.signEvent(eventToSign);
-        printLog(`Successfully signed event for post ${post.postId || post._id}: ${signedEvent.id}`);
         
         // Determine scheduled date
         let scheduledDate = new Date(post.scheduledFor);
@@ -393,14 +447,17 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
         
         // Sign and promote the post
         printLog(`About to call API for post ${post.postId || post._id} with signed event:`, signedEvent);
+        printLog(`Scheduled date: ${scheduledDate.toISOString()}`);
         
         const result = await ScheduledPostService.signAndPromotePost(
           post.postId || post._id,
           signedEvent,
-          scheduledDate
+          scheduledDate,
+          post
         );
         
         printLog(`API response for post ${post.postId || post._id}:`, result);
+        printLog(`=== NOSTR SIGNING DEBUG END ===`);
         
       } catch (error) {
         console.error(`Error signing post ${post.postId || post._id}:`, error);
@@ -428,6 +485,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
   // Individual post signing handlers
   const handleSignIndividualPost = async (post: ScheduledPost) => {
     try {
+      printLog(`🔥 BUTTON PRESSED! POST DATA: ${JSON.stringify(post, null, 2)}`);
       const postId = getPostId(post);
       printLog(`Starting individual sign for post: ${postId}`);
       
@@ -436,15 +494,24 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
         throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
       }
       
-      // Build the content for signing
+      // 1. Access both the text and media url
       const baseContent = post.content.text || '';
+      const mediaUrl = post.content.mediaUrl || '';
       
-      // Create the Nostr event to sign
+      printLog(`DEBUG: baseContent="${baseContent}"`);
+      printLog(`DEBUG: mediaUrl="${mediaUrl}"`);
+      
+      // 2. Append the mediaurl to the text
+      const finalContent = `${baseContent}\n\n${mediaUrl}`;
+      
+      printLog(`DEBUG: finalContent="${finalContent}"`);
+      
+      // 3. Sign using the user's extension assuming that that is the kind 1 event itself. Nothing else. Just that text
       const eventToSign = {
         kind: 1,
         created_at: Math.floor(Date.now() / 1000),
-        content: baseContent,
-        tags: [],
+        content: finalContent,
+        tags: []
       };
       
       // Sign the event
@@ -466,7 +533,8 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
       const result = await ScheduledPostService.signAndPromotePost(
         postId,
         signedEvent,
-        scheduledDate
+        scheduledDate,
+        post
       );
       
       printLog(`Successfully signed and promoted individual post: ${result.postId}`);

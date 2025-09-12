@@ -117,6 +117,7 @@ export class ScheduledPostService {
    */
   static async updateScheduledPost(postId: string, updates: UpdateScheduledPostRequest): Promise<ScheduledPost> {
     try {
+      printLog(`🚨🚨🚨 WRONG FUNCTION CALLED: updateScheduledPost for ${postId} 🚨🚨🚨`);
       printLog(`Updating scheduled post: ${postId}`);
       
       const response = await fetch(`${API_URL}/api/social/posts/${postId}`, {
@@ -235,15 +236,28 @@ export class ScheduledPostService {
   static async signAndPromotePost(
     postId: string, 
     signedEvent: any, 
-    newScheduledDate?: Date
+    newScheduledDate?: Date,
+    originalPost?: ScheduledPost
   ): Promise<ScheduledPost> {
     try {
-      printLog(`Signing and promoting post: ${postId}`);
+      // CACHE BUST 12345 - NEW CODE RUNNING
+      printLog(`🔥🔥🔥 signAndPromotePost CALLED - POST ID: ${postId} 🔥🔥🔥`);
+      printLog(`🔥🔥🔥 SIGNED EVENT CONTENT: "${signedEvent.content}" 🔥🔥🔥`);
       
-      // Create Primal URL using bech32-like encoding (simplified for now)
-      const primalUrl = `https://primal.net/e/note1${signedEvent.id.slice(0, 16)}...`;
+      printLog(`=== signAndPromotePost DEBUG START ===`);
+      printLog(`Post ID: ${postId}`);
+      printLog(`Signed event received:`, JSON.stringify(signedEvent, null, 2));
+      printLog(`New scheduled date: ${newScheduledDate?.toISOString()}`);
+      
+      // Create Primal URL using full event ID
+      const primalUrl = `https://primal.net/e/note1${signedEvent.id}`;
+      printLog(`Generated Primal URL: ${primalUrl}`);
+      
+      // 4. Submit that in the PUT request as the "text" argument
+      const completeText = signedEvent.content;
       
       const requestBody: any = {
+        text: completeText, // Complete content with media URL that was signed
         platformData: {
           nostrEventId: signedEvent.id,
           nostrSignature: signedEvent.sig,
@@ -254,9 +268,16 @@ export class ScheduledPostService {
             "wss://relay.damus.io", 
             "wss://nos.lol"
           ],
-          nostrPostUrl: primalUrl
+          nostrPostUrl: primalUrl,
+          signedEvent: signedEvent // Include complete signed event for backend validation
         }
       };
+
+      // FORCE DEBUG: Log every single field
+      printLog(`=== REQUEST BODY CONSTRUCTION DEBUG ===`);
+      printLog(`signedEvent.content: "${signedEvent.content}"`);
+      printLog(`requestBody.text: "${requestBody.text}"`);
+      printLog(`=== END REQUEST BODY CONSTRUCTION DEBUG ===`);
 
       if (newScheduledDate) {
         requestBody.newScheduledDate = newScheduledDate.toISOString();
@@ -264,8 +285,8 @@ export class ScheduledPostService {
       }
 
       printLog(`Making PUT request to ${API_URL}/api/social/posts/${postId}`);
-      printLog(`Request body: ${JSON.stringify(requestBody, null, 2)}`);
-      printLog(`Auth headers: ${JSON.stringify(this.getAuthHeaders())}`);
+      printLog(`CRITICAL: Updated text content being sent: "${signedEvent.content}"`);
+      printLog(`🚨 CRITICAL DEBUG - TEXT FIELD: ${requestBody.text}`);
 
       const response = await fetch(`${API_URL}/api/social/posts/${postId}`, {
         method: 'PUT',
@@ -274,10 +295,10 @@ export class ScheduledPostService {
       });
 
       printLog(`Response status: ${response.status}`);
-      printLog(`Response headers: ${JSON.stringify(Object.fromEntries(Array.from(response.headers.entries())))}`);
 
       const data = await this.handleResponse<{ post: ScheduledPost }>(response);
       printLog(`Successfully signed and promoted post: ${postId}`);
+      printLog(`=== signAndPromotePost DEBUG END ===`);
       
       return data.post;
     } catch (error) {
@@ -372,3 +393,4 @@ export default ScheduledPostService;
 
 
 
+// Cache bust 1757717498
