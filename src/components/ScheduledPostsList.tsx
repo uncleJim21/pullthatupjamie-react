@@ -671,7 +671,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
           
           <div className="text-left mb-6">
             <p className="text-gray-300 mb-4">
-              <strong>Original → Proposed Time:</strong><br />
+              <strong>{isPastTime ? 'Original → Proposed Time:' : 'Scheduled Time:'}</strong><br />
               <span className="text-gray-400">
                 {formatScheduledDate(postToSign.scheduledFor)}
                 {isPastTime && nextSlot && (
