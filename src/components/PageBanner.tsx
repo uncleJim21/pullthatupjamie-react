@@ -4,7 +4,7 @@ import { Headphones, Search, LayoutDashboard } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import AccountButton from './AccountButton.tsx';
 import SignInModal from './SignInModal.tsx';
-import {printLog} from '../constants/constants.ts';
+import {printLog, NavigationMode} from '../constants/constants.ts';
 
 interface PageBannerProps {
   logoText?: string;
@@ -15,6 +15,7 @@ interface PageBannerProps {
   onTutorialClick?: () => void;
   isUserSignedIn?: boolean;
   setIsUserSignedIn?: (value: boolean) => void;
+  navigationMode?: NavigationMode;
 }
 
 interface AdminFeed {
@@ -30,7 +31,8 @@ const PageBanner: React.FC<PageBannerProps> = ({
   onSignOut,
   onTutorialClick,
   isUserSignedIn: propsIsUserSignedIn,
-  setIsUserSignedIn: propsSetIsUserSignedIn
+  setIsUserSignedIn: propsSetIsUserSignedIn,
+  navigationMode = NavigationMode.STANDARD
 }) => {
   const [adminFeed, setAdminFeed] = useState<AdminFeed | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -299,40 +301,44 @@ const PageBanner: React.FC<PageBannerProps> = ({
             }}
             className="desktop-nav"
           >
-            <a 
-              href="/app"
-              style={navLinkStyle}
-              className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
-              onClick={(e) => {
-                e.preventDefault();
-                // Check if we need to reload by comparing URLs
-                if (window.location.pathname === '/app' && !window.location.search.includes('mode=web-search')) {
-                  window.location.reload();
-                } else {
-                  window.location.href = '/app';
-                }
-              }}
-            >
-              <Headphones size={24} style={iconStyle} />
-              <span>Search Podcasts</span>
-            </a>
-            <a 
-              href="/app/?mode=web-search"
-              style={navLinkStyle}
-              className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
-              onClick={(e) => {
-                e.preventDefault();
-                // Check if we need to reload by comparing URLs
-                if (window.location.pathname === '/app' && window.location.search.includes('mode=web-search')) {
-                  window.location.reload();
-                } else {
-                  window.location.href = '/app/?mode=web-search';
-                }
-              }}
-            >
-              <Search size={24} style={iconStyle} />
-              <span>Search Web</span>
-            </a>
+            {navigationMode === NavigationMode.STANDARD && (
+              <>
+                <a 
+                  href="/app"
+                  style={navLinkStyle}
+                  className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Check if we need to reload by comparing URLs
+                    if (window.location.pathname === '/app' && !window.location.search.includes('mode=web-search')) {
+                      window.location.reload();
+                    } else {
+                      window.location.href = '/app';
+                    }
+                  }}
+                >
+                  <Headphones size={24} style={iconStyle} />
+                  <span>Search Podcasts</span>
+                </a>
+                <a 
+                  href="/app/?mode=web-search"
+                  style={navLinkStyle}
+                  className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Check if we need to reload by comparing URLs
+                    if (window.location.pathname === '/app' && window.location.search.includes('mode=web-search')) {
+                      window.location.reload();
+                    } else {
+                      window.location.href = '/app/?mode=web-search';
+                    }
+                  }}
+                >
+                  <Search size={24} style={iconStyle} />
+                  <span>Search Web</span>
+                </a>
+              </>
+            )}
             <a 
               href="#" 
               onClick={handleProDashboardClick}
@@ -349,6 +355,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
               onSignOut={handleSignOut}
               onTutorialClick={onTutorialClick || (() => {})}
               isSignedIn={isUserSignedIn}
+              navigationMode={navigationMode}
             />
           </nav>
         )}
@@ -373,44 +380,48 @@ const PageBanner: React.FC<PageBannerProps> = ({
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <a 
-                href="/app"
-                style={{ ...navLinkStyle, padding: '8px 12px' }}
-                className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setIsMenuOpen(false);
-                  
-                  // Check if we need to reload by comparing URLs
-                  if (window.location.pathname === '/app' && !window.location.search.includes('mode=web-search')) {
-                    window.location.reload();
-                  } else {
-                    window.location.href = '/app';
-                  }
-                }}
-              >
-                <Headphones size={24} style={iconStyle} />
-                <span>Search Podcasts</span>
-              </a>
-              <a 
-                href="/app/?mode=web-search"
-                style={{ ...navLinkStyle, padding: '8px 12px' }}
-                className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setIsMenuOpen(false);
-                  
-                  // Check if we need to reload by comparing URLs
-                  if (window.location.pathname === '/app' && window.location.search.includes('mode=web-search')) {
-                    window.location.reload();
-                  } else {
-                    window.location.href = '/app/?mode=web-search';
-                  }
-                }}
-              >
-                <Search size={24} style={iconStyle} />
-                <span>Search Web</span>
-              </a>
+              {navigationMode === NavigationMode.STANDARD && (
+                <>
+                  <a 
+                    href="/app"
+                    style={{ ...navLinkStyle, padding: '8px 12px' }}
+                    className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setIsMenuOpen(false);
+                      
+                      // Check if we need to reload by comparing URLs
+                      if (window.location.pathname === '/app' && !window.location.search.includes('mode=web-search')) {
+                        window.location.reload();
+                      } else {
+                        window.location.href = '/app';
+                      }
+                    }}
+                  >
+                    <Headphones size={24} style={iconStyle} />
+                    <span>Search Podcasts</span>
+                  </a>
+                  <a 
+                    href="/app/?mode=web-search"
+                    style={{ ...navLinkStyle, padding: '8px 12px' }}
+                    className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setIsMenuOpen(false);
+                      
+                      // Check if we need to reload by comparing URLs
+                      if (window.location.pathname === '/app' && window.location.search.includes('mode=web-search')) {
+                        window.location.reload();
+                      } else {
+                        window.location.href = '/app/?mode=web-search';
+                      }
+                    }}
+                  >
+                    <Search size={24} style={iconStyle} />
+                    <span>Search Web</span>
+                  </a>
+                </>
+              )}
               <a 
                 href="#" 
                 onClick={handleProDashboardClick}
@@ -434,6 +445,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
                   onTutorialClick={onTutorialClick || (() => {})}
                   isSignedIn={isUserSignedIn}
                   isInMobileMenu={true}
+                  navigationMode={navigationMode}
                 />
               </div>
             </div>

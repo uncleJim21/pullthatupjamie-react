@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { DEBUG_MODE, FRONTEND_URL, printLog } from '../../constants/constants.ts';
+import { DEBUG_MODE, FRONTEND_URL, printLog, NavigationMode } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
@@ -707,6 +707,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         onTutorialClick={handleTutorialClick}
         isUserSignedIn={isUserSignedIn}
         setIsUserSignedIn={setIsUserSignedIn}
+        navigationMode={isAdmin ? NavigationMode.CLEAN : NavigationMode.STANDARD}
       />
       
       {/* Header Section */}
