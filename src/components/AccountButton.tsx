@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, Radio, BookOpen } from 'lucide-react';
+import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, LayoutDashboard, BookOpen, Headphones, Search } from 'lucide-react';
 import BitcoinConnectButton from './BitcoinConnectButton.tsx';
 import { useNavigate } from 'react-router-dom';
 import AuthService from '../services/authService.ts';
+import { NavigationMode } from '../constants/constants.ts';
 
 interface AccountButtonProps {
   onConnect: () => void;
@@ -12,6 +13,7 @@ interface AccountButtonProps {
   onTutorialClick: () => void;
   isSignedIn: boolean;
   isInMobileMenu?: boolean; // New prop to detect if we're in mobile menu
+  navigationMode?: NavigationMode;
 }
 
 interface AdminFeed {
@@ -27,6 +29,7 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
   onTutorialClick,
   isSignedIn,
   isInMobileMenu = false,
+  navigationMode = NavigationMode.STANDARD,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
@@ -175,7 +178,43 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
               <BitcoinConnectButton onConnect={onConnect} />
             </div>
 
-            {/* My Feed Button (for admins) */}
+            {/* Navigation Items (only in CLEAN mode) */}
+            {navigationMode === NavigationMode.CLEAN && (
+              <>
+                <button
+                  onClick={() => {
+                    // Check if we need to reload by comparing URLs
+                    if (window.location.pathname === '/app' && !window.location.search.includes('mode=web-search')) {
+                      window.location.reload();
+                    } else {
+                      window.location.href = '/app';
+                    }
+                    setIsOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Headphones size={20} />
+                  <span>Search Podcasts</span>
+                </button>
+                <button
+                  onClick={() => {
+                    // Check if we need to reload by comparing URLs
+                    if (window.location.pathname === '/app' && window.location.search.includes('mode=web-search')) {
+                      window.location.reload();
+                    } else {
+                      window.location.href = '/app/?mode=web-search';
+                    }
+                    setIsOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Search size={20} />
+                  <span>Search Web</span>
+                </button>
+              </>
+            )}
+
+            {/* Pro Dashboard Button (for admins) */}
             {adminFeed?.access === 'admin' && (
               <button
                 onClick={() => {
@@ -184,8 +223,8 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
                 }}
                 className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
               >
-                <Radio size={20} />
-                <span>My Podcast</span>
+                <LayoutDashboard size={20} />
+                <span>Pro Dashboard</span>
               </button>
             )}
 

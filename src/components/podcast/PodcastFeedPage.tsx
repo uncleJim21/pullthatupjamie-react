@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { DEBUG_MODE, FRONTEND_URL, printLog } from '../../constants/constants.ts';
+import { DEBUG_MODE, FRONTEND_URL, printLog, NavigationMode } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
-import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share, Shield, Settings, Calendar } from 'lucide-react';
+import { Copy, Check, QrCodeIcon, MessageSquare, History, Link, Upload, ExternalLink, ChevronDown, Share, Shield, Settings, Calendar, ChevronsLeftRightEllipsis, ChevronsLeftRight, ChevronsRightLeft } from 'lucide-react';
 import QRCodeModal from '../QRCodeModal.tsx';
 import AuthService from '../../services/authService.ts';
 import { SocialPlatform } from '../SocialShareModal.tsx';
@@ -122,6 +122,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [runHistory, setRunHistory] = useState<RunHistory[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [jamieProView, setJamieProView] = useState<JamieProView>('history');
+    const [isCollapsibleTabsOpen, setIsCollapsibleTabsOpen] = useState(false);
     
     // Initialize jamieProView from URL parameter
     useEffect(() => {
@@ -423,6 +424,14 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     }
   }, [feedData, initialView, defaultTab, isAdmin, searchParams]);
 
+  // Set default tab for admin users
+  useEffect(() => {
+    if (isAdmin && feedData && !initialView) {
+      // Only set Jamie Pro as default if no specific initial view is provided
+      setActiveTab('Jamie Pro');
+    }
+  }, [isAdmin, feedData, initialView]);
+
   // Add a useEffect to ensure activeTab is never 'Jamie Pro' for non-admin users
   useEffect(() => {
     // Don't forcibly change the tab for Jamie Pro since we want to allow users to view it
@@ -707,6 +716,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         onTutorialClick={handleTutorialClick}
         isUserSignedIn={isUserSignedIn}
         setIsUserSignedIn={setIsUserSignedIn}
+        navigationMode={isAdmin ? NavigationMode.CLEAN : NavigationMode.STANDARD}
       />
       
       {/* Header Section */}
@@ -769,28 +779,89 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       <div className="border-b border-gray-800" style={{ backgroundColor: feedData.headerColor }}>
         <div className="max-w-4xl mx-auto px-4 overflow-x-auto">
           <div className="flex gap-8 min-w-max">
-            {([
-                'Episodes', 
-                // 'Home', 
-                // 'Top Clips', 
-                'Subscribe',
-                ...(isAdmin ? ['Jamie Pro', 'Uploads'] : [])
-            ] as TabType[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`py-4 px-2 relative ${
-                  activeTab === tab 
-                    ? 'text-white font-medium' 
-                    : 'text-white opacity-80 hover:text-gray-300'
-                }`}
-              >
-                {tab}
-                {activeTab === tab && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"></div>
-                )}
-              </button>
-            ))}
+            {isAdmin ? (
+              // Admin view with collapsible tabs
+              <>
+                {/* Collapsible Tabs Button - positioned on the left */}
+                <button
+                  onClick={() => setIsCollapsibleTabsOpen(!isCollapsibleTabsOpen)}
+                  className="py-4 px-2 relative text-white opacity-80 hover:text-gray-300 flex items-center justify-center"
+                  title={isCollapsibleTabsOpen ? "Hide additional tabs" : "Show additional tabs"}
+                >
+                  {isCollapsibleTabsOpen ? <ChevronsRightLeft size={18} /> : <ChevronsLeftRightEllipsis size={18} />}
+                </button>
+                
+                {/* Collapsible tabs with animation */}
+                <div 
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    isCollapsibleTabsOpen ? 'max-w-none opacity-100' : 'max-w-0 opacity-0'
+                  }`}
+                  style={{
+                    transition: 'max-width 0.3s ease-in-out, opacity 0.3s ease-in-out'
+                  }}
+                >
+                  <div className="flex gap-8 min-w-max">
+                    {(['Episodes', 'Subscribe'] as TabType[]).map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`py-4 px-2 relative whitespace-nowrap ${
+                          activeTab === tab 
+                            ? 'text-white font-medium' 
+                            : 'text-white opacity-80 hover:text-gray-300'
+                        }`}
+                      >
+                        {tab}
+                        {activeTab === tab && (
+                          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"></div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Always visible admin tabs */}
+                {(['Jamie Pro', 'Uploads'] as TabType[]).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`py-4 px-2 relative ${
+                      activeTab === tab 
+                        ? 'text-white font-medium' 
+                        : 'text-white opacity-80 hover:text-gray-300'
+                    }`}
+                  >
+                    {tab}
+                    {activeTab === tab && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"></div>
+                    )}
+                  </button>
+                ))}
+              </>
+            ) : (
+              // Regular user view
+              <>
+                {([
+                    'Episodes', 
+                    'Subscribe'
+                ] as TabType[]).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`py-4 px-2 relative ${
+                      activeTab === tab 
+                        ? 'text-white font-medium' 
+                        : 'text-white opacity-80 hover:text-gray-300'
+                    }`}
+                  >
+                    {tab}
+                    {activeTab === tab && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"></div>
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         </div>
       </div>

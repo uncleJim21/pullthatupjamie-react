@@ -48,3 +48,8 @@ export enum RequestAuthMethod {
   FREE = 'free',
   FREE_EXPENDED = 'free-expended'//means they're in limbo and have to choose
 }
+
+export enum NavigationMode {
+  STANDARD = 'standard', // Current behavior - show Search Podcasts/Web in header
+  CLEAN = 'clean'        // Hide header nav, move to AccountButton dropdown
+}
