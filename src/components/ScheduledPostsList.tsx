@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Clock, Twitter, Edit, Trash2, RefreshCw, AlertCircle, CheckCircle, XCircle, PenTool, X } from 'lucide-react';
+import { Calendar, Clock, Twitter, Edit, Trash2, RefreshCw, AlertCircle, CheckCircle, XCircle, PenTool, X, Zap } from 'lucide-react';
 import { printLog } from '../constants/constants.ts';
 import DeleteConfirmationModal from './DeleteConfirmationModal.tsx';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
@@ -106,6 +106,11 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
   // SocialShareModal state
   const [showSocialShareModal, setShowSocialShareModal] = useState(false);
   const [currentPost, setCurrentPost] = useState<ScheduledPost | null>(null);
+  
+  // Sign Confirmation Modal state
+  const [showSignConfirmationModal, setShowSignConfirmationModal] = useState(false);
+  const [postToSign, setPostToSign] = useState<ScheduledPost | null>(null);
+  const [isSigning, setIsSigning] = useState(false);
   
   // Slot tracking for scheduling
   const [usedSlots, setUsedSlots] = useState<Set<string>>(new Set());
@@ -483,69 +488,10 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
   };
 
   // Individual post signing handlers
-  const handleSignIndividualPost = async (post: ScheduledPost) => {
-    try {
-      printLog(`🔥 BUTTON PRESSED! POST DATA: ${JSON.stringify(post, null, 2)}`);
-      const postId = getPostId(post);
-      printLog(`Starting individual sign for post: ${postId}`);
-      
-      // Check if Nostr extension is available
-      if (!window.nostr) {
-        throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
-      }
-      
-      // 1. Access both the text and media url
-      const baseContent = post.content.text || '';
-      const mediaUrl = post.content.mediaUrl || '';
-      
-      printLog(`DEBUG: baseContent="${baseContent}"`);
-      printLog(`DEBUG: mediaUrl="${mediaUrl}"`);
-      
-      // 2. Append the mediaurl to the text
-      const finalContent = `${baseContent}\n\n${mediaUrl}`;
-      
-      printLog(`DEBUG: finalContent="${finalContent}"`);
-      
-      // 3. Sign using the user's extension assuming that that is the kind 1 event itself. Nothing else. Just that text
-      const eventToSign = {
-        kind: 1,
-        created_at: Math.floor(Date.now() / 1000),
-        content: finalContent,
-        tags: []
-      };
-      
-      // Sign the event
-      const signedEvent = await window.nostr.signEvent(eventToSign);
-      printLog(`Successfully signed event for post ${postId}: ${signedEvent.id}`);
-      
-      // Determine scheduled date
-      let scheduledDate = new Date(post.scheduledFor);
-      const now = new Date();
-      
-      if (scheduledDate <= now) {
-        // Date is in the past, use next available slot
-        const nextSlot = getNextAvailableSlot(new Set());
-        scheduledDate = nextSlot.date;
-        printLog(`Post ${postId} rescheduled to ${scheduledDate.toISOString()}`);
-      }
-      
-      // Sign and promote the post
-      const result = await ScheduledPostService.signAndPromotePost(
-        postId,
-        signedEvent,
-        scheduledDate,
-        post
-      );
-      
-      printLog(`Successfully signed and promoted individual post: ${result.postId}`);
-      
-      // Refresh the list
-      await loadPosts();
-      
-    } catch (error) {
-      console.error(`Error signing individual post:`, error);
-      printLog(`Failed to sign individual post: ${error}`);
-    }
+  const handleSignIndividualPost = (post: ScheduledPost) => {
+    printLog(`🔥 SIGN BUTTON PRESSED! POST DATA: ${JSON.stringify(post, null, 2)}`);
+    setPostToSign(post);
+    setShowSignConfirmationModal(true);
   };
 
   const handleRejectIndividualPost = async (post: ScheduledPost) => {
@@ -642,6 +588,160 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
     
     // Optionally refresh the list to ensure consistency with server
     // loadPosts();
+  };
+
+  // Sign Confirmation Modal Component
+  const SignConfirmationModal = () => {
+    if (!showSignConfirmationModal || !postToSign) return null;
+
+    const scheduledDate = new Date(postToSign.scheduledFor);
+    const now = new Date();
+    const isPastTime = scheduledDate <= now;
+    const nextSlot = isPastTime ? getNextAvailableSlot(new Set()) : null;
+
+    const handleSignConfirm = async (publishTime: 'now' | 'scheduled' | 'next-slot') => {
+      setIsSigning(true);
+      
+      try {
+        // Check if Nostr extension is available
+        if (!window.nostr) {
+          throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
+        }
+        
+        // Build content
+        const baseContent = postToSign.content.text || '';
+        const mediaUrl = postToSign.content.mediaUrl || '';
+        const finalContent = `${baseContent}\n\n${mediaUrl}`;
+        
+        // Sign the event
+        const eventToSign = {
+          kind: 1,
+          created_at: Math.floor(Date.now() / 1000),
+          content: finalContent,
+          tags: []
+        };
+        
+        const signedEvent = await window.nostr.signEvent(eventToSign);
+        
+        // Determine final scheduled date based on user choice
+        let finalScheduledDate: Date;
+        switch (publishTime) {
+          case 'now':
+            finalScheduledDate = new Date(); // Publish immediately
+            break;
+          case 'next-slot':
+            finalScheduledDate = nextSlot!.date;
+            break;
+          case 'scheduled':
+          default:
+            finalScheduledDate = scheduledDate; // Use original time
+            break;
+        }
+        
+        // Sign and promote the post
+        const result = await ScheduledPostService.signAndPromotePost(
+          getPostId(postToSign),
+          signedEvent,
+          finalScheduledDate,
+          postToSign
+        );
+        
+        printLog(`Successfully signed and promoted post: ${result.postId}`);
+        
+        // Close modal and refresh list
+        setShowSignConfirmationModal(false);
+        setPostToSign(null);
+        await loadPosts();
+        
+      } catch (error) {
+        console.error('Error signing post:', error);
+        printLog(`Failed to sign post: ${error}`);
+      } finally {
+        setIsSigning(false);
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+        <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+          <div className="flex items-center justify-center mb-4">
+            <PenTool className="w-8 h-8 text-purple-400 mr-3" />
+            <h2 className="text-white text-xl font-bold">Sign & Publish Post</h2>
+          </div>
+          
+          <div className="text-left mb-6">
+            <p className="text-gray-300 mb-4">
+              <strong>Original → Proposed Time:</strong><br />
+              <span className="text-gray-400">
+                {formatScheduledDate(postToSign.scheduledFor)}
+                {isPastTime && nextSlot && (
+                  <span className="text-white"> → {formatScheduledDate(nextSlot.date.toISOString())}</span>
+                )}
+              </span>
+            </p>
+            
+            {isPastTime && (
+              <div className="bg-yellow-900/20 border border-yellow-800 rounded-lg p-4 mb-4 flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+                <p className="text-yellow-300 text-xs">
+                  This post was scheduled for the past. Choose when to publish:
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => {
+                setShowSignConfirmationModal(false);
+                setPostToSign(null);
+              }}
+              disabled={isSigning}
+              className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            
+            {isPastTime ? (
+              <>
+                <button
+                  onClick={() => handleSignConfirm('next-slot')}
+                  disabled={isSigning}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSigning && (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {isSigning ? 'Signing...' : 'Schedule'}
+                </button>
+                
+                <button
+                  onClick={() => handleSignConfirm('now')}
+                  disabled={isSigning}
+                  className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSigning && (
+                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {isSigning ? 'Signing...' : 'Post Now'}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => handleSignConfirm('scheduled')}
+                disabled={isSigning}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSigning && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {isSigning ? 'Signing...' : 'Sign & Schedule'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -1062,6 +1162,9 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
         deleteButtonText="Delete Post"
         itemType="scheduled post"
       />
+
+      {/* Sign Confirmation Modal */}
+      <SignConfirmationModal />
     </div>
   );
 };
