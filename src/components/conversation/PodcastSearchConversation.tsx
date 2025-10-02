@@ -4,7 +4,7 @@ import type { PodcastSearchItem } from '../../types/conversation';
 import { PodcastSearchResultItem, PresentationContext } from '../podcast/PodcastSearchResultItem.tsx';
 import { BaseConversationLayout } from './BaseConversationLayout.tsx';
 import { ClipProgress } from '../../types/clips.ts';
-import { AuthConfig } from '../../constants/constants.ts';
+import { AuthConfig, AIClipsViewStyle } from '../../constants/constants.ts';
 
 interface PodcastSearchConversationProps {
   item: PodcastSearchItem;
@@ -14,6 +14,7 @@ interface PodcastSearchConversationProps {
   onShareModalOpen?: (isOpen: boolean) => void;
   onSocialShareModalOpen?: (isOpen: boolean) => void;
   isClipBatchPage?: boolean;
+  clipBatchViewMode?: AIClipsViewStyle;
 }
 
 // PodcastSearchConversation.tsx
@@ -24,7 +25,8 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
   authConfig,
   onShareModalOpen,
   onSocialShareModalOpen,
-  isClipBatchPage
+  isClipBatchPage,
+  clipBatchViewMode
 }) => {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
 
@@ -43,6 +45,33 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
     setCurrentlyPlayingId(null);
   };
 
+  // For clipBatch pages, render based on view mode
+  if (isClipBatchPage && clipBatchViewMode === AIClipsViewStyle.GRID) {
+    return (
+      <BaseConversationLayout query={item.query}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-48">
+          {item.data.quotes.map((quote, index) => (
+            <PodcastSearchResultItem
+              key={index}
+              {...quote}
+              id={`${item.id}-${index}`}
+              isPlaying={currentlyPlayingId === `${item.id}-${index}`}
+              onPlayPause={handlePlayPause}
+              onEnded={handleEnded}
+              onClipProgress={onClipProgress}
+              authConfig={authConfig}
+              onShareModalOpen={onShareModalOpen}
+              onSocialShareModalOpen={onSocialShareModalOpen}
+              presentationContext={PresentationContext.clipBatch}
+              viewMode={AIClipsViewStyle.GRID}
+            />
+          ))}
+        </div>
+      </BaseConversationLayout>
+    );
+  }
+
+  // Default list view
   return (
     <BaseConversationLayout query={item.query}>
       <div className="space-y-6 pb-48">

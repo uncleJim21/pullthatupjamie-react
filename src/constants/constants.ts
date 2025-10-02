@@ -53,3 +53,8 @@ export enum NavigationMode {
   STANDARD = 'standard', // Current behavior - show Search Podcasts/Web in header
   CLEAN = 'clean'        // Hide header nav, move to AccountButton dropdown
 }
+
+export enum AIClipsViewStyle {
+  GRID = 'grid',
+  LIST = 'list'
+}

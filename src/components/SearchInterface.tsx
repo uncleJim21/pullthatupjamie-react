@@ -1,7 +1,7 @@
 import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
-import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL } from '../constants/constants.ts';
+import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef} from 'react';
@@ -19,7 +19,7 @@ import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter } from 'lucide-react';
+import { Filter, List, Grid3X3 } from 'lucide-react';
 import PodcastSourceFilterModal from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
 import PageBanner from './PageBanner.tsx';
@@ -245,6 +245,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Add state for admin privileges and toggle
   const [adminFeedId, setAdminFeedId] = useState<string | null>(null);
   const [podcastSearchMode, setPodcastSearchMode] = useState<'global' | 'my-pod'>('global');
+  
+  // Add state for clipBatch view mode with localStorage persistence
+  const [clipBatchViewMode, setClipBatchViewMode] = useState<AIClipsViewStyle>(() => {
+    const saved = localStorage.getItem('preferredAIClipsViewStyle');
+    return saved === AIClipsViewStyle.LIST ? AIClipsViewStyle.LIST : AIClipsViewStyle.GRID;
+  });
+
+  // Handler for view mode changes with localStorage persistence
+  const handleViewModeChange = (mode: AIClipsViewStyle) => {
+    setClipBatchViewMode(mode);
+    localStorage.setItem('preferredAIClipsViewStyle', mode);
+  };
   
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const clipId = searchParams.get('clip');
@@ -1515,6 +1527,34 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 className="max-w-full h-auto"
               />
               <p className="text-gray-400 text-xl font-medium mt-2">AI Curated Clips for You</p>
+              
+              {/* View Mode Toggle */}
+              <div className="flex justify-center mt-6">
+                <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
+                  <button
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                      clipBatchViewMode === AIClipsViewStyle.GRID
+                        ? 'bg-[#1A1A1A] text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                    onClick={() => handleViewModeChange(AIClipsViewStyle.GRID)}
+                  >
+                    <Grid3X3 className="w-4 h-4" />
+                    <span>Grid</span>
+                  </button>
+                  <button
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                      clipBatchViewMode === AIClipsViewStyle.LIST
+                        ? 'bg-[#1A1A1A] text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                    onClick={() => handleViewModeChange(AIClipsViewStyle.LIST)}
+                  >
+                    <List className="w-4 h-4" />
+                    <span>List</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
@@ -1740,12 +1780,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             <ConversationRenderer 
               key={item.id}
               item={item} 
-              clipProgress={clipProgress}
+              clipProgress={clipProgress || null}
               onClipProgress={handleClipProgress}
               authConfig={authConfig}
               onShareModalOpen={setIsShareModalOpen}
               onSocialShareModalOpen={setIsSocialShareModalOpen}
               isClipBatchPage={isClipBatchPage}
+              clipBatchViewMode={clipBatchViewMode}
             />
           ))}
       </div>
