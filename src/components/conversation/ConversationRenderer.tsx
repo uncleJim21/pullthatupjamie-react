@@ -5,7 +5,7 @@ import { ExpertModeConversation } from './ExpertModeConversation.tsx';
 import { PodcastSearchConversation } from './PodcastSearchConversation.tsx';
 import type { ConversationItem } from '../../types/conversation';
 import { ClipProgress } from '../../types/clips.ts';
-import { AuthConfig } from '../../constants/constants.ts';
+import { AuthConfig, AIClipsViewStyle } from '../../constants/constants.ts';
 
 interface ConversationRendererProps {
   item: ConversationItem;
@@ -15,6 +15,7 @@ interface ConversationRendererProps {
   onShareModalOpen?: (isOpen: boolean) => void;
   onSocialShareModalOpen?: (isOpen: boolean) => void;
   isClipBatchPage?: boolean;
+  clipBatchViewMode?: AIClipsViewStyle;
 }
 
 export const ConversationRenderer: React.FC<ConversationRendererProps> = ({ 
@@ -24,7 +25,8 @@ export const ConversationRenderer: React.FC<ConversationRendererProps> = ({
   authConfig,
   onShareModalOpen,
   onSocialShareModalOpen,
-  isClipBatchPage
+  isClipBatchPage,
+  clipBatchViewMode
 }) => {
   switch (item.type) {
     case 'web-search':
@@ -41,6 +43,7 @@ export const ConversationRenderer: React.FC<ConversationRendererProps> = ({
           onShareModalOpen={onShareModalOpen}
           onSocialShareModalOpen={onSocialShareModalOpen}
           isClipBatchPage={isClipBatchPage}
+          clipBatchViewMode={clipBatchViewMode}
         />
       );
     default:

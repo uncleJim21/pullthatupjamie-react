@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Share, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2, ChevronRight } from 'lucide-react';
+import { ExternalLink, Share, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2, ChevronRight, Check } from 'lucide-react';
 import { formatTime } from '../../utils/time.ts';
 import { makeClip, fetchClipById } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
 import EditTimestampsModal from "./EditTimestampsModal.tsx";
 import SocialShareModal, { SocialPlatform } from "../SocialShareModal.tsx";
 import ShareModal from "../ShareModal.tsx";
-import { AuthConfig } from "../../constants/constants.ts";
+import { AuthConfig, AIClipsViewStyle } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
 
@@ -44,6 +44,7 @@ interface PodcastSearchResultItemProps {
   onClipProgress?: (progress: ClipProgress) => void;
   authConfig?: AuthConfig | null | undefined;
   presentationContext?:PresentationContext;
+  viewMode?: AIClipsViewStyle;
   runId?: string;
   feedId?: string;
   onSignInClick?: () => void;
@@ -72,6 +73,7 @@ export const PodcastSearchResultItem = ({
   onClipProgress,
   authConfig,
   presentationContext = PresentationContext.search,
+  viewMode = AIClipsViewStyle.LIST,
   runId,
   feedId,
   onSignInClick,
@@ -280,19 +282,19 @@ export const PodcastSearchResultItem = ({
       printLog(`Creating clip for share: ${shareLink}, start: ${timeContext.start_time}, end: ${timeContext.end_time}`);
       const response = await makeClip(shareLink, authConfig!, timeContext.start_time, timeContext.end_time);
       
-              if (response.status === "completed" && response.url) {
-          // Clip is ready immediately
-          printLog(`Clip ready immediately: ${response.url}`);
-          setShareClipUrl(response.url);
-          setShareClipLookupHash(response.lookupHash);
-          setIsShareProcessing(false);
-          setIsShareModalOpen(true);
-        } else {
-          // Need to poll for completion
-          printLog(`Polling for clip completion with lookupHash: ${response.lookupHash}`);
-          setShareClipLookupHash(response.lookupHash);
-          await pollForClipCompletion(response.lookupHash);
-        }
+      if (response.status === "completed" && response.url) {
+        // Clip is ready immediately
+        printLog(`Clip ready immediately: ${response.url}`);
+        setShareClipUrl(response.url);
+        setShareClipLookupHash(response.lookupHash);
+        setIsShareProcessing(false);
+        setIsShareModalOpen(true);
+      } else {
+        // Need to poll for completion
+        printLog(`Polling for clip completion with lookupHash: ${response.lookupHash}`);
+        setShareClipLookupHash(response.lookupHash);
+        await pollForClipCompletion(response.lookupHash);
+      }
     } catch (error) {
       console.error("Failed to create clip for sharing:", error);
       setIsShareProcessing(false);
@@ -449,6 +451,221 @@ export const PodcastSearchResultItem = ({
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // Grid view for clipBatch
+  if (viewMode === AIClipsViewStyle.GRID && presentationContext === PresentationContext.clipBatch) {
+    return (
+      <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          onTimeUpdate={handleTimeUpdate}
+          onEnded={() => {
+            if (audioRef.current) {
+              audioRef.current.currentTime = timeContext.start_time;
+              setCurrentTime(timeContext.start_time);
+            }
+            onEnded(id);
+          }}
+        />
+        
+        {/* Episode Image with Better Aspect Ratio */}
+        <div className="relative h-32 group cursor-pointer" onClick={handlePlayPause}>
+          {!imageLoaded && (
+            <div className="w-full h-full bg-gray-800 animate-pulse" />
+          )}
+          <img
+            src={episodeImage}
+            alt={episode}
+            className={`w-full h-full object-cover ${
+              imageLoaded ? 'block' : 'hidden'
+            }`}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageLoaded(false)}
+          />
+          
+          {/* Play/Pause Button - Always Visible */}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePlayPause();
+              }}
+              className={`p-2 rounded-full text-black transition-colors ${
+                audioUrl === 'URL unavailable'
+                  ? 'bg-gray-700'
+                  : 'hover:bg-gray-200 bg-white'
+              }`}
+              disabled={audioUrl === 'URL unavailable'}
+            >
+              {isBuffering ? (
+                <Loader className="animate-spin" size={16} />
+              ) : isPlaying ? (
+                <Pause size={16} />
+              ) : (
+                <Play size={16} />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Content - Title and Action Buttons Side by Side */}
+        <div className="p-4 flex items-start gap-4 min-h-[80px]">
+          {/* Title Text */}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-medium text-white line-clamp-3">{episode}</h3>
+          </div>
+          
+          {/* Action Buttons - 2x2 Grid with Borders and Smaller Size */}
+          <div className="grid grid-cols-2 gap-2 flex-shrink-0">
+            <button
+              className="p-2.5 rounded border border-gray-600 text-gray-300 hover:bg-gray-800 hover:border-gray-500 transition-colors flex items-center justify-center"
+              onClick={handleShare}
+              title="Copy Link"
+            >
+              {showCopied ? <Check className="h-4 w-4" /> : <Link className="h-4 w-4" />}
+            </button>
+            {listenLink && (
+              <button
+                className="p-2.5 rounded border border-gray-600 text-gray-300 hover:bg-gray-800 hover:border-gray-500 transition-colors flex items-center justify-center"
+                onClick={handleListen}
+                title="Listen"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </button>
+            )}
+            {onClipProgress && (
+              <button
+                className="p-2.5 rounded border border-gray-600 text-gray-300 hover:bg-gray-800 hover:border-gray-500 transition-colors flex items-center justify-center"
+                onClick={handleClip}
+                title="Clip"
+              >
+                <Scissors className="h-4 w-4" />
+              </button>
+            )}
+            {shareable && (
+              <button
+                className="p-2.5 rounded border border-gray-600 text-gray-300 hover:bg-gray-800 hover:border-gray-500 transition-colors flex items-center justify-center"
+                onClick={handleShareClip}
+                disabled={isShareProcessing}
+                title="Share"
+              >
+                {isShareProcessing ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Share className="h-4 w-4" />
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Share Modal for Grid View */}
+        {isShareModalOpen && shareClipUrl && (
+          <ShareModal
+            isOpen={isShareModalOpen}
+            onClose={() => {
+              setIsShareModalOpen(false);
+              setShareClipUrl('');
+              setShareClipLookupHash('');
+            }}
+            fileUrl={shareClipUrl}
+            title="Share This Clip"
+            itemName="clip"
+            showCopy={true}
+            showDownload={true}
+            showTwitter={true}
+            showNostr={true}
+            copySuccessMessage="Clip link copied!"
+            downloadButtonLabel="Download Clip"
+            twitterButtonLabel="Share on Social Media"
+            nostrButtonLabel="Share on Nostr"
+            lookupHash={shareClipLookupHash}
+            auth={authConfig}
+            onSocialShareModalOpen={onSocialShareModalOpen}
+          />
+        )}
+
+        {/* Social Share Modal for Grid View */}
+        {isSocialShareModalOpen && shareClipUrl && (
+          <SocialShareModal
+            isOpen={isSocialShareModalOpen}
+            onClose={() => {
+              setIsSocialShareModalOpen(false);
+              setShareClipUrl('');
+              setShareClipLookupHash('');
+              onSocialShareModalOpen?.(false);
+            }}
+            fileUrl={shareClipUrl}
+            itemName="clip"
+            onComplete={(success, platform) => {
+              printLog(`Share completed: ${success} on ${platform}`);
+              setIsSocialShareModalOpen(false);
+              setShareClipUrl('');
+              setShareClipLookupHash('');
+              onSocialShareModalOpen?.(false);
+            }}
+            platform={SocialPlatform.Twitter}
+            lookupHash={shareClipLookupHash}
+            auth={authConfig}
+          />
+        )}
+
+        {/* Edit Timestamps Modal for Grid View */}
+        {isEditModalOpen && (
+          <EditTimestampsModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            audioUrl={audioUrl}
+            episodeTitle={episode}
+            episodeDate={date}
+            creator={creator}
+            episodeImage={episodeImage}
+            initialStartTime={timeContext.start_time}
+            initialEndTime={timeContext.end_time}
+            onConfirm={handleUpdateTimestamps}
+            editTimestampsError={editTimestampsError}
+          />
+        )}
+
+        {/* Clip Modal for Grid View */}
+        {isClipModalOpen && (
+          <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-[9999]">
+            <div className="bg-[#111111] rounded-lg p-6 text-center w-[90%] max-w-sm border border-gray-800 relative mb-36">
+              {/* Close Button */}
+              <button
+                onClick={handleClipCancel}
+                className="absolute top-2 right-2 text-white text-3xl"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+
+              {/* Modal Content */}
+              <div className="flex flex-col items-center space-y-6">
+                {/* Edit Timestamps Button */}
+                <button
+                  onClick={handleEditTimestamps}
+                  className="flex items-center justify-center px-6 py-3 bg-[#1A1A1A] text-white border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors w-full mt-8 z-100"
+                >
+                  <Edit2 className="w-5 h-5 mr-2" />
+                  Edit Timestamps
+                </button>
+                {/* Clip This Button */}
+                <button
+                  onClick={() => handleClipConfirm(null,null)}
+                  className="flex items-center font-bold justify-center px-6 py-3 bg-white text-black rounded-lg hover:bg-gray-400 transition-colors w-full mt-8"
+                >
+                  <Scissors className="w-5 h-5 mr-2" />
+                  Clip This
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
