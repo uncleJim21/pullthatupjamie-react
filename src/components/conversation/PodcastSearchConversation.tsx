@@ -49,7 +49,7 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
   if (isClipBatchPage && clipBatchViewMode === AIClipsViewStyle.GRID) {
     return (
       <BaseConversationLayout query={item.query}>
-        <div className="grid grid-cols-3 gap-6 pb-48">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-48">
           {item.data.quotes.map((quote, index) => (
             <PodcastSearchResultItem
               key={index}
