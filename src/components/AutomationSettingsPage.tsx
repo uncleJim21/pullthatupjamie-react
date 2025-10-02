@@ -217,6 +217,10 @@ const AutomationSettingsPage: React.FC = () => {
     twitter: { enabled: false, available: true, authenticated: false },
     nostr: { enabled: false, available: true, authenticated: false }
   });
+  
+  // Token polling states (matches SocialShareModal)
+  const [isPollingTokens, setIsPollingTokens] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [automationSettings, setAutomationSettings] = useState<PlatformAutomationSettings>({
     twitterOAuthEnabled: false,
     nostrAutomationEnabled: false
@@ -369,8 +373,8 @@ const AutomationSettingsPage: React.FC = () => {
     try {
       const result = await PlatformIntegrationService.connectTwitter();
       if (result.success) {
-        // Refresh platform status after connection
-        await loadPlatformStatus();
+        // Start polling for tokens after opening auth window (matches SocialShareModal)
+        startTokenPolling();
       } else {
         console.error('Twitter connection failed:', result.error);
         alert('Failed to connect to Twitter. Please try again.');
@@ -407,6 +411,49 @@ const AutomationSettingsPage: React.FC = () => {
         : { nostrAutomationEnabled: enabled }
       )
     }));
+  };
+
+  // Token polling functions (matches SocialShareModal)
+  const startTokenPolling = () => {
+    if (isPollingTokens) return;
+    
+    setIsPollingTokens(true);
+    printLog('Starting token polling for Twitter auth...');
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const twitterState = await PlatformIntegrationService.checkTwitterAuth();
+        if (twitterState.authenticated) {
+          printLog('Twitter authentication detected, stopping polling');
+          setPlatformStates(prev => ({
+            ...prev,
+            twitter: twitterState
+          }));
+          stopTokenPolling();
+        }
+      } catch (error) {
+        printLog(`Error during token polling: ${error}`);
+      }
+    }, 2000); // Poll every 2 seconds
+    
+    setPollingInterval(pollInterval);
+    
+    // Stop polling after 5 minutes
+    setTimeout(() => {
+      if (isPollingTokens) {
+        printLog('Token polling timeout reached');
+        stopTokenPolling();
+      }
+    }, 300000);
+  };
+
+  const stopTokenPolling = () => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+    setIsPollingTokens(false);
+    printLog('Stopped token polling');
   };
 
   const loadPlatformStatus = async () => {
@@ -632,6 +679,15 @@ const AutomationSettingsPage: React.FC = () => {
       }
     }
   }, [scheduledSlots, scheduleMode]);
+
+  // Cleanup polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [pollingInterval]);
 
   // Handle sign in modal open
   const handleOpenSignInModal = () => {

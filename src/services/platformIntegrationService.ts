@@ -164,30 +164,41 @@ export class PlatformIntegrationService {
   }
 
   /**
-   * Initiate Twitter OAuth connection
+   * Initiate Twitter OAuth connection (matches SocialShareModal workflow)
    */
   static async connectTwitter(): Promise<{ success: boolean; error?: string; redirectUrl?: string }> {
     try {
-      const response = await fetch('/api/social/twitter/connect', {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
+
+      printLog(`Starting Twitter auth at ${API_URL}/api/twitter/x-oauth`);
+      const response = await fetch(`${API_URL}/api/twitter/x-oauth`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
           'Content-Type': 'application/json',
+          'Origin': window.location.origin
         },
+        body: JSON.stringify({ token }),
+        credentials: 'include',
+        mode: 'cors'
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const error = await response.json();
+        throw new Error(error.message || `Failed to start Twitter auth: ${response.status}`);
       }
 
       const data = await response.json();
+      printLog(`Twitter auth response: ${JSON.stringify(data)}`);
       
-      if (data.success && data.redirectUrl) {
-        // Open Twitter OAuth in new window
-        window.open(data.redirectUrl, 'twitter-oauth', 'width=600,height=700,scrollbars=yes,resizable=yes');
-        return { success: true, redirectUrl: data.redirectUrl };
+      if (data.authUrl) {
+        // Open Twitter OAuth in new window (matches SocialShareModal)
+        window.open(data.authUrl, '_blank');
+        return { success: true, redirectUrl: data.authUrl };
       } else {
-        return { success: false, error: data.error || 'Failed to initiate OAuth' };
+        return { success: false, error: 'No auth URL received' };
       }
     } catch (error) {
       printLog('Twitter connect failed:', error);
@@ -199,24 +210,37 @@ export class PlatformIntegrationService {
   }
 
   /**
-   * Disconnect Twitter OAuth
+   * Disconnect Twitter OAuth (matches SocialShareModal workflow)
    */
   static async disconnectTwitter(): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch('/api/social/twitter/disconnect', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No auth token found');
       }
 
+      printLog(`Attempting to revoke Twitter access at ${API_URL}/api/twitter/revoke`);
+      
+      const response = await fetch(`${API_URL}/api/twitter/revoke`, {
+        method: 'POST',
+        headers: {
+          'Accept': '*/*',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin
+        },
+        body: JSON.stringify({ confirmRevoke: true }),
+        credentials: 'include',
+        mode: 'cors'
+      });
+      
       const data = await response.json();
-      return { success: data.success, error: data.error };
+      printLog(`Revoke response: ${JSON.stringify(data)}`);
+      
+      return { 
+        success: data.success === true, 
+        error: data.error || (data.success === false ? data.message : undefined)
+      };
     } catch (error) {
       printLog('Twitter disconnect failed:', error);
       return { 
