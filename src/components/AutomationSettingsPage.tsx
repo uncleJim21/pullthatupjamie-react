@@ -221,24 +221,28 @@ const AutomationSettingsPage: React.FC = () => {
     twitterOAuthEnabled: false,
     nostrAutomationEnabled: false
   });
+  const [scheduleMode, setScheduleMode] = useState<'recommended' | 'custom'>('recommended');
+  
+  // Debug: Log initial state
+  printLog(`Initial scheduleMode state: ${scheduleMode}`);
   const [scheduledSlots, setScheduledSlots] = useState<ScheduledSlot[]>(() => {
-    // Generate default slots: 9:45 AM and 4:45 PM on weekdays (Monday-Friday)
-    const defaultSlots: ScheduledSlot[] = [];
+    // Generate recommended slots: 9:45 AM and 4:45 PM CT on weekdays (Monday-Friday)
+    const recommendedSlots: ScheduledSlot[] = [];
     for (let day = 1; day <= 5; day++) { // Monday = 1, Friday = 5
-      defaultSlots.push({
+      recommendedSlots.push({
         id: `slot_${day}_morning_${Date.now()}`,
         dayOfWeek: day,
         time: '09:45',
         enabled: true
       });
-      defaultSlots.push({
+      recommendedSlots.push({
         id: `slot_${day}_afternoon_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         dayOfWeek: day,
         time: '16:45',
         enabled: true
       });
     }
-    return defaultSlots;
+    return recommendedSlots;
   });
 
   // Handle topic input changes
@@ -314,6 +318,50 @@ const AutomationSettingsPage: React.FC = () => {
   // Handle scheduled slots changes
   const handleScheduledSlotsChange = (slots: ScheduledSlot[]) => {
     setScheduledSlots(slots);
+  };
+
+  // Generate recommended slots
+  const generateRecommendedSlots = (): ScheduledSlot[] => {
+    const recommendedSlots: ScheduledSlot[] = [];
+    for (let day = 1; day <= 5; day++) { // Monday = 1, Friday = 5
+      recommendedSlots.push({
+        id: `slot_${day}_morning_${Date.now()}`,
+        dayOfWeek: day,
+        time: '09:45',
+        enabled: true
+      });
+      recommendedSlots.push({
+        id: `slot_${day}_afternoon_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        dayOfWeek: day,
+        time: '16:45',
+        enabled: true
+      });
+    }
+    return recommendedSlots;
+  };
+
+  // Handle schedule mode change
+  const handleScheduleModeChange = (mode: 'recommended' | 'custom') => {
+    printLog(`handleScheduleModeChange called with mode: ${mode}`);
+    setScheduleMode(mode);
+    // Store the user's explicit choice in localStorage
+    localStorage.setItem('scheduleMode', mode);
+    printLog(`Saved scheduleMode to localStorage: ${mode}`);
+    
+    if (mode === 'recommended') {
+      // Reset to recommended slots when switching back
+      const recommendedSlots = generateRecommendedSlots();
+      setScheduledSlots(recommendedSlots);
+      printLog(`Reset to recommended slots: ${recommendedSlots.length} slots`);
+      
+      // Also store the recommended schedule confirmation in localStorage
+      localStorage.setItem('recommendedScheduleConfirmed', 'true');
+      printLog(`Saved recommendedScheduleConfirmed to localStorage: true`);
+    } else {
+      // Clear the recommended confirmation when switching to custom
+      localStorage.removeItem('recommendedScheduleConfirmed');
+      printLog(`Removed recommendedScheduleConfirmed from localStorage`);
+    }
   };
 
   // Platform integration handlers
@@ -406,6 +454,7 @@ const AutomationSettingsPage: React.FC = () => {
   // Load authentication state from localStorage
   useEffect(() => {
     const checkSignedIn = () => {
+      printLog(`Component mounted - checking authentication state`);
       const hasToken = !!localStorage.getItem('auth_token');
       const hasSquareId = !!localStorage.getItem('squareId');
       const isUserSignedIn = hasToken && hasSquareId;
@@ -415,6 +464,8 @@ const AutomationSettingsPage: React.FC = () => {
       const adminPrivs = localStorage.getItem('admin_privs');
       const isUserAdmin = adminPrivs === 'true' && isUserSignedIn; // Must be signed in AND have admin privs
       setIsAdmin(isUserAdmin);
+      
+      printLog(`Auth check - isUserSignedIn: ${isUserSignedIn}, isUserAdmin: ${isUserAdmin}`);
       
       // Show admin required modal if user is not signed in OR not admin
       if (!isUserSignedIn || !isUserAdmin) {
@@ -432,9 +483,11 @@ const AutomationSettingsPage: React.FC = () => {
   useEffect(() => {
     const loadAutomationSettings = async () => {
       try {
+        printLog(`loadAutomationSettings called - isAdmin: ${isAdmin}`);
         setIsLoading(true);
         const feedId = '550168'; // Hardcoded feedId as shown in the curl example
         
+        printLog(`Fetching automation settings for feedId: ${feedId}`);
         const result = await getAutomationSettings(feedId);
         
         if (result.success && result.data) {
@@ -457,9 +510,42 @@ const AutomationSettingsPage: React.FC = () => {
           }
           
           // Populate posting schedule
+          printLog(`Loading automation settings - postingSchedule: ${JSON.stringify(postingSchedule)}`);
           if (postingSchedule?.scheduledPostSlots && Array.isArray(postingSchedule.scheduledPostSlots)) {
+            printLog(`Found scheduledPostSlots: ${postingSchedule.scheduledPostSlots.length} slots`);
             setScheduledSlots(postingSchedule.scheduledPostSlots);
+            
+            // Check if user has explicitly chosen a schedule mode
+            const savedScheduleMode = localStorage.getItem('scheduleMode');
+            const recommendedConfirmed = localStorage.getItem('recommendedScheduleConfirmed');
+            printLog(`Saved scheduleMode from localStorage: ${savedScheduleMode}`);
+            printLog(`Recommended schedule confirmed: ${recommendedConfirmed}`);
+            
+            if (savedScheduleMode === 'custom' || savedScheduleMode === 'recommended') {
+              printLog(`Using saved scheduleMode: ${savedScheduleMode}`);
+              setScheduleMode(savedScheduleMode);
+            } else if (recommendedConfirmed === 'true') {
+              printLog(`User previously confirmed recommended schedule, using recommended mode`);
+              setScheduleMode('recommended');
+            } else {
+              // Always default to recommended unless there's explicit evidence of custom settings
+              // Only check for very obvious custom modifications (weekend days, very different slot counts)
+              const hasWeekendDays = postingSchedule.scheduledPostSlots.some(slot => 
+                slot.dayOfWeek === 0 || slot.dayOfWeek === 6
+              );
+              const hasVeryDifferentCount = postingSchedule.scheduledPostSlots.length < 5 || postingSchedule.scheduledPostSlots.length > 15;
+              
+              printLog(`Pattern analysis - hasWeekendDays: ${hasWeekendDays}, hasVeryDifferentCount: ${hasVeryDifferentCount}`);
+              
+              // Only set to custom for very obvious custom modifications, otherwise default to recommended
+              const determinedMode = (hasWeekendDays || hasVeryDifferentCount) ? 'custom' : 'recommended';
+              printLog(`Determined scheduleMode: ${determinedMode} (defaulting to recommended unless obvious custom modifications)`);
+              setScheduleMode(determinedMode);
+            }
+          } else {
+            printLog(`No scheduledPostSlots found, keeping default recommended mode`);
           }
+          // Note: scheduleMode defaults to 'recommended' in useState, so no need to set it here
 
           // Load platform integration settings from userSettings
           const userSettings = localStorage.getItem('userSettings');
@@ -495,6 +581,57 @@ const AutomationSettingsPage: React.FC = () => {
       checkPlatformStatus();
     }
   }, [currentStep, isAdmin]);
+
+  // Debug: Track scheduleMode changes
+  useEffect(() => {
+    printLog(`scheduleMode state changed to: ${scheduleMode}`);
+  }, [scheduleMode]);
+
+  // Ensure we have the correct slots when in recommended mode
+  useEffect(() => {
+    if (scheduleMode === 'recommended') {
+      // Check if current slots match recommended pattern
+      const hasCorrectTimes = scheduledSlots.every(slot => 
+        slot.time === '09:45' || slot.time === '16:45'
+      );
+      const hasCorrectDays = scheduledSlots.every(slot => 
+        slot.dayOfWeek >= 1 && slot.dayOfWeek <= 5
+      );
+      const hasCorrectCount = scheduledSlots.length === 10;
+      
+      printLog(`Recommended mode check - hasCorrectTimes: ${hasCorrectTimes}, hasCorrectDays: ${hasCorrectDays}, hasCorrectCount: ${hasCorrectCount}`);
+      
+      if (!hasCorrectTimes || !hasCorrectDays || !hasCorrectCount) {
+        printLog(`Recommended mode detected but slots don't match pattern. Regenerating recommended slots.`);
+        const recommendedSlots = generateRecommendedSlots();
+        setScheduledSlots(recommendedSlots);
+        printLog(`Regenerated recommended slots: ${recommendedSlots.length} slots`);
+      }
+    }
+  }, [scheduleMode]);
+
+  // Additional check when scheduledSlots are loaded from backend
+  useEffect(() => {
+    if (scheduleMode === 'recommended' && scheduledSlots.length > 0) {
+      // Check if current slots match recommended pattern
+      const hasCorrectTimes = scheduledSlots.every(slot => 
+        slot.time === '09:45' || slot.time === '16:45'
+      );
+      const hasCorrectDays = scheduledSlots.every(slot => 
+        slot.dayOfWeek >= 1 && slot.dayOfWeek <= 5
+      );
+      const hasCorrectCount = scheduledSlots.length === 10;
+      
+      printLog(`Backend slots check - hasCorrectTimes: ${hasCorrectTimes}, hasCorrectDays: ${hasCorrectDays}, hasCorrectCount: ${hasCorrectCount}`);
+      
+      if (!hasCorrectTimes || !hasCorrectDays || !hasCorrectCount) {
+        printLog(`Backend slots don't match recommended pattern. Regenerating recommended slots.`);
+        const recommendedSlots = generateRecommendedSlots();
+        setScheduledSlots(recommendedSlots);
+        printLog(`Regenerated recommended slots from backend check: ${recommendedSlots.length} slots`);
+      }
+    }
+  }, [scheduledSlots, scheduleMode]);
 
   // Handle sign in modal open
   const handleOpenSignInModal = () => {
@@ -554,6 +691,9 @@ const AutomationSettingsPage: React.FC = () => {
     try {
       setIsSaving(true);
       const feedId = '550168'; // Hardcoded feedId as shown in the curl example
+      
+      printLog(`Saving settings - scheduleMode: ${scheduleMode}, scheduledSlots count: ${scheduledSlots.length}`);
+      printLog(`Scheduled slots being saved: ${JSON.stringify(scheduledSlots)}`);
       
       const settingsToSave: AutomationSettings = {
         curationSettings: {
@@ -813,6 +953,7 @@ const AutomationSettingsPage: React.FC = () => {
         );
       
       case AutomationStep.POSTING_SCHEDULE:
+        printLog(`Rendering POSTING_SCHEDULE step - current scheduleMode: ${scheduleMode}`);
         return (
           <div className="max-w-2xl mx-auto">
             {/* Header Text */}
@@ -823,15 +964,68 @@ const AutomationSettingsPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Scheduled Post Slots */}
+            {/* Schedule Mode Selection */}
             <div className="mb-8">
-              <ScheduledPostSlots
-                slots={scheduledSlots}
-                onSlotsChange={handleScheduledSlotsChange}
-                maxSlots={10}
-                isSelectable={false}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Recommended Option */}
+                <button
+                  onClick={() => handleScheduleModeChange('recommended')}
+                  className={`p-6 rounded-lg border-2 transition-all duration-200 ${
+                    scheduleMode === 'recommended'
+                      ? 'border-white bg-gray-900'
+                      : 'border-gray-700 bg-gray-900/60 hover:border-gray-600'
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">⭐</div>
+                    <h3 className="text-lg font-bold text-white mb-2">Recommended</h3>
+                    <p className="text-sm text-gray-400 mb-3">
+                      Optimal times for maximum engagement
+                    </p>
+                    <div className="text-sm text-gray-300">
+                      <div>9:45 AM CT</div>
+                      <div>4:45 PM CT</div>
+                      <div className="text-xs text-gray-500 mt-1">Monday - Friday</div>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Custom Option */}
+                <button
+                  onClick={() => handleScheduleModeChange('custom')}
+                  className={`p-6 rounded-lg border-2 transition-all duration-200 ${
+                    scheduleMode === 'custom'
+                      ? 'border-white bg-gray-900'
+                      : 'border-gray-700 bg-gray-900/60 hover:border-gray-600'
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">⚙️</div>
+                    <h3 className="text-lg font-bold text-white mb-2">Custom</h3>
+                    <p className="text-sm text-gray-400 mb-3">
+                      Create your own posting schedule
+                    </p>
+                    <div className="text-sm text-gray-300">
+                      <div>Choose your own times</div>
+                      <div>Select specific days</div>
+                      <div className="text-xs text-gray-500 mt-1">Full control</div>
+                    </div>
+                  </div>
+                </button>
+              </div>
             </div>
+
+            {/* Custom Schedule UI - Only show when Custom is selected */}
+            {scheduleMode === 'custom' && (
+              <div className="mb-8">
+                <ScheduledPostSlots
+                  slots={scheduledSlots}
+                  onSlotsChange={handleScheduledSlotsChange}
+                  maxSlots={10}
+                  isSelectable={false}
+                />
+              </div>
+            )}
             
             {/* Navigation Buttons */}
             <div className="flex justify-between items-center pt-6">

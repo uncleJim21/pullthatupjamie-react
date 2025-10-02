@@ -236,7 +236,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
   const copyToClipboard = () => {
     const lna = feedData?.lightningAddress
-    console.log(`lna:${lna}`)
+    printLog(`lna:${lna}`)
     if(!lna){return}
     navigator.clipboard.writeText(lna);
     setCopied(true);
@@ -419,7 +419,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         setActiveTab('Uploads');
       } else {
         setActiveTab('Episodes');
-        console.log('Non-admin user attempted to access Uploads tab, falling back to Episodes tab');
+        printLog('Non-admin user attempted to access Uploads tab, falling back to Episodes tab');
       }
     }
   }, [feedData, initialView, defaultTab, isAdmin, searchParams]);
@@ -438,7 +438,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     // but see an error message if they're not authorized
     if (activeTab === 'Uploads' && !isAdmin) {
       setActiveTab('Episodes');
-      console.log('Non-admin user attempted to access restricted tab, falling back to Episodes tab');
+      printLog('Non-admin user attempted to access restricted tab, falling back to Episodes tab');
     }
   }, [activeTab, isAdmin]);
 
@@ -571,9 +571,9 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           return;
       }
       const response = await AuthService.checkPrivs(token);
-      console.log(`checkPrivs response:${JSON.stringify(response,null,2)}`);
+      printLog(`checkPrivs response:${JSON.stringify(response,null,2)}`);
       if (response && response.privs.privs && response.privs.privs.feedId === feedId) {
-          console.log(`Admin privileges granted`);
+          printLog(`Admin privileges granted`);
           setIsAdmin(response.privs.privs.access === 'admin');
       } else {
           setIsAdmin(false);
@@ -901,6 +901,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
               <div className="space-y-6">
                 {feedData.episodes.map(episode => (
                   <PodcastSearchResultItem
+                    key={episode.id}
                     id={episode.id}
                     quote={episode.description || ''}
                     episode={episode.title}
@@ -958,6 +959,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   <div className="space-y-6">
                     {feedData.episodes.map(episode => (
                       <PodcastSearchResultItem
+                        key={episode.id}
                         id={episode.id}
                         quote={episode.description || ''}
                         episode={episode.title}
