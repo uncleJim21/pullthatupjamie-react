@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { DEBUG_MODE, FRONTEND_URL, printLog, NavigationMode } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
@@ -111,6 +111,7 @@ type JamieProView = 'chat' | 'history' | 'settings' | 'scheduled-posts';
 const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> = ({ initialView, defaultTab }) => {
     const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
     const [feedData, setFeedData] = useState<PodcastFeedData | null>(null);
     const [featuredEpisode, setFeaturedEpisode] = useState<Episode | null>(null);
     const [activeTab, setActiveTab] = useState<TabType>('Episodes');
@@ -1343,7 +1344,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden hover:border-gray-700 transition-colors cursor-pointer"
                         onClick={() => {
                           if (run._id && feedId) {
-                            window.location.href = `/app/feed/${feedId}/clipBatch/${run._id}`;
+                            navigate(`/app/feed/${feedId}/clipBatch/${run._id}`);
                           }
                         }}
                       >
