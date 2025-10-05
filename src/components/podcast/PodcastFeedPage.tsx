@@ -177,7 +177,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     // Derived state for backward compatibility
     const autoShare = userSettings.autoStartCrosspost || false;
     const settingsData = {
-        fullJamieAutoEnabled: userSettings.fullJamieAutoEnabled || false,
+        jamieFullAutoEnabled: userSettings.jamieFullAutoEnabled || false,
         autoStartCrosspost: userSettings.autoStartCrosspost || false,
         crosspostSignature: userSettings.crosspostSignature || '',
         scheduledPostSlots: userSettings.scheduledPostSlots || [],
@@ -201,18 +201,18 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const handleFullJamieAutoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const newValue = e.target.checked;
         
-        if (newValue && !settingsData.fullJamieAutoEnabled) {
+        if (newValue && !settingsData.jamieFullAutoEnabled) {
             // User is enabling automation for the first time, show configuration modal
             setIsConfigureAutomationModalOpen(true);
         } else {
             // User is disabling automation or it was already enabled
-            await updateSetting('fullJamieAutoEnabled', newValue);
+            await updateSetting('jamieFullAutoEnabled', newValue);
         }
     };
 
     const handleConfigureAutomation = () => {
         // Enable the setting and navigate to automation settings
-        updateSetting('fullJamieAutoEnabled', true);
+        updateSetting('jamieFullAutoEnabled', true);
         setIsConfigureAutomationModalOpen(false);
         window.open('/app/automation-settings', '_blank');
     };
@@ -1219,7 +1219,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                             <p className="text-gray-400 text-sm">
                               Enable fully automated content creation and posting workflows
                             </p>
-                            {settingsData.fullJamieAutoEnabled && (
+                            {settingsData.jamieFullAutoEnabled && (
                               <a
                                 href="/app/automation-settings"
                                 target="_blank"
@@ -1233,8 +1233,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                           <div className="ml-4">
                             <input
                               type="checkbox"
-                              id="fullJamieAutoEnabled"
-                              checked={settingsData.fullJamieAutoEnabled || false}
+                              id="jamieFullAutoEnabled"
+                              checked={settingsData.jamieFullAutoEnabled || false}
                               onChange={handleFullJamieAutoChange}
                               className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white focus:ring-2"
                             />
