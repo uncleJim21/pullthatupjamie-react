@@ -29,6 +29,7 @@ import WelcomeModal from './WelcomeModal.tsx';
 import AccountButton from './AccountButton.tsx';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 import AuthService from '../services/authService.ts';
+import ImageWithLoader from './ImageWithLoader.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';

@@ -3,6 +3,7 @@ import { Twitter, Loader2, Pin, PinOff, Users, X, Link } from 'lucide-react';
 import { mentionService } from '../services/mentionService.ts';
 import { MentionResult, TwitterResult, NostrResult } from '../types/mention.ts';
 import { API_URL } from '../constants/constants.ts';
+import ImageWithLoader from './ImageWithLoader.tsx';
 
 export enum Platform {
   Twitter = 'twitter',
@@ -309,10 +310,11 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
         {/* Profile Image */}
         <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
           {result.profile_image_url ? (
-            <img 
+            <ImageWithLoader
               src={result.profile_image_url} 
               alt={result.name}
               className="w-8 h-8 object-cover"
+              loadingClassName="w-8 h-8 bg-gray-800 animate-pulse"
             />
           ) : (
             <Twitter className="w-4 h-4 text-blue-400" />
@@ -449,10 +451,11 @@ const MentionsLookupView: React.FC<MentionsLookupViewProps> = ({
         {/* Profile Image */}
         <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
           {effectiveData.picture ? (
-            <img 
+            <ImageWithLoader
               src={effectiveData.picture} 
               alt={effectiveData.displayName || 'Nostr User'}
               className="w-8 h-8 object-cover"
+              loadingClassName="w-8 h-8 bg-gray-800 animate-pulse"
             />
           ) : (
             <img 
