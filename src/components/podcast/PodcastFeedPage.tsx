@@ -29,6 +29,7 @@ import ScheduledPostsList from '../ScheduledPostsList.tsx';
 import ScheduledPostService from '../../services/scheduledPostService.ts';
 import { useUserSettings } from '../../hooks/useUserSettings.ts';
 import ScheduledPostSlots from '../ScheduledPostSlots.tsx';
+import ImageWithLoader from '../ImageWithLoader.tsx';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -727,10 +728,11 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       >
         <div className="max-w-4xl mx-auto flex items-start gap-6">
           {/* Podcast Logo */}
-          <img 
+          <ImageWithLoader
             src={feedData.logoUrl} 
             alt={feedData.title}
             className="sm:w-32 sm:h-32 w-24 w-24 rounded-lg shadow-lg border border-gray-700"
+            loadingClassName="sm:w-32 sm:h-32 w-24 w-24 rounded-lg shadow-lg border border-gray-700 bg-gray-800 animate-pulse"
           />
           
           {/* Podcast Info with tinted background */}
