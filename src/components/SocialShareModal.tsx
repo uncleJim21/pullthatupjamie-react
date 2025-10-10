@@ -130,9 +130,46 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
 }) => {
   const [content, setContent] = useState<string>('');
   
+  // Helper function to load platform defaults from localStorage
+  const loadPlatformDefaults = () => {
+    try {
+      const savedDefaults = localStorage.getItem('socialSharePlatformDefaults');
+      if (savedDefaults) {
+        const defaults = JSON.parse(savedDefaults);
+        return {
+          twitter: defaults.twitter ?? true,
+          nostr: defaults.nostr ?? true
+        };
+      }
+    } catch (error) {
+      console.error('Error loading platform defaults from localStorage:', error);
+    }
+    // Default values if no saved preferences
+    return {
+      twitter: true,
+      nostr: true
+    };
+  };
+
+  // Helper function to save platform defaults to localStorage
+  const savePlatformDefaults = (twitterEnabled: boolean, nostrEnabled: boolean) => {
+    try {
+      const defaults = {
+        twitter: twitterEnabled,
+        nostr: nostrEnabled
+      };
+      localStorage.setItem('socialSharePlatformDefaults', JSON.stringify(defaults));
+    } catch (error) {
+      console.error('Error saving platform defaults to localStorage:', error);
+    }
+  };
+
+  // Load initial defaults
+  const initialDefaults = loadPlatformDefaults();
+
   // Unified platform state objects
   const [twitterState, setTwitterState] = useState<PlatformState>({
-    enabled: true,
+    enabled: initialDefaults.twitter,
     available: true,
     authenticated: false,
     currentOperation: OperationType.IDLE,
@@ -142,7 +179,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   });
   
   const [nostrState, setNostrState] = useState<PlatformState>({
-    enabled: true,
+    enabled: initialDefaults.nostr,
     available: false,
     authenticated: false,
     currentOperation: OperationType.IDLE,
@@ -860,6 +897,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         setIsCheckingTokens(true);
         try {
           await checkTwitterAuth(); // This now handles both auth check and hasValidTokens
+          
+          // Reload platform defaults after auth check to ensure proper state
+          const currentDefaults = loadPlatformDefaults();
+          // Only apply Twitter default if authenticated, otherwise force to false
+          const twitterEnabled = twitterState.authenticated ? currentDefaults.twitter : false;
+          setTwitterState(prev => ({ ...prev, enabled: twitterEnabled }));
+          setNostrState(prev => ({ ...prev, enabled: currentDefaults.nostr }));
+          
+          // Update localStorage if Twitter was forced to false due to no auth
+          if (!twitterState.authenticated && currentDefaults.twitter) {
+            savePlatformDefaults(false, currentDefaults.nostr);
+          }
         } catch (error) {
           printLog(`Error during initial check: ${error}`);
           setHasValidTokens(false);
@@ -1074,13 +1123,28 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         ...prev,
         authenticated: twitterState.authenticated,
         available: twitterState.available,
-        username: twitterState.username
+        username: twitterState.username,
+        // Auto-uncheck if not authenticated
+        enabled: twitterState.authenticated ? prev.enabled : false
       }));
       setHasValidTokens(twitterState.authenticated);
+      
+      // Save updated state to localStorage if Twitter was unchecked due to no auth
+      if (!twitterState.authenticated) {
+        savePlatformDefaults(false, nostrState.enabled);
+      }
     } catch (error) {
       printLog(`Error checking Twitter auth: ${error}`);
-      setTwitterState(prev => ({ ...prev, authenticated: false, username: undefined }));
+      setTwitterState(prev => ({ 
+        ...prev, 
+        authenticated: false, 
+        username: undefined,
+        enabled: false // Auto-uncheck on error
+      }));
       setHasValidTokens(false);
+      
+      // Save updated state to localStorage
+      savePlatformDefaults(false, nostrState.enabled);
     }
   };
 
@@ -3089,8 +3153,13 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 <input
                   type="checkbox"
                   checked={twitterState.enabled}
-                  onChange={(e) => setTwitterState(prev => ({ ...prev, enabled: e.target.checked }))}
-                  className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                  onChange={(e) => {
+                    const newEnabled = e.target.checked;
+                    setTwitterState(prev => ({ ...prev, enabled: newEnabled }));
+                    savePlatformDefaults(newEnabled, nostrState.enabled);
+                  }}
+                  disabled={!twitterState.authenticated}
+                  className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 disabled:opacity-50"
                 />
               </div>
             </div>
@@ -3142,7 +3211,11 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 <input
                   type="checkbox"
                   checked={nostrState.enabled && nostrState.available && nostrState.authenticated}
-                  onChange={(e) => setNostrState(prev => ({ ...prev, enabled: e.target.checked }))}
+                  onChange={(e) => {
+                    const newEnabled = e.target.checked;
+                    setNostrState(prev => ({ ...prev, enabled: newEnabled }));
+                    savePlatformDefaults(twitterState.enabled, newEnabled);
+                  }}
                   disabled={!nostrState.available || !nostrState.authenticated}
                   className="w-4 h-4 text-purple-500 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 disabled:opacity-50"
                 />
