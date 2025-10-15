@@ -26,6 +26,36 @@ const ASPECT_RATIO = 16 / 9;
 const PREVIEW_WIDTH = 160; // Smaller for list view
 const PREVIEW_HEIGHT = (PREVIEW_WIDTH / ASPECT_RATIO) * 1.3; // Increased by 30%
 
+// Helper function to check if Nostr extension is available and can sign
+const checkNostrExtension = async (): Promise<boolean> => {
+  if (typeof window === 'undefined' || !window.nostr || typeof window.nostr.signEvent !== 'function') {
+    return false;
+  }
+  
+  try {
+    // Test with a simple event to see if we can actually sign
+    const testEvent = {
+      kind: 1,
+      created_at: Math.floor(Date.now() / 1000),
+      content: 'test',
+      tags: []
+    };
+    
+    // Try to sign a test event - this will prompt user for permission if needed
+    await window.nostr.signEvent(testEvent);
+    return true;
+  } catch (error) {
+    console.log('Nostr extension test failed:', error);
+    return false;
+  }
+};
+
+// Helper function to show Nostr extension warning modal
+const showNostrExtensionWarning = (setShowNostrWarningModal: (show: boolean) => void) => {
+  printLog('Nostr extension not available or permission denied - showing warning modal');
+  setShowNostrWarningModal(true);
+};
+
 // Helper function to get user signature from localStorage
 const getUserSignature = (): string | null => {
   try {
@@ -111,6 +141,9 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
   const [showSignConfirmationModal, setShowSignConfirmationModal] = useState(false);
   const [postToSign, setPostToSign] = useState<ScheduledPost | null>(null);
   const [isSigning, setIsSigning] = useState(false);
+  
+  // Nostr Extension Warning Modal state
+  const [showNostrWarningModal, setShowNostrWarningModal] = useState(false);
   
   // Slot tracking for scheduling
   const [usedSlots, setUsedSlots] = useState<Set<string>>(new Set());
@@ -327,7 +360,14 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
   };
 
   // Unsigned post action handlers
-  const handleSignAllUnsigned = () => {
+  const handleSignAllUnsigned = async () => {
+    // Check if Nostr extension is available and can sign before proceeding
+    const canSign = await checkNostrExtension();
+    if (!canSign) {
+      showNostrExtensionWarning(setShowNostrWarningModal);
+      return;
+    }
+    
     const unsignedPosts = posts.filter(post => post.status === 'unsigned');
     printLog(`Sign All clicked - would sign ${unsignedPosts.length} unsigned posts`);
     setShowSignAllModal(true);
@@ -421,8 +461,8 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
         printLog(`DEBUG: baseContent="${baseContent}"`);
         printLog(`DEBUG: mediaUrl="${mediaUrl}"`);
         
-        // 2. Append the mediaurl to the text
-        const finalContent = `${baseContent}\n\n${mediaUrl}`;
+        // 2. Build final content using the proper function (includes signature and call-to-action)
+        const finalContent = buildFinalContentForNostr(baseContent, mediaUrl);
         
         printLog(`DEBUG: finalContent="${finalContent}"`);
         
@@ -488,7 +528,14 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
   };
 
   // Individual post signing handlers
-  const handleSignIndividualPost = (post: ScheduledPost) => {
+  const handleSignIndividualPost = async (post: ScheduledPost) => {
+    // Check if Nostr extension is available and can sign before proceeding
+    const canSign = await checkNostrExtension();
+    if (!canSign) {
+      showNostrExtensionWarning(setShowNostrWarningModal);
+      return;
+    }
+    
     printLog(`🔥 SIGN BUTTON PRESSED! POST DATA: ${JSON.stringify(post, null, 2)}`);
     setPostToSign(post);
     setShowSignConfirmationModal(true);
@@ -608,10 +655,10 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
           throw new Error('Nostr extension not available. Please install/enable a NIP-07 extension.');
         }
         
-        // Build content
+        // Build content using the proper function (includes signature and call-to-action)
         const baseContent = postToSign.content.text || '';
         const mediaUrl = postToSign.content.mediaUrl || '';
-        const finalContent = `${baseContent}\n\n${mediaUrl}`;
+        const finalContent = buildFinalContentForNostr(baseContent, mediaUrl);
         
         // Sign the event
         const eventToSign = {
@@ -738,6 +785,56 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
                 {isSigning ? 'Signing...' : 'Sign & Schedule'}
               </button>
             )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Nostr Extension Warning Modal Component
+  const NostrWarningModal = () => {
+    if (!showNostrWarningModal) return null;
+
+    return (
+      <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+        <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+          <div className="flex items-center justify-center mb-4">
+            <AlertCircle className="w-8 h-8 text-yellow-400 mr-3" />
+            <h2 className="text-white text-xl font-bold">Nostr Extension Not Connected</h2>
+          </div>
+          
+          <div className="text-left mb-6">
+            <p className="text-gray-300 mb-4">
+              To sign posts, you need a Nostr extension installed and enabled in your browser.
+            </p>
+            
+            <div className="bg-yellow-900/20 border border-yellow-800 rounded-lg p-4 mb-4">
+              <h3 className="text-yellow-300 font-semibold mb-2">Recommended Extensions:</h3>
+              <ul className="text-yellow-200 text-sm space-y-1">
+                <li>• <strong>Alby</strong> - Most popular and user-friendly</li>
+                <li>• <strong>nos2x</strong> - Lightweight and fast</li>
+                <li>• <strong>Nostr Wallet Connect</strong> - For advanced users</li>
+              </ul>
+            </div>
+            
+            <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-4">
+              <h3 className="text-blue-300 font-semibold mb-2">After Installing:</h3>
+              <ol className="text-blue-200 text-sm space-y-1">
+                <li>1. Install the extension from your browser's extension store</li>
+                <li>2. Create or import your Nostr key</li>
+                <li>3. Refresh this page</li>
+                <li>4. Try signing again</li>
+              </ol>
+            </div>
+          </div>
+          
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => setShowNostrWarningModal(false)}
+              className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium"
+            >
+              Got It
+            </button>
           </div>
         </div>
       </div>
@@ -1165,6 +1262,9 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
 
       {/* Sign Confirmation Modal */}
       <SignConfirmationModal />
+
+      {/* Nostr Extension Warning Modal */}
+      <NostrWarningModal />
     </div>
   );
 };
