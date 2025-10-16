@@ -30,6 +30,7 @@ import ScheduledPostService from '../../services/scheduledPostService.ts';
 import { useUserSettings } from '../../hooks/useUserSettings.ts';
 import ScheduledPostSlots from '../ScheduledPostSlots.tsx';
 import ImageWithLoader from '../ImageWithLoader.tsx';
+import MediaRenderingComponent from '../MediaRenderingComponent.tsx';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -157,6 +158,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
     const [isConfigureAutomationModalOpen, setIsConfigureAutomationModalOpen] = useState(false);
     const [shouldAutoSignAll, setShouldAutoSignAll] = useState(false);
+    const [isMediaRenderingOpen, setIsMediaRenderingOpen] = useState(false);
+    const [currentMediaFile, setCurrentMediaFile] = useState<{url: string, name: string, type?: string} | null>(null);
     
 
     // Use the new userSettings hook with cloud sync for admin users
@@ -684,6 +687,20 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     setIsTutorialOpen(false);
   };
 
+  const handleOpenMediaFile = (upload: UploadItem) => {
+    setCurrentMediaFile({
+      url: upload.publicUrl,
+      name: upload.fileName,
+      type: upload.fileName.split('.').pop()?.toLowerCase()
+    });
+    setIsMediaRenderingOpen(true);
+  };
+
+  const handleCloseMediaRendering = () => {
+    setIsMediaRenderingOpen(false);
+    setCurrentMediaFile(null);
+  };
+
 
   if (isLoading) {
     return (
@@ -1071,15 +1088,13 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                             >
                               <Share className="w-5 h-5" />
                             </button>
-                            <a 
-                              href={upload.publicUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
+                            <button
+                              onClick={() => handleOpenMediaFile(upload)}
                               className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
                               title="Open file"
                             >
                               <ExternalLink className="w-5 h-5" />
-                            </a>
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -1510,6 +1525,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         onClose={handleCancelAutomation}
         onConfigure={handleConfigureAutomation}
       />
+
+      {/* Media Rendering Component */}
+      {isMediaRenderingOpen && currentMediaFile && (
+        <MediaRenderingComponent
+          fileUrl={currentMediaFile.url}
+          fileName={currentMediaFile.name}
+          fileType={currentMediaFile.type}
+          onClose={handleCloseMediaRendering}
+        />
+      )}
     </div>
   );
 };
