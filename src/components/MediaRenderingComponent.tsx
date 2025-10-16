@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, Scissors, Share } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Scissors, Share, Filter } from 'lucide-react';
 
 interface MediaRenderingComponentProps {
   fileUrl: string;
@@ -24,6 +24,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const [isMediaLoading, setIsMediaLoading] = useState(true);
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [isFilterEnabled, setIsFilterEnabled] = useState(false);
   
   // Sample transcript data with more diverse content for filtering
   const transcriptData = [
@@ -133,10 +134,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Filter transcript data based on search query
-  const filteredTranscriptData = transcriptData.filter(item =>
-    searchQuery === '' || item.text.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter transcript data based on search query and filter toggle
+  const filteredTranscriptData = isFilterEnabled 
+    ? transcriptData.filter(item =>
+        searchQuery === '' || item.text.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : transcriptData;
 
   // Filter children clips data based on search query
   const filteredChildrenClipsData = childrenClipsData.filter(clip =>
@@ -454,6 +457,17 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                 onKeyPress={handleSearchKeyPress}
                 className="flex-1 bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent"
               />
+              <button
+                onClick={() => setIsFilterEnabled(!isFilterEnabled)}
+                className={`flex items-center justify-center w-10 h-10 rounded-md transition-colors ${
+                  isFilterEnabled 
+                    ? 'bg-white text-black hover:bg-gray-200' 
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                }`}
+                title={isFilterEnabled ? 'Disable filter (show all)' : 'Enable filter (show matches only)'}
+              >
+                <Filter size={16} />
+              </button>
               {searchQuery.trim() !== '' && highlightedIndex !== null && (
                 <div className="text-gray-400 text-sm whitespace-nowrap">
                   {currentMatchIndex + 1} of {getMatchingIndices(searchQuery).length}
