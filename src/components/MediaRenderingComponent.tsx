@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Scissors, Share, Filter } from 'lucide-react';
+import TranscriptionService from '../services/transcriptionService.ts';
 
 interface MediaRenderingComponentProps {
   fileUrl: string;
@@ -25,9 +26,15 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [isFilterEnabled, setIsFilterEnabled] = useState(false);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
+  const [currentActiveIndex, setCurrentActiveIndex] = useState<number | null>(null);
+  const [transcriptData, setTranscriptData] = useState<Array<{time: string, text: string}>>([]);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   
-  // Sample transcript data with more diverse content for filtering
-  const transcriptData = [
+  // Sample transcript data with more diverse content for filtering (fallback)
+  const sampleTranscriptData = [
     { time: '0:15', text: 'Welcome back to the podcast everyone. Today we\'re diving deep into the world of artificial intelligence and machine learning.' },
     { time: '0:30', text: 'So Jamie, you\'ve been working in tech for over a decade now. What\'s your take on the current AI boom?' },
     { time: '0:45', text: 'Well, it\'s fascinating to see how quickly things are evolving. Just last year, we were talking about GPT-3, and now we have GPT-4 and beyond.' },
@@ -107,13 +114,114 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     setIsMuted(!isMuted);
   };
 
-  // Handle time updates
-  const handleTimeUpdate = () => {
+  // Get current transcript text for subtitle display
+  const getCurrentTranscriptText = (): string => {
+    if (transcriptData.length === 0) {
+      return 'No transcript available';
+    }
+    if (currentActiveIndex !== null && transcriptData[currentActiveIndex]) {
+      return transcriptData[currentActiveIndex].text;
+    }
+    return 'Reiciendis corporis nemo'; // Default fallback
+  };
+
+  // Convert seconds to MM:SS format
+  const secondsToTimeString = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  // Convert sentence-level timestamps to transcript format
+  const convertSentencesToTranscript = (sentences: Array<{text: string, start: number, end: number}>): Array<{time: string, text: string}> => {
+    return sentences.map(sentence => ({
+      time: secondsToTimeString(sentence.start),
+      text: sentence.text
+    }));
+  };
+
+  // Start transcription process
+  const startTranscription = async () => {
+    setIsTranscribing(true);
+    setTranscriptionError(null);
+
+    try {
+      const response = await TranscriptionService.startTranscription({
+        remote_url: fileUrl,
+        guid: null
+      });
+
+      if (response.successAction?.url) {
+        // Start polling for results
+        const transcript = await TranscriptionService.pollForCompletion(
+          response.successAction.url,
+          (status) => {
+            // Optional: handle progress updates
+            console.log('Transcription progress:', status.state);
+          }
+        );
+        
+        setTranscriptData(transcript);
+        setIsTranscribing(false);
+      } else {
+        throw new Error('Invalid response from transcription service');
+      }
+    } catch (error) {
+      console.error('Transcription error:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      setTranscriptionError(error instanceof Error ? error.message : 'Failed to start transcription');
+      setIsTranscribing(false);
+    }
+  };
+
+  // Convert time string (e.g., "2:15") to seconds
+  const timeStringToSeconds = (timeString: string): number => {
+    const [minutes, seconds] = timeString.split(':').map(Number);
+    return minutes * 60 + seconds;
+  };
+
+  // Find transcript entry based on current playback time
+  const findCurrentTranscriptEntry = (playbackTime: number): number => {
+    for (let i = transcriptData.length - 1; i >= 0; i--) {
+      const entryTime = timeStringToSeconds(transcriptData[i].time);
+      if (playbackTime >= entryTime) {
+        return i;
+      }
+    }
+    return 0; // Default to first entry
+  };
+
+  // Handle time updates with auto-scroll
+  const handleTimeUpdateWithAutoScroll = () => {
     const current = isVideo ? videoRef.current?.currentTime : audioRef.current?.currentTime;
     const total = isVideo ? videoRef.current?.duration : audioRef.current?.duration;
     
     if (current !== undefined) setCurrentTime(current);
     if (total !== undefined) setDuration(total);
+
+    // Auto-scroll transcript based on current playback time
+    if (isAutoScrollEnabled && current !== undefined) {
+      const currentEntryIndex = findCurrentTranscriptEntry(current);
+      setCurrentActiveIndex(currentEntryIndex);
+      
+      // Only scroll if we're not currently highlighting a search result
+      if (highlightedIndex === null || !searchQuery.trim()) {
+        const contentArea = contentAreaRef.current;
+        if (contentArea) {
+          const currentElement = contentArea.querySelector(`[data-index="${currentEntryIndex}"]`);
+          if (currentElement) {
+            currentElement.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            });
+          }
+        }
+      }
+    }
   };
 
   // Handle seeking
@@ -124,6 +232,23 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     } else if (isAudio && audioRef.current) {
       audioRef.current.currentTime = seekTime;
     }
+    setCurrentTime(seekTime);
+  };
+
+  // Handle clicking on transcript entry
+  const handleTranscriptClick = (timeString: string) => {
+    const seekTime = timeStringToSeconds(timeString);
+    
+    if (isVideo && videoRef.current) {
+      videoRef.current.currentTime = seekTime;
+      videoRef.current.play();
+      setIsPlaying(true);
+    } else if (isAudio && audioRef.current) {
+      audioRef.current.currentTime = seekTime;
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+    
     setCurrentTime(seekTime);
   };
 
@@ -206,6 +331,62 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     }, 100);
   };
 
+  // Handle automatic scrolling after user stops typing (non-filter mode)
+  const handleAutoScroll = (query: string) => {
+    if (query.trim() === '') {
+      setHighlightedIndex(null);
+      setCurrentMatchIndex(0);
+      return;
+    }
+
+    const matchingIndices = getMatchingIndices(query);
+    
+    if (matchingIndices.length === 0) {
+      setHighlightedIndex(null);
+      setCurrentMatchIndex(0);
+      return;
+    }
+
+    // Go to first match and scroll to it
+    const targetIndex = matchingIndices[0];
+    setHighlightedIndex(targetIndex);
+    setCurrentMatchIndex(0);
+    
+    // Scroll to the matching entry after a brief delay
+    setTimeout(() => {
+      const contentArea = contentAreaRef.current;
+      if (contentArea) {
+        const matchingElement = contentArea.querySelector(`[data-index="${targetIndex}"]`);
+        if (matchingElement) {
+          matchingElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        }
+      }
+    }, 100);
+  };
+
+  // Handle search input change with debounced auto-scroll
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Set new timeout for auto-scroll (only in non-filter mode)
+    if (!isFilterEnabled) {
+      const timeout = setTimeout(() => {
+        handleAutoScroll(query);
+      }, 500); // 500ms delay after user stops typing
+      
+      setSearchTimeout(timeout);
+    }
+  };
+
   // Handle Enter key press in search input (Find Next)
   const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -229,8 +410,8 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       video.addEventListener('play', handlePlay);
       video.addEventListener('pause', handlePause);
       video.addEventListener('ended', handleEnded);
-      video.addEventListener('timeupdate', handleTimeUpdate);
-      video.addEventListener('loadedmetadata', handleTimeUpdate);
+      video.addEventListener('timeupdate', handleTimeUpdateWithAutoScroll);
+      video.addEventListener('loadedmetadata', handleTimeUpdateWithAutoScroll);
       video.addEventListener('loadeddata', handleLoadedData);
       video.addEventListener('canplay', handleCanPlay);
     }
@@ -239,8 +420,8 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       audio.addEventListener('play', handlePlay);
       audio.addEventListener('pause', handlePause);
       audio.addEventListener('ended', handleEnded);
-      audio.addEventListener('timeupdate', handleTimeUpdate);
-      audio.addEventListener('loadedmetadata', handleTimeUpdate);
+      audio.addEventListener('timeupdate', handleTimeUpdateWithAutoScroll);
+      audio.addEventListener('loadedmetadata', handleTimeUpdateWithAutoScroll);
       audio.addEventListener('loadeddata', handleLoadedData);
       audio.addEventListener('canplay', handleCanPlay);
     }
@@ -250,8 +431,8 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         video.removeEventListener('play', handlePlay);
         video.removeEventListener('pause', handlePause);
         video.removeEventListener('ended', handleEnded);
-        video.removeEventListener('timeupdate', handleTimeUpdate);
-        video.removeEventListener('loadedmetadata', handleTimeUpdate);
+        video.removeEventListener('timeupdate', handleTimeUpdateWithAutoScroll);
+        video.removeEventListener('loadedmetadata', handleTimeUpdateWithAutoScroll);
         video.removeEventListener('loadeddata', handleLoadedData);
         video.removeEventListener('canplay', handleCanPlay);
       }
@@ -259,13 +440,13 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         audio.removeEventListener('play', handlePlay);
         audio.removeEventListener('pause', handlePause);
         audio.removeEventListener('ended', handleEnded);
-        audio.removeEventListener('timeupdate', handleTimeUpdate);
-        audio.removeEventListener('loadedmetadata', handleTimeUpdate);
+        audio.removeEventListener('timeupdate', handleTimeUpdateWithAutoScroll);
+        audio.removeEventListener('loadedmetadata', handleTimeUpdateWithAutoScroll);
         audio.removeEventListener('loadeddata', handleLoadedData);
         audio.removeEventListener('canplay', handleCanPlay);
       }
     };
-  }, [isVideo, isAudio]);
+  }, [isVideo, isAudio, isAutoScrollEnabled, highlightedIndex, searchQuery]);
 
   // Handle real-time search as user types (first match only)
   useEffect(() => {
@@ -285,6 +466,22 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       setCurrentMatchIndex(0);
     }
   }, [searchQuery]);
+
+  // Clear active index when auto-scroll is disabled
+  useEffect(() => {
+    if (!isAutoScrollEnabled) {
+      setCurrentActiveIndex(null);
+    }
+  }, [isAutoScrollEnabled]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
 
   // Skip rendering if not video or audio
   if (!isVideo && !isAudio) {
@@ -323,7 +520,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
               
               {/* Subtitle overlay */}
               <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-black/70 px-6 py-3 rounded-lg">
-                <p className="text-white text-lg font-medium">Reiciendis corporis nemo</p>
+                <p className="text-white text-lg font-medium select-none">{getCurrentTranscriptText()}</p>
               </div>
 
               {/* Video controls overlay */}
@@ -453,7 +650,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                 type="text"
                 placeholder="Search"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={handleSearchInputChange}
                 onKeyPress={handleSearchKeyPress}
                 className="flex-1 bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent"
               />
@@ -476,25 +673,71 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
             </div>
           </div>
 
+          {/* Auto-scroll toggle */}
+          <div className="px-4 pb-4 border-b border-gray-800">
+            <label className="flex items-center space-x-2 text-sm text-gray-400 hover:text-white cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isAutoScrollEnabled}
+                onChange={(e) => setIsAutoScrollEnabled(e.target.checked)}
+                className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white focus:ring-2"
+              />
+              <span>Auto-scroll transcript with playback</span>
+            </label>
+          </div>
+
           {/* Content area */}
           <div ref={contentAreaRef} className="flex-1 overflow-y-auto p-4">
             {showTranscript ? (
               <div className="space-y-4">
-                {filteredTranscriptData.length > 0 ? (
+                {transcriptData.length === 0 ? (
+                  <div className="text-center text-gray-400 py-12">
+                    <p className="select-none mb-6">No transcript yet</p>
+                    {isTranscribing ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                        <span className="select-none">Transcribing...</span>
+                      </div>
+                    ) : transcriptionError ? (
+                      <div className="text-red-400 mb-4">
+                        <p className="select-none">{transcriptionError}</p>
+                        <button
+                          onClick={startTranscription}
+                          className="mt-4 bg-white text-black px-6 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                        >
+                          Try Again
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={startTranscription}
+                        className="bg-white text-black px-6 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                      >
+                        Transcribe
+                      </button>
+                    )}
+                  </div>
+                ) : filteredTranscriptData.length > 0 ? (
                   filteredTranscriptData.map((item, index) => {
                     const originalIndex = transcriptData.findIndex(original => original === item);
                     const isHighlighted = highlightedIndex === originalIndex;
+                    const isActive = currentActiveIndex === originalIndex;
                     
                     return (
                       <div 
                         key={index} 
                         data-index={originalIndex}
-                        className={`flex items-start space-x-3 p-3 rounded-lg transition-colors ${
-                          isHighlighted ? 'bg-yellow-900/30 border border-yellow-600' : 'hover:bg-gray-900/50'
+                        onClick={() => handleTranscriptClick(item.time)}
+                        className={`flex items-start space-x-3 p-3 rounded-lg transition-colors cursor-pointer ${
+                          isHighlighted 
+                            ? 'bg-yellow-900/30 border border-yellow-600' 
+                            : isActive 
+                              ? 'border border-white shadow-[0_0_10px_rgba(255,255,255,0.3)]' 
+                              : 'hover:bg-gray-900/50'
                         }`}
                       >
-                        <span className="text-gray-400 text-sm font-mono">{item.time}</span>
-                        <p className="text-white text-sm leading-relaxed">
+                        <span className="text-gray-400 text-sm font-mono select-none">{item.time}</span>
+                        <p className="text-white text-sm leading-relaxed select-none">
                           {item.text}
                         </p>
                       </div>
@@ -502,7 +745,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                   })
                 ) : (
                   <div className="text-center text-gray-400 py-8">
-                    <p>No matching transcript entries found</p>
+                    <p className="select-none">No matching transcript entries found</p>
                   </div>
                 )}
               </div>
@@ -512,8 +755,8 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                   filteredChildrenClipsData.map((clip) => (
                     <div key={clip.id} className="flex items-center justify-between p-3 bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer">
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">{clip.name}</p>
-                        <p className="text-gray-400 text-xs">{clip.duration}</p>
+                        <p className="text-white text-sm font-medium truncate select-none">{clip.name}</p>
+                        <p className="text-gray-400 text-xs select-none">{clip.duration}</p>
                       </div>
                       <button className="ml-3 text-gray-400 hover:text-white transition-colors">
                         <Play size={16} />
@@ -522,7 +765,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                   ))
                 ) : (
                   <div className="text-center text-gray-400 py-8">
-                    <p>No children clips</p>
+                    <p className="select-none">No children clips</p>
                   </div>
                 )}
               </div>
