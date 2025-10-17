@@ -186,12 +186,18 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
 
   // Find transcript entry based on current playback time
   const findCurrentTranscriptEntry = (playbackTime: number): number => {
+    console.log('Finding transcript entry for playback time:', playbackTime);
+    console.log('Transcript data:', transcriptData);
+    
     for (let i = transcriptData.length - 1; i >= 0; i--) {
       const entryTime = timeStringToSeconds(transcriptData[i].time);
+      console.log(`Entry ${i}: time="${transcriptData[i].time}" -> ${entryTime}s, playback=${playbackTime}s`);
       if (playbackTime >= entryTime) {
+        console.log(`Found matching entry: ${i}`);
         return i;
       }
     }
+    console.log('No matching entry found, returning 0');
     return 0; // Default to first entry
   };
 
@@ -200,12 +206,15 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     const current = isVideo ? videoRef.current?.currentTime : audioRef.current?.currentTime;
     const total = isVideo ? videoRef.current?.duration : audioRef.current?.duration;
     
+    console.log('Time update - current:', current, 'total:', total, 'isAutoScrollEnabled:', isAutoScrollEnabled);
+    
     if (current !== undefined) setCurrentTime(current);
     if (total !== undefined) setDuration(total);
 
     // Auto-scroll transcript based on current playback time
     if (isAutoScrollEnabled && current !== undefined) {
       const currentEntryIndex = findCurrentTranscriptEntry(current);
+      console.log('Setting currentActiveIndex to:', currentEntryIndex);
       setCurrentActiveIndex(currentEntryIndex);
       
       // Only scroll if we're not currently highlighting a search result

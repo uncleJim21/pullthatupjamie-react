@@ -172,13 +172,42 @@ class TranscriptionService {
       const words = transcriptionStatus.channels[0].alternatives[0].words;
       const transcript = transcriptionStatus.channels[0].alternatives[0].transcript || '';
       
-      // If we have a transcript, create a single sentence entry
-      if (transcript.trim()) {
-        allSentences.push({
-          text: transcript,
-          start: words[0]?.start || 0,
-          end: words[words.length - 1]?.end || 0
-        });
+      // Create multiple sentence entries by grouping words into sentences
+      if (words.length > 0) {
+        let currentSentence = '';
+        let sentenceStart = words[0].start;
+        let sentenceEnd = words[0].end;
+        
+        for (let i = 0; i < words.length; i++) {
+          const word = words[i];
+          currentSentence += word.punctuated_word + ' ';
+          
+          // Check if this word ends a sentence (has punctuation)
+          if (word.punctuated_word.match(/[.!?]$/)) {
+            allSentences.push({
+              text: currentSentence.trim(),
+              start: sentenceStart,
+              end: word.end
+            });
+            
+            // Start new sentence
+            currentSentence = '';
+            if (i + 1 < words.length) {
+              sentenceStart = words[i + 1].start;
+            }
+          } else {
+            sentenceEnd = word.end;
+          }
+        }
+        
+        // Add any remaining text as a sentence
+        if (currentSentence.trim()) {
+          allSentences.push({
+            text: currentSentence.trim(),
+            start: sentenceStart,
+            end: sentenceEnd
+          });
+        }
       }
     }
     
