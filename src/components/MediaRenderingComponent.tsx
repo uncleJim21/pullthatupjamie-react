@@ -198,6 +198,34 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         if (existingTranscript && existingTranscript.length > 0) {
           setTranscriptData(existingTranscript);
           console.log('Loaded existing transcript with', existingTranscript.length, 'entries');
+          
+          // Initialize the current active index based on current playback time
+          setTimeout(() => {
+            const currentPlaybackTime = isVideo ? videoRef.current?.currentTime || 0 : audioRef.current?.currentTime || 0;
+            const initialActiveIndex = findCurrentTranscriptEntry(currentPlaybackTime);
+            setCurrentActiveIndex(initialActiveIndex);
+            console.log('Initialized currentActiveIndex to:', initialActiveIndex, 'for playback time:', currentPlaybackTime);
+            
+            // Scroll to the correct position
+            if (isAutoScrollEnabled) {
+              const contentArea = contentAreaRef.current;
+              if (contentArea) {
+                const currentElement = contentArea.querySelector(`[data-index="${initialActiveIndex}"]`);
+                console.log('Looking for element with data-index:', initialActiveIndex);
+                console.log('Found element:', currentElement);
+                console.log('Available data-index elements:', Array.from(contentArea.querySelectorAll('[data-index]')).map(el => el.getAttribute('data-index')));
+                if (currentElement) {
+                  currentElement.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center' 
+                  });
+                  console.log('Scrolled to initial position for index:', initialActiveIndex);
+                } else {
+                  console.log('Could not find element with data-index:', initialActiveIndex);
+                }
+              }
+            }
+          }, 100); // Small delay to ensure DOM is ready
         }
       } catch (error) {
         console.error('Error checking existing transcript:', error);
@@ -208,6 +236,16 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
 
     checkExistingTranscript();
   }, [fileUrl]);
+
+  // Update active index when transcript data changes
+  useEffect(() => {
+    if (transcriptData.length > 0) {
+      const currentPlaybackTime = isVideo ? videoRef.current?.currentTime || 0 : audioRef.current?.currentTime || 0;
+      const newActiveIndex = findCurrentTranscriptEntry(currentPlaybackTime);
+      setCurrentActiveIndex(newActiveIndex);
+      console.log('Updated currentActiveIndex to:', newActiveIndex, 'after transcript data change');
+    }
+  }, [transcriptData]);
 
   // Convert time string (e.g., "2:15") to seconds
   const timeStringToSeconds = (timeString: string): number => {
@@ -255,11 +293,17 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         const contentArea = contentAreaRef.current;
         if (contentArea) {
           const currentElement = contentArea.querySelector(`[data-index="${currentEntryIndex}"]`);
+          console.log('Auto-scroll: Looking for element with data-index:', currentEntryIndex);
+          console.log('Auto-scroll: Found element:', currentElement);
+          console.log('Auto-scroll: Available data-index elements:', Array.from(contentArea.querySelectorAll('[data-index]')).map(el => el.getAttribute('data-index')));
           if (currentElement) {
             currentElement.scrollIntoView({ 
               behavior: 'smooth', 
               block: 'center' 
             });
+            console.log('Auto-scroll: Scrolled to index:', currentEntryIndex);
+          } else {
+            console.log('Auto-scroll: Could not find element with data-index:', currentEntryIndex);
           }
         }
       }
