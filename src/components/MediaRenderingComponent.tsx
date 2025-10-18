@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Scissors, Share, Filter } from 'lucide-react';
-import TranscriptionService from '../services/transcriptionService.ts';
+import TranscriptionService, { generateHash } from '../services/transcriptionService.ts';
 
 interface MediaRenderingComponentProps {
   fileUrl: string;
@@ -32,6 +32,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const [transcriptData, setTranscriptData] = useState<Array<{time: string, text: string}>>([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+  const [isCheckingExistingTranscript, setIsCheckingExistingTranscript] = useState(true);
   
   // Sample transcript data with more diverse content for filtering (fallback)
   const sampleTranscriptData = [
@@ -119,9 +120,15 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     if (transcriptData.length === 0) {
       return 'No transcript available';
     }
-    if (currentActiveIndex !== null && transcriptData[currentActiveIndex]) {
-      return transcriptData[currentActiveIndex].text;
+    
+    // Always find the current transcript entry based on playback time
+    const currentEntryIndex = findCurrentTranscriptEntry(currentTime);
+    console.log('getCurrentTranscriptText - currentTime:', currentTime, 'currentEntryIndex:', currentEntryIndex);
+    if (currentEntryIndex !== null && transcriptData[currentEntryIndex]) {
+      console.log('Returning transcript text:', transcriptData[currentEntryIndex].text);
+      return transcriptData[currentEntryIndex].text;
     }
+    
     return 'Reiciendis corporis nemo'; // Default fallback
   };
 
@@ -151,10 +158,13 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         guid: null
       });
 
-      if (response.successAction?.url) {
-        // Start polling for results
+      // Generate the same GUID that was used in the request
+      const guid = generateHash(fileUrl);
+      
+      if (response.successAction?.url || response.success) {
+        // Start polling for results using the GUID
         const transcript = await TranscriptionService.pollForCompletion(
-          response.successAction.url,
+          guid,
           (status) => {
             // Optional: handle progress updates
             console.log('Transcription progress:', status.state);
@@ -178,6 +188,27 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     }
   };
 
+  // Check for existing transcript when component loads
+  useEffect(() => {
+    const checkExistingTranscript = async () => {
+      try {
+        setIsCheckingExistingTranscript(true);
+        const existingTranscript = await TranscriptionService.checkExistingTranscript(fileUrl);
+        
+        if (existingTranscript && existingTranscript.length > 0) {
+          setTranscriptData(existingTranscript);
+          console.log('Loaded existing transcript with', existingTranscript.length, 'entries');
+        }
+      } catch (error) {
+        console.error('Error checking existing transcript:', error);
+      } finally {
+        setIsCheckingExistingTranscript(false);
+      }
+    };
+
+    checkExistingTranscript();
+  }, [fileUrl]);
+
   // Convert time string (e.g., "2:15") to seconds
   const timeStringToSeconds = (timeString: string): number => {
     const [minutes, seconds] = timeString.split(':').map(Number);
@@ -186,8 +217,10 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
 
   // Find transcript entry based on current playback time
   const findCurrentTranscriptEntry = (playbackTime: number): number => {
-    console.log('Finding transcript entry for playback time:', playbackTime);
-    console.log('Transcript data:', transcriptData);
+    console.log('=== FIND CURRENT TRANSCRIPT ENTRY ===');
+    console.log('Playback time:', playbackTime);
+    console.log('Transcript data length:', transcriptData.length);
+    console.log('First few entries:', transcriptData.slice(0, 3));
     
     for (let i = transcriptData.length - 1; i >= 0; i--) {
       const entryTime = timeStringToSeconds(transcriptData[i].time);
@@ -702,7 +735,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                 {transcriptData.length === 0 ? (
                   <div className="text-center text-gray-400 py-12">
                     <p className="select-none mb-6">No transcript yet</p>
-                    {isTranscribing ? (
+                    {isCheckingExistingTranscript ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                        <span className="select-none">Checking for existing transcript...</span>
+                      </div>
+                    ) : isTranscribing ? (
                       <div className="flex items-center justify-center space-x-2">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
                         <span className="select-none">Transcribing...</span>

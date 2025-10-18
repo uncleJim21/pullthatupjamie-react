@@ -1,5 +1,47 @@
 import { printLog } from '../constants/constants.ts';
 
+// Simple hash function for generating deterministic GUIDs
+export function generateHash(input: string): string {
+  console.log('=== HASH CALCULATION DEBUG ===');
+  console.log('Input URL:', input);
+  console.log('Input length:', input.length);
+  
+  // Simple, deterministic hash function - same input ALWAYS produces same output
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  console.log('Initial hash:', hash);
+  console.log('Absolute hash:', Math.abs(hash));
+  
+  // Convert to hex
+  let hex = Math.abs(hash).toString(16);
+  console.log('Initial hex:', hex);
+  console.log('Initial hex length:', hex.length);
+  
+  // Pad deterministically to 40 characters using only the original hash and input length
+  const paddingLength = 40 - hex.length;
+  console.log('Padding length needed:', paddingLength);
+  
+  for (let i = 0; i < paddingLength; i++) {
+    const paddingValue = hash + input.length + i;
+    const paddingChar = Math.abs(paddingValue).toString(16);
+    const lastChar = paddingChar.charAt(paddingChar.length - 1);
+    console.log(`Padding step ${i}: hash(${hash}) + inputLength(${input.length}) + i(${i}) = ${paddingValue}, abs = ${Math.abs(paddingValue)}, hex = ${paddingChar}, last char = ${lastChar}`);
+    hex += lastChar;
+  }
+  
+  const result = hex.substring(0, 40);
+  console.log('Final hex:', result);
+  console.log('Final length:', result.length);
+  console.log('=== END HASH DEBUG ===');
+  
+  return result;
+}
+
 export interface TranscriptionRequest {
   remote_url: string;
   guid?: string | null;
@@ -71,22 +113,35 @@ class TranscriptionService {
    * Start transcription process
    */
   static async startTranscription(request: TranscriptionRequest): Promise<TranscriptionResponse> {
+    console.log('=== START TRANSCRIPTION CALLED ===');
+    console.log('Request:', request);
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
         throw new Error('No authentication token found. Please sign in again.');
       }
 
-      printLog(`Starting transcription for URL: ${request.remote_url}`);
+          // Generate deterministic GUID from the remote URL
+          const guid = generateHash(request.remote_url);
+          const requestWithGuid = {
+            ...request,
+            guid: guid
+          };
 
-      const response = await fetch(this.WHISPR_API_URL, {
+          console.log(`Starting transcription for URL: ${request.remote_url}`);
+          console.log(`Generated GUID: ${guid} (length: ${guid.length})`);
+          console.log(`Request payload:`, JSON.stringify(requestWithGuid, null, 2));
+
+      const backendUrl = 'https://whispr-v3-w-caching-ex8zk.ondigitalocean.app/WHSPR';
+      
+      const response = await fetch(backendUrl, {
         method: 'POST',
         headers: {
           'accept': 'application/json, text/plain, */*',
           'authorization': `Bearer: ${token}`,
           'content-type': 'application/json',
         },
-        body: JSON.stringify(request)
+        body: JSON.stringify(requestWithGuid)
       });
 
       if (!response.ok) {
@@ -94,26 +149,68 @@ class TranscriptionService {
       }
 
       const data = await response.json();
-      printLog(`Transcription started: ${JSON.stringify(data)}`);
+      console.log(`Transcription started: ${JSON.stringify(data)}`);
       return data;
     } catch (error) {
-      printLog(`Transcription error: ${error}`);
+      console.log(`Transcription error: ${error}`);
       console.error('Transcription error:', error);
       throw error;
     }
   }
 
   /**
-   * Poll for transcription completion
+   * Check if transcript already exists for a given URL
    */
-  static async getTranscriptionStatus(resultUrl: string): Promise<TranscriptionStatus> {
+  static async checkExistingTranscript(remoteUrl: string): Promise<TranscriptEntry[] | null> {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
         throw new Error('No authentication token found. Please sign in again.');
       }
 
-      const response = await fetch(resultUrl, {
+      // Generate the same deterministic GUID
+      const guid = generateHash(remoteUrl);
+
+      console.log(`Checking existing transcript for URL: ${remoteUrl}`);
+      console.log(`Generated GUID: ${guid} (length: ${guid.length})`);
+
+      console.log(`Checking for existing transcript with GUID: ${guid}`);
+
+      const status = await this.getTranscriptionStatus(guid);
+      
+      // If we have completed data, return it
+      if (status.channels?.[0]?.alternatives?.[0]) {
+        const allSentences = this.extractAllSentences(status);
+        if (allSentences.length > 0) {
+          const transcript = this.convertSentencesToTranscript(allSentences);
+          printLog(`Found existing transcript with ${transcript.length} entries`);
+          return transcript;
+        }
+      }
+
+      printLog('No existing transcript found');
+      return null;
+    } catch (error) {
+      printLog(`Error checking existing transcript: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Poll for transcription completion
+   */
+  static async getTranscriptionStatus(guid: string): Promise<TranscriptionStatus> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No authentication token found. Please sign in again.');
+      }
+
+      const backendUrl = `https://whispr-v3-w-caching-ex8zk.ondigitalocean.app/WHSPR/${guid}/get_result_by_guid`;
+      
+      console.log(`Checking transcription status via backend: ${backendUrl}`);
+
+      const response = await fetch(backendUrl, {
         headers: {
           'accept': 'application/json, text/plain, */*',
           'authorization': `Bearer: ${token}`,
@@ -125,10 +222,10 @@ class TranscriptionService {
       }
 
       const data = await response.json();
-      printLog(`Transcription status: ${JSON.stringify(data)}`);
+      console.log(`Transcription status: ${JSON.stringify(data)}`);
       return data;
     } catch (error) {
-      printLog(`Status polling error: ${error}`);
+      console.log(`Status polling error: ${error}`);
       console.error('Status polling error:', error);
       throw error;
     }
@@ -217,16 +314,16 @@ class TranscriptionService {
   /**
    * Poll for transcription completion with automatic retry
    */
-  static async pollForCompletion(resultUrl: string, onProgress?: (status: TranscriptionStatus) => void): Promise<TranscriptEntry[]> {
+  static async pollForCompletion(guid: string, onProgress?: (status: TranscriptionStatus) => void): Promise<TranscriptEntry[]> {
     const maxAttempts = 120; // 10 minutes max (5 second intervals)
     let attempts = 0;
 
     return new Promise((resolve, reject) => {
       const poll = async () => {
         try {
-          const status = await this.getTranscriptionStatus(resultUrl);
+          const status = await this.getTranscriptionStatus(guid);
           
-          printLog(`Polling attempt ${attempts + 1}: state=${status.state}, hasChannels=${!!status.channels?.[0]?.alternatives?.[0]}`);
+          console.log(`Polling attempt ${attempts + 1}: state=${status.state}, hasChannels=${!!status.channels?.[0]?.alternatives?.[0]}`);
           
           if (onProgress) {
             onProgress(status);
