@@ -81,6 +81,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const audioRef = useRef<HTMLAudioElement>(null);
   const contentAreaRef = useRef<HTMLDivElement>(null);
   const isAutoScrollEnabledRef = useRef(isAutoScrollEnabled);
+  const manualSeekTimeRef = useRef<number | null>(null);
 
   // Update ref when isAutoScrollEnabled changes
   useEffect(() => {
@@ -119,6 +120,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       audioRef.current.muted = !isMuted;
     }
     setIsMuted(!isMuted);
+  };
+
+  // Convert time string (e.g., "2:15") to seconds
+  const timeStringToSeconds = (timeString: string): number => {
+    const [minutes, seconds] = timeString.split(':').map(Number);
+    return minutes * 60 + seconds;
   };
 
   // Single source of truth for current transcript entry
@@ -265,12 +272,34 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
 
   // Transcript data changes - no state updates needed, highlighting handled in render
 
-  // Convert time string (e.g., "2:15") to seconds
-  const timeStringToSeconds = (timeString: string): number => {
-    const [minutes, seconds] = timeString.split(':').map(Number);
-    return minutes * 60 + seconds;
-  };
-
+  // Handle manual seeks (when user clicks on transcript entry)
+  useEffect(() => {
+    if (manualSeekTimeRef.current !== null && isAutoScrollEnabledRef.current) {
+      const seekTime = manualSeekTimeRef.current;
+      printLog('Manual seek detected to time: ' + seekTime);
+      
+      const currentEntry = getCurrentTranscriptEntry(seekTime);
+      const contentArea = contentAreaRef.current;
+      
+      if (contentArea) {
+        const currentElement = contentArea.querySelector(`[data-index="${currentEntry.index}"]`);
+        printLog('Manual seek - scrolling to index: ' + currentEntry.index);
+        
+        if (currentElement) {
+          currentElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+          printLog('Manual seek - scroll completed');
+        } else {
+          printLog('Manual seek - could not find element with index: ' + currentEntry.index);
+        }
+      }
+      
+      // Clear the manual seek ref
+      manualSeekTimeRef.current = null;
+    }
+  }, [currentTime, transcriptData]);
 
   // Handle time updates with auto-scroll
   const handleTimeUpdateWithAutoScroll = () => {
@@ -336,6 +365,9 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   // Handle clicking on transcript entry
   const handleTranscriptClick = (timeString: string) => {
     const seekTime = timeStringToSeconds(timeString);
+    
+    // Set manual seek time ref to trigger scroll on next render
+    manualSeekTimeRef.current = seekTime;
     
     if (isVideo && videoRef.current) {
       videoRef.current.currentTime = seekTime;
@@ -544,7 +576,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         audio.removeEventListener('canplay', handleCanPlay);
       }
     };
-  }, [isVideo, isAudio, highlightedIndex, searchQuery]);
+  }, [isVideo, isAudio, highlightedIndex, searchQuery, transcriptData]);
 
   // Handle real-time search as user types (first match only)
   useEffect(() => {
