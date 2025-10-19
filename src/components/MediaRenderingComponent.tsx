@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Scissors, Share, Filter } from 'lucide-react';
 import TranscriptionService, { generateHash } from '../services/transcriptionService.ts';
+import { printLog } from '../constants/constants.ts';
 
 interface MediaRenderingComponentProps {
   fileUrl: string;
@@ -80,6 +81,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const contentAreaRef = useRef<HTMLDivElement>(null);
+  const isAutoScrollEnabledRef = useRef(isAutoScrollEnabled);
+
+  // Update ref when isAutoScrollEnabled changes
+  useEffect(() => {
+    isAutoScrollEnabledRef.current = isAutoScrollEnabled;
+  }, [isAutoScrollEnabled]);
 
   // Determine media type
   const isVideo = fileType?.startsWith('video/') || 
@@ -123,9 +130,9 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     
     // Always find the current transcript entry based on playback time
     const currentEntryIndex = findCurrentTranscriptEntry(currentTime);
-    console.log('getCurrentTranscriptText - currentTime:', currentTime, 'currentEntryIndex:', currentEntryIndex);
+    printLog('getCurrentTranscriptText - currentTime: ' + currentTime + ', currentEntryIndex: ' + currentEntryIndex);
     if (currentEntryIndex !== null && transcriptData[currentEntryIndex]) {
-      console.log('Returning transcript text:', transcriptData[currentEntryIndex].text);
+      printLog('Returning transcript text: ' + transcriptData[currentEntryIndex].text);
       return transcriptData[currentEntryIndex].text;
     }
     
@@ -167,7 +174,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           guid,
           (status) => {
             // Optional: handle progress updates
-            console.log('Transcription progress:', status.state);
+            printLog('Transcription progress: ' + status.state);
           }
         );
         
@@ -177,12 +184,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         throw new Error('Invalid response from transcription service');
       }
     } catch (error) {
-      console.error('Transcription error:', error);
-      console.error('Error details:', {
+      printLog('Transcription error: ' + error);
+      printLog('Error details: ' + JSON.stringify({
         name: error.name,
         message: error.message,
         stack: error.stack
-      });
+      }));
       setTranscriptionError(error instanceof Error ? error.message : 'Failed to start transcription');
       setIsTranscribing(false);
     }
@@ -197,38 +204,47 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         
         if (existingTranscript && existingTranscript.length > 0) {
           setTranscriptData(existingTranscript);
-          console.log('Loaded existing transcript with', existingTranscript.length, 'entries');
+          printLog('Loaded existing transcript with ' + existingTranscript.length + ' entries');
           
           // Initialize the current active index based on current playback time
           setTimeout(() => {
             const currentPlaybackTime = isVideo ? videoRef.current?.currentTime || 0 : audioRef.current?.currentTime || 0;
             const initialActiveIndex = findCurrentTranscriptEntry(currentPlaybackTime);
             setCurrentActiveIndex(initialActiveIndex);
-            console.log('Initialized currentActiveIndex to:', initialActiveIndex, 'for playback time:', currentPlaybackTime);
+            printLog('Initialized currentActiveIndex to: ' + initialActiveIndex + ', for playback time: ' + currentPlaybackTime);
             
             // Scroll to the correct position
             if (isAutoScrollEnabled) {
               const contentArea = contentAreaRef.current;
               if (contentArea) {
                 const currentElement = contentArea.querySelector(`[data-index="${initialActiveIndex}"]`);
-                console.log('Looking for element with data-index:', initialActiveIndex);
-                console.log('Found element:', currentElement);
-                console.log('Available data-index elements:', Array.from(contentArea.querySelectorAll('[data-index]')).map(el => el.getAttribute('data-index')));
+                printLog('=== PANEL SCROLL DEBUG (MOUNT) ===');
+                printLog('Looking for element with data-index: ' + initialActiveIndex);
+                printLog('Found element: ' + (currentElement ? 'YES' : 'NO'));
+                printLog('Available data-index elements: ' + JSON.stringify(Array.from(contentArea.querySelectorAll('[data-index]')).map(el => el.getAttribute('data-index'))));
+                printLog('Content area scroll position: ' + contentArea.scrollTop);
+                printLog('Content area height: ' + contentArea.clientHeight);
+                printLog('Content area scroll height: ' + contentArea.scrollHeight);
+                if (currentElement) {
+                  printLog('Element position relative to viewport: ' + currentElement.getBoundingClientRect().top);
+                  printLog('Element offset from content area top: ' + (currentElement.offsetTop - contentArea.scrollTop));
+                }
+                printLog('=== END PANEL SCROLL DEBUG ===');
                 if (currentElement) {
                   currentElement.scrollIntoView({ 
                     behavior: 'smooth', 
                     block: 'center' 
                   });
-                  console.log('Scrolled to initial position for index:', initialActiveIndex);
+                  printLog('Scrolled to initial position for index: ' + initialActiveIndex);
                 } else {
-                  console.log('Could not find element with data-index:', initialActiveIndex);
+                  printLog('Could not find element with data-index: ' + initialActiveIndex);
                 }
               }
             }
           }, 100); // Small delay to ensure DOM is ready
         }
       } catch (error) {
-        console.error('Error checking existing transcript:', error);
+        printLog('Error checking existing transcript: ' + error);
       } finally {
         setIsCheckingExistingTranscript(false);
       }
@@ -243,7 +259,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       const currentPlaybackTime = isVideo ? videoRef.current?.currentTime || 0 : audioRef.current?.currentTime || 0;
       const newActiveIndex = findCurrentTranscriptEntry(currentPlaybackTime);
       setCurrentActiveIndex(newActiveIndex);
-      console.log('Updated currentActiveIndex to:', newActiveIndex, 'after transcript data change');
+      printLog('Updated currentActiveIndex to: ' + newActiveIndex + ', after transcript data change');
     }
   }, [transcriptData]);
 
@@ -255,20 +271,20 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
 
   // Find transcript entry based on current playback time
   const findCurrentTranscriptEntry = (playbackTime: number): number => {
-    console.log('=== FIND CURRENT TRANSCRIPT ENTRY ===');
-    console.log('Playback time:', playbackTime);
-    console.log('Transcript data length:', transcriptData.length);
-    console.log('First few entries:', transcriptData.slice(0, 3));
+    printLog('=== FIND CURRENT TRANSCRIPT ENTRY ===');
+    printLog('Playback time: ' + playbackTime);
+    printLog('Transcript data length: ' + transcriptData.length);
+    printLog('First few entries: ' + JSON.stringify(transcriptData.slice(0, 3)));
     
     for (let i = transcriptData.length - 1; i >= 0; i--) {
       const entryTime = timeStringToSeconds(transcriptData[i].time);
-      console.log(`Entry ${i}: time="${transcriptData[i].time}" -> ${entryTime}s, playback=${playbackTime}s`);
+      printLog('Entry ' + i + ': time="' + transcriptData[i].time + '" -> ' + entryTime + 's, playback=' + playbackTime + 's');
       if (playbackTime >= entryTime) {
-        console.log(`Found matching entry: ${i}`);
+        printLog('Found matching entry: ' + i);
         return i;
       }
     }
-    console.log('No matching entry found, returning 0');
+    printLog('No matching entry found, returning 0');
     return 0; // Default to first entry
   };
 
@@ -277,35 +293,50 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     const current = isVideo ? videoRef.current?.currentTime : audioRef.current?.currentTime;
     const total = isVideo ? videoRef.current?.duration : audioRef.current?.duration;
     
-    console.log('Time update - current:', current, 'total:', total, 'isAutoScrollEnabled:', isAutoScrollEnabled);
+    printLog('Time update - current: ' + current + ', total: ' + total + ', isAutoScrollEnabled: ' + isAutoScrollEnabledRef.current);
     
     if (current !== undefined) setCurrentTime(current);
     if (total !== undefined) setDuration(total);
 
-    // Auto-scroll transcript based on current playback time
-    if (isAutoScrollEnabled && current !== undefined) {
+    // Always update current active index based on playback time (for highlighting)
+    if (current !== undefined) {
       const currentEntryIndex = findCurrentTranscriptEntry(current);
-      console.log('Setting currentActiveIndex to:', currentEntryIndex);
+      printLog('Setting currentActiveIndex to: ' + currentEntryIndex);
       setCurrentActiveIndex(currentEntryIndex);
       
-      // Only scroll if we're not currently highlighting a search result
-      if (highlightedIndex === null || !searchQuery.trim()) {
+      // Only auto-scroll if enabled and not currently highlighting a search result
+      if (isAutoScrollEnabledRef.current && (highlightedIndex === null || !searchQuery.trim())) {
         const contentArea = contentAreaRef.current;
         if (contentArea) {
           const currentElement = contentArea.querySelector(`[data-index="${currentEntryIndex}"]`);
-          console.log('Auto-scroll: Looking for element with data-index:', currentEntryIndex);
-          console.log('Auto-scroll: Found element:', currentElement);
-          console.log('Auto-scroll: Available data-index elements:', Array.from(contentArea.querySelectorAll('[data-index]')).map(el => el.getAttribute('data-index')));
+          printLog('=== PANEL SCROLL DEBUG (PLAYBACK) ===');
+          printLog('Auto-scroll: Looking for element with data-index: ' + currentEntryIndex);
+          printLog('Auto-scroll: Found element: ' + (currentElement ? 'YES' : 'NO'));
+          printLog('Auto-scroll: Available data-index elements: ' + JSON.stringify(Array.from(contentArea.querySelectorAll('[data-index]')).map(el => el.getAttribute('data-index'))));
+          printLog('Content area scroll position: ' + contentArea.scrollTop);
+          printLog('Content area height: ' + contentArea.clientHeight);
+          printLog('Content area scroll height: ' + contentArea.scrollHeight);
+          printLog('highlightedIndex: ' + highlightedIndex + ', searchQuery: "' + searchQuery + '"');
+          if (currentElement) {
+            printLog('Element position relative to viewport: ' + currentElement.getBoundingClientRect().top);
+            printLog('Element offset from content area top: ' + (currentElement.offsetTop - contentArea.scrollTop));
+            printLog('Element is visible: ' + (currentElement.getBoundingClientRect().top >= 0 && currentElement.getBoundingClientRect().bottom <= contentArea.clientHeight));
+          }
+          printLog('=== END PANEL SCROLL DEBUG ===');
           if (currentElement) {
             currentElement.scrollIntoView({ 
               behavior: 'smooth', 
               block: 'center' 
             });
-            console.log('Auto-scroll: Scrolled to index:', currentEntryIndex);
+            printLog('Auto-scroll: Scrolled to index: ' + currentEntryIndex);
           } else {
-            console.log('Auto-scroll: Could not find element with data-index:', currentEntryIndex);
+            printLog('Auto-scroll: Could not find element with data-index: ' + currentEntryIndex);
           }
         }
+      } else if (!isAutoScrollEnabledRef.current) {
+        printLog('Auto-scroll disabled - highlighting only (currentActiveIndex: ' + currentEntryIndex + ')');
+      } else {
+        printLog('Auto-scroll: Skipped scrolling due to search highlighting (highlightedIndex: ' + highlightedIndex + ', searchQuery: "' + searchQuery + '")');
       }
     }
   };
@@ -532,7 +563,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         audio.removeEventListener('canplay', handleCanPlay);
       }
     };
-  }, [isVideo, isAudio, isAutoScrollEnabled, highlightedIndex, searchQuery]);
+  }, [isVideo, isAudio, highlightedIndex, searchQuery]);
 
   // Handle real-time search as user types (first match only)
   useEffect(() => {
@@ -553,12 +584,8 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     }
   }, [searchQuery]);
 
-  // Clear active index when auto-scroll is disabled
-  useEffect(() => {
-    if (!isAutoScrollEnabled) {
-      setCurrentActiveIndex(null);
-    }
-  }, [isAutoScrollEnabled]);
+  // Clear active index when auto-scroll is disabled - REMOVED
+  // We now always highlight the current entry regardless of auto-scroll setting
 
   // Cleanup timeout on unmount
   useEffect(() => {
