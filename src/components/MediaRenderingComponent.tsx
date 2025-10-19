@@ -599,7 +599,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         {/* Left side - Media Player */}
         <div className="flex-1 flex flex-col">
           {isVideo ? (
-            <div className="flex-1 relative bg-black flex items-center justify-center">
+            <div className="flex-1 relative bg-black" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', overflow: 'hidden' }}>
               {isMediaLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
@@ -608,7 +608,15 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
               <video
                 ref={videoRef}
                 src={fileUrl}
-                className="w-full h-full object-contain"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  objectPosition: 'center',
+                  display: 'block',
+                  maxWidth: '100%',
+                  maxHeight: '100%'
+                }}
                 onClick={togglePlayPause}
               />
               
