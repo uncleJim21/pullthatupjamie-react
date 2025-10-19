@@ -29,7 +29,6 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const [isFilterEnabled, setIsFilterEnabled] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
-  const [currentActiveIndex, setCurrentActiveIndex] = useState<number | null>(null);
   const [transcriptData, setTranscriptData] = useState<Array<{time: string, text: string}>>([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
@@ -122,21 +121,36 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     setIsMuted(!isMuted);
   };
 
+  // Single source of truth for current transcript entry
+  const getCurrentTranscriptEntry = (playbackTime: number) => {
+    if (transcriptData.length === 0) {
+      return { index: 0, text: 'No transcript available' };
+    }
+    
+    // Find the current transcript entry based on playback time
+    for (let i = transcriptData.length - 1; i >= 0; i--) {
+      const entryTime = timeStringToSeconds(transcriptData[i].time);
+      if (playbackTime >= entryTime) {
+        return { 
+          index: i, 
+          text: transcriptData[i].text 
+        };
+      }
+    }
+    
+    // Default to first entry if no match found
+    return { 
+      index: 0, 
+      text: transcriptData[0]?.text || 'Reiciendis corporis nemo' 
+    };
+  };
+
   // Get current transcript text for subtitle display
   const getCurrentTranscriptText = (): string => {
-    if (transcriptData.length === 0) {
-      return 'No transcript available';
-    }
-    
-    // Always find the current transcript entry based on playback time
-    const currentEntryIndex = findCurrentTranscriptEntry(currentTime);
-    printLog('getCurrentTranscriptText - currentTime: ' + currentTime + ', currentEntryIndex: ' + currentEntryIndex);
-    if (currentEntryIndex !== null && transcriptData[currentEntryIndex]) {
-      printLog('Returning transcript text: ' + transcriptData[currentEntryIndex].text);
-      return transcriptData[currentEntryIndex].text;
-    }
-    
-    return 'Reiciendis corporis nemo'; // Default fallback
+    const currentEntry = getCurrentTranscriptEntry(currentTime);
+    printLog('getCurrentTranscriptText - currentTime: ' + currentTime + ', currentEntryIndex: ' + currentEntry.index);
+    printLog('Returning transcript text: ' + currentEntry.text);
+    return currentEntry.text;
   };
 
   // Convert seconds to MM:SS format
@@ -206,20 +220,16 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           setTranscriptData(existingTranscript);
           printLog('Loaded existing transcript with ' + existingTranscript.length + ' entries');
           
-          // Initialize the current active index based on current playback time
+          // Initial scroll to correct position (highlighting handled in render)
           setTimeout(() => {
-            const currentPlaybackTime = isVideo ? videoRef.current?.currentTime || 0 : audioRef.current?.currentTime || 0;
-            const initialActiveIndex = findCurrentTranscriptEntry(currentPlaybackTime);
-            setCurrentActiveIndex(initialActiveIndex);
-            printLog('Initialized currentActiveIndex to: ' + initialActiveIndex + ', for playback time: ' + currentPlaybackTime);
-            
-            // Scroll to the correct position
             if (isAutoScrollEnabled) {
+              const currentPlaybackTime = isVideo ? videoRef.current?.currentTime || 0 : audioRef.current?.currentTime || 0;
+              const initialEntry = getCurrentTranscriptEntry(currentPlaybackTime);
               const contentArea = contentAreaRef.current;
               if (contentArea) {
-                const currentElement = contentArea.querySelector(`[data-index="${initialActiveIndex}"]`);
+                const currentElement = contentArea.querySelector(`[data-index="${initialEntry.index}"]`);
                 printLog('=== PANEL SCROLL DEBUG (MOUNT) ===');
-                printLog('Looking for element with data-index: ' + initialActiveIndex);
+                printLog('Looking for element with data-index: ' + initialEntry.index);
                 printLog('Found element: ' + (currentElement ? 'YES' : 'NO'));
                 printLog('Available data-index elements: ' + JSON.stringify(Array.from(contentArea.querySelectorAll('[data-index]')).map(el => el.getAttribute('data-index'))));
                 printLog('Content area scroll position: ' + contentArea.scrollTop);
@@ -235,9 +245,9 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                     behavior: 'smooth', 
                     block: 'center' 
                   });
-                  printLog('Scrolled to initial position for index: ' + initialActiveIndex);
+                  printLog('Scrolled to initial position for index: ' + initialEntry.index);
                 } else {
-                  printLog('Could not find element with data-index: ' + initialActiveIndex);
+                  printLog('Could not find element with data-index: ' + initialEntry.index);
                 }
               }
             }
@@ -253,15 +263,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     checkExistingTranscript();
   }, [fileUrl]);
 
-  // Update active index when transcript data changes
-  useEffect(() => {
-    if (transcriptData.length > 0) {
-      const currentPlaybackTime = isVideo ? videoRef.current?.currentTime || 0 : audioRef.current?.currentTime || 0;
-      const newActiveIndex = findCurrentTranscriptEntry(currentPlaybackTime);
-      setCurrentActiveIndex(newActiveIndex);
-      printLog('Updated currentActiveIndex to: ' + newActiveIndex + ', after transcript data change');
-    }
-  }, [transcriptData]);
+  // Transcript data changes - no state updates needed, highlighting handled in render
 
   // Convert time string (e.g., "2:15") to seconds
   const timeStringToSeconds = (timeString: string): number => {
@@ -269,24 +271,6 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     return minutes * 60 + seconds;
   };
 
-  // Find transcript entry based on current playback time
-  const findCurrentTranscriptEntry = (playbackTime: number): number => {
-    printLog('=== FIND CURRENT TRANSCRIPT ENTRY ===');
-    printLog('Playback time: ' + playbackTime);
-    printLog('Transcript data length: ' + transcriptData.length);
-    printLog('First few entries: ' + JSON.stringify(transcriptData.slice(0, 3)));
-    
-    for (let i = transcriptData.length - 1; i >= 0; i--) {
-      const entryTime = timeStringToSeconds(transcriptData[i].time);
-      printLog('Entry ' + i + ': time="' + transcriptData[i].time + '" -> ' + entryTime + 's, playback=' + playbackTime + 's');
-      if (playbackTime >= entryTime) {
-        printLog('Found matching entry: ' + i);
-        return i;
-      }
-    }
-    printLog('No matching entry found, returning 0');
-    return 0; // Default to first entry
-  };
 
   // Handle time updates with auto-scroll
   const handleTimeUpdateWithAutoScroll = () => {
@@ -298,19 +282,16 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     if (current !== undefined) setCurrentTime(current);
     if (total !== undefined) setDuration(total);
 
-    // Always update current active index based on playback time (for highlighting)
+    // Auto-scroll logic (highlighting now handled directly in render)
     if (current !== undefined) {
-      const currentEntryIndex = findCurrentTranscriptEntry(current);
-      printLog('Setting currentActiveIndex to: ' + currentEntryIndex);
-      setCurrentActiveIndex(currentEntryIndex);
-      
       // Only auto-scroll if enabled and not currently highlighting a search result
       if (isAutoScrollEnabledRef.current && (highlightedIndex === null || !searchQuery.trim())) {
+        const currentEntry = getCurrentTranscriptEntry(current);
         const contentArea = contentAreaRef.current;
         if (contentArea) {
-          const currentElement = contentArea.querySelector(`[data-index="${currentEntryIndex}"]`);
+          const currentElement = contentArea.querySelector(`[data-index="${currentEntry.index}"]`);
           printLog('=== PANEL SCROLL DEBUG (PLAYBACK) ===');
-          printLog('Auto-scroll: Looking for element with data-index: ' + currentEntryIndex);
+          printLog('Auto-scroll: Looking for element with data-index: ' + currentEntry.index);
           printLog('Auto-scroll: Found element: ' + (currentElement ? 'YES' : 'NO'));
           printLog('Auto-scroll: Available data-index elements: ' + JSON.stringify(Array.from(contentArea.querySelectorAll('[data-index]')).map(el => el.getAttribute('data-index'))));
           printLog('Content area scroll position: ' + contentArea.scrollTop);
@@ -328,13 +309,13 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
               behavior: 'smooth', 
               block: 'center' 
             });
-            printLog('Auto-scroll: Scrolled to index: ' + currentEntryIndex);
+            printLog('Auto-scroll: Scrolled to index: ' + currentEntry.index);
           } else {
-            printLog('Auto-scroll: Could not find element with data-index: ' + currentEntryIndex);
+            printLog('Auto-scroll: Could not find element with data-index: ' + currentEntry.index);
           }
         }
       } else if (!isAutoScrollEnabledRef.current) {
-        printLog('Auto-scroll disabled - highlighting only (currentActiveIndex: ' + currentEntryIndex + ')');
+        printLog('Auto-scroll disabled - highlighting handled in render');
       } else {
         printLog('Auto-scroll: Skipped scrolling due to search highlighting (highlightedIndex: ' + highlightedIndex + ', searchQuery: "' + searchQuery + '")');
       }
@@ -627,13 +608,13 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
               <video
                 ref={videoRef}
                 src={fileUrl}
-                className="max-w-full max-h-full"
+                className="w-full h-full object-contain"
                 onClick={togglePlayPause}
               />
               
-              {/* Subtitle overlay */}
-              <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-black/70 px-6 py-3 rounded-lg">
-                <p className="text-white text-lg font-medium select-none">{getCurrentTranscriptText()}</p>
+              {/* Subtitle overlay - positioned at bottom above controls */}
+              <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-black/70 px-6 py-3 rounded-lg max-w-[80%]">
+                <p className="text-white text-lg font-medium select-none text-center">{getCurrentTranscriptText()}</p>
               </div>
 
               {/* Video controls overlay */}
@@ -839,7 +820,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                   filteredTranscriptData.map((item, index) => {
                     const originalIndex = transcriptData.findIndex(original => original === item);
                     const isHighlighted = highlightedIndex === originalIndex;
-                    const isActive = currentActiveIndex === originalIndex;
+                    
+                    // Use the same DRY logic as subtitles - direct calculation, no state dependency
+                    const currentEntry = getCurrentTranscriptEntry(currentTime);
+                    const isActive = currentEntry.index === originalIndex;
+                    
+                    printLog(`Entry ${originalIndex}: time=${item.time}, isActive=${isActive}, currentEntryIndex=${currentEntry.index}, currentTime=${currentTime}`);
                     
                     return (
                       <div 
