@@ -41,6 +41,14 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const [childrenError, setChildrenError] = useState<string | null>(null);
   const [pollingClips, setPollingClips] = useState<Set<string>>(new Set());
   
+  // Clip creation mode state
+  const [isClipMode, setIsClipMode] = useState(false);
+  const [selectedEntries, setSelectedEntries] = useState<Set<number>>(new Set());
+  const [clipStartTime, setClipStartTime] = useState(0);
+  const [clipEndTime, setClipEndTime] = useState(0);
+  const [isCreatingClip, setIsCreatingClip] = useState(false);
+  const [clipCreationError, setClipCreationError] = useState<string | null>(null);
+  
   // Sample transcript data with more diverse content for filtering (fallback)
   const sampleTranscriptData = [
     { time: '0:15', text: 'Welcome back to the podcast everyone. Today we\'re diving deep into the world of artificial intelligence and machine learning.' },
@@ -341,6 +349,24 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     };
   }, []);
 
+  // Add text selection listener for clip mode
+  useEffect(() => {
+    if (!isClipMode) return;
+    
+    const handleSelectionChange = () => {
+      // Debounce the selection handler
+      setTimeout(() => {
+        handleTextSelection();
+      }, 100);
+    };
+    
+    document.addEventListener('mouseup', handleSelectionChange);
+    
+    return () => {
+      document.removeEventListener('mouseup', handleSelectionChange);
+    };
+  }, [isClipMode, transcriptData]);
+
   // Transcript data changes - no state updates needed, highlighting handled in render
 
   // Handle manual seeks (when user clicks on transcript entry)
@@ -453,12 +479,248 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     setCurrentTime(seekTime);
   };
 
-  // Format time
+  // Format time with one decimal place for seconds
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    const seconds = (time % 60).toFixed(1);
+    return `${minutes}:${seconds.padStart(4, '0')}`;
   };
+
+  // ========== CLIP MODE FUNCTIONS ==========
+  
+  // Enter clip mode
+  const handleEnterClipMode = () => {
+    printLog('Entering clip mode');
+    setIsClipMode(true);
+    setSelectedEntries(new Set());
+    setClipStartTime(0);
+    setClipEndTime(0);
+    setClipCreationError(null);
+    
+    // Pause playback when entering clip mode
+    if (isPlaying) {
+      togglePlayPause();
+    }
+  };
+
+  // Exit clip mode (cancel)
+  const handleCancelClipMode = () => {
+    printLog('Canceling clip mode');
+    setIsClipMode(false);
+    setSelectedEntries(new Set());
+    setClipStartTime(0);
+    setClipEndTime(0);
+    setClipCreationError(null);
+  };
+
+  // Calculate time range from selected entries (ensures contiguous selection)
+  const calculateClipRange = (selection: Set<number>) => {
+    if (selection.size === 0) {
+      return { startTime: 0, endTime: 0 };
+    }
+
+    const selectedIndices = Array.from(selection).sort((a, b) => a - b);
+    
+    // Check for contiguity
+    for (let i = 1; i < selectedIndices.length; i++) {
+      if (selectedIndices[i] !== selectedIndices[i - 1] + 1) {
+        printLog('Warning: Non-contiguous selection detected');
+        // For now, just use the range from first to last (will fill gaps)
+        break;
+      }
+    }
+    
+    const firstIndex = selectedIndices[0];
+    const lastIndex = selectedIndices[selectedIndices.length - 1];
+    
+    const startTime = timeStringToSeconds(transcriptData[firstIndex].time);
+    
+    // End time is the start of the next entry, or calculate based on duration
+    let endTime: number;
+    if (lastIndex < transcriptData.length - 1) {
+      endTime = timeStringToSeconds(transcriptData[lastIndex + 1].time);
+    } else {
+      // Last entry - use video duration or add estimated duration
+      endTime = duration || (startTime + 10); // Fallback: add 10 seconds
+    }
+    
+    return { startTime, endTime };
+  };
+
+  // Toggle entry selection (maintains contiguity)
+  const toggleEntrySelection = (index: number) => {
+    const newSelection = new Set(selectedEntries);
+    
+    if (newSelection.size === 0) {
+      // First selection - just add it
+      newSelection.add(index);
+    } else {
+      const selectedIndices = Array.from(newSelection).sort((a, b) => a - b);
+      const minIndex = selectedIndices[0];
+      const maxIndex = selectedIndices[selectedIndices.length - 1];
+      
+      if (newSelection.has(index)) {
+        // Deselecting - check if it's at the edge
+        if (index === minIndex) {
+          // Remove from start
+          newSelection.delete(index);
+        } else if (index === maxIndex) {
+          // Remove from end
+          newSelection.delete(index);
+        } else {
+          // Clicking in middle - contract selection to this point
+          // Keep entries from min to clicked index
+          for (let i = index + 1; i <= maxIndex; i++) {
+            newSelection.delete(i);
+          }
+        }
+      } else {
+        // Selecting - extend range to include this index
+        if (index < minIndex) {
+          // Extend backwards
+          for (let i = index; i < minIndex; i++) {
+            newSelection.add(i);
+          }
+        } else if (index > maxIndex) {
+          // Extend forwards
+          for (let i = maxIndex + 1; i <= index; i++) {
+            newSelection.add(i);
+          }
+        } else {
+          // Fill gap in middle
+          for (let i = minIndex; i <= index; i++) {
+            newSelection.add(i);
+          }
+        }
+      }
+    }
+    
+    setSelectedEntries(newSelection);
+    
+    // Update clip range
+    const { startTime, endTime } = calculateClipRange(newSelection);
+    setClipStartTime(startTime);
+    setClipEndTime(endTime);
+    
+    printLog('Selection updated: ' + Array.from(newSelection).sort((a, b) => a - b).join(','));
+    printLog('Clip range: ' + formatTime(startTime) + ' - ' + formatTime(endTime));
+  };
+
+  // Handle text selection - detect which entries are selected
+  const handleTextSelection = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || !isClipMode) return;
+    
+    printLog('Text selection detected');
+    
+    // Get the range of selected text
+    const range = selection.getRangeAt(0);
+    const container = contentAreaRef.current;
+    if (!container) return;
+    
+    // Find all transcript entries that intersect with the selection
+    const selectedIndices = new Set<number>();
+    const transcriptElements = container.querySelectorAll('[data-index]');
+    
+    transcriptElements.forEach((element) => {
+      const index = parseInt(element.getAttribute('data-index') || '-1');
+      if (index === -1) return;
+      
+      // Check if this element intersects with the selection
+      if (selection.containsNode(element, true)) {
+        selectedIndices.add(index);
+      }
+    });
+    
+    if (selectedIndices.size > 0) {
+      // Make selection contiguous
+      const indices = Array.from(selectedIndices).sort((a, b) => a - b);
+      const contiguousSelection = new Set<number>();
+      
+      for (let i = indices[0]; i <= indices[indices.length - 1]; i++) {
+        contiguousSelection.add(i);
+      }
+      
+      setSelectedEntries(contiguousSelection);
+      
+      // Update clip range
+      const { startTime, endTime } = calculateClipRange(contiguousSelection);
+      setClipStartTime(startTime);
+      setClipEndTime(endTime);
+      
+      printLog('Text selection mapped to entries: ' + Array.from(contiguousSelection).sort((a, b) => a - b).join(','));
+      
+      // Clear the text selection
+      selection.removeAllRanges();
+    }
+  };
+
+  // Finish clip creation
+  const handleFinishClip = async () => {
+    if (selectedEntries.size === 0) {
+      setClipCreationError('Please select at least one transcript entry');
+      return;
+    }
+    
+    const clipDuration = clipEndTime - clipStartTime;
+    
+    // Validate duration
+    if (clipDuration > 600) {
+      setClipCreationError('Clip duration cannot exceed 10 minutes (current: ' + formatTime(clipDuration) + ')');
+      return;
+    }
+    
+    if (clipDuration <= 0) {
+      setClipCreationError('Invalid clip duration');
+      return;
+    }
+    
+    setIsCreatingClip(true);
+    setClipCreationError(null);
+    
+    try {
+      printLog('Creating clip: ' + clipStartTime + 's - ' + clipEndTime + 's');
+      
+      const response = await VideoEditService.createVideoEdit({
+        cdnUrl: fileUrl,
+        startTime: parseFloat(clipStartTime.toFixed(1)),
+        endTime: parseFloat(clipEndTime.toFixed(1)),
+        useSubtitles: false
+      });
+      
+      printLog('Clip creation started: ' + response.lookupHash);
+      
+      // Poll for completion
+      await VideoEditService.pollForCompletion(
+        response.lookupHash,
+        (status) => {
+          printLog('Clip status: ' + status.status);
+        }
+      );
+      
+      printLog('Clip created successfully!');
+      
+      // Exit clip mode
+      setIsClipMode(false);
+      setSelectedEntries(new Set());
+      setClipStartTime(0);
+      setClipEndTime(0);
+      
+      // Switch to Children Clips tab to show the new clip
+      setShowTranscript(false);
+      setShowChildrenClips(true);
+      
+      // Children clips will reload automatically via useEffect
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to create clip';
+      printLog('Clip creation error: ' + errorMsg);
+      setClipCreationError(errorMsg);
+    } finally {
+      setIsCreatingClip(false);
+    }
+  };
+
 
   // Filter transcript data based on search query and filter toggle
   const filteredTranscriptData = isFilterEnabled 
@@ -467,10 +729,17 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       )
     : transcriptData;
 
-  // Filter children clips data based on search query
-  const filteredChildrenClipsData = childrenClips.filter(clip =>
-    searchQuery === '' || clip.editRange.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter children clips data based on search query, and sort chronologically (newest first)
+  const filteredChildrenClipsData = childrenClips
+    .filter(clip =>
+      searchQuery === '' || clip.editRange.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Sort by creation date, newest first
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateB - dateA;
+    });
 
   // Get all matching indices for the current search query
   const getMatchingIndices = (query: string) => {
@@ -878,17 +1147,55 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
             </div>
           </div>
 
-          {/* Auto-scroll toggle */}
+          {/* Top control area - Auto-scroll or Clip Mode Banner */}
           <div className="px-4 pb-4 border-b border-gray-800">
-            <label className="flex items-center space-x-2 text-sm text-gray-400 hover:text-white cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isAutoScrollEnabled}
-                onChange={(e) => setIsAutoScrollEnabled(e.target.checked)}
-                className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white focus:ring-2"
-              />
-              <span>Auto-scroll transcript with playback</span>
-            </label>
+            {isClipMode ? (
+              // Clip Mode Banner
+              <div className="bg-blue-900/30 border border-blue-700 rounded-lg px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Scissors size={20} className="text-blue-400" />
+                    <div>
+                      <p className="text-white font-medium select-none">Clip Creation Mode</p>
+                      <p className="text-sm text-gray-400 select-none">
+                        Click or drag to select transcript entries, or highlight text to create a clip
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {selectedEntries.size > 0 ? (
+                      <div>
+                        <p className="text-sm text-gray-400 select-none">Selected Range</p>
+                        <p className="text-white font-medium select-none">
+                          {formatTime(clipStartTime)} - {formatTime(clipEndTime)}
+                        </p>
+                        <p className="text-xs text-gray-500 select-none">
+                          Duration: {formatTime(clipEndTime - clipStartTime)}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 select-none">No selection</p>
+                    )}
+                  </div>
+                </div>
+                {clipCreationError && (
+                  <div className="mt-2 text-red-400 text-sm select-none">
+                    {clipCreationError}
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Normal Mode - Auto-scroll checkbox
+              <label className="flex items-center space-x-2 text-sm text-gray-400 hover:text-white cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isAutoScrollEnabled}
+                  onChange={(e) => setIsAutoScrollEnabled(e.target.checked)}
+                  className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white focus:ring-2"
+                />
+                <span>Auto-scroll transcript with playback</span>
+              </label>
+            )}
           </div>
 
           {/* Content area */}
@@ -931,6 +1238,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                   filteredTranscriptData.map((item, index) => {
                     const originalIndex = transcriptData.findIndex(original => original === item);
                     const isHighlighted = highlightedIndex === originalIndex;
+                    const isSelected = selectedEntries.has(originalIndex);
                     
                     // Use the same DRY logic as subtitles - direct calculation, no state dependency
                     const currentEntry = getCurrentTranscriptEntry(currentTime);
@@ -942,17 +1250,34 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                       <div 
                         key={index} 
                         data-index={originalIndex}
-                        onClick={() => handleTranscriptClick(item.time)}
+                        onClick={() => {
+                          if (isClipMode) {
+                            toggleEntrySelection(originalIndex);
+                          } else {
+                            handleTranscriptClick(item.time);
+                          }
+                        }}
                         className={`flex items-start space-x-3 p-3 rounded-lg transition-colors cursor-pointer ${
-                          isHighlighted 
-                            ? 'bg-yellow-900/30 border border-yellow-600' 
-                            : isActive 
-                              ? 'border border-white shadow-[0_0_10px_rgba(255,255,255,0.3)]' 
-                              : 'hover:bg-gray-900/50'
+                          isClipMode && isSelected
+                            ? 'bg-blue-900/50 border-2 border-blue-500' 
+                            : isHighlighted 
+                              ? 'bg-yellow-900/30 border border-yellow-600' 
+                              : isActive 
+                                ? 'border border-white shadow-[0_0_10px_rgba(255,255,255,0.3)]' 
+                                : 'hover:bg-gray-900/50'
                         }`}
                       >
+                        {isClipMode && (
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleEntrySelection(originalIndex)}
+                            className="mt-1 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-2"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        )}
                         <span className="text-gray-400 text-sm font-mono select-none">{item.time}</span>
-                        <p className="text-white text-sm leading-relaxed select-none">
+                        <p className={`text-white text-sm leading-relaxed flex-1 ${isClipMode ? '' : 'select-none'}`}>
                           {item.text}
                         </p>
                       </div>
@@ -994,13 +1319,18 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                     return (
                       <div 
                         key={clip.lookupHash} 
+                        onClick={() => {
+                          if (isCompleted && clip.url) {
+                            window.open(clip.url, '_blank');
+                          }
+                        }}
                         className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
                           isCompleted ? 'bg-gray-900 hover:bg-gray-800 cursor-pointer' : 'bg-gray-900/50'
                         }`}
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-white text-sm font-medium select-none">
-                            {clip.editRange} ({clip.duration}s)
+                            {clip.editRange.replace(/(\d+\.\d+)/g, (match) => parseFloat(match).toFixed(1))} ({clip.duration.toFixed(1)}s)
                           </p>
                           <p className={`text-xs select-none ${
                             isProcessing ? 'text-blue-400' : 
@@ -1025,16 +1355,9 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                         </div>
                         
                         {isCompleted && clip.url && (
-                          <button 
-                            onClick={() => {
-                              // Open clip in new tab
-                              window.open(clip.url!, '_blank');
-                            }}
-                            className="ml-3 text-gray-400 hover:text-white transition-colors"
-                            title="Play clip"
-                          >
+                          <div className="ml-3 text-gray-400">
                             <Play size={16} />
-                          </button>
+                          </div>
                         )}
                       </div>
                     );
@@ -1058,14 +1381,54 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           {/* Action buttons */}
           <div className="p-4 border-t border-gray-800">
             <div className="flex space-x-3">
-              <button className="flex items-center space-x-2 bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors font-medium">
-                <Scissors size={16} />
-                <span>Clip</span>
-              </button>
-              <button className="flex-1 bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors font-medium flex items-center justify-center space-x-2">
-                <Share size={16} />
-                <span>Share</span>
-              </button>
+              {isClipMode ? (
+                // Clip Mode Buttons
+                <>
+                  <button 
+                    onClick={handleFinishClip}
+                    disabled={selectedEntries.size === 0 || isCreatingClip}
+                    className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-md font-medium transition-colors flex-1 ${
+                      selectedEntries.size === 0 || isCreatingClip
+                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-500'
+                    }`}
+                  >
+                    {isCreatingClip ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Creating Clip...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Scissors size={16} />
+                        <span>Finish Clip</span>
+                      </>
+                    )}
+                  </button>
+                  <button 
+                    onClick={handleCancelClipMode}
+                    disabled={isCreatingClip}
+                    className="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                // Normal Mode Buttons
+                <>
+                  <button 
+                    onClick={handleEnterClipMode}
+                    className="flex items-center space-x-2 bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors font-medium"
+                  >
+                    <Scissors size={16} />
+                    <span>Clip</span>
+                  </button>
+                  <button className="flex-1 bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors font-medium flex items-center justify-center space-x-2">
+                    <Share size={16} />
+                    <span>Share</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
