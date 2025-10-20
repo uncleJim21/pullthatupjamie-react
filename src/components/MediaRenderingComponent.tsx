@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Scissors, Share, Filter } from 'lucide-react';
 import TranscriptionService, { generateHash } from '../services/transcriptionService.ts';
+import VideoEditService, { ChildEdit } from '../services/videoEditService.ts';
 import { printLog } from '../constants/constants.ts';
 
 interface MediaRenderingComponentProps {
@@ -34,6 +35,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [isCheckingExistingTranscript, setIsCheckingExistingTranscript] = useState(true);
   
+  // Children clips state
+  const [childrenClips, setChildrenClips] = useState<ChildEdit[]>([]);
+  const [isLoadingChildren, setIsLoadingChildren] = useState(false);
+  const [childrenError, setChildrenError] = useState<string | null>(null);
+  const [pollingClips, setPollingClips] = useState<Set<string>>(new Set());
+  
   // Sample transcript data with more diverse content for filtering (fallback)
   const sampleTranscriptData = [
     { time: '0:15', text: 'Welcome back to the podcast everyone. Today we\'re diving deep into the world of artificial intelligence and machine learning.' },
@@ -63,19 +70,6 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     { time: '6:15', text: 'That\'s all for today\'s episode. Don\'t forget to subscribe and leave us a review. See you next time!' }
   ];
 
-  // Sample children clips data
-  const childrenClipsData = [
-    { id: 1, name: 'ai_boom_discussion_clip.mp4', duration: '0:15' },
-    { id: 2, name: 'gpt_evolution_clip.mp4', duration: '0:22' },
-    { id: 3, name: 'business_implementation_clip.mp4', duration: '0:18' },
-    { id: 4, name: 'job_displacement_clip.mp4', duration: '0:25' },
-    { id: 5, name: 'ai_augmentation_clip.mp4', duration: '0:20' },
-    { id: 6, name: 'content_creation_clip.mp4', duration: '0:28' },
-    { id: 7, name: 'podcast_production_clip.mp4', duration: '0:24' },
-    { id: 8, name: 'ethical_considerations_clip.mp4', duration: '0:19' },
-    { id: 9, name: 'ai_predictions_clip.mp4', duration: '0:26' },
-    { id: 10, name: 'advice_for_beginners_clip.mp4', duration: '0:21' }
-  ];
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -189,7 +183,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       // Generate the same GUID that was used in the request
       const guid = generateHash(fileUrl);
       
-      if (response.successAction?.url || response.success) {
+      if (response.successAction?.url) {
         // Start polling for results using the GUID
         const transcript = await TranscriptionService.pollForCompletion(
           guid,
@@ -244,7 +238,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                 printLog('Content area scroll height: ' + contentArea.scrollHeight);
                 if (currentElement) {
                   printLog('Element position relative to viewport: ' + currentElement.getBoundingClientRect().top);
-                  printLog('Element offset from content area top: ' + (currentElement.offsetTop - contentArea.scrollTop));
+                  printLog('Element offset from content area top: ' + ((currentElement as HTMLElement).offsetTop - contentArea.scrollTop));
                 }
                 printLog('=== END PANEL SCROLL DEBUG ===');
                 if (currentElement) {
@@ -269,6 +263,83 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
 
     checkExistingTranscript();
   }, [fileUrl]);
+
+  // Load children clips when Children Clips tab is opened
+  useEffect(() => {
+    const loadChildrenClips = async () => {
+      if (!showChildrenClips) return;
+      
+      setIsLoadingChildren(true);
+      setChildrenError(null);
+      
+      try {
+        const children = await VideoEditService.getChildEdits(fileName);
+        setChildrenClips(children);
+        printLog('Loaded ' + children.length + ' child edits');
+        
+        // Start polling for any processing clips
+        const processingClips = children.filter(c => c.status === 'processing' || c.status === 'queued');
+        processingClips.forEach(clip => startPollingClip(clip.lookupHash));
+        
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Failed to load child edits';
+        printLog('Error loading children clips: ' + errorMsg);
+        setChildrenError(errorMsg);
+      } finally {
+        setIsLoadingChildren(false);
+      }
+    };
+    
+    loadChildrenClips();
+  }, [showChildrenClips, fileName]);
+
+  // Poll for processing clips
+  const startPollingClip = (lookupHash: string) => {
+    printLog('Starting to poll for clip: ' + lookupHash);
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const status = await VideoEditService.checkEditStatus(lookupHash);
+        printLog('Clip ' + lookupHash + ' status: ' + status.status);
+        
+        if (status.status === 'completed' || status.status === 'failed') {
+          clearInterval(pollInterval);
+          setPollingClips(prev => {
+            const next = new Set(prev);
+            next.delete(lookupHash);
+            return next;
+          });
+          
+          // Refresh children list
+          printLog('Clip processing finished, refreshing children list');
+          if (showChildrenClips) {
+            const children = await VideoEditService.getChildEdits(fileName);
+            setChildrenClips(children);
+          }
+        }
+      } catch (error) {
+        printLog('Polling error for ' + lookupHash + ': ' + error);
+        clearInterval(pollInterval);
+        setPollingClips(prev => {
+          const next = new Set(prev);
+          next.delete(lookupHash);
+          return next;
+        });
+      }
+    }, 3000); // Poll every 3 seconds
+    
+    setPollingClips(prev => new Set(prev).add(lookupHash));
+  };
+
+  // Cleanup polling intervals on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all polling intervals when component unmounts
+      pollingClips.forEach(() => {
+        printLog('Cleaning up polling intervals');
+      });
+    };
+  }, []);
 
   // Transcript data changes - no state updates needed, highlighting handled in render
 
@@ -329,7 +400,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           printLog('highlightedIndex: ' + highlightedIndex + ', searchQuery: "' + searchQuery + '"');
           if (currentElement) {
             printLog('Element position relative to viewport: ' + currentElement.getBoundingClientRect().top);
-            printLog('Element offset from content area top: ' + (currentElement.offsetTop - contentArea.scrollTop));
+            printLog('Element offset from content area top: ' + ((currentElement as HTMLElement).offsetTop - contentArea.scrollTop));
             printLog('Element is visible: ' + (currentElement.getBoundingClientRect().top >= 0 && currentElement.getBoundingClientRect().bottom <= contentArea.clientHeight));
           }
           printLog('=== END PANEL SCROLL DEBUG ===');
@@ -397,8 +468,8 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     : transcriptData;
 
   // Filter children clips data based on search query
-  const filteredChildrenClipsData = childrenClipsData.filter(clip =>
-    searchQuery === '' || clip.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredChildrenClipsData = childrenClips.filter(clip =>
+    searchQuery === '' || clip.editRange.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Get all matching indices for the current search query
@@ -895,21 +966,89 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredChildrenClipsData.length > 0 ? (
-                  filteredChildrenClipsData.map((clip) => (
-                    <div key={clip.id} className="flex items-center justify-between p-3 bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate select-none">{clip.name}</p>
-                        <p className="text-gray-400 text-xs select-none">{clip.duration}</p>
+                {isLoadingChildren ? (
+                  <div className="flex items-center justify-center py-12 space-x-2">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    <span className="text-gray-400 select-none">Loading child clips...</span>
+                  </div>
+                ) : childrenError ? (
+                  <div className="text-center text-red-400 py-12">
+                    <p className="select-none mb-4">{childrenError}</p>
+                    <button
+                      onClick={() => {
+                        setShowChildrenClips(false);
+                        setTimeout(() => setShowChildrenClips(true), 100);
+                      }}
+                      className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors text-sm"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                ) : filteredChildrenClipsData.length > 0 ? (
+                  filteredChildrenClipsData.map((clip) => {
+                    const isPolling = pollingClips.has(clip.lookupHash);
+                    const isProcessing = clip.status === 'processing' || clip.status === 'queued';
+                    const isFailed = clip.status === 'failed';
+                    const isCompleted = clip.status === 'completed';
+                    
+                    return (
+                      <div 
+                        key={clip.lookupHash} 
+                        className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                          isCompleted ? 'bg-gray-900 hover:bg-gray-800 cursor-pointer' : 'bg-gray-900/50'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm font-medium select-none">
+                            {clip.editRange} ({clip.duration}s)
+                          </p>
+                          <p className={`text-xs select-none ${
+                            isProcessing ? 'text-blue-400' : 
+                            isFailed ? 'text-red-400' : 
+                            'text-gray-400'
+                          }`}>
+                            {isProcessing && isPolling && (
+                              <span className="flex items-center space-x-1">
+                                <div className="animate-spin rounded-full h-3 w-3 border-b border-blue-400"></div>
+                                <span>Processing...</span>
+                              </span>
+                            )}
+                            {isProcessing && !isPolling && 'Queued'}
+                            {isCompleted && '✓ Ready'}
+                            {isFailed && '✗ Failed'}
+                          </p>
+                          {clip.createdAt && (
+                            <p className="text-gray-500 text-xs select-none mt-1">
+                              {new Date(clip.createdAt).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                        
+                        {isCompleted && clip.url && (
+                          <button 
+                            onClick={() => {
+                              // Open clip in new tab
+                              window.open(clip.url!, '_blank');
+                            }}
+                            className="ml-3 text-gray-400 hover:text-white transition-colors"
+                            title="Play clip"
+                          >
+                            <Play size={16} />
+                          </button>
+                        )}
                       </div>
-                      <button className="ml-3 text-gray-400 hover:text-white transition-colors">
-                        <Play size={16} />
-                      </button>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="text-center text-gray-400 py-8">
-                    <p className="select-none">No children clips</p>
+                    <p className="select-none">
+                      {searchQuery ? 'No matching clips found' : 'No child clips yet'}
+                    </p>
+                    {!searchQuery && (
+                      <p className="text-gray-500 text-sm mt-2 select-none">
+                        Use the Clip button to create clips from this video
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
