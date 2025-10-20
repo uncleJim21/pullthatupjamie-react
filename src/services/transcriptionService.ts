@@ -106,6 +106,12 @@ export interface TranscriptEntry {
   text: string;
 }
 
+export interface WordTimestamp {
+  word: string;
+  start: number;
+  end: number;
+}
+
 class TranscriptionService {
   private static readonly WHISPR_API_URL = 'https://whispr-v3-w-caching-ex8zk.ondigitalocean.app/WHSPR';
 
@@ -155,6 +161,50 @@ class TranscriptionService {
       console.log(`Transcription error: ${error}`);
       console.error('Transcription error:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Check if transcript already exists for a given URL - returns both sentences and words
+   */
+  static async checkExistingTranscriptWithWords(remoteUrl: string): Promise<{
+    sentences: TranscriptEntry[];
+    words: WordTimestamp[];
+  } | null> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No authentication token found. Please sign in again.');
+      }
+
+      // Generate the same deterministic GUID
+      const guid = generateHash(remoteUrl);
+
+      console.log(`Checking existing transcript for URL: ${remoteUrl}`);
+      console.log(`Generated GUID: ${guid} (length: ${guid.length})`);
+
+      console.log(`Checking for existing transcript with GUID: ${guid}`);
+
+      const status = await this.getTranscriptionStatus(guid);
+      
+      // If we have completed data, return it
+      if (status.channels?.[0]?.alternatives?.[0]) {
+        const result = this.extractSentencesAndWords(status);
+        if (result.sentences.length > 0) {
+          const transcript = this.convertSentencesToTranscript(result.sentences);
+          printLog(`Found existing transcript with ${transcript.length} entries and ${result.words.length} word timestamps`);
+          return {
+            sentences: transcript,
+            words: result.words
+          };
+        }
+      }
+
+      printLog('No existing transcript found');
+      return null;
+    } catch (error) {
+      printLog(`Error checking existing transcript: ${error}`);
+      return null;
     }
   }
 
@@ -254,7 +304,16 @@ class TranscriptionService {
    * Extract all sentences from transcription result
    */
   static extractAllSentences(transcriptionStatus: TranscriptionStatus): Array<{text: string, start: number, end: number}> {
+    const result = this.extractSentencesAndWords(transcriptionStatus);
+    return result.sentences;
+  }
+
+  static extractSentencesAndWords(transcriptionStatus: TranscriptionStatus): {
+    sentences: Array<{text: string, start: number, end: number}>;
+    words: WordTimestamp[];
+  } {
     const allSentences: Array<{text: string, start: number, end: number}> = [];
+    const allWords: WordTimestamp[] = [];
     
     // Check for paragraph-based structure first
     if (transcriptionStatus.channels?.[0]?.alternatives?.[0]?.paragraphs?.paragraphs) {
@@ -263,11 +322,30 @@ class TranscriptionService {
           allSentences.push(...paragraph.sentences);
         }
       });
+      
+      // Extract words from the main words array (not from paragraphs)
+      if (transcriptionStatus.channels[0].alternatives[0].words) {
+        transcriptionStatus.channels[0].alternatives[0].words.forEach(word => {
+          allWords.push({
+            word: word.punctuated_word,
+            start: word.start,
+            end: word.end
+          });
+        });
+      }
     }
     // Fallback: check for word-based structure and create sentences
     else if (transcriptionStatus.channels?.[0]?.alternatives?.[0]?.words) {
       const words = transcriptionStatus.channels[0].alternatives[0].words;
-      const transcript = transcriptionStatus.channels[0].alternatives[0].transcript || '';
+      
+      // Save all word-level timestamps
+      words.forEach(word => {
+        allWords.push({
+          word: word.punctuated_word,
+          start: word.start,
+          end: word.end
+        });
+      });
       
       // Create multiple sentence entries by grouping words into sentences
       if (words.length > 0) {
@@ -308,13 +386,16 @@ class TranscriptionService {
       }
     }
     
-    return allSentences;
+    return { sentences: allSentences, words: allWords };
   }
 
   /**
-   * Poll for transcription completion with automatic retry
+   * Poll for transcription completion with automatic retry - returns both sentences and words
    */
-  static async pollForCompletion(guid: string, onProgress?: (status: TranscriptionStatus) => void): Promise<TranscriptEntry[]> {
+  static async pollForCompletionWithWords(guid: string, onProgress?: (status: TranscriptionStatus) => void): Promise<{
+    sentences: TranscriptEntry[];
+    words: WordTimestamp[];
+  }> {
     const maxAttempts = 120; // 10 minutes max (5 second intervals)
     let attempts = 0;
 
@@ -330,24 +411,30 @@ class TranscriptionService {
           }
 
           if (status.state === 'COMPLETED' && status.channels?.[0]?.alternatives?.[0]) {
-            // Extract all sentences from all paragraphs
-            const allSentences = this.extractAllSentences(status);
+            // Extract both sentences and words
+            const result = this.extractSentencesAndWords(status);
             
-            // Convert to transcript format
-            const transcript = this.convertSentencesToTranscript(allSentences);
-            resolve(transcript);
+            // Convert sentences to transcript format
+            const transcript = this.convertSentencesToTranscript(result.sentences);
+            resolve({
+              sentences: transcript,
+              words: result.words
+            });
             return;
           }
 
           // Also check if we have data even if state isn't COMPLETED
           if (status.channels?.[0]?.alternatives?.[0] && status.channels[0].alternatives[0].transcript) {
-            // Extract all sentences from all paragraphs
-            const allSentences = this.extractAllSentences(status);
+            // Extract both sentences and words
+            const result = this.extractSentencesAndWords(status);
             
-            if (allSentences.length > 0) {
-              // Convert to transcript format
-              const transcript = this.convertSentencesToTranscript(allSentences);
-              resolve(transcript);
+            if (result.sentences.length > 0) {
+              // Convert sentences to transcript format
+              const transcript = this.convertSentencesToTranscript(result.sentences);
+              resolve({
+                sentences: transcript,
+                words: result.words
+              });
               return;
             }
           }
@@ -371,6 +458,14 @@ class TranscriptionService {
 
       poll();
     });
+  }
+
+  /**
+   * Poll for transcription completion with automatic retry
+   */
+  static async pollForCompletion(guid: string, onProgress?: (status: TranscriptionStatus) => void): Promise<TranscriptEntry[]> {
+    const result = await this.pollForCompletionWithWords(guid, onProgress);
+    return result.sentences;
   }
 }
 

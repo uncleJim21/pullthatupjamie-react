@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Scissors, Share, Filter } from 'lucide-react';
 import TranscriptionService, { generateHash } from '../services/transcriptionService.ts';
 import VideoEditService, { ChildEdit, SubtitleSegment } from '../services/videoEditService.ts';
+import { WordTimestamp } from '../services/transcriptionService.ts';
 import { printLog } from '../constants/constants.ts';
 
 interface MediaRenderingComponentProps {
@@ -31,6 +32,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [transcriptData, setTranscriptData] = useState<Array<{time: string, text: string}>>([]);
+  const [wordTimestamps, setWordTimestamps] = useState<WordTimestamp[]>([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [isCheckingExistingTranscript, setIsCheckingExistingTranscript] = useState(true);
@@ -193,7 +195,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       
       if (response.successAction?.url) {
         // Start polling for results using the GUID
-        const transcript = await TranscriptionService.pollForCompletion(
+        const result = await TranscriptionService.pollForCompletionWithWords(
           guid,
           (status) => {
             // Optional: handle progress updates
@@ -201,7 +203,9 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           }
         );
         
-        setTranscriptData(transcript);
+        setTranscriptData(result.sentences);
+        setWordTimestamps(result.words);
+        printLog('Loaded ' + result.sentences.length + ' sentences and ' + result.words.length + ' word timestamps');
         setIsTranscribing(false);
       } else {
         throw new Error('Invalid response from transcription service');
@@ -223,11 +227,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     const checkExistingTranscript = async () => {
       try {
         setIsCheckingExistingTranscript(true);
-        const existingTranscript = await TranscriptionService.checkExistingTranscript(fileUrl);
+        const existingResult = await TranscriptionService.checkExistingTranscriptWithWords(fileUrl);
         
-        if (existingTranscript && existingTranscript.length > 0) {
-          setTranscriptData(existingTranscript);
-          printLog('Loaded existing transcript with ' + existingTranscript.length + ' entries');
+        if (existingResult && existingResult.sentences.length > 0) {
+          setTranscriptData(existingResult.sentences);
+          setWordTimestamps(existingResult.words);
+          printLog('Loaded existing transcript with ' + existingResult.sentences.length + ' entries and ' + existingResult.words.length + ' word timestamps');
           
           // Initial scroll to correct position (highlighting handled in render)
           setTimeout(() => {
@@ -655,34 +660,37 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     }
   };
 
-  // Generate subtitle segments from selected transcript entries
+  // Generate word-level subtitle segments from selected transcript entries
   const generateSubtitleSegments = (): SubtitleSegment[] => {
-    if (selectedEntries.size === 0) return [];
+    if (selectedEntries.size === 0 || wordTimestamps.length === 0) return [];
     
     const selectedIndices = Array.from(selectedEntries).sort((a, b) => a - b);
     const segments: SubtitleSegment[] = [];
     
-    selectedIndices.forEach((index, i) => {
+    selectedIndices.forEach((index) => {
       const entry = transcriptData[index];
       if (!entry) return;
       
-      const startTime = timeStringToSeconds(entry.time);
+      // Find word-level timestamps that correspond to this transcript entry
+      const entryStartTime = timeStringToSeconds(entry.time);
       
-      // Calculate end time - either next entry's start time or clip end time
-      let endTime: number;
-      if (i < selectedIndices.length - 1) {
-        const nextIndex = selectedIndices[i + 1];
-        endTime = timeStringToSeconds(transcriptData[nextIndex].time);
-      } else {
-        // Last entry - use clip end time
-        endTime = clipEndTime;
-      }
-      
-      segments.push({
-        start: parseFloat(startTime.toFixed(1)),
-        end: parseFloat(endTime.toFixed(1)),
-        text: entry.text
+      // Find words that fall within this transcript entry's time range
+      const entryWords = wordTimestamps.filter(word => {
+        const wordStart = word.start;
+        // Check if word starts within this entry's time range (with some tolerance)
+        return wordStart >= (entryStartTime - 0.5) && wordStart < (entryStartTime + 10); // Assume max 10s per entry
       });
+      
+      // Create individual word-level subtitle segments
+      entryWords.forEach(word => {
+        segments.push({
+          start: parseFloat(word.start.toFixed(1)),
+          end: parseFloat(word.end.toFixed(1)),
+          text: word.word
+        });
+      });
+      
+      printLog(`Entry ${index}: Generated ${entryWords.length} word-level segments for "${entry.text.substring(0, 30)}..."`);
     });
     
     return segments;
