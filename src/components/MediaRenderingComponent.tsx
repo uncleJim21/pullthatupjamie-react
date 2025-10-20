@@ -502,6 +502,10 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     setClipEndTime(0);
     setClipCreationError(null);
     
+    // Switch to transcript view when entering clip mode
+    setShowTranscript(true);
+    setShowChildrenClips(false);
+    
     // Pause playback when entering clip mode
     if (isPlaying) {
       togglePlayPause();
@@ -1137,31 +1141,33 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
 
         {/* Right side - Transcript Panel */}
         <div className="w-96 bg-black border-l border-gray-800 flex flex-col">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-800 mt-12">
-            <button
-              onClick={() => {
-                setShowTranscript(true);
-                setShowChildrenClips(false);
-              }}
-              className={`flex-1 py-3 px-4 text-sm font-medium ${
-                showTranscript ? 'text-white border-b-2 border-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Transcript
-            </button>
-            <button
-              onClick={() => {
-                setShowTranscript(false);
-                setShowChildrenClips(true);
-              }}
-              className={`flex-1 py-3 px-4 text-sm font-medium ${
-                showChildrenClips ? 'text-white border-b-2 border-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Children Clips
-            </button>
-          </div>
+          {/* Tabs - Hide when in clip mode */}
+          {!isClipMode && (
+            <div className="flex border-b border-gray-800 mt-12">
+              <button
+                onClick={() => {
+                  setShowTranscript(true);
+                  setShowChildrenClips(false);
+                }}
+                className={`flex-1 py-3 px-4 text-sm font-medium ${
+                  showTranscript ? 'text-white border-b-2 border-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Transcript
+              </button>
+              <button
+                onClick={() => {
+                  setShowTranscript(false);
+                  setShowChildrenClips(true);
+                }}
+                className={`flex-1 py-3 px-4 text-sm font-medium ${
+                  showChildrenClips ? 'text-white border-b-2 border-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Children Clips
+              </button>
+            </div>
+          )}
 
           {/* Search bar */}
           <div className="p-4 border-b border-gray-800">
@@ -1198,32 +1204,39 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
             {isClipMode ? (
               // Clip Mode Banner
               <div className="bg-blue-900/30 border border-blue-700 rounded-lg px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Scissors size={20} className="text-blue-400" />
-                    <div>
-                      <p className="text-white font-medium select-none">Clip Creation Mode</p>
-                      <p className="text-sm text-gray-400 select-none">
-                        Click or drag to select transcript entries, or highlight text to create a clip
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    {selectedEntries.size > 0 ? (
+                {selectedEntries.size > 0 ? (
+                  // Show only selected range when user has made a selection
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Scissors size={20} className="text-blue-400" />
                       <div>
-                        <p className="text-sm text-gray-400 select-none">Selected Range</p>
-                        <p className="text-white font-medium select-none">
+                        <p className="text-white font-medium select-none">Selected Range</p>
+                        <p className="text-sm text-gray-400 select-none">
                           {formatTime(clipStartTime)} - {formatTime(clipEndTime)}
                         </p>
                         <p className="text-xs text-gray-500 select-none">
                           Duration: {formatTime(clipEndTime - clipStartTime)}
                         </p>
                       </div>
-                    ) : (
-                      <p className="text-sm text-gray-500 select-none">No selection</p>
-                    )}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  // Show instructions when no selection is made
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Scissors size={20} className="text-blue-400" />
+                      <div>
+                        <p className="text-white font-medium select-none">Clip Creation Mode</p>
+                        <p className="text-sm text-gray-400 select-none">
+                          Click or drag to select transcript entries, or highlight text to create a clip
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500 select-none">No selection</p>
+                    </div>
+                  </div>
+                )}
                 {clipCreationError && (
                   <div className="mt-2 text-red-400 text-sm select-none">
                     {clipCreationError}
