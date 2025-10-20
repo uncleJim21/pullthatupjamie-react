@@ -4,11 +4,18 @@ import { printLog } from '../constants/constants.ts';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4132';
 
 // Interfaces
+export interface SubtitleSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
 export interface CreateEditRequest {
   cdnUrl: string;
   startTime: number;
   endTime: number;
   useSubtitles?: boolean;
+  subtitles?: SubtitleSegment[];
 }
 
 export interface CreateEditResponse {

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Scissors, Share, Filter } from 'lucide-react';
 import TranscriptionService, { generateHash } from '../services/transcriptionService.ts';
-import VideoEditService, { ChildEdit } from '../services/videoEditService.ts';
+import VideoEditService, { ChildEdit, SubtitleSegment } from '../services/videoEditService.ts';
 import { printLog } from '../constants/constants.ts';
 
 interface MediaRenderingComponentProps {
@@ -655,6 +655,39 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     }
   };
 
+  // Generate subtitle segments from selected transcript entries
+  const generateSubtitleSegments = (): SubtitleSegment[] => {
+    if (selectedEntries.size === 0) return [];
+    
+    const selectedIndices = Array.from(selectedEntries).sort((a, b) => a - b);
+    const segments: SubtitleSegment[] = [];
+    
+    selectedIndices.forEach((index, i) => {
+      const entry = transcriptData[index];
+      if (!entry) return;
+      
+      const startTime = timeStringToSeconds(entry.time);
+      
+      // Calculate end time - either next entry's start time or clip end time
+      let endTime: number;
+      if (i < selectedIndices.length - 1) {
+        const nextIndex = selectedIndices[i + 1];
+        endTime = timeStringToSeconds(transcriptData[nextIndex].time);
+      } else {
+        // Last entry - use clip end time
+        endTime = clipEndTime;
+      }
+      
+      segments.push({
+        start: parseFloat(startTime.toFixed(1)),
+        end: parseFloat(endTime.toFixed(1)),
+        text: entry.text
+      });
+    });
+    
+    return segments;
+  };
+
   // Finish clip creation
   const handleFinishClip = async () => {
     if (selectedEntries.size === 0) {
@@ -681,11 +714,16 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     try {
       printLog('Creating clip: ' + clipStartTime + 's - ' + clipEndTime + 's');
       
+      // Generate subtitle segments from selected transcript entries
+      const subtitles = generateSubtitleSegments();
+      printLog('Generated ' + subtitles.length + ' subtitle segments');
+      
       const response = await VideoEditService.createVideoEdit({
         cdnUrl: fileUrl,
         startTime: parseFloat(clipStartTime.toFixed(1)),
         endTime: parseFloat(clipEndTime.toFixed(1)),
-        useSubtitles: false
+        useSubtitles: true,
+        subtitles: subtitles
       });
       
       printLog('Clip creation started: ' + response.lookupHash);
