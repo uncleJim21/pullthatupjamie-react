@@ -31,6 +31,7 @@ import { useUserSettings } from '../../hooks/useUserSettings.ts';
 import ScheduledPostSlots from '../ScheduledPostSlots.tsx';
 import ImageWithLoader from '../ImageWithLoader.tsx';
 import MediaRenderingComponent from '../MediaRenderingComponent.tsx';
+import MediaThumbnail from '../MediaThumbnail.tsx';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -496,6 +497,15 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     return fileName.replace(timestampPattern, '');
   };
 
+  const truncateMiddle = (text: string, maxLength: number) => {
+    if (text.length <= maxLength) return text;
+    
+    const startLength = Math.floor((maxLength - 3) / 2);
+    const endLength = Math.ceil((maxLength - 3) / 2);
+    
+    return text.substring(0, startLength) + '...' + text.substring(text.length - endLength);
+  };
+
   const handleCopyFileUrl = (url: string, key: string) => {
     navigator.clipboard.writeText(url)
       .then(() => {
@@ -688,12 +698,23 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   };
 
   const handleOpenMediaFile = (upload: UploadItem) => {
-    setCurrentMediaFile({
-      url: upload.publicUrl,
-      name: upload.fileName,
-      type: upload.fileName.split('.').pop()?.toLowerCase()
-    });
-    setIsMediaRenderingOpen(true);
+    const fileExtension = upload.fileName.split('.').pop()?.toLowerCase();
+    
+    // Check if it's an image file
+    const isImage = fileExtension && ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
+    
+    if (isImage) {
+      // Open image in new tab
+      window.open(upload.publicUrl, '_blank');
+    } else {
+      // Open audio/video in MediaRenderingComponent
+      setCurrentMediaFile({
+        url: upload.publicUrl,
+        name: upload.fileName,
+        type: upload.fileName.split('.').pop()?.toLowerCase()
+      });
+      setIsMediaRenderingOpen(true);
+    }
   };
 
   const handleCloseMediaRendering = () => {
@@ -1059,18 +1080,30 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       {uploads.map((upload) => (
                         <div 
                           key={upload.key}
-                          className="bg-[#111111] border border-gray-800 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:border-gray-700 transition-colors"
+                          className="bg-[#111111] border border-gray-800 rounded-lg p-4 flex items-center gap-4 hover:border-gray-700 transition-colors"
                         >
+                          {/* Thumbnail Preview */}
+                          <MediaThumbnail
+                            fileUrl={upload.publicUrl}
+                            fileName={upload.fileName}
+                            width={60}
+                            height={60}
+                            className="flex-shrink-0"
+                          />
+                          
+                          {/* File Info */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-white font-medium truncate" title={cleanFileName(upload.fileName)}>
-                              {cleanFileName(upload.fileName)}
+                            <p className="text-white font-medium" title={cleanFileName(upload.fileName)}>
+                              {truncateMiddle(cleanFileName(upload.fileName), 30)}
                             </p>
                             <div className="flex flex-wrap text-gray-400 text-sm mt-1 gap-4">
                               <p>Uploaded {formatDate(upload.lastModified)}</p>
                               <p>{formatBytes(upload.size)}</p>
                             </div>
                           </div>
-                          <div className="flex space-x-3 self-end sm:self-center">
+                          
+                          {/* Action Buttons */}
+                          <div className="flex space-x-3 flex-shrink-0">
                             <button
                               onClick={() => handleCopyFileUrl(upload.publicUrl, upload.key)}
                               className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
