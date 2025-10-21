@@ -41,6 +41,12 @@ export const generateAssistContent = async (
     } else if (auth.type === RequestAuthMethod.SQUARE && auth.credentials) {
       const { username } = auth.credentials;
       headers.Authorization = `Basic ${btoa(`${username}:`)}`;
+    } else if (auth.type === 'admin') {
+      // Handle admin authentication - use Basic auth with username
+      const username = localStorage.getItem('squareId');
+      if (username) {
+        headers.Authorization = `Basic ${btoa(`${username}:`)}`;
+      }
     }
 
     const response = await fetch(`${API_URL}/api/jamie-assist/${lookupHash}`, {
