@@ -1936,7 +1936,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           
           <div className="text-left overflow-y-auto px-1 flex-1" style={{ scrollbarWidth: 'thin' }}>
             <p className="text-gray-300 mb-4">
-              Jamie Assist helps you craft engaging social media posts about your clip using AI.
+              For clips with available transcripts & metadata, Jamie Assist helps you craft engaging social media posts about your clip using AI.
             </p>
             
             <h3 className="text-white font-medium mb-2">What it does:</h3>
