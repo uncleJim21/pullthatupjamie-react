@@ -4,6 +4,7 @@ import TranscriptionService, { generateHash } from '../services/transcriptionSer
 import VideoEditService, { ChildEdit, SubtitleSegment } from '../services/videoEditService.ts';
 import { WordTimestamp } from '../services/transcriptionService.ts';
 import { printLog } from '../constants/constants.ts';
+import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 
 interface MediaRenderingComponentProps {
   fileUrl: string;
@@ -50,6 +51,10 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const [clipEndTime, setClipEndTime] = useState(0);
   const [isCreatingClip, setIsCreatingClip] = useState(false);
   const [clipCreationError, setClipCreationError] = useState<string | null>(null);
+  
+  // Social share modal state
+  const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
+  const [currentShareUrl, setCurrentShareUrl] = useState<string | null>(null);
   
   // Sample transcript data with more diverse content for filtering (fallback)
   const sampleTranscriptData = [
@@ -771,6 +776,16 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     }
   };
 
+  // Share clip handler
+  const handleShareClip = (clipUrl: string) => {
+    setCurrentShareUrl(clipUrl);
+    setIsSocialShareModalOpen(true);
+  };
+
+  const handleCloseSocialShareModal = () => {
+    setIsSocialShareModalOpen(false);
+    setCurrentShareUrl(null);
+  };
 
   // Filter transcript data based on search query and filter toggle
   const filteredTranscriptData = isFilterEnabled 
@@ -1428,8 +1443,22 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                         </div>
                         
                         {isCompleted && clip.url && (
-                          <div className="ml-3 text-gray-400">
-                            <Play size={16} />
+                          <div className="ml-3 flex items-center space-x-3">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (clip.url) {
+                                  handleShareClip(clip.url);
+                                }
+                              }}
+                              className="flex items-center justify-center w-8 h-8 bg-gray-700 hover:bg-gray-600 text-white rounded-full transition-colors"
+                              title="Share clip"
+                            >
+                              <Share size={18} />
+                            </button>
+                            <div className="flex items-center justify-center w-8 h-8 bg-gray-700 text-white rounded-full">
+                              <Play size={18} />
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1506,6 +1535,24 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Social Share Modal */}
+      {isSocialShareModalOpen && currentShareUrl && (
+        <SocialShareModal
+          isOpen={isSocialShareModalOpen}
+          onClose={handleCloseSocialShareModal}
+          fileUrl={currentShareUrl}
+          itemName="clip"
+          onComplete={(success, platform) => {
+            handleCloseSocialShareModal();
+            if (success) {
+              printLog(`Successfully shared clip on ${platform}`);
+            }
+          }}
+          platform={SocialPlatform.Twitter}
+          auth={localStorage.getItem('admin_privs') === 'true' ? { type: 'admin' } : undefined}
+        />
+      )}
     </div>
   );
 };
