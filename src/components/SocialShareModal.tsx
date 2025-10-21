@@ -2944,7 +2944,28 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             />
             
             {/* Mode Switcher Toggle - Bottom Right Corner */}
-            <div className="absolute bottom-3 right-3 z-10">
+            <div className="absolute bottom-3 right-3 z-10 flex items-center space-x-2">
+              {/* Info Icon */}
+              <Info 
+                className={`w-5 h-5 transition-colors duration-300 ${
+                  (platformMode === 'twitter' && twitterState.enabled) || (platformMode === 'nostr' && nostrState.enabled)
+                    ? 'text-orange-400' 
+                    : 'text-gray-500'
+                }`}
+                title="Platform status information"
+              />
+              
+              {/* Star Icon */}
+              <Sparkles 
+                className={`w-5 h-5 transition-colors duration-300 ${
+                  (platformMode === 'twitter' && twitterState.enabled) || (platformMode === 'nostr' && nostrState.enabled)
+                    ? 'text-orange-400' 
+                    : 'text-gray-500'
+                }`}
+                title="Platform enabled status"
+              />
+              
+              {/* Platform Switch */}
               <button
                 onClick={() => handlePlatformModeChange(platformMode === 'twitter' ? 'nostr' : 'twitter')}
                 className={`relative w-16 h-8 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 hover:scale-105 ${
@@ -3455,33 +3476,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   ${(isPublishing || isGeneratingContent || isScheduling) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
               >
                 Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (scheduledDate) {
-                    // Directly schedule (create or update) when a time exists
-                    handleSchedule();
-                  } else {
-                    handlePublish();
-                  }
-                }}
-                disabled={
-                  scheduledDate
-                    ? (isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate)
-                    : (isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled))
-                }
-                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg ${scheduledDate ? 'bg-white text-black' : 'bg-white text-black'} font-medium 
-                  ${scheduledDate
-                    ? ((isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100')
-                    : ((isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled)) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100')
-                  } transition-colors`}
-              >
-                {isPublishing ? (
-                  <span className="flex items-center">
-                    <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                    {scheduledDate ? 'Scheduling...' : 'Publishing...'}
-                  </span>
-                ) : scheduledDate ? 'Schedule' : 'Post Now'}
               </button>
             </>
           )}
