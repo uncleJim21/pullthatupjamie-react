@@ -121,6 +121,20 @@ export const PodcastSearchResultItem = ({
     }
   },[isEditModalOpen])
 
+  // Listen for events to close SocialShareModal when other modals open
+  useEffect(() => {
+    const handleCloseAllSocialShareModals = () => {
+      if (isShareModalOpen) {
+        setIsShareModalOpen(false);
+        setShareClipUrl('');
+        setShareClipLookupHash('');
+      }
+    };
+
+    window.addEventListener('closeAllSocialShareModals', handleCloseAllSocialShareModals);
+    return () => window.removeEventListener('closeAllSocialShareModals', handleCloseAllSocialShareModals);
+  }, [isShareModalOpen]);
+
   const handlePlayPause = async () => {
     if (audioRef.current) {
       try {
@@ -285,6 +299,10 @@ export const PodcastSearchResultItem = ({
       if (response.status === "completed" && response.url) {
         // Clip is ready immediately
         printLog(`Clip ready immediately: ${response.url}`);
+        
+        // Close any other open SocialShareModals by dispatching a custom event
+        window.dispatchEvent(new CustomEvent('closeAllSocialShareModals'));
+        
         setShareClipUrl(response.url);
         setShareClipLookupHash(response.lookupHash);
         setIsShareProcessing(false);

@@ -55,6 +55,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   // Social share modal state
   const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
   const [currentShareUrl, setCurrentShareUrl] = useState<string | null>(null);
+  const [currentLookupHash, setCurrentLookupHash] = useState<string | null>(null);
   
   // Sample transcript data with more diverse content for filtering (fallback)
   const sampleTranscriptData = [
@@ -777,14 +778,19 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   };
 
   // Share clip handler
-  const handleShareClip = (clipUrl: string) => {
+  const handleShareClip = (clipUrl: string, lookupHash: string) => {
+    // Close any other open SocialShareModals by dispatching a custom event
+    window.dispatchEvent(new CustomEvent('closeAllSocialShareModals'));
+    
     setCurrentShareUrl(clipUrl);
+    setCurrentLookupHash(lookupHash);
     setIsSocialShareModalOpen(true);
   };
 
   const handleCloseSocialShareModal = () => {
     setIsSocialShareModalOpen(false);
     setCurrentShareUrl(null);
+    setCurrentLookupHash(null);
   };
 
   // Filter transcript data based on search query and filter toggle
@@ -1013,6 +1019,20 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       }
     };
   }, [searchTimeout]);
+
+  // Listen for events to close SocialShareModal when other modals open
+  useEffect(() => {
+    const handleCloseAllSocialShareModals = () => {
+      if (isSocialShareModalOpen) {
+        setIsSocialShareModalOpen(false);
+        setCurrentShareUrl(null);
+        setCurrentLookupHash(null);
+      }
+    };
+
+    window.addEventListener('closeAllSocialShareModals', handleCloseAllSocialShareModals);
+    return () => window.removeEventListener('closeAllSocialShareModals', handleCloseAllSocialShareModals);
+  }, [isSocialShareModalOpen]);
 
   // Skip rendering if not video or audio
   if (!isVideo && !isAudio) {
@@ -1448,7 +1468,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (clip.url) {
-                                  handleShareClip(clip.url);
+                                  handleShareClip(clip.url, clip.lookupHash);
                                 }
                               }}
                               className="flex items-center justify-center w-8 h-8 bg-gray-700 hover:bg-gray-600 text-white rounded-full transition-colors"
@@ -1543,6 +1563,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           onClose={handleCloseSocialShareModal}
           fileUrl={currentShareUrl}
           itemName="clip"
+          lookupHash={currentLookupHash || undefined}
           onComplete={(success, platform) => {
             handleCloseSocialShareModal();
             if (success) {

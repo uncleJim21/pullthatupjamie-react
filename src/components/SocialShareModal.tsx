@@ -129,6 +129,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   signAllProgress = { current: 0, total: 0 }
 }) => {
   const [content, setContent] = useState<string>('');
+  const [delayedDisabled, setDelayedDisabled] = useState<boolean>(true);
   
   // Helper function to load platform defaults from localStorage
   const loadPlatformDefaults = () => {
@@ -745,6 +746,16 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Computed state for overall publishing status
   const isPublishing = twitterState.currentOperation === OperationType.PUBLISHING || 
                       nostrState.currentOperation === OperationType.PUBLISHING;
+
+  // Add delay before evaluating disabled status
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const shouldBeDisabled = isGeneratingContent || isPublishing || !lookupHash;
+      setDelayedDisabled(shouldBeDisabled);
+    }, 100); // 100ms delay
+
+    return () => clearTimeout(timer);
+  }, [isGeneratingContent, isPublishing, lookupHash]);
 
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
@@ -2946,24 +2957,42 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             {/* Mode Switcher Toggle - Bottom Right Corner */}
             <div className="absolute bottom-3 right-3 z-10 flex items-center space-x-2">
               {/* Info Icon */}
-              <Info 
-                className={`w-5 h-5 transition-colors duration-300 ${
-                  (platformMode === 'twitter' && twitterState.enabled) || (platformMode === 'nostr' && nostrState.enabled)
-                    ? 'text-orange-400' 
-                    : 'text-gray-500'
-                }`}
-                title="Platform status information"
-              />
+              {isGeneratingContent ? (
+                <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
+              ) : (
+                <button
+                  onClick={() => setShowInfoModal(true)}
+                  className="transition-colors duration-300 hover:scale-110"
+                  title="About Jamie Assist"
+                  aria-label="Learn more about Jamie Assist"
+                >
+                  <Info 
+                    className={`w-5 h-5 transition-colors duration-300 ${
+                      (platformMode === 'twitter' && twitterState.enabled) || (platformMode === 'nostr' && nostrState.enabled)
+                        ? 'text-orange-400' 
+                        : 'text-gray-500'
+                    }`}
+                  />
+                </button>
+              )}
               
-              {/* Star Icon */}
-              <Sparkles 
-                className={`w-5 h-5 transition-colors duration-300 ${
-                  (platformMode === 'twitter' && twitterState.enabled) || (platformMode === 'nostr' && nostrState.enabled)
-                    ? 'text-orange-400' 
-                    : 'text-gray-500'
+              {/* Star Icon - Clickable Jamie Assist */}
+              <button
+                onClick={handleJamieAssist}
+                disabled={delayedDisabled}
+                className={`transition-colors duration-300 ${
+                  delayedDisabled ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-110'
                 }`}
-                title="Platform enabled status"
-              />
+                title={delayedDisabled ? "Jamie Assist unavailable" : "Click to generate content with Jamie Assist"}
+              >
+                <Sparkles 
+                  className={`w-5 h-5 transition-colors duration-300 ${
+                    !delayedDisabled
+                      ? 'text-orange-400' 
+                      : 'text-gray-500'
+                  }`}
+                />
+              </button>
               
               {/* Platform Switch */}
               <button
@@ -3302,41 +3331,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           </div>
         )}
         
-        {/* Jamie Assist button and info button */}
-        {!isSchedulingMode && (
-          <div className="flex justify-center mb-3">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleJamieAssist}
-                disabled={isGeneratingContent || isPublishing || !lookupHash}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
-                  ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
-              >
-                {isGeneratingContent ? (
-                  <span className="flex items-center">
-                    <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                    Generating...
-                  </span>
-                ) : (
-                  <span className="flex items-center">
-                    <Sparkles className="w-4 h-4 mr-1 sm:mr-2" />
-                    Jamie Assist
-                  </span>
-                )}
-              </button>
-              
-              <button
-                onClick={() => setShowInfoModal(true)}
-                className="flex items-center space-x-1 px-2 py-1 rounded-full border border-gray-700 group hover:bg-gray-800 hover:border-amber-500/30 transition-colors"
-                title="About Jamie Assist"
-                aria-label="Learn more about Jamie Assist"
-              >
-                <Info className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-500" />
-              </button>
-            </div>
-          </div>
-        )}
-        
         {/* Scheduling Section */}
         <div className="mb-4 sm:mb-6">
           <div className="flex flex-col items-center mb-3">
@@ -3476,6 +3470,33 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   ${(isPublishing || isGeneratingContent || isScheduling) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800 hover:text-white transition-colors'}`}
               >
                 Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (scheduledDate) {
+                    // Directly schedule (create or update) when a time exists
+                    handleSchedule();
+                  } else {
+                    handlePublish();
+                  }
+                }}
+                disabled={
+                  scheduledDate
+                    ? (isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate)
+                    : (isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled))
+                }
+                className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg ${scheduledDate ? 'bg-white text-black' : 'bg-white text-black'} font-medium 
+                  ${scheduledDate
+                    ? ((isScheduling || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!isUpdateMode && (!twitterState.enabled && !nostrState.enabled)) || !scheduledDate) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100')
+                    : ((isPublishing || isGeneratingContent || (!content.trim() && !(fileUrl || renderUrl)) || (!twitterState.enabled && !nostrState.enabled)) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100')
+                  } transition-colors`}
+              >
+                {isPublishing ? (
+                  <span className="flex items-center">
+                    <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                    {scheduledDate ? 'Scheduling...' : 'Publishing...'}
+                  </span>
+                ) : scheduledDate ? 'Schedule' : 'Post Now'}
               </button>
             </>
           )}
