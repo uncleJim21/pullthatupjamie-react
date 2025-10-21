@@ -1148,6 +1148,10 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                 onClick={() => {
                   setShowTranscript(true);
                   setShowChildrenClips(false);
+                  // Clear search filter when switching to transcript
+                  setSearchQuery('');
+                  setHighlightedIndex(null);
+                  setCurrentMatchIndex(0);
                 }}
                 className={`flex-1 py-3 px-4 text-sm font-medium ${
                   showTranscript ? 'text-white border-b-2 border-white' : 'text-gray-400 hover:text-white'
@@ -1155,17 +1159,21 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
               >
                 Transcript
               </button>
-              <button
-                onClick={() => {
-                  setShowTranscript(false);
-                  setShowChildrenClips(true);
-                }}
-                className={`flex-1 py-3 px-4 text-sm font-medium ${
-                  showChildrenClips ? 'text-white border-b-2 border-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Children Clips
-              </button>
+            <button
+              onClick={() => {
+                setShowTranscript(false);
+                setShowChildrenClips(true);
+                // Clear search filter when switching to children clips
+                setSearchQuery('');
+                setHighlightedIndex(null);
+                setCurrentMatchIndex(0);
+              }}
+              className={`flex-1 py-3 px-4 text-sm font-medium ${
+                showChildrenClips ? 'text-white border-b-2 border-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Children Clips
+            </button>
             </div>
           )}
 
@@ -1174,20 +1182,26 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
             <div className="flex items-center space-x-2">
               <input
                 type="text"
-                placeholder="Search"
+                placeholder={showChildrenClips ? "Search not available for clips" : "Search"}
                 value={searchQuery}
                 onChange={handleSearchInputChange}
                 onKeyPress={handleSearchKeyPress}
-                className="flex-1 bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent"
+                disabled={showChildrenClips}
+                className={`flex-1 bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent ${
+                  showChildrenClips ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               />
               <button
                 onClick={() => setIsFilterEnabled(!isFilterEnabled)}
+                disabled={showChildrenClips}
                 className={`flex items-center justify-center w-10 h-10 rounded-md transition-colors ${
-                  isFilterEnabled 
-                    ? 'bg-white text-black hover:bg-gray-200' 
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                  showChildrenClips 
+                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed opacity-50'
+                    : isFilterEnabled 
+                      ? 'bg-white text-black hover:bg-gray-200' 
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
                 }`}
-                title={isFilterEnabled ? 'Disable filter (show all)' : 'Enable filter (show matches only)'}
+                title={showChildrenClips ? 'Filter not available for clips' : (isFilterEnabled ? 'Disable filter (show all)' : 'Enable filter (show matches only)')}
               >
                 <Filter size={16} />
               </button>
