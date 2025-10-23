@@ -129,7 +129,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   signAllProgress = { current: 0, total: 0 }
 }) => {
   const [content, setContent] = useState<string>('');
-  const [delayedDisabled, setDelayedDisabled] = useState<boolean>(true);
   
   // Helper function to load platform defaults from localStorage
   const loadPlatformDefaults = () => {
@@ -746,16 +745,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Computed state for overall publishing status
   const isPublishing = twitterState.currentOperation === OperationType.PUBLISHING || 
                       nostrState.currentOperation === OperationType.PUBLISHING;
-
-  // Add delay before evaluating disabled status
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const shouldBeDisabled = isGeneratingContent || isPublishing || !lookupHash;
-      setDelayedDisabled(shouldBeDisabled);
-    }, 100); // 100ms delay
-
-    return () => clearTimeout(timer);
-  }, [isGeneratingContent, isPublishing, lookupHash]);
 
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
@@ -2901,14 +2890,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             <div 
               className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none"
               style={{ 
-                height: "120px", 
-                minHeight: "100px",
+                height: "144px", 
+                minHeight: "144px",
                 zIndex: 1
               }}
             >
               {/* Background layer */}
               <div 
-                className="absolute inset-0 bg-gray-900 border border-gray-700 rounded-xl"
+                className="absolute inset-0 border border-gray-700 rounded-xl"
+                style={{ background: '#1f2937' }} // grey-800 color to match textarea
               />
               
               {/* Highlighted content layer */}
@@ -2916,8 +2906,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 ref={highlightLayerRef}
                 className="absolute inset-0 p-3 sm:p-4 text-base whitespace-pre-wrap break-words overflow-hidden"
                 style={{ 
-                  height: "120px", 
-                  minHeight: "100px",
+                  height: "144px", 
+                  minHeight: "144px",
                   lineHeight: '1.5',
                   fontFamily: 'inherit',
                   fontSize: 'inherit',
@@ -2941,13 +2931,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   highlightLayerRef.current.scrollLeft = target.scrollLeft;
                 }
               }}
-              className="relative w-full border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none text-white"
+              className="relative w-full border border-gray-700 rounded-xl p-3 sm:p-4 mb-1 text-base focus:border-gray-500 focus:outline-none text-white resize-y"
               placeholder={`Write about this ${itemName}...`}
               style={{ 
-                resize: "none", 
-                height: "120px", 
-                minHeight: "100px",
-                background: 'transparent',
+                height: "144px", // Increased from 120px (24px per line, so +1 line = +24px)
+                minHeight: "144px", // Increased from 100px
+                background: '#1f2937', // grey-800 color for the textarea background
                 color: 'rgba(255, 255, 255, 0.9)',
                 zIndex: 2,
                 lineHeight: '1.5'
@@ -2955,46 +2944,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             />
             
             {/* Mode Switcher Toggle - Bottom Right Corner */}
-            <div className="absolute bottom-3 right-3 z-10 flex items-center space-x-2">
-              {/* Info Icon */}
-              {isGeneratingContent ? (
-                <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
-              ) : (
-                <button
-                  onClick={() => setShowInfoModal(true)}
-                  className="transition-colors duration-300 hover:scale-110"
-                  title="About Jamie Assist"
-                  aria-label="Learn more about Jamie Assist"
-                >
-                  <Info 
-                    className={`w-5 h-5 transition-colors duration-300 ${
-                      (platformMode === 'twitter' && twitterState.enabled) || (platformMode === 'nostr' && nostrState.enabled)
-                        ? 'text-orange-400' 
-                        : 'text-gray-500'
-                    }`}
-                  />
-                </button>
-              )}
-              
-              {/* Star Icon - Clickable Jamie Assist */}
-              <button
-                onClick={handleJamieAssist}
-                disabled={delayedDisabled}
-                className={`transition-colors duration-300 ${
-                  delayedDisabled ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-110'
-                }`}
-                title={delayedDisabled ? "Jamie Assist unavailable" : "Click to generate content with Jamie Assist"}
-              >
-                <Sparkles 
-                  className={`w-5 h-5 transition-colors duration-300 ${
-                    !delayedDisabled
-                      ? 'text-orange-400' 
-                      : 'text-gray-500'
-                  }`}
-                />
-              </button>
-              
-              {/* Platform Switch */}
+            <div className="absolute bottom-3 right-3 z-10">
               <button
                 onClick={() => handlePlatformModeChange(platformMode === 'twitter' ? 'nostr' : 'twitter')}
                 className={`relative w-16 h-8 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 hover:scale-105 ${
@@ -3328,6 +3278,41 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 Nostr relays: {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
               </div>
             )}
+          </div>
+        )}
+        
+        {/* Jamie Assist button and info button */}
+        {!isSchedulingMode && (
+          <div className="flex justify-center mb-3">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleJamieAssist}
+                disabled={isGeneratingContent || isPublishing || !lookupHash}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
+                  ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
+              >
+                {isGeneratingContent ? (
+                  <span className="flex items-center">
+                    <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
+                    Generating...
+                  </span>
+                ) : (
+                  <span className="flex items-center">
+                    <Sparkles className="w-4 h-4 mr-1 sm:mr-2" />
+                    Jamie Assist
+                  </span>
+                )}
+              </button>
+              
+              <button
+                onClick={() => setShowInfoModal(true)}
+                className="flex items-center space-x-1 px-2 py-1 rounded-full border border-gray-700 group hover:bg-gray-800 hover:border-amber-500/30 transition-colors"
+                title="About Jamie Assist"
+                aria-label="Learn more about Jamie Assist"
+              >
+                <Info className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-500" />
+              </button>
+            </div>
           </div>
         )}
         
