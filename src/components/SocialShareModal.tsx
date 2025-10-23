@@ -3190,7 +3190,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   ) : nostrState.available ? (
                     <p className="text-white text-sm">Connect NIP07 Extension to Post on Nostr</p>
                   ) : (
-                    <div className="text-xs text-gray-400 italic opacity-70">Nostr: Coming Soon</div>
+                    <div className="text-xs text-gray-400 italic opacity-70">
+                      No{' '}
+                      <a 
+                        href="https://nostr-nips.com/nip-07" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-purple-400 hover:text-purple-300 underline"
+                      >
+                        NIP07 Nostr Extension
+                      </a>
+                      {' '}Found
+                    </div>
                   )}
                 </div>
                 {nostrState.available && !nostrState.authenticated && (
