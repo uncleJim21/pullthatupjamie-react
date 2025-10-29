@@ -56,6 +56,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
   const [currentShareUrl, setCurrentShareUrl] = useState<string | null>(null);
   const [currentLookupHash, setCurrentLookupHash] = useState<string | null>(null);
+  const [currentParentUrl, setCurrentParentUrl] = useState<string | null>(null);
   
   // Sample transcript data with more diverse content for filtering (fallback)
   const sampleTranscriptData = [
@@ -778,12 +779,13 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   };
 
   // Share clip handler
-  const handleShareClip = (clipUrl: string, lookupHash: string) => {
+  const handleShareClip = (clipUrl: string, lookupHash: string, parentUrl?: string) => {
     // Close any other open SocialShareModals by dispatching a custom event
     window.dispatchEvent(new CustomEvent('closeAllSocialShareModals'));
     
     setCurrentShareUrl(clipUrl);
     setCurrentLookupHash(lookupHash);
+    setCurrentParentUrl(parentUrl || null);
     setIsSocialShareModalOpen(true);
   };
   
@@ -801,6 +803,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     setIsSocialShareModalOpen(false);
     setCurrentShareUrl(null);
     setCurrentLookupHash(null);
+    setCurrentParentUrl(null);
   };
 
   // Filter transcript data based on search query and filter toggle
@@ -1469,7 +1472,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (clip.url) {
-                                  handleShareClip(clip.url, clip.lookupHash);
+                                  handleShareClip(clip.url, clip.lookupHash, clip.originalUrl);
                                 }
                               }}
                               className="flex items-center justify-center w-8 h-8 bg-gray-700 hover:bg-gray-600 text-white rounded-full transition-colors"
@@ -1576,6 +1579,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           }}
           platform={SocialPlatform.Twitter}
           auth={localStorage.getItem('admin_privs') === 'true' ? { type: 'admin' } : undefined}
+          videoMetadata={currentParentUrl ? { customUrl: currentParentUrl } : undefined}
         />
       )}
     </div>
