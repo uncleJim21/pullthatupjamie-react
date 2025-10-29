@@ -792,6 +792,16 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     setCurrentLookupHash(lookupHash);
     setIsSocialShareModalOpen(true);
   };
+  
+  // Share full video handler
+  const handleShareFullVideo = () => {
+    // Close any other open SocialShareModals by dispatching a custom event
+    window.dispatchEvent(new CustomEvent('closeAllSocialShareModals'));
+    
+    setCurrentShareUrl(fileUrl);
+    setCurrentLookupHash(null); // No lookupHash for full video
+    setIsSocialShareModalOpen(true);
+  };
 
   const handleCloseSocialShareModal = () => {
     setIsSocialShareModalOpen(false);
@@ -1551,7 +1561,10 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                     <Scissors size={16} />
                     <span>Clip</span>
                   </button>
-                  <button className="flex-1 bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors font-medium flex items-center justify-center space-x-2">
+                  <button 
+                    onClick={handleShareFullVideo}
+                    className="flex-1 bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors font-medium flex items-center justify-center space-x-2"
+                  >
                     <Share size={16} />
                     <span>Share</span>
                   </button>
@@ -1568,12 +1581,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           isOpen={isSocialShareModalOpen}
           onClose={handleCloseSocialShareModal}
           fileUrl={currentShareUrl}
-          itemName="clip"
+          itemName={currentLookupHash ? "clip" : "video"}
           lookupHash={currentLookupHash || undefined}
           onComplete={(success, platform) => {
             handleCloseSocialShareModal();
             if (success) {
-              printLog(`Successfully shared clip on ${platform}`);
+              printLog(`Successfully shared ${currentLookupHash ? 'clip' : 'video'} on ${platform}`);
             }
           }}
           platform={SocialPlatform.Twitter}
