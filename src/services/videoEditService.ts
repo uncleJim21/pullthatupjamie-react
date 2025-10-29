@@ -1,7 +1,7 @@
-import { printLog } from '../constants/constants.ts';
+import { printLog, API_URL } from '../constants/constants.ts';
 
 // Base API URL - will use same backend as other services
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4132';
+const API_BASE_URL = API_URL;
 
 // Interfaces
 export interface SubtitleSegment {
