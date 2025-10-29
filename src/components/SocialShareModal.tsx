@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin, Clock } from 'lucide-react';
+import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin, Clock, FileText, Link as LinkIcon } from 'lucide-react';
 import { printLog, API_URL } from '../constants/constants.ts';
 import PlatformIntegrationService from '../services/platformIntegrationService.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
@@ -79,6 +79,12 @@ interface SocialShareModalProps {
   // Sign All progress overlay props
   showSignAllOverlay?: boolean;
   signAllProgress?: { current: number; total: number };
+  // Video metadata (managed by parent component)
+  videoMetadata?: {
+    description?: string;
+    customUrl?: string;
+  };
+  onVideoMetadataChange?: (metadata: { description?: string; customUrl?: string }) => void;
 }
 
 // Simplified unified state interface
@@ -126,9 +132,20 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   updateContext,
   onSchedulingModeChange,
   showSignAllOverlay = false,
-  signAllProgress = { current: 0, total: 0 }
+  signAllProgress = { current: 0, total: 0 },
+  videoMetadata,
+  onVideoMetadataChange
 }) => {
   const [content, setContent] = useState<string>('');
+  const [delayedDisabled, setDelayedDisabled] = useState<boolean>(true);
+  
+  // Video metadata state (local to modal)
+  const [hasPromptedUser, setHasPromptedUser] = useState(false);
+  const [showVideoDetailsModal, setShowVideoDetailsModal] = useState(false);
+  const [tempDescription, setTempDescription] = useState('');
+  const [tempUrl, setTempUrl] = useState('');
+  
+  const hasMetadata = !!(videoMetadata?.description || videoMetadata?.customUrl);
   
   // Helper function to load platform defaults from localStorage
   const loadPlatformDefaults = () => {
@@ -746,6 +763,16 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const isPublishing = twitterState.currentOperation === OperationType.PUBLISHING || 
                       nostrState.currentOperation === OperationType.PUBLISHING;
 
+  // Add delay before evaluating disabled status
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const shouldBeDisabled = isGeneratingContent || isPublishing || !lookupHash;
+      setDelayedDisabled(shouldBeDisabled);
+    }, 100); // 100ms delay
+
+    return () => clearTimeout(timer);
+  }, [isGeneratingContent, isPublishing, lookupHash]);
+
   // Helper to determine if file is video
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
   const isImage = fileUrl && (fileUrl.endsWith('.png') || fileUrl.endsWith('.jpg') || fileUrl.endsWith('.jpeg') || fileUrl.endsWith('.gif'));
@@ -898,17 +925,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         try {
           await checkTwitterAuth(); // This now handles both auth check and hasValidTokens
           
-          // Reload platform defaults after auth check to ensure proper state
-          const currentDefaults = loadPlatformDefaults();
-          // Only apply Twitter default if authenticated, otherwise force to false
-          const twitterEnabled = twitterState.authenticated ? currentDefaults.twitter : false;
-          setTwitterState(prev => ({ ...prev, enabled: twitterEnabled }));
-          setNostrState(prev => ({ ...prev, enabled: currentDefaults.nostr }));
-          
-          // Update localStorage if Twitter was forced to false due to no auth
-          if (!twitterState.authenticated && currentDefaults.twitter) {
-            savePlatformDefaults(false, currentDefaults.nostr);
-          }
+          // Don't override localStorage defaults here - checkTwitterAuth handles state updates
+          // The user's checkbox preference is preserved in localStorage
         } catch (error) {
           printLog(`Error during initial check: ${error}`);
           setHasValidTokens(false);
@@ -1040,6 +1058,30 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       setLastSearchQuery('');
     }
   }, [isOpen, clearMentionSearch]);
+
+  // Note: Video details modal now only shows when user clicks Jamie Assist (see handleJamieAssist)
+  
+  // Handlers for video details modal
+  const handleOpenVideoDetails = () => {
+    setTempDescription(videoMetadata?.description || '');
+    setTempUrl(videoMetadata?.customUrl || fileUrl);
+    setShowVideoDetailsModal(true);
+  };
+  
+  const handleSaveVideoDetails = () => {
+    const newMetadata = {
+      description: tempDescription.trim() || undefined,
+      customUrl: tempUrl.trim() || undefined
+    };
+    onVideoMetadataChange?.(newMetadata);
+    setShowVideoDetailsModal(false);
+    setHasPromptedUser(true);
+  };
+  
+  const handleSkipVideoDetails = () => {
+    setShowVideoDetailsModal(false);
+    setHasPromptedUser(true);
+  };
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -1430,7 +1472,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         if (response.success && response.tweet?.id) {
           printLog('Tweet posted successfully');
-          const tweetUrl = `https://x.com/RobinSeyr/status/${response.tweet.id}`;
+          const tweetUrl = `https://x.com/uncleJim21/status/${response.tweet.id}`;
           setSuccessUrls(prev => ({ ...prev, twitter: tweetUrl }));
           setTwitterState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: true }));
           return true;
@@ -1677,17 +1719,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     // Clear any previous errors
     setJamieAssistError(null);
 
-    // Get current timestamp
-    const currentTime = Date.now();
-    
-    // Check if this is a back-to-back call without user edits
-    const isBackToBackCall = (currentTime - lastJamieAssistCall < 10000) && !userEditedSinceLastAssist;
-    
-    // Update last call timestamp
-    setLastJamieAssistCall(currentTime);
-    
-    // Reset user edit tracking flag
-    setUserEditedSinceLastAssist(false);
+    // Check for auth first
+    if (!auth) {
+      console.error("Missing auth for Jamie Assist");
+      setIsRegisterModalOpen(true);
+      return;
+    }
     
     // Validate lookupHash
     if (!lookupHash) {
@@ -1703,13 +1740,25 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       return;
     }
     
-    // Check for auth
-    if (!auth) {
-      console.error("Missing auth for Jamie Assist");
-      // Instead of showing error, open the register modal
-      setIsRegisterModalOpen(true);
-      return;
+    // Show video details modal if no metadata exists and haven't prompted yet
+    if (!hasMetadata && !hasPromptedUser) {
+      setTempDescription('');
+      setTempUrl(fileUrl);
+      setShowVideoDetailsModal(true);
+      return; // Stop here - they'll click Jamie Assist again after filling details
     }
+
+    // Get current timestamp
+    const currentTime = Date.now();
+    
+    // Check if this is a back-to-back call without user edits
+    const isBackToBackCall = (currentTime - lastJamieAssistCall < 10000) && !userEditedSinceLastAssist;
+    
+    // Update last call timestamp
+    setLastJamieAssistCall(currentTime);
+    
+    // Reset user edit tracking flag
+    setUserEditedSinceLastAssist(false);
 
     printLog(`Calling Jamie Assist with lookupHash: ${lookupHash}`);
     setIsGeneratingContent(true);
@@ -1721,8 +1770,17 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         setContent('');
       }
       
-      // Prepare additional prefs string
+      // Prepare additional prefs string with video metadata context
       let prefs = additionalPrefs;
+      
+      // Add video metadata context if available
+      if (videoMetadata?.description) {
+        prefs = `About this video: ${videoMetadata.description}\n\n${prefs}`;
+      }
+      
+      // Always include a URL - use custom URL if provided, otherwise use CDN URL
+      const shareUrl = videoMetadata?.customUrl || fileUrl;
+      prefs = `${prefs}\n\nFull video available at: ${shareUrl}`;
       
       // Only use existing content if it's not a back-to-back call
       if (content.trim() && !isBackToBackCall) {
@@ -2944,7 +3002,46 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             />
             
             {/* Mode Switcher Toggle - Bottom Right Corner */}
-            <div className="absolute bottom-3 right-3 z-10">
+            <div className="absolute bottom-3 right-3 z-10 flex items-center space-x-2">
+              {/* Info Icon */}
+              {isGeneratingContent ? (
+                <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
+              ) : (
+                <button
+                  onClick={() => setShowInfoModal(true)}
+                  className="transition-colors duration-300 hover:scale-110"
+                  title="About Jamie Assist"
+                  aria-label="Learn more about Jamie Assist"
+                >
+                  <Info 
+                    className={`w-5 h-5 transition-colors duration-300 ${
+                      (platformMode === 'twitter' && twitterState.enabled) || (platformMode === 'nostr' && nostrState.enabled)
+                        ? 'text-orange-400' 
+                        : 'text-gray-500'
+                    }`}
+                  />
+                </button>
+              )}
+              
+              {/* Star Icon - Clickable Jamie Assist */}
+              <button
+                onClick={handleJamieAssist}
+                disabled={delayedDisabled}
+                className={`transition-colors duration-300 ${
+                  delayedDisabled ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-110'
+                }`}
+                title={delayedDisabled ? "Jamie Assist unavailable" : "Click to generate content with Jamie Assist"}
+              >
+                <Sparkles 
+                  className={`w-5 h-5 transition-colors duration-300 ${
+                    !delayedDisabled
+                      ? 'text-orange-400' 
+                      : 'text-gray-500'
+                  }`}
+                />
+              </button>
+              
+              {/* Platform Switch */}
               <button
                 onClick={() => handlePlatformModeChange(platformMode === 'twitter' ? 'nostr' : 'twitter')}
                 className={`relative w-16 h-8 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 hover:scale-105 ${
@@ -3086,14 +3183,25 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               <div className="text-gray-400 text-xs pl-1">
                 The link to your {itemName}, attribution, and a signature will be added automatically when you publish.
               </div>
-              <button
-                onClick={() => setShowPinManagement(true)}
-                className="flex items-center space-x-1 text-xs text-gray-400 hover:text-yellow-500 transition-colors"
-                title="Manage pinned mentions"
-              >
-                <Pin className="w-3 h-3" />
-                <span>Pins</span>
-              </button>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={handleOpenVideoDetails}
+                  className="flex items-center space-x-1 text-xs text-gray-400 hover:text-blue-500 transition-colors"
+                  title={hasMetadata ? "Edit video details" : "Add video details (helps Jamie Assist)"}
+                >
+                  <FileText className="w-3 h-3" />
+                  <span>Details</span>
+                  {hasMetadata && <Check className="w-3 h-3 text-green-500" />}
+                </button>
+                <button
+                  onClick={() => setShowPinManagement(true)}
+                  className="flex items-center space-x-1 text-xs text-gray-400 hover:text-yellow-500 transition-colors"
+                  title="Manage pinned mentions"
+                >
+                  <Pin className="w-3 h-3" />
+                  <span>Pins</span>
+                </button>
+              </div>
             </div>
             
             {/* Platform Selection with Checkboxes */}
@@ -3289,41 +3397,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 Nostr relays: {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
               </div>
             )}
-          </div>
-        )}
-        
-        {/* Jamie Assist button and info button */}
-        {!isSchedulingMode && (
-          <div className="flex justify-center mb-3">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleJamieAssist}
-                disabled={isGeneratingContent || isPublishing || !lookupHash}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-medium flex items-center
-                  ${(isGeneratingContent || isPublishing || !lookupHash) ? 'opacity-50 cursor-not-allowed' : 'hover:from-amber-400 hover:to-amber-500 transition-colors'}`}
-              >
-                {isGeneratingContent ? (
-                  <span className="flex items-center">
-                    <Loader2 className="animate-spin w-4 h-4 mr-1 sm:mr-2" />
-                    Generating...
-                  </span>
-                ) : (
-                  <span className="flex items-center">
-                    <Sparkles className="w-4 h-4 mr-1 sm:mr-2" />
-                    Jamie Assist
-                  </span>
-                )}
-              </button>
-              
-              <button
-                onClick={() => setShowInfoModal(true)}
-                className="flex items-center space-x-1 px-2 py-1 rounded-full border border-gray-700 group hover:bg-gray-800 hover:border-amber-500/30 transition-colors"
-                title="About Jamie Assist"
-                aria-label="Learn more about Jamie Assist"
-              >
-                <Info className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-500" />
-              </button>
-            </div>
           </div>
         )}
         
@@ -3571,6 +3644,87 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
               <p className="text-gray-400 text-sm mt-3">
                 Please confirm signing in your Nostr extension
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Video Details Modal */}
+        {showVideoDetailsModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
+            <div className="bg-black border border-gray-800 rounded-xl p-6 w-full max-w-md relative shadow-xl">
+              <button 
+                onClick={handleSkipVideoDetails} 
+                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              
+              <div className="mb-4 flex items-center">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mr-3">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-xl font-semibold text-white">Video Details</h2>
+              </div>
+              
+              <p className="text-gray-300 text-sm mb-4">
+                Help Jamie Assist write better copy by providing context about this {itemName}.
+              </p>
+              
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2">
+                    What's this video about? <span className="text-gray-500">(optional)</span>
+                  </label>
+                  <textarea
+                    value={tempDescription}
+                    onChange={(e) => setTempDescription(e.target.value)}
+                    placeholder="e.g., Discussion about AI safety and alignment with experts"
+                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
+                    rows={3}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    This helps Jamie Assist understand the context and write more relevant posts
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2 flex items-center">
+                    <LinkIcon className="w-3 h-3 mr-1" />
+                    Where to watch the full video? <span className="text-gray-500 ml-1">(optional)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={tempUrl}
+                    onChange={(e) => setTempUrl(e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..."
+                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Defaults to CDN URL if left empty
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleSkipVideoDetails}
+                  className="flex-1 px-4 py-2.5 rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors font-medium"
+                >
+                  Skip for Now
+                </button>
+                <button
+                  onClick={handleSaveVideoDetails}
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium hover:from-blue-400 hover:to-blue-500 transition-colors"
+                >
+                  Save Details
+                </button>
+              </div>
+              
+              {!hasPromptedUser && (
+                <p className="text-xs text-gray-500 text-center mt-3">
+                  💡 Stored for this session and reused for all clips from this video
+                </p>
+              )}
             </div>
           </div>
         )}
