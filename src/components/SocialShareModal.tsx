@@ -239,6 +239,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [thumbnailRetry, setThumbnailRetry] = useState(false);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
+  // Video duration state for Twitter length validation
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  const [isLoadingDuration, setIsLoadingDuration] = useState(true);
+
   // User settings hook for managing preferences including jamieAssistDefaults with cloud sync enabled
   const { settings: jamieSettings, updateSetting: updateJamieSetting, flushPendingChanges } = useUserSettings({
     enableCloudSync: true
@@ -777,6 +781,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const isVideo = fileUrl && (fileUrl.endsWith('.mp4') || fileUrl.endsWith('.webm') || fileUrl.endsWith('.mov'));
   const isImage = fileUrl && (fileUrl.endsWith('.png') || fileUrl.endsWith('.jpg') || fileUrl.endsWith('.jpeg') || fileUrl.endsWith('.gif'));
 
+  // Twitter video duration limit (2.5 minutes = 150 seconds)
+  const TWITTER_MAX_DURATION = 150;
+  const isVideoTooLongForTwitter = Boolean(isVideo && videoDuration !== null && videoDuration > TWITTER_MAX_DURATION);
+
   // Set preview sizing constants for consistency
   const previewMaxWidth = 300;
   const previewHeight = 150; // fixed height for all states
@@ -789,6 +797,49 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   useEffect(() => {
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
+
+  // Load video duration for Twitter validation
+  useEffect(() => {
+    if (!isOpen || !isVideo || !fileUrl) {
+      setIsLoadingDuration(false);
+      return;
+    }
+
+    setIsLoadingDuration(true);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    
+    const handleLoadedMetadata = () => {
+      setVideoDuration(video.duration);
+      setIsLoadingDuration(false);
+      printLog(`Video duration loaded: ${video.duration}s`);
+    };
+    
+    const handleError = () => {
+      printLog('Failed to load video duration');
+      setVideoDuration(null);
+      setIsLoadingDuration(false);
+    };
+    
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('error', handleError);
+    video.src = fileUrl;
+    
+    return () => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('error', handleError);
+      video.src = '';
+    };
+  }, [isOpen, isVideo, fileUrl]);
+
+  // Auto-disable Twitter checkbox when video is too long
+  useEffect(() => {
+    if (isVideoTooLongForTwitter && twitterState.enabled) {
+      printLog('Video exceeds Twitter duration limit - disabling Twitter checkbox');
+      setTwitterState(prev => ({ ...prev, enabled: false }));
+      savePlatformDefaults(false, nostrState.enabled);
+    }
+  }, [isVideoTooLongForTwitter]);
 
   // Auto-select next slot when scheduling mode opens
   useEffect(() => {
@@ -3222,9 +3273,25 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                       >
                         Post Successful - View on Twitter
                       </a>
+                    ) : isVideoTooLongForTwitter ? (
+                      <div className="flex flex-col">
+                        <p className="text-white text-sm">Signed in as @{twitterState.username}</p>
+                        <p className="text-red-400 text-xs mt-1">
+                          Video too long ({Math.floor(videoDuration! / 60)}:{Math.floor(videoDuration! % 60).toString().padStart(2, '0')}) - Twitter max is 2:30
+                        </p>
+                      </div>
                     ) : (
                       <p className="text-white text-sm">Signed in as @{twitterState.username}</p>
                     )
+                  ) : isVideoTooLongForTwitter ? (
+                    <div className="flex flex-col">
+                      <p className="text-white text-sm">
+                        {isAdmin ? 'Connect to post directly' : 'Web sharing available'}
+                      </p>
+                      <p className="text-red-400 text-xs mt-1">
+                        Video too long ({Math.floor(videoDuration! / 60)}:{Math.floor(videoDuration! % 60).toString().padStart(2, '0')}) - Twitter max is 2:30
+                      </p>
+                    </div>
                   ) : (
                     <p className="text-white text-sm">
                       {isAdmin ? 'Connect to post directly' : 'Web sharing available'}
@@ -3266,8 +3333,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                     setTwitterState(prev => ({ ...prev, enabled: newEnabled }));
                     savePlatformDefaults(newEnabled, nostrState.enabled);
                   }}
-                  disabled={!twitterState.authenticated}
+                  disabled={!twitterState.authenticated || isVideoTooLongForTwitter}
                   className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 disabled:opacity-50"
+                  title={isVideoTooLongForTwitter ? "Video exceeds Twitter's 2:30 limit" : ""}
                 />
               </div>
             </div>
