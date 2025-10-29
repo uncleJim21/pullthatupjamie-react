@@ -675,34 +675,20 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const generateSubtitleSegments = (): SubtitleSegment[] => {
     if (selectedEntries.size === 0 || wordTimestamps.length === 0) return [];
     
-    const selectedIndices = Array.from(selectedEntries).sort((a, b) => a - b);
-    const segments: SubtitleSegment[] = [];
-    
-    selectedIndices.forEach((index) => {
-      const entry = transcriptData[index];
-      if (!entry) return;
-      
-      // Find word-level timestamps that correspond to this transcript entry
-      const entryStartTime = timeStringToSeconds(entry.time);
-      
-      // Find words that fall within this transcript entry's time range
-      const entryWords = wordTimestamps.filter(word => {
-        const wordStart = word.start;
-        // Check if word starts within this entry's time range (with some tolerance)
-        return wordStart >= (entryStartTime - 0.5) && wordStart < (entryStartTime + 10); // Assume max 10s per entry
-      });
-      
-      // Create individual word-level subtitle segments
-      entryWords.forEach(word => {
-        segments.push({
-          start: parseFloat(word.start.toFixed(1)),
-          end: parseFloat(word.end.toFixed(1)),
-          text: word.word
-        });
-      });
-      
-      printLog(`Entry ${index}: Generated ${entryWords.length} word-level segments for "${entry.text.substring(0, 30)}..."`);
+    // Filter words that overlap with the clip time range
+    // A word overlaps if: word.end > clipStartTime AND word.start < clipEndTime
+    const clippedWords = wordTimestamps.filter(word => {
+      return word.end > clipStartTime && word.start < clipEndTime;
     });
+    
+    // Create individual word-level subtitle segments
+    const segments: SubtitleSegment[] = clippedWords.map(word => ({
+      start: parseFloat(word.start.toFixed(1)),
+      end: parseFloat(word.end.toFixed(1)),
+      text: word.word
+    }));
+    
+    printLog(`Generated ${segments.length} subtitle segments for clip ${clipStartTime}s - ${clipEndTime}s`);
     
     return segments;
   };
