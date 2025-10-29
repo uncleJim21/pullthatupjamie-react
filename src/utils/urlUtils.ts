@@ -1,4 +1,4 @@
-import { FRONTEND_URL, printLog, DEBUG_MODE } from '../constants/constants.ts';
+import { DEBUG_MODE } from '../constants/constants.ts';
 
 /**
  * DIRECT OVERRIDE: Creates a properly formatted share URL for the application

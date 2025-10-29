@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send } from 'lucide-react';
 import { API_URL } from '../../constants/constants.ts';
-import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -23,7 +22,6 @@ export const JamieChat: React.FC<JamieChatProps> = ({ feedId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [preferences, setPreferences] = useState<any>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,10 +60,11 @@ export const JamieChat: React.FC<JamieChatProps> = ({ feedId }) => {
       if (!response.ok) {
         // Handle 400 errors with suggestions
         if (response.status === 400 && data.suggestion) {
-          throw {
+          const error: PreferenceUpdateError = {
             error: data.error,
             suggestion: data.suggestion
-          } as PreferenceUpdateError;
+          };
+          throw error;
         }
         throw new Error(data.error || `Failed to update preferences: ${response.statusText}`);
       }
@@ -74,8 +73,7 @@ export const JamieChat: React.FC<JamieChatProps> = ({ feedId }) => {
         throw new Error('Failed to update preferences: ' + (data.error || 'Unknown error'));
       }
 
-      // Update local preferences state
-      setPreferences(data.data.updated);
+      // Return the updated preferences
       return data.data.updated;
     } catch (error) {
       console.error('Error updating preferences:', error);
@@ -107,8 +105,6 @@ export const JamieChat: React.FC<JamieChatProps> = ({ feedId }) => {
         if (!data.success) {
           throw new Error('Failed to load preferences: ' + (data.error || 'Unknown error'));
         }
-
-        setPreferences(data.data);
         
         // Add initial Jamie message with preferences
         setMessages([{
