@@ -749,6 +749,11 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       setClipStartTime(0);
       setClipEndTime(0);
       
+      // Clear search state before switching tabs
+      setSearchQuery('');
+      setHighlightedIndex(null);
+      setCurrentMatchIndex(0);
+      
       // Switch to Children Clips tab to show the new clip
       setShowTranscript(false);
       setShowChildrenClips(true);
