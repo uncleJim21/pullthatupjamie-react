@@ -925,17 +925,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         try {
           await checkTwitterAuth(); // This now handles both auth check and hasValidTokens
           
-          // Reload platform defaults after auth check to ensure proper state
-          const currentDefaults = loadPlatformDefaults();
-          // Only apply Twitter default if authenticated, otherwise force to false
-          const twitterEnabled = twitterState.authenticated ? currentDefaults.twitter : false;
-          setTwitterState(prev => ({ ...prev, enabled: twitterEnabled }));
-          setNostrState(prev => ({ ...prev, enabled: currentDefaults.nostr }));
-          
-          // Update localStorage if Twitter was forced to false due to no auth
-          if (!twitterState.authenticated && currentDefaults.twitter) {
-            savePlatformDefaults(false, currentDefaults.nostr);
-          }
+          // Don't override localStorage defaults here - checkTwitterAuth handles state updates
+          // The user's checkbox preference is preserved in localStorage
         } catch (error) {
           printLog(`Error during initial check: ${error}`);
           setHasValidTokens(false);

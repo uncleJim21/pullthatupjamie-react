@@ -57,12 +57,6 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const [currentShareUrl, setCurrentShareUrl] = useState<string | null>(null);
   const [currentLookupHash, setCurrentLookupHash] = useState<string | null>(null);
   
-  // Video metadata (stored per-video session)
-  const [videoMetadata, setVideoMetadata] = useState<{
-    description?: string;
-    customUrl?: string;
-  }>({});
-  
   // Sample transcript data with more diverse content for filtering (fallback)
   const sampleTranscriptData = [
     { time: '0:15', text: 'Welcome back to the podcast everyone. Today we\'re diving deep into the world of artificial intelligence and machine learning.' },
@@ -1591,8 +1585,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           }}
           platform={SocialPlatform.Twitter}
           auth={localStorage.getItem('admin_privs') === 'true' ? { type: 'admin' } : undefined}
-          videoMetadata={videoMetadata}
-          onVideoMetadataChange={setVideoMetadata}
+          enableVideoMetadata={true}
         />
       )}
     </div>
