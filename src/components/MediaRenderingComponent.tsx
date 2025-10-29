@@ -1319,7 +1319,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           {/* Content area */}
           <div ref={contentAreaRef} className="flex-1 overflow-y-auto p-4">
             {showTranscript ? (
-              <div className="space-y-4">
+              <div className="space-y-1">
                 {transcriptData.length === 0 ? (
                   <div className="text-center text-gray-400 py-12">
                     <p className="select-none mb-6">No transcript yet</p>
@@ -1375,27 +1375,18 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                             handleTranscriptClick(item.time);
                           }
                         }}
-                        className={`flex items-start space-x-3 p-3 rounded-lg transition-colors cursor-pointer ${
+                        className={`flex items-start space-x-2 px-2 py-1.5 rounded transition-colors cursor-pointer ${
                           isClipMode && isSelected
-                            ? 'bg-blue-900/50 border-2 border-blue-500' 
+                            ? 'bg-white text-black' 
                             : isHighlighted 
-                              ? 'bg-yellow-900/30 border border-yellow-600' 
+                              ? 'bg-yellow-500/20 text-white' 
                               : isActive 
-                                ? 'border border-white shadow-[0_0_10px_rgba(255,255,255,0.3)]' 
-                                : 'hover:bg-gray-900/50'
+                                ? 'bg-gray-800 text-white' 
+                                : 'text-gray-300 hover:bg-gray-900/50'
                         }`}
                       >
-                        {isClipMode && (
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleEntrySelection(originalIndex)}
-                            className="mt-1 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-2"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        )}
-                        <span className="text-gray-400 text-sm font-mono select-none">{item.time}</span>
-                        <p className={`text-white text-sm leading-relaxed flex-1 ${isClipMode ? '' : 'select-none'}`}>
+                        <span className="text-gray-500 text-xs font-mono select-none min-w-[2.5rem]">{item.time}</span>
+                        <p className={`text-xs leading-relaxed flex-1 ${isClipMode ? '' : 'select-none'}`}>
                           {item.text}
                         </p>
                       </div>
@@ -1585,7 +1576,6 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           }}
           platform={SocialPlatform.Twitter}
           auth={localStorage.getItem('admin_privs') === 'true' ? { type: 'admin' } : undefined}
-          enableVideoMetadata={true}
         />
       )}
     </div>
