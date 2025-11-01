@@ -4,7 +4,7 @@ import TranscriptionService, { generateHash } from '../services/transcriptionSer
 import VideoEditService, { ChildEdit, SubtitleSegment } from '../services/videoEditService.ts';
 import { WordTimestamp } from '../services/transcriptionService.ts';
 import { printLog } from '../constants/constants.ts';
-import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
+import SocialShareModal, { SocialPlatform, SocialShareModalParentContext } from './SocialShareModal.tsx';
 
 interface MediaRenderingComponentProps {
   fileUrl: string;
@@ -1571,6 +1571,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           platform={SocialPlatform.Twitter}
           auth={localStorage.getItem('admin_privs') === 'true' ? { type: 'admin' } : undefined}
           videoMetadata={currentParentUrl ? { customUrl: currentParentUrl } : undefined}
+          parentContext={SocialShareModalParentContext.MediaRenderingComponent}
         />
       )}
     </div>
