@@ -51,6 +51,15 @@ export enum SocialPlatform {
   Nostr = 'nostr'
 }
 
+// Parent context enum to determine when to show video details
+export enum SocialShareModalParentContext {
+  MediaRenderingComponent = 'MediaRenderingComponent',
+  ScheduledPostsList = 'ScheduledPostsList',
+  PodcastFeedPage = 'PodcastFeedPage',
+  SearchInterface = 'SearchInterface',
+  Other = 'Other'
+}
+
 // Add operation types for better state management
 enum OperationType {
   IDLE = 'idle',
@@ -85,6 +94,8 @@ interface SocialShareModalProps {
     customUrl?: string;
   };
   onVideoMetadataChange?: (metadata: { description?: string; customUrl?: string }) => void;
+  // Parent context to determine when to show video details
+  parentContext?: SocialShareModalParentContext;
 }
 
 // Simplified unified state interface
@@ -134,7 +145,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   showSignAllOverlay = false,
   signAllProgress = { current: 0, total: 0 },
   videoMetadata,
-  onVideoMetadataChange
+  onVideoMetadataChange,
+  parentContext = SocialShareModalParentContext.Other
 }) => {
   const [content, setContent] = useState<string>('');
   const [delayedDisabled, setDelayedDisabled] = useState<boolean>(true);
@@ -146,6 +158,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const [tempUrl, setTempUrl] = useState('');
   
   const hasMetadata = !!(videoMetadata?.description || videoMetadata?.customUrl);
+  // Check specifically if description exists (user-provided context about the video)
+  const hasDescription = !!(videoMetadata?.description);
   
   // Helper function to load platform defaults from localStorage
   const loadPlatformDefaults = () => {
@@ -1766,6 +1780,34 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   };
 
+  // Helper functions to track prompted videos per fileUrl
+  const STORAGE_KEY = 'jamieAssistPromptedVideos';
+  
+  const hasPromptedForVideo = (videoUrl: string): boolean => {
+    try {
+      const prompted = localStorage.getItem(STORAGE_KEY);
+      if (!prompted) return false;
+      const promptedUrls = JSON.parse(prompted) as string[];
+      return promptedUrls.includes(videoUrl);
+    } catch (error) {
+      console.error('Error checking prompted videos:', error);
+      return false;
+    }
+  };
+  
+  const markVideoAsPrompted = (videoUrl: string): void => {
+    try {
+      const prompted = localStorage.getItem(STORAGE_KEY);
+      const promptedUrls = prompted ? (JSON.parse(prompted) as string[]) : [];
+      if (!promptedUrls.includes(videoUrl)) {
+        promptedUrls.push(videoUrl);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(promptedUrls));
+      }
+    } catch (error) {
+      console.error('Error marking video as prompted:', error);
+    }
+  };
+
   const handleJamieAssist = async () => {
     // Clear any previous errors
     setJamieAssistError(null);
@@ -1791,11 +1833,15 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       return;
     }
     
-    // Show video details modal if no metadata exists and haven't prompted yet
-    if (!hasMetadata && !hasPromptedUser) {
+    // Show video details modal only if parent is MediaRenderingComponent and this is first time for this video
+    // Only check for description (not customUrl), since customUrl is just a URL override, not user-provided context
+    if (parentContext === SocialShareModalParentContext.MediaRenderingComponent && 
+        !hasDescription && 
+        !hasPromptedForVideo(fileUrl)) {
       setTempDescription('');
       setTempUrl(fileUrl);
       setShowVideoDetailsModal(true);
+      markVideoAsPrompted(fileUrl); // Mark as prompted so it won't show again for this video
       return; // Stop here - they'll click Jamie Assist again after filling details
     }
 
