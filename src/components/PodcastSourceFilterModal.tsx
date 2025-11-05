@@ -1,18 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, Filter, Search, X } from 'lucide-react';
+import { Check, Filter, Search, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { fetchAvailableSources, submitPodcastRequest, PodcastSource, sortPodcastSources } from '../services/podcastSourceService.ts';
 import PodcastSourceItem from './PodcastSourceItem.tsx';
 import { CheckoutModal } from './CheckoutModal.tsx';
 import { printLog } from '../constants/constants.ts';
+
+export interface PodcastSearchFilters {
+  episodeName: string;
+  minDate: string;
+  maxDate: string;
+}
 
 interface PodcastSourceFilterModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedSources: Set<string>;
   setSelectedSources: React.Dispatch<React.SetStateAction<Set<string>>>;
+  filters?: PodcastSearchFilters;
+  setFilters?: (filters: PodcastSearchFilters) => void;
 }
 
 const STORAGE_KEY = 'selectedPodcastSources';
+const FILTERS_STORAGE_KEY = 'podcastSearchFilters';
 
 // Enum for tracking the podcast request flow steps
 enum RequestFlowStep {
@@ -28,7 +37,9 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
   isOpen,
   onClose,
   selectedSources,
-  setSelectedSources
+  setSelectedSources,
+  filters,
+  setFilters
 }) => {
   const [sources, setSources] = useState<PodcastSource[]>([]);
   const [filteredSources, setFilteredSources] = useState<PodcastSource[]>([]);
@@ -38,6 +49,14 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const sourcesContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Advanced filters state
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [localFilters, setLocalFilters] = useState<PodcastSearchFilters>({
+    episodeName: '',
+    minDate: '',
+    maxDate: ''
+  });
   
   // Keep track of whether sources have already been fetched
   const hasSourcesLoaded = useRef(false);
@@ -56,6 +75,24 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
   const [isSuccess, setIsSuccess] = useState(false);
   const [isPurchaseSuccess, setIsPurchaseSuccess] = useState(false);
   const [isRequestingPodcast, setIsRequestingPodcast] = useState(false);
+
+  // Load filters from localStorage or props on mount
+  useEffect(() => {
+    const savedFilters = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (savedFilters) {
+      try {
+        const parsed = JSON.parse(savedFilters);
+        setLocalFilters(parsed);
+        if (setFilters) {
+          setFilters(parsed);
+        }
+      } catch (e) {
+        console.error('Error parsing saved filters:', e);
+      }
+    } else if (filters) {
+      setLocalFilters(filters);
+    }
+  }, []);
 
   useEffect(() => {
     const checkScreenSize = () => setIsMobile(window.innerWidth <= 768);
@@ -171,7 +208,43 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
     // Save the current selection to localStorage before closing
     localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(selectedSources)));
     printLog(`Modal closed with selection: ${JSON.stringify(Array.from(selectedSources))}`);
+    
+    // Save filters to localStorage
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(localFilters));
+    if (setFilters) {
+      setFilters(localFilters);
+    }
+    printLog(`Modal closed with filters: ${JSON.stringify(localFilters)}`);
+    
     onClose();
+  };
+
+  const handleFilterChange = (key: keyof PodcastSearchFilters, value: string) => {
+    const newFilters = { ...localFilters, [key]: value };
+    setLocalFilters(newFilters);
+    // Auto-save to localStorage
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(newFilters));
+    if (setFilters) {
+      setFilters(newFilters);
+    }
+  };
+
+  const resetFilters = () => {
+    const emptyFilters = {
+      episodeName: '',
+      minDate: '',
+      maxDate: ''
+    };
+    setLocalFilters(emptyFilters);
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(emptyFilters));
+    if (setFilters) {
+      setFilters(emptyFilters);
+    }
+    printLog('Filters reset');
+  };
+
+  const hasActiveFilters = () => {
+    return localFilters.episodeName !== '' || localFilters.minDate !== '' || localFilters.maxDate !== '';
   };
 
   // Podcast request flow functions
@@ -557,12 +630,76 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
               <Search className="absolute right-3 top-2 text-gray-400 w-4 h-4" />
             </div>
 
-            <button 
-              onClick={startRequestFlow}
-              className="w-full mb-3 px-4 py-2 text-black font-medium bg-white rounded-lg hover:bg-gray-200 flex justify-center items-center text-sm"
-            >
-              Request a Podcast
-            </button>
+            {/* Advanced Filters Accordion */}
+            <div className="mb-3 border border-gray-700 rounded-lg overflow-hidden bg-gray-900">
+              <button
+                onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+                className="w-full px-4 py-2 flex justify-between items-center text-white hover:bg-gray-800 transition-colors"
+              >
+                <span className="text-sm font-medium">
+                  Advanced Filters {hasActiveFilters() && <span className="text-blue-400">●</span>}
+                </span>
+                {isAdvancedOpen ? (
+                  <ChevronUp className="w-4 h-4 text-gray-400" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                )}
+              </button>
+
+              {isAdvancedOpen && (
+                <div className="p-4 border-t border-gray-700 space-y-3">
+                  {/* Episode Name Filter */}
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Episode Name (Exact Match)
+                    </label>
+                    <input
+                      type="text"
+                      value={localFilters.episodeName}
+                      onChange={(e) => handleFilterChange('episodeName', e.target.value)}
+                      placeholder="Enter exact episode title..."
+                      className="w-full px-3 py-2 bg-black border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 text-sm"
+                    />
+                  </div>
+
+                  {/* Date Range Filters */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">
+                        Min Date
+                      </label>
+                      <input
+                        type="date"
+                        value={localFilters.minDate}
+                        onChange={(e) => handleFilterChange('minDate', e.target.value)}
+                        className="w-full px-2 py-2 bg-black border border-gray-700 rounded text-white focus:outline-none focus:border-gray-600 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">
+                        Max Date
+                      </label>
+                      <input
+                        type="date"
+                        value={localFilters.maxDate}
+                        onChange={(e) => handleFilterChange('maxDate', e.target.value)}
+                        className="w-full px-2 py-2 bg-black border border-gray-700 rounded text-white focus:outline-none focus:border-gray-600 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Reset Filters Button */}
+                  {hasActiveFilters() && (
+                    <button
+                      onClick={resetFilters}
+                      className="w-full px-3 py-1.5 text-xs text-blue-400 hover:text-blue-300 border border-blue-400 hover:border-blue-300 rounded transition-colors"
+                    >
+                      Clear All Filters
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div ref={sourcesContainerRef} className="flex-1 overflow-y-auto p-2 custom-scrollbar">

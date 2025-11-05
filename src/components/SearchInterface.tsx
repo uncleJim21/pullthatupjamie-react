@@ -19,8 +19,8 @@ import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter, List, Grid3X3 } from 'lucide-react';
-import PodcastSourceFilterModal from './PodcastSourceFilterModal.tsx';
+import { Filter, List, Grid3X3, X as XIcon } from 'lucide-react';
+import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
 import PageBanner from './PageBanner.tsx';
 import ShareModal from './ShareModal.tsx';
@@ -192,6 +192,26 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [filterClicked, setFilterClicked] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   
+  // Podcast search filters state
+  const FILTERS_STORAGE_KEY = 'podcastSearchFilters';
+  const [searchFilters, setSearchFilters] = useState<PodcastSearchFilters>(() => {
+    const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error parsing saved filters:', e);
+        return { episodeName: '', minDate: '', maxDate: '' };
+      }
+    }
+    return { episodeName: '', minDate: '', maxDate: '' };
+  });
+
+  // Helper to check if any filters are active
+  const hasActiveFilters = () => {
+    return searchFilters.episodeName !== '' || searchFilters.minDate !== '' || searchFilters.maxDate !== '';
+  };
+
   // Podcast stats - these will be updated from API later
   const [podcastStats, setPodcastStats] = useState<PodcastStats>({
     clipCount: 423587,
@@ -751,6 +771,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     localStorage.setItem(STORAGE_KEY, JSON.stringify(feedIdsToUse));
     
     printLog(`Using feed IDs for search: ${JSON.stringify(feedIdsToUse,null,2)}`);
+    printLog(`Using filters: ${JSON.stringify(searchFilters)}`);
 
     const auth = await getAuth() as AuthConfig;
     if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
@@ -761,7 +782,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     printLog(`Request auth method:${requestAuthMethod}`)
     
     try {
-      const quoteResults = await handleQuoteSearch(query, auth, feedIdsToUse);
+      const quoteResults = await handleQuoteSearch(
+        query, 
+        auth, 
+        feedIdsToUse,
+        searchFilters.minDate || undefined,
+        searchFilters.maxDate || undefined,
+        searchFilters.episodeName || undefined
+      );
       setConversation(prev => [...prev, {
         id: searchState.activeConversationId as number,
         type: 'podcast-search' as const,
@@ -1015,7 +1043,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 feedIdsToUse = Array.from(selectedSources) as string[];
               }
               
-              const quoteResults = await handleQuoteSearch(queryParam, auth, feedIdsToUse);
+              const quoteResults = await handleQuoteSearch(
+                queryParam, 
+                auth, 
+                feedIdsToUse,
+                searchFilters.minDate || undefined,
+                searchFilters.maxDate || undefined,
+                searchFilters.episodeName || undefined
+              );
               
               setConversation(prev => [...prev, {
                 id: nextConversationId.current++,
@@ -1195,6 +1230,21 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     printLog("handleFilterClick function called");
   };
 
+  // Function to reset all filters
+  const handleResetFilters = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const emptyFilters = {
+      episodeName: '',
+      minDate: '',
+      maxDate: ''
+    };
+    setSearchFilters(emptyFilters);
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(emptyFilters));
+    printLog('All filters reset from filter icon');
+  };
+
   // Update the lastUsedSourcesRef whenever selectedSources changes
   useEffect(() => {
     // Create a deep copy of the selectedSources set to ensure it's not a reference
@@ -1352,6 +1402,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         }}
         selectedSources={selectedSources}
         setSelectedSources={setSelectedSources}
+        filters={searchFilters}
+        setFilters={setSearchFilters}
       />
       
       {isClipBatchPage && (
@@ -1628,25 +1680,47 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             {/* Filter button and toggle - desktop version (outside search bar) */}
             {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
               <div className="absolute -right-14 top-0 z-10 hidden md:block">
-                <button
-                  onClick={handleFilterClick}
-                  className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
-                  aria-label="Filter"
-                >
-                  <Filter className="w-5 h-5" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={handleFilterClick}
+                    className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
+                    aria-label="Filter"
+                  >
+                    <Filter className="w-5 h-5" />
+                  </button>
+                  {hasActiveFilters() && (
+                    <button
+                      onClick={handleResetFilters}
+                      className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors shadow-lg"
+                      aria-label="Reset Filters"
+                    >
+                      <XIcon className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             {/* Filter button - mobile version (inside search bar) */}
             {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
               <div className="absolute right-2 top-2 z-10 md:hidden">
-                <button
-                  onClick={handleFilterClick}
-                  className="flex items-center justify-center text-white hover:text-gray-300 transition-colors"
-                  aria-label="Filter"
-                >
-                  <Filter className="w-5 h-5" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={handleFilterClick}
+                    className="flex items-center justify-center text-white hover:text-gray-300 transition-colors"
+                    aria-label="Filter"
+                  >
+                    <Filter className="w-5 h-5" />
+                  </button>
+                  {hasActiveFilters() && (
+                    <button
+                      onClick={handleResetFilters}
+                      className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors"
+                      aria-label="Reset Filters"
+                    >
+                      <XIcon className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             <textarea
@@ -1968,25 +2042,47 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             {/* Filter button and toggle - desktop version (outside search bar) */}
             {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
               <div className="absolute -right-14 top-0 z-10 hidden md:block">
-                <button
-                  onClick={handleFilterClick}
-                  className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
-                  aria-label="Filter"
-                >
-                  <Filter className="w-5 h-5" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={handleFilterClick}
+                    className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
+                    aria-label="Filter"
+                  >
+                    <Filter className="w-5 h-5" />
+                  </button>
+                  {hasActiveFilters() && (
+                    <button
+                      onClick={handleResetFilters}
+                      className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors shadow-lg"
+                      aria-label="Reset Filters"
+                    >
+                      <XIcon className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             {/* Filter button - mobile version (inside search bar) */}
             {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
               <div className="absolute right-2 top-2 z-10 md:hidden">
-                <button
-                  onClick={handleFilterClick}
-                  className="flex items-center justify-center text-white hover:text-gray-300 transition-colors"
-                  aria-label="Filter"
-                >
-                  <Filter className="w-5 h-5" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={handleFilterClick}
+                    className="flex items-center justify-center text-white hover:text-gray-300 transition-colors"
+                    aria-label="Filter"
+                  >
+                    <Filter className="w-5 h-5" />
+                  </button>
+                  {hasActiveFilters() && (
+                    <button
+                      onClick={handleResetFilters}
+                      className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors"
+                      aria-label="Reset Filters"
+                    >
+                      <XIcon className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             <textarea
