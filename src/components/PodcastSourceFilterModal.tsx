@@ -106,6 +106,24 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
       // Log the current selected sources when the modal opens
       printLog(`Modal opened with selectedSources: ${JSON.stringify(Array.from(selectedSources))}`);
       
+      // Reset accordion to collapsed state when modal opens
+      setIsAdvancedOpen(false);
+      
+      // Load filters from localStorage when modal opens
+      const savedFilters = localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (savedFilters) {
+        try {
+          const parsed = JSON.parse(savedFilters);
+          setLocalFilters(parsed);
+          if (setFilters) {
+            setFilters(parsed);
+          }
+          printLog(`Loaded filters from storage: ${JSON.stringify(parsed)}`);
+        } catch (e) {
+          console.error('Error parsing saved filters:', e);
+        }
+      }
+      
       const fetchSources = async () => {
         try {
           // Only fetch sources if they haven't been loaded yet
@@ -245,6 +263,29 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
 
   const hasActiveFilters = () => {
     return localFilters.episodeName !== '' || localFilters.minDate !== '' || localFilters.maxDate !== '';
+  };
+
+  // Helper function to set date ranges
+  const setDateRange = (days: number) => {
+    const today = new Date();
+    const pastDate = new Date();
+    pastDate.setDate(today.getDate() - days);
+    
+    const maxDate = today.toISOString().split('T')[0];
+    const minDate = pastDate.toISOString().split('T')[0];
+    
+    const newFilters = {
+      ...localFilters,
+      minDate,
+      maxDate
+    };
+    
+    setLocalFilters(newFilters);
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(newFilters));
+    if (setFilters) {
+      setFilters(newFilters);
+    }
+    printLog(`Set date range to last ${days} days: ${minDate} to ${maxDate}`);
   };
 
   // Podcast request flow functions
@@ -662,6 +703,27 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
                     />
                   </div>
 
+                  {/* Quick Date Range Buttons */}
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Quick Date Ranges
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setDateRange(7)}
+                        className="px-3 py-2 text-xs bg-gray-800 text-white border border-gray-700 rounded hover:bg-gray-700 transition-colors"
+                      >
+                        Last 7 Days
+                      </button>
+                      <button
+                        onClick={() => setDateRange(30)}
+                        className="px-3 py-2 text-xs bg-gray-800 text-white border border-gray-700 rounded hover:bg-gray-700 transition-colors"
+                      >
+                        Last 30 Days
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Date Range Filters */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -672,7 +734,8 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
                         type="date"
                         value={localFilters.minDate}
                         onChange={(e) => handleFilterChange('minDate', e.target.value)}
-                        className="w-full px-2 py-2 bg-black border border-gray-700 rounded text-white focus:outline-none focus:border-gray-600 text-sm"
+                        className="w-full px-2 py-2 bg-black border border-gray-700 rounded text-white focus:outline-none focus:border-gray-600 text-sm [color-scheme:dark]"
+                        style={{ colorScheme: 'dark' }}
                       />
                     </div>
                     <div>
@@ -683,7 +746,8 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
                         type="date"
                         value={localFilters.maxDate}
                         onChange={(e) => handleFilterChange('maxDate', e.target.value)}
-                        className="w-full px-2 py-2 bg-black border border-gray-700 rounded text-white focus:outline-none focus:border-gray-600 text-sm"
+                        className="w-full px-2 py-2 bg-black border border-gray-700 rounded text-white focus:outline-none focus:border-gray-600 text-sm [color-scheme:dark]"
+                        style={{ colorScheme: 'dark' }}
                       />
                     </div>
                   </div>

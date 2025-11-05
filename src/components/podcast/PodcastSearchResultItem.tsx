@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ExternalLink, Share, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2, ChevronRight, Check } from 'lucide-react';
-import { formatTime } from '../../utils/time.ts';
+import { ExternalLink, Share, Play, Pause, Loader, RotateCcw, RotateCw, SkipBack, SkipForward,Scissors, Link, Edit2, ChevronRight, Check, Calendar } from 'lucide-react';
+import { formatTime, formatShortDate } from '../../utils/time.ts';
 import { makeClip, fetchClipById } from '../../services/clipService.ts';
 import { ClipProgress } from '../../types/clips.ts';
 import EditTimestampsModal from "./EditTimestampsModal.tsx";
@@ -459,8 +459,14 @@ export const PodcastSearchResultItem = ({
               <div className="flex justify-between items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <h3 className="text-xl font-medium text-white mb-1">
-                    Clips Batch Run: {new Date(date).toLocaleString()}
+                    Clips Batch Run
                   </h3>
+                  {date && (
+                    <div className="flex items-center gap-1 mb-1">
+                      <Calendar className="w-3 h-3 text-gray-400" />
+                      <span className="text-sm text-gray-400">{formatShortDate(date)}</span>
+                    </div>
+                  )}
                   <p className="text-base text-gray-400 truncate line-clamp-1">{creator}</p>
                   <p className="text-base text-gray-400 truncate line-clamp-1">{episode}</p>
                 </div>
@@ -532,9 +538,15 @@ export const PodcastSearchResultItem = ({
 
         {/* Content - Title and Action Buttons Side by Side */}
         <div className="p-4 flex items-start gap-4 min-h-[80px]">
-          {/* Title Text */}
+          {/* Title Text with Date */}
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-medium text-white line-clamp-3">{episode}</h3>
+            {date && (
+              <div className="flex items-center gap-1 mt-1">
+                <Calendar className="w-3 h-3 text-gray-500" />
+                <span className="text-xs text-gray-500">{formatShortDate(date)}</span>
+              </div>
+            )}
           </div>
           
           {/* Action Buttons - 2x2 Grid with Borders and Smaller Size */}
@@ -765,6 +777,12 @@ export const PodcastSearchResultItem = ({
               <div className="flex-grow pr-0 sm:pr-4 min-w-0 w-full sm:max-w-[calc(100%-220px)]">
                 <h3 className="text-lg font-medium text-white line-clamp-1 sm:line-clamp-2">{episode}</h3>
                 <p className="text-sm text-gray-400 line-clamp-1">{creator}</p>
+                {date && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <Calendar className="w-3 h-3 text-gray-500" />
+                    <span className="text-xs text-gray-500">{formatShortDate(date)}</span>
+                  </div>
+                )}
               </div>
   
               {/* Action Buttons */}
