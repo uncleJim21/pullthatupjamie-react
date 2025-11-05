@@ -1,9 +1,21 @@
 import { API_URL, AuthConfig, RequestAuthMethod } from "../constants/constants.ts";
 
+export interface PodcastSearchParams {
+  query: string;
+  limit?: number;
+  feedIds?: string[];
+  minDate?: string;
+  maxDate?: string;
+  episodeName?: string;
+}
+
 export const handleQuoteSearch = async (
   queryToUse: string,
   auth:AuthConfig, 
-  selectedFeedIds?: string[]
+  selectedFeedIds?: string[],
+  minDate?: string,
+  maxDate?: string,
+  episodeName?: string
 ) => {
   try{
     const headers: Record<string, string> = {
@@ -20,14 +32,27 @@ export const handleQuoteSearch = async (
     }
     // FREE tier doesn't need an auth header
 
+    const body: PodcastSearchParams = { 
+      query: queryToUse,
+      limit: 20,
+      feedIds: selectedFeedIds || []
+    };
+
+    // Add optional filters if provided
+    if (minDate) {
+      body.minDate = minDate;
+    }
+    if (maxDate) {
+      body.maxDate = maxDate;
+    }
+    if (episodeName && episodeName.trim() !== '') {
+      body.episodeName = episodeName.trim();
+    }
+
     const response = await fetch(`${API_URL}/api/search-quotes`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ 
-        query: queryToUse,
-        limit: 20,
-        feedIds: selectedFeedIds || []
-      })
+      body: JSON.stringify(body)
     });
   
     if (!response.ok) {

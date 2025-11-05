@@ -22,7 +22,16 @@ export const getTimestampedUrl = (audioUrl: string, startTime: number): string =
 
 // Unified date formatting function: "Mon 8/11/25 @ 2:30 PM"
 export const formatScheduledDate = (dateInput: string | Date): string => {
+  if (!dateInput) {
+    return 'Date Not Available';
+  }
+  
   const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return 'Date Not Available';
+  }
   
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const dayName = dayNames[date.getDay()];
@@ -44,7 +53,16 @@ export const formatScheduledDate = (dateInput: string | Date): string => {
 
 // Short date format without time: "Mon 8/11/25"
 export const formatShortDate = (dateInput: string | Date): string => {
+  if (!dateInput) {
+    return 'Date Not Available';
+  }
+  
   const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return 'Date Not Available';
+  }
   
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const dayName = dayNames[date.getDay()];
