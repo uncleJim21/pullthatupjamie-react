@@ -32,6 +32,7 @@ import ScheduledPostSlots from '../ScheduledPostSlots.tsx';
 import ImageWithLoader from '../ImageWithLoader.tsx';
 import MediaRenderingComponent from '../MediaRenderingComponent.tsx';
 import MediaThumbnail from '../MediaThumbnail.tsx';
+import RssService, { RssVideoItem } from '../../services/rssService.ts';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -110,6 +111,7 @@ const ConfigureAutomationModal = ({ isOpen, onClose, onConfigure }: ConfigureAut
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history' | 'settings' | 'scheduled-posts';
+type UploadsView = 'uploads' | 'rss-feed';
 
 const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> = ({ initialView, defaultTab }) => {
     const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
@@ -127,6 +129,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [jamieProView, setJamieProView] = useState<JamieProView>('history');
     const [isCollapsibleTabsOpen, setIsCollapsibleTabsOpen] = useState(false);
+    const [uploadsView, setUploadsView] = useState<UploadsView>('uploads');
     
     // Initialize jamieProView from URL parameter
     useEffect(() => {
@@ -161,6 +164,9 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [shouldAutoSignAll, setShouldAutoSignAll] = useState(false);
     const [isMediaRenderingOpen, setIsMediaRenderingOpen] = useState(false);
     const [currentMediaFile, setCurrentMediaFile] = useState<{url: string, name: string, type?: string} | null>(null);
+    const [rssVideos, setRssVideos] = useState<RssVideoItem[]>([]);
+    const [isLoadingRssVideos, setIsLoadingRssVideos] = useState(false);
+    const [rssVideosError, setRssVideosError] = useState<string | null>(null);
     
 
     // Use the new userSettings hook with cloud sync for admin users
@@ -370,6 +376,23 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     }
   };
 
+  const fetchRssVideos = async () => {
+    try {
+      setIsLoadingRssVideos(true);
+      setRssVideosError(null);
+      
+      // TODO: Make feed URL dynamic based on user's podcast feed
+      // Currently hardcoded to TFTC feed: https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9
+      const videos = await RssService.getVideoUrlsFromFeed();
+      setRssVideos(videos);
+    } catch (error) {
+      console.error('Error fetching RSS videos:', error);
+      setRssVideosError('Failed to load RSS video feed. Please try again.');
+    } finally {
+      setIsLoadingRssVideos(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'Jamie Pro') {
       fetchRunHistory();
@@ -377,10 +400,14 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     
     if (activeTab === 'Uploads') {
       // Reset to first page when tab changes to Uploads
-      setCurrentPage(1);
-      fetchUploads();
+      if (uploadsView === 'uploads') {
+        setCurrentPage(1);
+        fetchUploads();
+      } else if (uploadsView === 'rss-feed') {
+        fetchRssVideos();
+      }
     }
-  }, [activeTab]);
+  }, [activeTab, uploadsView]);
 
   // This useEffect is removed - using the one below that properly checks isUserSignedIn dependency 
 
@@ -1040,28 +1067,135 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
               <div className="py-8">
                 <div className="flex justify-between items-center mb-4">
                   <div className="space-y-2">
-                    <h2 className="text-xl font-bold">Your Uploads</h2>
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
-                      <input
-                        type="checkbox"
-                        id="globalAutoShare"
-                        checked={autoShare}
-                        onChange={handleAutoShareChange}
-                        className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white"
-                      />
-                      <label htmlFor="globalAutoShare">Start Auto Share after Upload</label>
+                    {/* Dropdown Menu for Uploads View Selection */}
+                    <div className="relative inline-block">
+                      <select
+                        value={uploadsView}
+                        onChange={(e) => setUploadsView(e.target.value as UploadsView)}
+                        className="text-xl font-bold bg-[#111111] text-white border border-gray-700 rounded-md px-3 py-2 pr-8 appearance-none cursor-pointer hover:border-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
+                        style={{ minWidth: '200px' }}
+                      >
+                        <option value="uploads">📤 Your Uploads</option>
+                        <option value="rss-feed">📡 RSS Feed</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white">
+                        <ChevronDown className="w-4 h-4" />
+                      </div>
                     </div>
+                    {uploadsView === 'uploads' && (
+                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <input
+                          type="checkbox"
+                          id="globalAutoShare"
+                          checked={autoShare}
+                          onChange={handleAutoShareChange}
+                          className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white"
+                        />
+                        <label htmlFor="globalAutoShare">Start Auto Share after Upload</label>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={openUploadModal}
-                    className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors flex items-center font-medium"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload
-                  </button>
+                  {uploadsView === 'uploads' && (
+                    <button
+                      onClick={openUploadModal}
+                      className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors flex items-center font-medium"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload
+                    </button>
+                  )}
                 </div>
                 
-                {isLoadingUploads ? (
+                {uploadsView === 'rss-feed' ? (
+                  // RSS Feed Videos View
+                  <div>
+                    {isLoadingRssVideos ? (
+                      <div className="flex justify-center items-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+                      </div>
+                    ) : rssVideosError ? (
+                      <div className="p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-400">
+                        {rssVideosError}
+                      </div>
+                    ) : rssVideos.length === 0 ? (
+                      <div className="p-8 bg-[#111111] border border-gray-800 rounded-lg text-center">
+                        <p className="text-gray-400">No video streams found in RSS feed.</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="space-y-3 mb-4">
+                          {rssVideos.map((video, index) => (
+                            <div 
+                              key={`${video.episodeGuid || index}-${video.videoUrl}`}
+                              className="bg-[#111111] border border-gray-800 rounded-lg p-4 flex items-center gap-4 hover:border-gray-700 transition-colors"
+                            >
+                              {/* Thumbnail Preview */}
+                              <MediaThumbnail
+                                fileUrl={video.videoUrl}
+                                fileName={video.title}
+                                width={60}
+                                height={60}
+                                className="flex-shrink-0"
+                              />
+                              
+                              {/* Video Info */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white font-medium" title={video.title}>
+                                  {truncateMiddle(video.title, 50)}
+                                </p>
+                                <div className="flex flex-wrap text-gray-400 text-sm mt-1 gap-4">
+                                  {video.publishedDate && (
+                                    <p>{formatDate(video.publishedDate)}</p>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Action Buttons */}
+                              <div className="flex space-x-3 flex-shrink-0">
+                                <button
+                                  onClick={() => handleCopyFileUrl(video.videoUrl, `rss-${index}`)}
+                                  className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
+                                  title="Copy link"
+                                >
+                                  {copiedLinkId === `rss-${index}` ? 
+                                    <Check className="w-5 h-5 text-green-500" /> : 
+                                    <Link className="w-5 h-5" />
+                                  }
+                                </button>
+                                <button
+                                  onClick={() => openShareModal(video.videoUrl)}
+                                  className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
+                                  title="Share file"
+                                >
+                                  <Share className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setCurrentMediaFile({
+                                      url: video.videoUrl,
+                                      name: video.title,
+                                      type: 'm3u8'
+                                    });
+                                    setIsMediaRenderingOpen(true);
+                                  }}
+                                  className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
+                                  title="Open video"
+                                >
+                                  <ExternalLink className="w-5 h-5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        {/* Video count */}
+                        <div className="text-center text-gray-500 text-sm mt-4">
+                          Showing {rssVideos.length} video{rssVideos.length !== 1 ? 's' : ''} from RSS feed
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : isLoadingUploads ? (
                   <div className="flex justify-center items-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
                   </div>
