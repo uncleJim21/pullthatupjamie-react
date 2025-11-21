@@ -377,16 +377,11 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   };
 
   const fetchRssVideos = async () => {
-    console.log('=== fetchRssVideos called ===');
-    console.log('=== fetchRssVideos called ===');
-    console.log('=== fetchRssVideos called ===');
-    alert('fetchRssVideos called!');
     printLog('=== fetchRssVideos called ===');
     try {
       setIsLoadingRssVideos(true);
       setRssVideosError(null);
-      
-      console.log('Fetching RSS videos from TFTC feed...');
+    
       printLog('Fetching RSS videos from TFTC feed...');
       // TODO: Make feed URL dynamic based on user's podcast feed
       // Currently hardcoded to TFTC feed: https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9
@@ -461,7 +456,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       });
       console.log('===== END THUMBNAILS =====');
       
-      alert(`Deduplicated! ${videos.length} -> ${uniqueVideos.length} videos`);
       
       setRssVideos(uniqueVideos);
       printLog('RSS videos set to state');
