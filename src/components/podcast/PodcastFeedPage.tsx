@@ -377,19 +377,101 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   };
 
   const fetchRssVideos = async () => {
+    console.log('=== fetchRssVideos called ===');
+    console.log('=== fetchRssVideos called ===');
+    console.log('=== fetchRssVideos called ===');
+    alert('fetchRssVideos called!');
+    printLog('=== fetchRssVideos called ===');
     try {
       setIsLoadingRssVideos(true);
       setRssVideosError(null);
       
+      console.log('Fetching RSS videos from TFTC feed...');
+      printLog('Fetching RSS videos from TFTC feed...');
       // TODO: Make feed URL dynamic based on user's podcast feed
       // Currently hardcoded to TFTC feed: https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9
       const videos = await RssService.getVideoUrlsFromFeed();
-      setRssVideos(videos);
+      
+      console.log(`Received ${videos.length} videos from RSS service`);
+      printLog(`Received ${videos.length} videos from RSS service`);
+      
+      // HACK: Fetch thumbnails directly here since RSS service isn't updating
+      console.log('Fetching RSS feed directly to get thumbnails...');
+      try {
+        const feedResponse = await fetch('https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9');
+        const xmlText = await feedResponse.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+        
+        // Create a map of title -> thumbnail URL
+        const thumbnailMap = new Map<string, string>();
+        const items = xmlDoc.querySelectorAll('channel > item');
+        
+        items.forEach((item) => {
+          const titleEl = item.querySelector('title');
+          const title = titleEl?.textContent || '';
+          
+          // Try to find itunes:image
+          const images = item.getElementsByTagName('itunes:image');
+          if (images.length > 0) {
+            const thumbnailUrl = images[0].getAttribute('href');
+            if (thumbnailUrl) {
+              thumbnailMap.set(title, thumbnailUrl);
+              console.log(`Found thumbnail for "${title.substring(0, 30)}...": ${thumbnailUrl}`);
+            }
+          }
+        });
+        
+        console.log(`Extracted ${thumbnailMap.size} thumbnails from RSS feed`);
+        
+        // Add thumbnails to videos
+        videos.forEach((video) => {
+          const thumbnail = thumbnailMap.get(video.title);
+          if (thumbnail) {
+            video.thumbnailUrl = thumbnail;
+          }
+        });
+      } catch (err) {
+        console.error('Failed to fetch thumbnails:', err);
+      }
+      
+      console.log(`Received ${videos.length} videos from RSS service`);
+      printLog(`Received ${videos.length} videos from RSS service`);
+      
+      // DEDUPLICATE HERE - compare first 20 characters of title
+      const seen = new Set<string>();
+      const uniqueVideos = videos.filter((video) => {
+        const key = video.title.substring(0, 20);
+        if (seen.has(key)) {
+          console.log(`REMOVING DUPLICATE: "${video.title}"`);
+          printLog(`REMOVING DUPLICATE: "${video.title}"`);
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
+      
+      console.log(`After deduplication: ${uniqueVideos.length} unique videos (removed ${videos.length - uniqueVideos.length} duplicates)`);
+      printLog(`After deduplication: ${uniqueVideos.length} unique videos (removed ${videos.length - uniqueVideos.length} duplicates)`);
+      
+      // Log thumbnail info
+      console.log('===== CHECKING THUMBNAILS =====');
+      uniqueVideos.forEach((video, i) => {
+        console.log(`Video ${i + 1}: "${video.title.substring(0, 40)}..." - Thumbnail: ${video.thumbnailUrl || 'NONE'}`);
+      });
+      console.log('===== END THUMBNAILS =====');
+      
+      alert(`Deduplicated! ${videos.length} -> ${uniqueVideos.length} videos`);
+      
+      setRssVideos(uniqueVideos);
+      printLog('RSS videos set to state');
     } catch (error) {
       console.error('Error fetching RSS videos:', error);
+      printLog('ERROR fetching RSS videos: ' + (error instanceof Error ? error.message : String(error)));
       setRssVideosError('Failed to load RSS video feed. Please try again.');
     } finally {
       setIsLoadingRssVideos(false);
+      printLog('=== fetchRssVideos completed ===');
     }
   };
 
@@ -1135,16 +1217,19 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       </div>
                     ) : (
                       <div>
+                        {printLog(`Rendering ${rssVideos.length} RSS videos in UI`) || null}
                         <div className="space-y-3 mb-4">
-                          {rssVideos.map((video, index) => (
+                          {rssVideos.map((video, index) => {
+                            printLog(`Rendering video ${index + 1}: "${video.title}"`);
+                            return (
                             <div 
                               key={`${video.episodeGuid || index}-${video.videoUrl}`}
                               className="bg-[#111111] border border-gray-800 rounded-lg p-4 flex items-center gap-4 hover:border-gray-700 transition-colors"
                             >
                               {/* Thumbnail Preview */}
                               <MediaThumbnail
-                                fileUrl={video.videoUrl}
-                                fileName={video.title}
+                                fileUrl={video.thumbnailUrl || video.videoUrl}
+                                fileName={video.thumbnailUrl ? 'thumbnail.jpg' : video.title}
                                 width={60}
                                 height={60}
                                 className="flex-shrink-0"
@@ -1197,7 +1282,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                                 </button>
                               </div>
                             </div>
-                          ))}
+                          );
+                          })}
                         </div>
                         
                         {/* Video count */}
