@@ -725,23 +725,35 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   };
 
   const handleOpenMediaFile = (upload: UploadItem) => {
+    printLog('=== handleOpenMediaFile called ===');
+    printLog('upload.fileName: ' + upload.fileName);
+    printLog('upload.publicUrl: ' + upload.publicUrl);
+    
     const fileExtension = upload.fileName.split('.').pop()?.toLowerCase();
+    printLog('fileExtension: ' + fileExtension);
     
     // Check if it's an image file
     const isImage = fileExtension && ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
+    printLog('isImage: ' + isImage);
     
     if (isImage) {
       // Open image in new tab
+      printLog('Opening image in new tab');
       window.open(upload.publicUrl, '_blank');
     } else {
       // Open audio/video in MediaRenderingComponent
-      setCurrentMediaFile({
+      printLog('Setting currentMediaFile and opening MediaRenderingComponent');
+      const mediaFile = {
         url: upload.publicUrl,
         name: upload.fileName,
         type: upload.fileName.split('.').pop()?.toLowerCase()
-      });
+      };
+      printLog('mediaFile: ' + JSON.stringify(mediaFile));
+      setCurrentMediaFile(mediaFile);
       setIsMediaRenderingOpen(true);
+      printLog('isMediaRenderingOpen set to true');
     }
+    printLog('==================================');
   };
 
   const handleCloseMediaRendering = () => {

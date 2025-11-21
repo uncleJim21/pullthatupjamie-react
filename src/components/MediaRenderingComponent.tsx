@@ -5,6 +5,7 @@ import VideoEditService, { ChildEdit, SubtitleSegment } from '../services/videoE
 import { WordTimestamp } from '../services/transcriptionService.ts';
 import { printLog } from '../constants/constants.ts';
 import SocialShareModal, { SocialPlatform, SocialShareModalParentContext } from './SocialShareModal.tsx';
+import Hls from 'hls.js';
 
 interface MediaRenderingComponentProps {
   fileUrl: string;
@@ -19,6 +20,15 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   fileType,
   onClose
 }) => {
+  // Debug logging for props
+  useEffect(() => {
+    printLog('=== MediaRenderingComponent Props ===');
+    printLog('fileUrl: ' + fileUrl);
+    printLog('fileName: ' + fileName);
+    printLog('fileType: ' + fileType);
+    printLog('=====================================');
+  }, [fileUrl, fileName, fileType]);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -93,6 +103,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const contentAreaRef = useRef<HTMLDivElement>(null);
   const isAutoScrollEnabledRef = useRef(isAutoScrollEnabled);
   const manualSeekTimeRef = useRef<number | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
 
   // Update ref when isAutoScrollEnabled changes
   useEffect(() => {
@@ -101,9 +112,108 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
 
   // Determine media type
   const isVideo = fileType?.startsWith('video/') || 
-    /\.(mp4|avi|mov|wmv|flv|webm|mkv)$/i.test(fileName);
+    fileType?.includes('mpegURL') || // HLS streaming (application/vnd.apple.mpegurl)
+    /\.(mp4|avi|mov|wmv|flv|webm|mkv|m3u8|m3u)$/i.test(fileName) || // Added m3u8 and m3u for HLS
+    fileUrl.includes('.m3u8'); // Also check URL for m3u8
   const isAudio = fileType?.startsWith('audio/') || 
     /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(fileName);
+
+  // Debug logging for media type detection
+  printLog('=== Media Type Detection ===');
+  printLog('isVideo: ' + isVideo);
+  printLog('isAudio: ' + isAudio);
+  printLog('fileType check - startsWith video/: ' + (fileType?.startsWith('video/') || false));
+  printLog('fileType check - includes mpegURL: ' + (fileType?.includes('mpegURL') || false));
+  printLog('fileName regex test: ' + /\.(mp4|avi|mov|wmv|flv|webm|mkv|m3u8|m3u)$/i.test(fileName));
+  printLog('fileUrl includes .m3u8: ' + fileUrl.includes('.m3u8'));
+  printLog('===========================');
+
+  // Initialize HLS.js for .m3u8 streams (AFTER isVideo is declared)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isVideo) return;
+
+    const isHLS = fileUrl.includes('.m3u8') || fileUrl.includes('.m3u');
+    
+    if (isHLS) {
+      printLog('=== HLS Stream Detected ===');
+      printLog('Initializing HLS.js for: ' + fileUrl);
+      
+      // Check if HLS is supported
+      if (Hls.isSupported()) {
+        printLog('HLS.js is supported - using HLS.js');
+        
+        // Cleanup previous HLS instance if exists
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+        }
+        
+        const hls = new Hls({
+          debug: true, // Enable debug logs
+          enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 90
+        });
+        
+        hls.loadSource(fileUrl);
+        hls.attachMedia(video);
+        
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          printLog('HLS manifest parsed successfully');
+          setIsMediaLoading(false);
+        });
+        
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          printLog('=== HLS Error ===');
+          printLog('Error type: ' + data.type);
+          printLog('Error details: ' + data.details);
+          printLog('Fatal: ' + data.fatal);
+          
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                printLog('Fatal network error - attempting to recover');
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                printLog('Fatal media error - attempting to recover');
+                hls.recoverMediaError();
+                break;
+              default:
+                printLog('Unrecoverable error - destroying HLS instance');
+                hls.destroy();
+                break;
+            }
+          }
+        });
+        
+        hlsRef.current = hls;
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Native HLS support (Safari)
+        printLog('Native HLS support detected (Safari) - using native playback');
+        video.src = fileUrl;
+        setIsMediaLoading(false);
+      } else {
+        printLog('ERROR: HLS not supported on this browser');
+        setIsMediaLoading(false);
+      }
+      
+      printLog('=========================');
+    } else {
+      // Non-HLS video - use regular src
+      printLog('Regular video file - using direct src');
+      video.src = fileUrl;
+    }
+    
+    // Cleanup
+    return () => {
+      if (hlsRef.current) {
+        printLog('Cleaning up HLS.js instance');
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [fileUrl, isVideo]);
 
   // Handle play/pause
   const togglePlayPause = () => {
@@ -950,6 +1060,17 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     const handleEnded = () => setIsPlaying(false);
     const handleLoadedData = () => setIsMediaLoading(false);
     const handleCanPlay = () => setIsMediaLoading(false);
+    
+    // Add error handler for debugging
+    const handleError = (e: Event) => {
+      const target = e.target as HTMLMediaElement;
+      printLog('=== Media Error ===');
+      printLog('Error occurred loading media');
+      printLog('Error code: ' + (target.error?.code || 'unknown'));
+      printLog('Error message: ' + (target.error?.message || 'unknown'));
+      printLog('Source URL: ' + (target.src || 'unknown'));
+      printLog('==================');
+    };
 
     if (video) {
       video.addEventListener('play', handlePlay);
@@ -959,6 +1080,11 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       video.addEventListener('loadedmetadata', handleTimeUpdateWithAutoScroll);
       video.addEventListener('loadeddata', handleLoadedData);
       video.addEventListener('canplay', handleCanPlay);
+      video.addEventListener('error', handleError);
+      
+      printLog('=== Video Element Initialized ===');
+      printLog('Video src: ' + video.src);
+      printLog('================================');
     }
 
     if (audio) {
@@ -969,6 +1095,11 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       audio.addEventListener('loadedmetadata', handleTimeUpdateWithAutoScroll);
       audio.addEventListener('loadeddata', handleLoadedData);
       audio.addEventListener('canplay', handleCanPlay);
+      audio.addEventListener('error', handleError);
+      
+      printLog('=== Audio Element Initialized ===');
+      printLog('Audio src: ' + audio.src);
+      printLog('================================');
     }
 
     return () => {
@@ -980,6 +1111,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         video.removeEventListener('loadedmetadata', handleTimeUpdateWithAutoScroll);
         video.removeEventListener('loadeddata', handleLoadedData);
         video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener('error', handleError);
       }
       if (audio) {
         audio.removeEventListener('play', handlePlay);
@@ -989,6 +1121,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
         audio.removeEventListener('loadedmetadata', handleTimeUpdateWithAutoScroll);
         audio.removeEventListener('loadeddata', handleLoadedData);
         audio.removeEventListener('canplay', handleCanPlay);
+        audio.removeEventListener('error', handleError);
       }
     };
   }, [isVideo, isAudio, highlightedIndex, searchQuery, transcriptData]);
@@ -1040,8 +1173,16 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
 
   // Skip rendering if not video or audio
   if (!isVideo && !isAudio) {
+    printLog('=== MediaRenderingComponent: NOT RENDERING ===');
+    printLog('Neither video nor audio detected - returning null');
+    printLog('isVideo: ' + isVideo + ', isAudio: ' + isAudio);
+    printLog('==============================================');
     return null;
   }
+
+  printLog('=== MediaRenderingComponent: RENDERING ===');
+  printLog('Will render as: ' + (isVideo ? 'VIDEO' : 'AUDIO'));
+  printLog('==========================================');
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex">
@@ -1068,7 +1209,6 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
               )}
               <video
                 ref={videoRef}
-                src={fileUrl}
                 style={{
                   width: '100%',
                   height: '100%',
@@ -1079,6 +1219,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                   maxHeight: '100%'
                 }}
                 onClick={togglePlayPause}
+                crossOrigin="anonymous"
               />
               
               {/* Subtitle overlay - positioned at bottom above controls */}
