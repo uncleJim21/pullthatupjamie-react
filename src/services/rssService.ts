@@ -1,3 +1,5 @@
+import { TFTC_FEED_URL } from '../constants/constants.ts';
+
 // Interface for podcast feed item
 export interface PodcastFeed {
   id: string;
@@ -131,7 +133,7 @@ class RssService {
    * 
    * TODO: Make feedUrl dynamic based on user's podcast feed
    */
-  async getVideoUrlsFromFeed(feedUrl: string = "https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9"): Promise<RssVideoItem[]> {
+  async getVideoUrlsFromFeed(feedUrl: string = TFTC_FEED_URL): Promise<RssVideoItem[]> {
     try {
       // Fetch the RSS feed XML
       const response = await fetch(feedUrl);
@@ -316,7 +318,7 @@ class RssService {
    * 
    * TODO: Make feedUrl dynamic based on user's podcast feed
    */
-  async getVideoUrlsFromFeed(feedUrl: string = "https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9"): Promise<RssVideoItem[]> {
+  async getVideoUrlsFromFeed(feedUrl: string = TFTC_FEED_URL): Promise<RssVideoItem[]> {
     try {
       // Fetch the RSS feed XML
       const response = await fetch(feedUrl);

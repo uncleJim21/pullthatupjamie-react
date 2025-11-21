@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { DEBUG_MODE, FRONTEND_URL, printLog, NavigationMode } from '../../constants/constants.ts';
+import { DEBUG_MODE, FRONTEND_URL, printLog, NavigationMode, TFTC_FEED_URL } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
@@ -384,7 +384,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     
       printLog('Fetching RSS videos from TFTC feed...');
       // TODO: Make feed URL dynamic based on user's podcast feed
-      // Currently hardcoded to TFTC feed: https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9
+      // Currently hardcoded to TFTC feed: See TFTC_FEED_URL constant
       const videos = await RssService.getVideoUrlsFromFeed();
       
       console.log(`Received ${videos.length} videos from RSS service`);
@@ -393,7 +393,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       // HACK: Fetch thumbnails directly here since RSS service isn't updating
       console.log('Fetching RSS feed directly to get thumbnails...');
       try {
-        const feedResponse = await fetch('https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9');
+        const feedResponse = await fetch(TFTC_FEED_URL);
         const xmlText = await feedResponse.text();
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(xmlText, 'text/xml');

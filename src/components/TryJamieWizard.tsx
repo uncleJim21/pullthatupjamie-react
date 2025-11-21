@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { API_URL, printLog } from '../constants/constants.ts';
+import { API_URL, printLog, TFTC_FEED_URL } from '../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
 import PageBanner from './PageBanner.tsx';
 import rssService, { PodcastFeed, PodcastEpisode, FeedInfo } from '../services/rssService.ts';
@@ -362,11 +362,11 @@ const TryJamieWizard: React.FC = () => {
     {
       id: "226249",
       title: "TFTC: A Bitcoin Podcast",
-      url: "https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9",
+      url: TFTC_FEED_URL,
       description: "A Bitcoin podcast exploring the future of money and freedom.",
       author: "Marty Bent",
       ownerName: "TFTC",
-      image: "https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9/files/COVER_ART---DEFAULT---e571338c-758b-45db-b083-0a16c49169b1.jpg"
+      image: `${TFTC_FEED_URL}/files/COVER_ART---DEFAULT---e571338c-758b-45db-b083-0a16c49169b1.jpg`
     },
     {
       id: "1365694",
