@@ -66,6 +66,7 @@ interface PresignedUrlResponse {
   publicUrl: string;
   maxSizeBytes: number;
   maxSizeMB: number;
+  cacheControl?: boolean | string;
 }
 
 /**
@@ -94,12 +95,14 @@ export const getUploadsList = async (authToken: string, page: number = 1): Promi
 };
 
 // Get a presigned URL for file upload
+// cacheControl defaults to true for optimal caching and performance
 export const getPresignedUrl = async (
   fileName: string, 
   fileType: string, 
-  authToken: string
+  authToken: string,
+  cacheControl: boolean | string = true
 ): Promise<PresignedUrlResponse> => {
-  console.log('Requesting presigned URL for:', { fileName, fileType });
+  console.log('Requesting presigned URL for:', { fileName, fileType, cacheControl });
   
   const response = await fetch(`${API_URL}/api/generate-presigned-url`, {
     method: 'POST',
@@ -110,7 +113,8 @@ export const getPresignedUrl = async (
     body: JSON.stringify({ 
       fileName, 
       fileType, 
-      acl: 'public-read' 
+      acl: 'public-read',
+      cacheControl
     })
   });
   
@@ -124,7 +128,8 @@ export const getPresignedUrl = async (
     uploadUrl: data.uploadUrl,
     key: data.key,
     feedId: data.feedId,
-    maxSizeMB: data.maxSizeMB
+    maxSizeMB: data.maxSizeMB,
+    cacheControl: data.cacheControl
   });
   
   return data;
@@ -133,10 +138,16 @@ export const getPresignedUrl = async (
 /**
  * Direct XMLHttpRequest upload to S3/DigitalOcean Spaces using presigned URL
  * This function is intended to be the most reliable method for uploads
+ * 
+ * @param file The file to upload
+ * @param presignedUrl The presigned URL to upload to
+ * @param cacheControl Cache-Control configuration (true = default, string = custom value, false = none)
+ * @param onProgress Optional progress callback
  */
 export const directUpload = async (
   file: File,
   presignedUrl: string,
+  cacheControl?: boolean | string,
   onProgress?: (progress: number) => void
 ): Promise<XMLHttpRequest> => {
   return new Promise((resolve, reject) => {
@@ -150,6 +161,16 @@ export const directUpload = async (
     // Set headers - keeping this minimal to avoid CORS issues
     xhr.setRequestHeader('Content-Type', file.type);
     xhr.setRequestHeader('x-amz-acl', 'public-read');
+    
+    // CRITICAL: Include Cache-Control header if cacheControl is enabled
+    if (cacheControl) {
+      const cacheControlValue = typeof cacheControl === 'string' 
+        ? cacheControl 
+        : 'public, max-age=31536000, immutable';
+      
+      xhr.setRequestHeader('Cache-Control', cacheControlValue);
+      console.log('Setting Cache-Control header:', cacheControlValue);
+    }
     
     // Don't send cookies
     xhr.withCredentials = false;
@@ -202,8 +223,16 @@ export const directUpload = async (
 /**
  * Process a file upload with status tracking
  * This is the primary function to use for uploads
+ * 
+ * @param file The file to upload
+ * @param authToken Authentication token
+ * @param cacheControl Cache-Control configuration (defaults to true for optimal caching)
  */
-export const processFileUpload = async (file: File, authToken: string) => {
+export const processFileUpload = async (
+  file: File, 
+  authToken: string,
+  cacheControl: boolean | string = true
+) => {
   let xhr: XMLHttpRequest | null = null;
   let aborted = false;
   
@@ -222,8 +251,8 @@ export const processFileUpload = async (file: File, authToken: string) => {
       progress: 10
     });
     
-    const presignedData = await getPresignedUrl(file.name, file.type, authToken);
-    const { uploadUrl, key, publicUrl } = presignedData;
+    const presignedData = await getPresignedUrl(file.name, file.type, authToken, cacheControl);
+    const { uploadUrl, key, publicUrl, cacheControl: responseCacheControl } = presignedData;
     
     // Extract a unique ID from the key (typically format: folder/id/filename)
     const uploadId = key.split('/')[1] || 'unknown';
@@ -236,8 +265,8 @@ export const processFileUpload = async (file: File, authToken: string) => {
       uploadId
     });
     
-    // Start the upload
-    xhr = await directUpload(file, uploadUrl, (progress) => {
+    // Start the upload with cache control
+    xhr = await directUpload(file, uploadUrl, responseCacheControl, (progress) => {
       // Scale progress from 20-90%
       const scaledProgress = 20 + (progress * 0.7);
       
