@@ -403,7 +403,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
       setChildrenError(null);
       
       try {
-        const children = await VideoEditService.getChildEdits(fileName);
+        const children = await VideoEditService.getChildEdits(fileUrl);
         setChildrenClips(children);
         printLog('Loaded ' + children.length + ' child edits');
         
@@ -421,7 +421,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     };
     
     loadChildrenClips();
-  }, [showChildrenClips, fileName]);
+  }, [showChildrenClips, fileUrl]);
 
   // Poll for processing clips
   const startPollingClip = (lookupHash: string) => {
@@ -443,7 +443,7 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           // Refresh children list
           printLog('Clip processing finished, refreshing children list');
           if (showChildrenClips) {
-            const children = await VideoEditService.getChildEdits(fileName);
+            const children = await VideoEditService.getChildEdits(fileUrl);
             setChildrenClips(children);
           }
         }

@@ -1211,7 +1211,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       </div>
                     ) : (
                       <div>
-                        {printLog(`Rendering ${rssVideos.length} RSS videos in UI`) || null}
+                        {(() => { printLog(`Rendering ${rssVideos.length} RSS videos in UI`); return null; })()}
                         <div className="space-y-3 mb-4">
                           {rssVideos.map((video, index) => {
                             printLog(`Rendering video ${index + 1}: "${video.title}"`);

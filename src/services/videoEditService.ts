@@ -1,7 +1,55 @@
 import { printLog, API_URL } from '../constants/constants.ts';
+import CryptoJS from 'crypto-js';
 
 // Base API URL - will use same backend as other services
 const API_BASE_URL = API_URL;
+
+// CDN Configuration - domains we own
+const OWN_CDN_DOMAINS = [
+  'cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com',
+  'nyc3.digitaloceanspaces.com' // Generic DigitalOcean Spaces
+];
+
+/**
+ * Calculate parent file base identifier for grouping video edits
+ * 
+ * For our own CDN URLs: Extract filename without extension
+ * For external URLs: Generate deterministic hash (ext-{first 16 chars of MD5})
+ * 
+ * @param cdnUrl - The full URL of the video file
+ * @returns parentFileBase identifier for querying child edits
+ */
+export function calculateParentFileBase(cdnUrl: string): string {
+  printLog('Calculating parentFileBase for URL: ' + cdnUrl);
+  
+  // Check if it's our own CDN
+  const isOurCdn = OWN_CDN_DOMAINS.some(domain => cdnUrl.includes(domain));
+  
+  if (isOurCdn) {
+    // Extract filename from our CDN
+    const urlParts = cdnUrl.split('/');
+    const filename = urlParts[urlParts.length - 1];
+    // Remove extension and query parameters
+    const fileBase = filename.split('?')[0].replace(/\.[^/.]+$/, '');
+    printLog('Our CDN detected - parentFileBase: ' + fileBase);
+    return fileBase;
+  } else {
+    // Hash external URL (deterministic)
+    // Remove query parameters first for consistency
+    const urlWithoutQuery = cdnUrl.split('?')[0];
+    
+    // Calculate MD5 hash
+    const hash = CryptoJS.MD5(urlWithoutQuery).toString();
+    
+    // Take first 16 characters and add prefix
+    const parentFileBase = 'ext-' + hash.substring(0, 16);
+    
+    printLog('External URL detected - parentFileBase: ' + parentFileBase);
+    printLog('Hash calculated from: ' + urlWithoutQuery);
+    
+    return parentFileBase;
+  }
+}
 
 // Interfaces
 export interface SubtitleSegment {
@@ -106,12 +154,31 @@ export const checkEditStatus = async (lookupHash: string): Promise<EditStatus> =
 };
 
 // Get all child edits for a parent file
-export const getChildEdits = async (parentFileName: string): Promise<ChildEdit[]> => {
-  printLog('Getting child edits for: ' + parentFileName);
+// Can accept either a parentFileBase directly, or a full CDN URL (will calculate parentFileBase)
+export const getChildEdits = async (parentFileNameOrUrl: string): Promise<ChildEdit[]> => {
+  console.log('========== GET CHILD EDITS DEBUG ==========');
+  console.log('Input received:', parentFileNameOrUrl);
+  console.log('Input type:', typeof parentFileNameOrUrl);
+  console.log('Input length:', parentFileNameOrUrl.length);
+  
+  // Check if input looks like a full URL (contains protocol)
+  const isUrl = parentFileNameOrUrl.startsWith('http://') || parentFileNameOrUrl.startsWith('https://');
+  console.log('Is URL?', isUrl);
+  
+  // Calculate parentFileBase if a URL was provided
+  const parentFileBase = isUrl ? calculateParentFileBase(parentFileNameOrUrl) : parentFileNameOrUrl;
+  
+  console.log('Final parentFileBase to query:', parentFileBase);
+  console.log('========== END DEBUG ==========');
+  
+  printLog('Getting child edits for parentFileBase: ' + parentFileBase);
+  if (isUrl) {
+    printLog('Calculated from URL: ' + parentFileNameOrUrl);
+  }
   
   const token = getAuthToken();
   
-  const response = await fetch(`${API_BASE_URL}/api/edit-children/${encodeURIComponent(parentFileName)}`, {
+  const response = await fetch(`${API_BASE_URL}/api/edit-children/${encodeURIComponent(parentFileBase)}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -189,7 +256,8 @@ const VideoEditService = {
   createVideoEdit,
   checkEditStatus,
   getChildEdits,
-  pollForCompletion
+  pollForCompletion,
+  calculateParentFileBase
 };
 
 export default VideoEditService;
