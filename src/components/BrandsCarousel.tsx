@@ -9,15 +9,21 @@ interface Brand {
 }
 
 const brands: Brand[] = [
+    {
+        name: 'TFTC: A Bitcoin Podcast',
+        imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005588287-tftc-cover.jpg',
+        width: 150,
+        height: 150,
+      },
+    {
+        name: 'Ungovernable Misfits',
+        imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005499982-ugmf-cover.jpg',
+        width: 150,
+        height: 150,
+      },
   {
     name: 'THE Bitcoin Podcast',
     imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005597054-tbp-walker.jpg',
-    width: 150,
-    height: 150,
-  },
-  {
-    name: 'TFTC: A Bitcoin Podcast',
-    imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005588287-tftc-cover.jpg',
     width: 150,
     height: 150,
   },
@@ -42,12 +48,6 @@ const brands: Brand[] = [
   {
     name: 'Trust Revolution',
     imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005539511-trust-revolution.jpg',
-    width: 150,
-    height: 150,
-  },
-  {
-    name: 'Ungovernable Misfits',
-    imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005499982-ugmf-cover.jpg',
     width: 150,
     height: 150,
   },
@@ -126,19 +126,28 @@ const BrandsCarousel: React.FC = () => {
         overflow: 'hidden',
         padding: '20px 0',
         position: 'relative',
-        maskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgb(0, 0, 0) 12.5%, rgb(0, 0, 0) 87.5%, rgba(0, 0, 0, 0) 100%)',
-        WebkitMaskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgb(0, 0, 0) 12.5%, rgb(0, 0, 0) 87.5%, rgba(0, 0, 0, 0) 100%)',
       }}
     >
       <div
-        ref={carouselRef}
         style={{
-          display: 'flex',
-          gap: '48px',
-          alignItems: 'center',
-          willChange: 'transform',
+          width: '100%',
+          maxWidth: '800px',
+          margin: '0 auto',
+          overflow: 'hidden',
+          position: 'relative',
+          maskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgb(0, 0, 0) 10%, rgb(0, 0, 0) 90%, rgba(0, 0, 0, 0) 100%)',
+          WebkitMaskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgb(0, 0, 0) 10%, rgb(0, 0, 0) 90%, rgba(0, 0, 0, 0) 100%)',
         }}
       >
+        <div
+          ref={carouselRef}
+          style={{
+            display: 'flex',
+            gap: '48px',
+            alignItems: 'center',
+            willChange: 'transform',
+          }}
+        >
         {triplicatedBrands.map((brand, index) => (
           <div
             key={`${brand.name}-${index}`}
@@ -215,6 +224,7 @@ const BrandsCarousel: React.FC = () => {
             )}
           </div>
         ))}
+        </div>
       </div>
     </div>
   );
