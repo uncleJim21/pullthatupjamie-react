@@ -6,6 +6,7 @@ import SymbolTile from './SymbolTile.tsx';
 import { SearchIcon, ShareIcon, ClipIcon } from './Icons.tsx';
 import TutorialModal from './TutorialModal.tsx';
 import CheckoutModal from './CheckoutModal.tsx';
+import BrandsCarousel from './BrandsCarousel.tsx';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -230,6 +231,9 @@ const HomePage: React.FC = () => {
                   Explore Free Tools
                 </Button>
               </div>
+              
+              {/* Brands Carousel */}
+              <BrandsCarousel />
               
               {/* Demo Image */}
               <img 
