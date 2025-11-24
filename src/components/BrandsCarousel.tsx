@@ -123,11 +123,31 @@ const BrandsCarousel: React.FC = () => {
     <div
       style={{
         width: '100%',
-        overflow: 'hidden',
         padding: '20px 0',
         position: 'relative',
       }}
     >
+      {/* Title */}
+      <h3
+        style={{
+          fontSize: '32px',
+          fontWeight: 'bold',
+          textAlign: 'center',
+          marginBottom: '32px',
+          color: 'white',
+        }}
+      >
+        Trusted by the Best
+      </h3>
+      
+      {/* Carousel Container */}
+      <div
+        style={{
+          width: '100%',
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      >
       <div
         style={{
           width: '100%',
@@ -225,6 +245,7 @@ const BrandsCarousel: React.FC = () => {
           </div>
         ))}
         </div>
+      </div>
       </div>
     </div>
   );
