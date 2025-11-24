@@ -107,12 +107,12 @@ const HomePage: React.FC = () => {
       }
       
       .hero-title-mobile {
-        font-size: 32px !important;
+        font-size: 25.6px !important;
         line-height: 1.2 !important;
         margin-bottom: 16px !important;
       }
       .hero-text-mobile {
-        font-size: 16px !important;
+        font-size: 12.8px !important;
         padding: 0 10px !important;
       }
       .hero-section-mobile {
@@ -127,7 +127,12 @@ const HomePage: React.FC = () => {
       .image-placeholder-mobile {
         height: 180px !important;
         margin: 0 auto 20px !important;
-        font-size: 14px !important;
+        font-size: 11.2px !important;
+      }
+      .demo-image-container-mobile {
+        height: 180px !important;
+        margin: 0 auto 10px !important;
+        padding: 0 15px !important;
       }
       .features-section-mobile {
         padding: 0 15px 40px !important;
@@ -139,11 +144,11 @@ const HomePage: React.FC = () => {
         padding: 40px 15px 60px !important;
       }
       .bottom-cta-title-mobile {
-        font-size: 28px !important;
+        font-size: 22.4px !important;
         margin-bottom: 16px !important;
       }
       .bottom-cta-text-mobile {
-        font-size: 16px !important;
+        font-size: 12.8px !important;
         padding: 0 10px !important;
         margin-bottom: 32px !important;
       }
@@ -204,17 +209,17 @@ const HomePage: React.FC = () => {
             {/* Hero Section */}
             <section 
               className="hero-section-mobile"
-              style={{ textAlign: 'center', padding: '32px 20px 60px' }}
+              style={{ textAlign: 'center', padding: '24px 20px 60px' }}
             >
               <h1 
                 className="hero-title-mobile"
-                style={{ fontSize: '48px', fontWeight: 'bold', marginBottom: '24px' }}
+                style={{ fontSize: '38.4px', fontWeight: 'bold', marginBottom: '14px' }}
               >
                 Your Podcast is a Gold Mine.
               </h1>
               <p 
                 className="hero-text-mobile"
-                style={{ fontSize: '18px', maxWidth: '800px', margin: '0 auto 40px', lineHeight: '1.6' }}
+                style={{ fontSize: '14.4px', maxWidth: '800px', margin: '0 auto 24px', lineHeight: '1.6' }}
               >
                 Find & Capitalize on Top Moments with lightning fast 
                 <br />search, clip, & AI tools - courtesy of your own personal Young Jamie.
@@ -222,7 +227,7 @@ const HomePage: React.FC = () => {
               
               <div 
                 className="button-container-mobile"
-                style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '42px' }}
+                style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '28px' }}
               >
                 <Button to="/try-jamie" variant="primary">
                   Try on Your Pod for Free
@@ -234,25 +239,27 @@ const HomePage: React.FC = () => {
               
               {/* Demo Image - Cropped */}
               <div
+                className="demo-image-container-mobile"
                 style={{
-                  height: '250px',
+                  height: '300px',
                   maxWidth: '800px',
-                  margin: '0 auto 10px',
+                  margin: '0 auto 2px',
                   width: '100%',
                   overflow: 'hidden',
                   borderRadius: '6px',
                   border: '1px solid rgb(55, 65, 81)',
+                  display: 'block',
                 }}
               >
                 <img 
                   src="https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764006585642-ptuj-demo-image.png"
                   alt="Pull That Up Jamie Demo"
-                  className="image-placeholder-mobile flex-shrink-0"
                   style={{ 
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
                     objectPosition: 'center top',
+                    display: 'block',
                   }}
                 />
               </div>
@@ -318,14 +325,14 @@ const HomePage: React.FC = () => {
             >
               <h2 
                 className="bottom-cta-title-mobile"
-                style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '20px' }}
+                style={{ fontSize: '28.8px', fontWeight: 'bold', marginBottom: '20px' }}
               >
                 Ready to get started?
               </h2>
               <p 
                 className="bottom-cta-text-mobile"
                 style={{ 
-                  fontSize: '18px', 
+                  fontSize: '14.4px', 
                   maxWidth: '600px', 
                   margin: '0 auto 40px', 
                   lineHeight: '1.6',

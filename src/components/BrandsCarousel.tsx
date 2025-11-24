@@ -14,42 +14,49 @@ const brands: Brand[] = [
         imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005588287-tftc-cover.jpg',
         width: 150,
         height: 150,
+        link: 'https://fountain.fm/show/V71wG3DhMtF9fDqaJRWX',
       },
     {
         name: 'Ungovernable Misfits',
         imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005499982-ugmf-cover.jpg',
         width: 150,
         height: 150,
+        link: 'https://fountain.fm/show/sbfNnARG7zj3nL6Xfill',
       },
   {
     name: 'THE Bitcoin Podcast',
     imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005597054-tbp-walker.jpg',
     width: 150,
     height: 150,
+    link: 'https://fountain.fm/show/68gcLZFDRxOzgGeZmXq6',
   },
   {
     name: 'Stacker News Live',
     imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005574138-snl-cover.jpg',
     width: 150,
     height: 150,
+    link: 'https://fountain.fm/show/Mg1AWuvkeZSFhsJZ3BW2',
   },
   {
     name: 'Build with Bitcoin',
     imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005565516-bwb-cover.jpeg',
     width: 150,
     height: 150,
+    link: 'https://fountain.fm/show/lZD63YUOaBWUQKyYR9MZ',
   },
   {
     name: 'News and Guidance',
     imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005556601-news-and-guidance.jpg',
     width: 150,
     height: 150,
+    link: 'https://fountain.fm/show/JU9ec1kVXBy285Av2ja9',
   },
   {
     name: 'Trust Revolution',
     imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005539511-trust-revolution.jpg',
     width: 150,
     height: 150,
+    link: 'https://fountain.fm/show/Mk0fJte5vrfiDQ5RyCZd',
   },
 ];
 
@@ -130,10 +137,10 @@ const BrandsCarousel: React.FC = () => {
       {/* Title */}
       <h3
         style={{
-          fontSize: '32px',
+          fontSize: '28px',
           fontWeight: 'bold',
           textAlign: 'center',
-          marginBottom: '32px',
+          marginBottom: '24px',
           color: 'white',
         }}
       >
