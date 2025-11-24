@@ -6,6 +6,7 @@ import SymbolTile from './SymbolTile.tsx';
 import { SearchIcon, ShareIcon, ClipIcon } from './Icons.tsx';
 import TutorialModal from './TutorialModal.tsx';
 import CheckoutModal from './CheckoutModal.tsx';
+import BrandsCarousel from './BrandsCarousel.tsx';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -51,6 +52,9 @@ const HomePage: React.FC = () => {
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fadeOut, setFadeOut] = useState(false);
+  const [dots, setDots] = useState('.');
 
   const handleTutorialClick = () => {
     setIsTutorialOpen(true);
@@ -68,6 +72,53 @@ const HomePage: React.FC = () => {
     setIsCheckoutModalOpen(false);
     setIsUpgradeSuccessPopUpOpen(true);
   };
+
+  // Animate dots
+  React.useEffect(() => {
+    if (!isLoading) return;
+    
+    const interval = setInterval(() => {
+      setDots(prev => {
+        if (prev === '.') return '..';
+        if (prev === '..') return '...';
+        return '.';
+      });
+    }, 400);
+
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  // Track image loading
+  React.useEffect(() => {
+    const images = [
+      './tron-background2.png',
+      'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764006585642-ptuj-demo-image.png',
+    ];
+
+    let loadedCount = 0;
+    const totalImages = images.length;
+
+    const checkAllLoaded = () => {
+      loadedCount++;
+      if (loadedCount === totalImages) {
+        // Start fade out
+        setTimeout(() => {
+          setFadeOut(true);
+          // Remove loading screen after fade animation
+          setTimeout(() => {
+            setIsLoading(false);
+          }, 500);
+        }, 300); // Small delay before fading out
+      }
+    };
+
+    images.forEach((src) => {
+      const img = new Image();
+      img.onload = checkAllLoaded;
+      img.onerror = checkAllLoaded; // Also count errors as "loaded" to prevent hanging
+      img.src = src;
+    });
+  }, []);
   
   // Mobile styles using CSS-in-JS with media queries
   const mobileStyles = `
@@ -106,13 +157,16 @@ const HomePage: React.FC = () => {
       }
       
       .hero-title-mobile {
-        font-size: 32px !important;
+        font-size: 25.6px !important;
         line-height: 1.2 !important;
         margin-bottom: 16px !important;
       }
       .hero-text-mobile {
-        font-size: 16px !important;
+        font-size: 12.8px !important;
         padding: 0 10px !important;
+      }
+      .desktop-break {
+        display: none !important;
       }
       .hero-section-mobile {
         padding: 32px 15px 40px !important;
@@ -126,7 +180,12 @@ const HomePage: React.FC = () => {
       .image-placeholder-mobile {
         height: 180px !important;
         margin: 0 auto 20px !important;
-        font-size: 14px !important;
+        font-size: 11.2px !important;
+      }
+      .demo-image-container-mobile {
+        height: 135px !important;
+        margin: 0 auto 10px !important;
+        padding: 0 15px !important;
       }
       .features-section-mobile {
         padding: 0 15px 40px !important;
@@ -138,11 +197,11 @@ const HomePage: React.FC = () => {
         padding: 40px 15px 60px !important;
       }
       .bottom-cta-title-mobile {
-        font-size: 28px !important;
+        font-size: 22.4px !important;
         margin-bottom: 16px !important;
       }
       .bottom-cta-text-mobile {
-        font-size: 16px !important;
+        font-size: 12.8px !important;
         padding: 0 10px !important;
         margin-bottom: 32px !important;
       }
@@ -157,6 +216,41 @@ const HomePage: React.FC = () => {
   return (
     <>
       <style>{mobileStyles}</style>
+      
+      {/* Loading Screen */}
+      {isLoading && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: '#000000',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            opacity: fadeOut ? 0 : 1,
+            transition: 'opacity 0.5s ease-out',
+          }}
+        >
+          <h1
+            style={{
+              fontSize: '48px',
+              fontWeight: 'bold',
+              color: '#b0b0b0',
+              textAlign: 'center',
+              fontFamily: '"Courier New", Courier, monospace',
+              textShadow: '0 0 8px rgba(176, 176, 176, 0.4)',
+              letterSpacing: '2px',
+            }}
+          >
+            Booting Up Jamie{dots}
+          </h1>
+        </div>
+      )}
+      
       <div style={{ 
         backgroundColor: 'black', 
         minHeight: '100vh', 
@@ -203,25 +297,25 @@ const HomePage: React.FC = () => {
             {/* Hero Section */}
             <section 
               className="hero-section-mobile"
-              style={{ textAlign: 'center', padding: '64px 20px 60px' }}
+              style={{ textAlign: 'center', padding: '24px 20px 60px' }}
             >
               <h1 
                 className="hero-title-mobile"
-                style={{ fontSize: '48px', fontWeight: 'bold', marginBottom: '24px' }}
+                style={{ fontSize: '38.4px', fontWeight: 'bold', marginBottom: '14px' }}
               >
                 Your Podcast is a Gold Mine.
               </h1>
               <p 
                 className="hero-text-mobile"
-                style={{ fontSize: '18px', maxWidth: '800px', margin: '0 auto 40px', lineHeight: '1.6' }}
+                style={{ fontSize: '14.4px', maxWidth: '800px', margin: '0 auto 24px', lineHeight: '1.6' }}
               >
                 Find & Capitalize on Top Moments with lightning fast 
-                <br />search, clip, & AI tools - courtesy of your own personal Young Jamie.
+                <br className="desktop-break" /> search, clip, & AI tools - courtesy of your own personal Young Jamie.
               </p>
               
               <div 
                 className="button-container-mobile"
-                style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '42px' }}
+                style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '28px' }}
               >
                 <Button to="/try-jamie" variant="primary">
                   Try on Your Pod for Free
@@ -231,18 +325,35 @@ const HomePage: React.FC = () => {
                 </Button>
               </div>
               
-              {/* Demo Image */}
-              <img 
-                src="/ptuj-demo-image.png"
-                alt="Pull That Up Jamie Demo"
-                className="image-placeholder-mobile rounded-md border border-gray-700 object-cover flex-shrink-0"
-                style={{ 
-                  height: '500px', 
-                  maxWidth: '800px', 
-                  margin: '0 auto 40px',
-                  width: '100%'
+              {/* Demo Image - Cropped */}
+              <div
+                className="demo-image-container-mobile"
+                style={{
+                  height: '300px',
+                  maxWidth: '800px',
+                  margin: '0 auto 2px',
+                  width: '100%',
+                  overflow: 'hidden',
+                  borderRadius: '6px',
+                  border: '1px solid rgb(55, 65, 81)',
+                  display: 'block',
                 }}
-              />
+              >
+                <img 
+                  src="https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764006585642-ptuj-demo-image.png"
+                  alt="Pull That Up Jamie Demo"
+                  style={{ 
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center top',
+                    display: 'block',
+                  }}
+                />
+              </div>
+              
+              {/* Brands Carousel */}
+              <BrandsCarousel />
             </section>
             
             {/* Features Section */}
@@ -302,14 +413,14 @@ const HomePage: React.FC = () => {
             >
               <h2 
                 className="bottom-cta-title-mobile"
-                style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '20px' }}
+                style={{ fontSize: '28.8px', fontWeight: 'bold', marginBottom: '20px' }}
               >
                 Ready to get started?
               </h2>
               <p 
                 className="bottom-cta-text-mobile"
                 style={{ 
-                  fontSize: '18px', 
+                  fontSize: '14.4px', 
                   maxWidth: '600px', 
                   margin: '0 auto 40px', 
                   lineHeight: '1.6',
