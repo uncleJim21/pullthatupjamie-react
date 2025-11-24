@@ -86,7 +86,7 @@ const BrandsCarousel: React.FC = () => {
 
     let animationFrameId: number;
     let position = 0;
-    const speed = 1.75; // pixels per frame
+    const speed = 0.75; // pixels per frame
 
     const animate = () => {
       if (contentWidth === 0) {

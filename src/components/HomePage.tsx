@@ -204,7 +204,7 @@ const HomePage: React.FC = () => {
             {/* Hero Section */}
             <section 
               className="hero-section-mobile"
-              style={{ textAlign: 'center', padding: '64px 20px 60px' }}
+              style={{ textAlign: 'center', padding: '32px 20px 60px' }}
             >
               <h1 
                 className="hero-title-mobile"
@@ -232,21 +232,33 @@ const HomePage: React.FC = () => {
                 </Button>
               </div>
               
+              {/* Demo Image - Cropped */}
+              <div
+                style={{
+                  height: '250px',
+                  maxWidth: '800px',
+                  margin: '0 auto 10px',
+                  width: '100%',
+                  overflow: 'hidden',
+                  borderRadius: '6px',
+                  border: '1px solid rgb(55, 65, 81)',
+                }}
+              >
+                <img 
+                  src="https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764006585642-ptuj-demo-image.png"
+                  alt="Pull That Up Jamie Demo"
+                  className="image-placeholder-mobile flex-shrink-0"
+                  style={{ 
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center top',
+                  }}
+                />
+              </div>
+              
               {/* Brands Carousel */}
               <BrandsCarousel />
-              
-              {/* Demo Image */}
-              <img 
-                src="/ptuj-demo-image.png"
-                alt="Pull That Up Jamie Demo"
-                className="image-placeholder-mobile rounded-md border border-gray-700 object-cover flex-shrink-0"
-                style={{ 
-                  height: '500px', 
-                  maxWidth: '800px', 
-                  margin: '0 auto 40px',
-                  width: '100%'
-                }}
-              />
             </section>
             
             {/* Features Section */}
