@@ -171,7 +171,7 @@ const BrandsCarousel: React.FC = () => {
           style={{
             display: 'flex',
             gap: '48px',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             willChange: 'transform',
           }}
         >
@@ -183,7 +183,6 @@ const BrandsCarousel: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center',
               gap: '8px',
             }}
           >
@@ -213,7 +212,7 @@ const BrandsCarousel: React.FC = () => {
                 />
                 <span
                   style={{
-                    fontSize: '12px',
+                    fontSize: '18px',
                     fontWeight: 'bold',
                     color: 'white',
                     textAlign: 'center',
