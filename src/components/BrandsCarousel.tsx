@@ -10,40 +10,46 @@ interface Brand {
 
 const brands: Brand[] = [
   {
-    name: 'Stacker News',
-    imageUrl: '/stacker-news-logo.png',
-    width: 200,
-    height: 60,
+    name: 'THE Bitcoin Podcast',
+    imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005597054-tbp-walker.jpg',
+    width: 150,
+    height: 150,
   },
   {
-    name: 'Nostr',
-    imageUrl: '/nostr-logo.png',
-    width: 180,
-    height: 60,
+    name: 'TFTC: A Bitcoin Podcast',
+    imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005588287-tftc-cover.jpg',
+    width: 150,
+    height: 150,
   },
   {
-    name: 'Bitcoin',
-    imageUrl: '/icons/bitcoin.png',
-    width: 60,
-    height: 60,
+    name: 'Stacker News Live',
+    imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005574138-snl-cover.jpg',
+    width: 150,
+    height: 150,
   },
   {
-    name: 'Tech',
-    imageUrl: '/icons/tech.png',
-    width: 60,
-    height: 60,
+    name: 'Build with Bitcoin',
+    imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005565516-bwb-cover.jpeg',
+    width: 150,
+    height: 150,
   },
   {
-    name: 'Economics',
-    imageUrl: '/icons/economics.png',
-    width: 60,
-    height: 60,
+    name: 'News and Guidance',
+    imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005556601-news-and-guidance.jpg',
+    width: 150,
+    height: 150,
   },
   {
-    name: 'Politics',
-    imageUrl: '/icons/politics.png',
-    width: 60,
-    height: 60,
+    name: 'Trust Revolution',
+    imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005539511-trust-revolution.jpg',
+    width: 150,
+    height: 150,
+  },
+  {
+    name: 'Ungovernable Misfits',
+    imageUrl: 'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764005499982-ugmf-cover.jpg',
+    width: 150,
+    height: 150,
   },
 ];
 
@@ -80,7 +86,7 @@ const BrandsCarousel: React.FC = () => {
 
     let animationFrameId: number;
     let position = 0;
-    const speed = 0.5; // pixels per frame
+    const speed = 1.75; // pixels per frame
 
     const animate = () => {
       if (contentWidth === 0) {
@@ -139,10 +145,10 @@ const BrandsCarousel: React.FC = () => {
             style={{
               flexShrink: 0,
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              minWidth: '150px',
-              height: '80px',
+              gap: '8px',
             }}
           >
             {brand.link ? (
@@ -152,41 +158,60 @@ const BrandsCarousel: React.FC = () => {
                 rel="noopener noreferrer"
                 style={{
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '100%',
-                  height: '100%',
+                  gap: '8px',
+                  textDecoration: 'none',
                 }}
               >
                 <img
                   src={brand.imageUrl}
                   alt={brand.name}
                   style={{
-                    maxWidth: '100%',
-                    maxHeight: '100%',
-                    objectFit: 'contain',
-                    opacity: 0.7,
-                    transition: 'opacity 0.3s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.opacity = '1';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.opacity = '0.7';
+                    width: '150px',
+                    height: '150px',
+                    objectFit: 'cover',
+                    borderRadius: '8px',
+                    opacity: 1,
                   }}
                 />
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    textAlign: 'center',
+                    maxWidth: '150px',
+                  }}
+                >
+                  {brand.name}
+                </span>
               </a>
             ) : (
-              <img
-                src={brand.imageUrl}
-                alt={brand.name}
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '100%',
-                  objectFit: 'contain',
-                  opacity: 0.7,
-                }}
-              />
+              <>
+                <img
+                  src={brand.imageUrl}
+                  alt={brand.name}
+                  style={{
+                    width: '150px',
+                    height: '150px',
+                    objectFit: 'cover',
+                    borderRadius: '8px',
+                    opacity: 1,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    textAlign: 'center',
+                    maxWidth: '150px',
+                  }}
+                >
+                  {brand.name}
+                </span>
+              </>
             )}
           </div>
         ))}
