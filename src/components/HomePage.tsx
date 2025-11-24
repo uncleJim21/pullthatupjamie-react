@@ -52,6 +52,9 @@ const HomePage: React.FC = () => {
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fadeOut, setFadeOut] = useState(false);
+  const [dots, setDots] = useState('.');
 
   const handleTutorialClick = () => {
     setIsTutorialOpen(true);
@@ -69,6 +72,53 @@ const HomePage: React.FC = () => {
     setIsCheckoutModalOpen(false);
     setIsUpgradeSuccessPopUpOpen(true);
   };
+
+  // Animate dots
+  React.useEffect(() => {
+    if (!isLoading) return;
+    
+    const interval = setInterval(() => {
+      setDots(prev => {
+        if (prev === '.') return '..';
+        if (prev === '..') return '...';
+        return '.';
+      });
+    }, 400);
+
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  // Track image loading
+  React.useEffect(() => {
+    const images = [
+      './tron-background2.png',
+      'https://cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com/jamie-pro/550168/uploads/1764006585642-ptuj-demo-image.png',
+    ];
+
+    let loadedCount = 0;
+    const totalImages = images.length;
+
+    const checkAllLoaded = () => {
+      loadedCount++;
+      if (loadedCount === totalImages) {
+        // Start fade out
+        setTimeout(() => {
+          setFadeOut(true);
+          // Remove loading screen after fade animation
+          setTimeout(() => {
+            setIsLoading(false);
+          }, 500);
+        }, 300); // Small delay before fading out
+      }
+    };
+
+    images.forEach((src) => {
+      const img = new Image();
+      img.onload = checkAllLoaded;
+      img.onerror = checkAllLoaded; // Also count errors as "loaded" to prevent hanging
+      img.src = src;
+    });
+  }, []);
   
   // Mobile styles using CSS-in-JS with media queries
   const mobileStyles = `
@@ -166,6 +216,41 @@ const HomePage: React.FC = () => {
   return (
     <>
       <style>{mobileStyles}</style>
+      
+      {/* Loading Screen */}
+      {isLoading && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: '#000000',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            opacity: fadeOut ? 0 : 1,
+            transition: 'opacity 0.5s ease-out',
+          }}
+        >
+          <h1
+            style={{
+              fontSize: '48px',
+              fontWeight: 'bold',
+              color: '#b0b0b0',
+              textAlign: 'center',
+              fontFamily: '"Courier New", Courier, monospace',
+              textShadow: '0 0 8px rgba(176, 176, 176, 0.4)',
+              letterSpacing: '2px',
+            }}
+          >
+            Booting Up Jamie{dots}
+          </h1>
+        </div>
+      )}
+      
       <div style={{ 
         backgroundColor: 'black', 
         minHeight: '100vh', 
