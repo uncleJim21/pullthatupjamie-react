@@ -115,6 +115,9 @@ const HomePage: React.FC = () => {
         font-size: 12.8px !important;
         padding: 0 10px !important;
       }
+      .desktop-break {
+        display: none !important;
+      }
       .hero-section-mobile {
         padding: 32px 15px 40px !important;
       }
@@ -130,7 +133,7 @@ const HomePage: React.FC = () => {
         font-size: 11.2px !important;
       }
       .demo-image-container-mobile {
-        height: 180px !important;
+        height: 135px !important;
         margin: 0 auto 10px !important;
         padding: 0 15px !important;
       }
@@ -222,7 +225,7 @@ const HomePage: React.FC = () => {
                 style={{ fontSize: '14.4px', maxWidth: '800px', margin: '0 auto 24px', lineHeight: '1.6' }}
               >
                 Find & Capitalize on Top Moments with lightning fast 
-                <br />search, clip, & AI tools - courtesy of your own personal Young Jamie.
+                <br className="desktop-break" /> search, clip, & AI tools - courtesy of your own personal Young Jamie.
               </p>
               
               <div 
