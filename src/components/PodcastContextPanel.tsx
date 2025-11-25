@@ -173,97 +173,126 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
               </div>
             ) : hierarchy ? (
-              <div className="space-y-4">
-                {/* Episode Image & Title */}
-                {hierarchy.hierarchy.episode?.metadata.imageUrl && (
-                  <div className="space-y-2">
-                    <img
-                      src={hierarchy.hierarchy.episode.metadata.imageUrl}
-                      alt="Episode"
-                      className="w-full rounded-lg object-cover"
-                    />
-                  </div>
-                )}
-
-                {/* Feed Title */}
-                {hierarchy.hierarchy.feed && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">FEED</p>
-                    <p className="text-sm text-white font-medium">
-                      {hierarchy.hierarchy.feed.metadata.title}
-                    </p>
-                  </div>
-                )}
-
-                {/* Episode Title */}
-                {hierarchy.hierarchy.episode && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">EPISODE</p>
-                    <p className="text-sm text-white font-medium line-clamp-3">
-                      {hierarchy.hierarchy.episode.metadata.title}
-                    </p>
-                    {hierarchy.hierarchy.episode.metadata.duration && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Duration: {formatTime(hierarchy.hierarchy.episode.metadata.duration)}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Chapter Details */}
-                {hierarchy.hierarchy.chapter && (
-                  <div className="p-3 bg-black/50 rounded-lg border border-gray-800">
-                    <p className="text-xs text-gray-500 mb-2">
-                      CHAPTER {hierarchy.hierarchy.chapter.metadata.chapterNumber}
-                    </p>
-                    <p className="text-sm text-white font-medium mb-2">
-                      {hierarchy.hierarchy.chapter.metadata.headline}
-                    </p>
-                    
-                    {/* Chapter Summary */}
-                    {hierarchy.hierarchy.chapter.metadata.summary && (
-                      <div className="mb-3">
-                        <p className="text-xs text-gray-500 mb-1">Summary:</p>
-                        <p className="text-xs text-gray-400 leading-relaxed">
-                          {hierarchy.hierarchy.chapter.metadata.summary}
+              <div className="space-y-6">
+                {/* Connected Hierarchy Visualization */}
+                <div className="space-y-0">
+                  {/* Feed */}
+                  {hierarchy.hierarchy.feed && (
+                    <div className="flex items-start space-x-3">
+                      <div className="flex flex-col items-center pt-1">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></div>
+                        <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
+                      </div>
+                      <div className="flex-1 pb-2">
+                        <p className="text-xs text-gray-500 mb-1">FEED</p>
+                        <p className="text-sm text-white font-medium leading-tight">
+                          {hierarchy.hierarchy.feed.metadata.title}
                         </p>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* Chapter Time Range */}
-                    <p className="text-xs text-gray-500 mb-2">
-                      {formatTime(hierarchy.hierarchy.chapter.metadata.startTime)} - {formatTime(hierarchy.hierarchy.chapter.metadata.endTime)}
-                      <span className="text-gray-600 ml-2">
-                        ({formatTime(hierarchy.hierarchy.chapter.metadata.duration)})
-                      </span>
-                    </p>
-
-                    {/* Keywords */}
-                    {hierarchy.hierarchy.chapter.metadata.keywords.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {hierarchy.hierarchy.chapter.metadata.keywords.map((keyword, idx) => (
-                          <span
-                            key={idx}
-                            className="text-xs px-2 py-0.5 bg-gray-800 text-gray-300 rounded"
-                          >
-                            {keyword}
-                          </span>
-                        ))}
+                  {/* Episode with small thumbnail */}
+                  {hierarchy.hierarchy.episode && (
+                    <div className="flex items-start space-x-3">
+                      <div className="flex flex-col items-center pt-1">
+                        <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                        {hierarchy.hierarchy.chapter && (
+                          <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
+                        )}
                       </div>
-                    )}
+                      <div className="flex-1 pb-2">
+                        <p className="text-xs text-gray-500 mb-1">EPISODE</p>
+                        <div className="flex items-start space-x-2">
+                          {hierarchy.hierarchy.episode.metadata.imageUrl && (
+                            <img
+                              src={hierarchy.hierarchy.episode.metadata.imageUrl}
+                              alt="Episode"
+                              className="w-12 h-12 rounded object-cover flex-shrink-0"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white font-medium line-clamp-2 leading-tight">
+                              {hierarchy.hierarchy.episode.metadata.title}
+                            </p>
+                            {hierarchy.hierarchy.episode.metadata.duration && (
+                              <p className="text-xs text-gray-400 mt-1">
+                                {formatTime(hierarchy.hierarchy.episode.metadata.duration)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Chapter */}
+                  {hierarchy.hierarchy.chapter && (
+                    <div className="flex items-start space-x-3">
+                      <div className="flex flex-col items-center pt-1">
+                        <div className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0"></div>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500 mb-1">
+                          CHAPTER {hierarchy.hierarchy.chapter.metadata.chapterNumber}
+                        </p>
+                        <p className="text-sm text-white font-medium mb-2 leading-tight">
+                          {hierarchy.hierarchy.chapter.metadata.headline}
+                        </p>
+                        
+                        {/* Chapter Time */}
+                        <p className="text-xs text-gray-500 mb-2">
+                          {formatTime(hierarchy.hierarchy.chapter.metadata.startTime)} - {formatTime(hierarchy.hierarchy.chapter.metadata.endTime)}
+                          <span className="text-gray-600 ml-1">
+                            ({formatTime(hierarchy.hierarchy.chapter.metadata.duration)})
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Chapter Summary - Separate Section */}
+                {hierarchy.hierarchy.chapter?.metadata.summary && (
+                  <div className="pt-4 border-t border-gray-800">
+                    <p className="text-xs text-gray-500 mb-2">SUMMARY</p>
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      {hierarchy.hierarchy.chapter.metadata.summary}
+                    </p>
+                  </div>
+                )}
+
+                {/* Keywords */}
+                {hierarchy.hierarchy.chapter && hierarchy.hierarchy.chapter.metadata.keywords.length > 0 && (
+                  <div className="pt-4 border-t border-gray-800">
+                    <p className="text-xs text-gray-500 mb-2">KEYWORDS</p>
+                    <div className="flex flex-wrap gap-1">
+                      {hierarchy.hierarchy.chapter.metadata.keywords.map((keyword, idx) => (
+                        <span
+                          key={idx}
+                          className="text-xs px-2 py-0.5 bg-gray-800 text-gray-300 rounded"
+                        >
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {/* Paragraph Details */}
                 {hierarchy.hierarchy.paragraph && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">PARAGRAPH</p>
-                    <p className="text-xs text-gray-400">
-                      Sequence: {hierarchy.hierarchy.paragraph.metadata.sequence}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      Words: {hierarchy.hierarchy.paragraph.metadata.num_words}
-                    </p>
+                  <div className="pt-4 border-t border-gray-800">
+                    <p className="text-xs text-gray-500 mb-2">PARAGRAPH</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-xs text-gray-600">Sequence</p>
+                        <p className="text-sm text-gray-300">{hierarchy.hierarchy.paragraph.metadata.sequence}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600">Words</p>
+                        <p className="text-sm text-gray-300">{hierarchy.hierarchy.paragraph.metadata.num_words}</p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
