@@ -52,6 +52,8 @@ interface PodcastSearchResultItemProps {
   onShareModalOpen?: (isOpen: boolean) => void;
   onSocialShareModalOpen?: (isOpen: boolean) => void;
   shareable?: boolean;
+  isHighlighted?: boolean;
+  onResultClick?: (paragraphId: string) => void;
 }
 
 export const PodcastSearchResultItem = ({
@@ -80,7 +82,9 @@ export const PodcastSearchResultItem = ({
   error,
   onShareModalOpen,
   onSocialShareModalOpen,
-  shareable = false
+  shareable = false,
+  isHighlighted = false,
+  onResultClick
 }: PodcastSearchResultItemProps) => {
   const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
@@ -439,7 +443,11 @@ export const PodcastSearchResultItem = ({
   if (presentationContext === PresentationContext.runHistoryPreview) {
     return (
       <div 
-        className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden cursor-pointer hover:border-gray-700 transition-colors"
+        className={`bg-[#111111] border rounded-lg overflow-hidden cursor-pointer hover:border-gray-700 transition-colors ${
+          isHighlighted 
+            ? 'border-white shadow-[0_0_20px_rgba(255,255,255,0.5)]' 
+            : 'border-gray-800'
+        }`}
         onClick={() => {
           if (runId) {
             navigate(`/app/feed/${feedId}/clipBatch/${runId}`);
@@ -482,7 +490,11 @@ export const PodcastSearchResultItem = ({
   // Grid view for clipBatch
   if (viewMode === AIClipsViewStyle.GRID && presentationContext === PresentationContext.clipBatch) {
     return (
-      <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden">
+      <div className={`bg-[#111111] border rounded-lg overflow-hidden transition-all ${
+        isHighlighted 
+          ? 'border-white shadow-[0_0_20px_rgba(255,255,255,0.5)]' 
+          : 'border-gray-800'
+      }`}>
         <audio
           ref={audioRef}
           src={audioUrl}
@@ -702,7 +714,20 @@ export const PodcastSearchResultItem = ({
 
   // Return original component rendering for other contexts
   return (
-    <div className="bg-[#111111] border border-gray-800 rounded-lg overflow-hidden z-100">
+    <div 
+      className={`bg-[#111111] border rounded-lg overflow-hidden z-100 transition-all cursor-pointer ${
+        isHighlighted 
+          ? 'border-white shadow-[0_0_20px_rgba(255,255,255,0.5)]' 
+          : 'border-gray-800'
+      }`}
+      onClick={() => {
+        // Call the onResultClick callback if provided (for split-screen context panel)
+        if (onResultClick) {
+          printLog(`Result clicked: ${shareLink}`);
+          onResultClick(shareLink);
+        }
+      }}
+    >
       <div className="border-b border-gray-800 bg-[#0A0A0A] p-4">
 
         {

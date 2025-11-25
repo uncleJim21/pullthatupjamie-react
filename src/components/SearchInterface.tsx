@@ -1,7 +1,7 @@
 import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
-import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle } from '../constants/constants.ts';
+import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, SearchViewStyle } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef} from 'react';
@@ -30,6 +30,7 @@ import AccountButton from './AccountButton.tsx';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 import AuthService from '../services/authService.ts';
 import ImageWithLoader from './ImageWithLoader.tsx';
+import PodcastContextPanel from './PodcastContextPanel.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -187,6 +188,16 @@ interface PodcastStats {
 export default function SearchInterface({ isSharePage = false, isClipBatchPage = false }: SearchInterfaceProps) {  
   const [query, setQuery] = useState('');
   const [model, setModel] = useState('claude-3-sonnet' as ModelType);
+  
+  // Search view style state (Classic vs Split Screen)
+  const [searchViewStyle, setSearchViewStyle] = useState<SearchViewStyle>(() => {
+    const saved = localStorage.getItem('searchViewStyle');
+    return saved === SearchViewStyle.CLASSIC ? SearchViewStyle.CLASSIC : SearchViewStyle.SPLIT_SCREEN;
+  });
+  
+  // Context panel state for split-screen view
+  const [isContextPanelOpen, setIsContextPanelOpen] = useState(false);
+  const [selectedParagraphId, setSelectedParagraphId] = useState<string | null>(null);
   
   // Update state for filter button
   const [filterClicked, setFilterClicked] = useState(false);
@@ -1213,6 +1224,52 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
   }, [isClipBatchPage, runId, feedId]);
 
+  // Auto-open context panel in split-screen mode when new podcast search results arrive
+  useEffect(() => {
+    printLog(`Context panel effect triggered - searchViewStyle: ${searchViewStyle}, searchMode: ${searchMode}, conversation.length: ${conversation.length}`);
+    
+    if (searchViewStyle === SearchViewStyle.SPLIT_SCREEN && 
+        searchMode === 'podcast-search' && 
+        conversation.length > 0) {
+      
+      // Get the latest podcast-search conversation item
+      const latestPodcastSearch = [...conversation]
+        .reverse()
+        .find(item => item.type === 'podcast-search');
+      
+      printLog(`Latest podcast search found: ${!!latestPodcastSearch}`);
+      
+      if (latestPodcastSearch && 
+          latestPodcastSearch.type === 'podcast-search' && 
+          latestPodcastSearch.data.quotes.length > 0) {
+        
+        const firstResult = latestPodcastSearch.data.quotes[0];
+        
+        // Use shareLink as fallback if id is undefined
+        const paragraphId = firstResult.id || firstResult.shareLink;
+        
+        printLog(`First result details: id=${firstResult.id}, shareLink=${firstResult.shareLink}`);
+        printLog(`Using paragraphId: ${paragraphId}`);
+        printLog(`Full first result: ${JSON.stringify(firstResult, null, 2)}`);
+        
+        // Set the first result as selected and open the context panel
+        setSelectedParagraphId(paragraphId);
+        setIsContextPanelOpen(true);
+        
+        printLog(`Split-screen: Auto-selected first result: ${paragraphId}`);
+      }
+    }
+  }, [conversation, searchViewStyle, searchMode]);
+
+  // Function to handle clicking on a search result (for split-screen context panel)
+  const handleResultClick = (paragraphId: string) => {
+    if (searchViewStyle === SearchViewStyle.SPLIT_SCREEN && searchMode === 'podcast-search') {
+      printLog(`Result clicked, updating context panel with paragraphId: ${paragraphId}`);
+      setSelectedParagraphId(paragraphId);
+      setIsContextPanelOpen(true);
+    }
+  };
+
   // Function to handle filter button click
   const handleFilterClick = (e: React.MouseEvent) => {
     // Prevent event from bubbling up to parent form
@@ -1844,10 +1901,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
       {/* Conversation History */}
       {conversation.length > 0 && (
-      <div className={`max-w-4xl mx-auto px-4 space-y-8 ${
+      <div className={`mx-auto px-4 space-y-8 transition-all duration-300 ${
         searchMode === 'podcast-search' && conversation.length > 0
           ? 'mb-1 pb-1'
           : 'mb-24 pb-24'
+      } ${
+        searchMode === 'podcast-search' && 
+        searchViewStyle === SearchViewStyle.SPLIT_SCREEN && 
+        isContextPanelOpen 
+          ? 'max-w-2xl mr-[600px]' 
+          : 'max-w-4xl'
       }`}>
         {conversation
           .filter(item => item.type === searchMode)
@@ -1862,6 +1925,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               onSocialShareModalOpen={setIsSocialShareModalOpen}
               isClipBatchPage={isClipBatchPage}
               clipBatchViewMode={clipBatchViewMode}
+              selectedParagraphId={selectedParagraphId}
+              onResultClick={handleResultClick}
             />
           ))}
       </div>
@@ -2037,7 +2102,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
       {/* Floating Search Bar */}
       {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
-        <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-40">
+        <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-50">
           <form onSubmit={handleSearch} className="relative">
             {/* Filter button and toggle - desktop version (outside search bar) */}
             {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
@@ -2225,6 +2290,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onComplete={() => {}}
         platform={SocialPlatform.Twitter}
       />
+
+      {/* Context Panel for Split-Screen Mode */}
+      {searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && (
+        <PodcastContextPanel
+          paragraphId={selectedParagraphId}
+          isOpen={isContextPanelOpen}
+          onClose={() => setIsContextPanelOpen(false)}
+        />
+      )}
 
     </div>
   );

@@ -1,0 +1,249 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronRight, ChevronLeft } from 'lucide-react';
+import ContextService, { AdjacentParagraph, HierarchyResponse } from '../services/contextService.ts';
+import { printLog } from '../constants/constants.ts';
+
+interface PodcastContextPanelProps {
+  paragraphId: string | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+type TabType = 'context' | 'concepts';
+
+const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
+  paragraphId,
+  isOpen,
+  onClose
+}) => {
+  const [activeTab, setActiveTab] = useState<TabType>('context');
+  const [paragraphs, setParagraphs] = useState<AdjacentParagraph[]>([]);
+  const [hierarchy, setHierarchy] = useState<HierarchyResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [highlightedParagraphId, setHighlightedParagraphId] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Fetch data when paragraphId changes
+  useEffect(() => {
+    printLog(`PodcastContextPanel effect - paragraphId: ${paragraphId}, isOpen: ${isOpen}`);
+    
+    if (!paragraphId || !isOpen) {
+      printLog(`Skipping fetch - paragraphId or isOpen is false`);
+      return;
+    }
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      printLog(`Starting fetch for paragraphId: ${paragraphId}`);
+
+      try {
+        // Fetch both adjacent paragraphs and hierarchy in parallel
+        printLog(`Calling ContextService.fetchAdjacentParagraphs and fetchHierarchy...`);
+        const [adjacentData, hierarchyData] = await Promise.all([
+          ContextService.fetchAdjacentParagraphs(paragraphId, 3),
+          ContextService.fetchHierarchy(paragraphId)
+        ]);
+
+        printLog(`Received ${adjacentData.paragraphs.length} paragraphs and hierarchy`);
+        setParagraphs(adjacentData.paragraphs);
+        setHierarchy(hierarchyData);
+        setHighlightedParagraphId(paragraphId);
+
+        // Scroll to the highlighted paragraph after a brief delay
+        setTimeout(() => {
+          scrollToHighlighted(paragraphId);
+        }, 100);
+      } catch (err) {
+        console.error('Error fetching context data:', err);
+        printLog(`Error fetching context data: ${err instanceof Error ? err.message : String(err)}`);
+        setError(err instanceof Error ? err.message : 'Failed to load context');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [paragraphId, isOpen]);
+
+  // Scroll to highlighted paragraph
+  const scrollToHighlighted = (targetId: string) => {
+    if (!contentRef.current) return;
+
+    const element = contentRef.current.querySelector(`[data-paragraph-id="${targetId}"]`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  // Convert seconds to MM:SS format
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div
+      className={`fixed top-0 right-0 h-full bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out z-40 ${
+        isOpen ? 'w-[600px] translate-x-0' : 'w-[600px] translate-x-full'
+      }`}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-800">
+        <h2 className="text-white text-lg font-semibold">Clip Context</h2>
+        <button
+          onClick={onClose}
+          className="text-gray-400 hover:text-white transition-colors"
+          aria-label="Close panel"
+        >
+          <ChevronRight className="w-6 h-6" />
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-gray-800">
+        <button
+          onClick={() => setActiveTab('context')}
+          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+            activeTab === 'context'
+              ? 'text-white border-b-2 border-white'
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Context
+        </button>
+        <button
+          onClick={() => setActiveTab('concepts')}
+          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+            activeTab === 'concepts'
+              ? 'text-white border-b-2 border-white'
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Concepts
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-hidden">
+        {activeTab === 'context' && (
+          <div className="h-full flex flex-col">
+            {/* Hierarchy Breadcrumb */}
+            {hierarchy && (
+              <div className="p-4 border-b border-gray-800 bg-[#0A0A0A]">
+                <div className="flex items-start space-x-3">
+                  {hierarchy.hierarchy.episode?.metadata.imageUrl && (
+                    <img
+                      src={hierarchy.hierarchy.episode.metadata.imageUrl}
+                      alt="Episode"
+                      className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 mb-1">
+                      {hierarchy.hierarchy.feed?.metadata.title || 'Unknown Podcast'}
+                    </p>
+                    <p className="text-sm text-white font-medium mb-1 line-clamp-2">
+                      {hierarchy.hierarchy.episode?.metadata.title || 'Unknown Episode'}
+                    </p>
+                    {hierarchy.hierarchy.chapter && (
+                      <div className="mt-2 p-2 bg-black/50 rounded border border-gray-800">
+                        <p className="text-xs text-gray-400 mb-1">
+                          Chapter {hierarchy.hierarchy.chapter.metadata.chapterNumber}
+                        </p>
+                        <p className="text-xs text-white font-medium">
+                          {hierarchy.hierarchy.chapter.metadata.headline}
+                        </p>
+                        {hierarchy.hierarchy.chapter.metadata.keywords.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {hierarchy.hierarchy.chapter.metadata.keywords.map((keyword, idx) => (
+                              <span
+                                key={idx}
+                                className="text-xs px-2 py-0.5 bg-gray-800 text-gray-300 rounded"
+                              >
+                                {keyword}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Paragraphs List */}
+            <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
+                </div>
+              ) : error ? (
+                <div className="text-center py-12">
+                  <p className="text-red-400 mb-2">{error}</p>
+                  <button
+                    onClick={() => paragraphId && ContextService.fetchAdjacentParagraphs(paragraphId, 3)}
+                    className="text-sm text-gray-400 hover:text-white underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : paragraphs.length > 0 ? (
+                <div className="space-y-1">
+                  {paragraphs.map((paragraph, index) => {
+                    const isHighlighted = paragraph.id === highlightedParagraphId;
+                    return (
+                      <div
+                        key={paragraph.id}
+                        data-paragraph-id={paragraph.id}
+                        className={`p-3 rounded-lg transition-all cursor-pointer ${
+                          isHighlighted
+                            ? 'bg-white/10 border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.3)]'
+                            : 'bg-gray-900/50 hover:bg-gray-800/50 border border-transparent'
+                        }`}
+                        onClick={() => {
+                          setHighlightedParagraphId(paragraph.id);
+                          // TODO: Add audio playback functionality
+                          printLog(`Clicked paragraph: ${paragraph.id} at ${paragraph.start_time}s`);
+                        }}
+                      >
+                        <div className="flex items-start space-x-2">
+                          <span className="text-xs text-gray-500 font-mono min-w-[3rem] flex-shrink-0">
+                            {formatTime(paragraph.start_time)}
+                          </span>
+                          <p className="text-sm text-gray-300 leading-relaxed flex-1">
+                            {paragraph.text}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-400">
+                  <p>No context available</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'concepts' && (
+          <div className="h-full flex items-center justify-center p-8">
+            <div className="text-center">
+              <p className="text-gray-400 mb-2">Concepts Tab</p>
+              <p className="text-gray-600 text-sm">Coming soon...</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default PodcastContextPanel;
+

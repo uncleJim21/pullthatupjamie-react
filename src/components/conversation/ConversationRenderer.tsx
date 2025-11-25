@@ -16,6 +16,8 @@ interface ConversationRendererProps {
   onSocialShareModalOpen?: (isOpen: boolean) => void;
   isClipBatchPage?: boolean;
   clipBatchViewMode?: AIClipsViewStyle;
+  selectedParagraphId?: string | null;
+  onResultClick?: (paragraphId: string) => void;
 }
 
 export const ConversationRenderer: React.FC<ConversationRendererProps> = ({ 
@@ -26,7 +28,9 @@ export const ConversationRenderer: React.FC<ConversationRendererProps> = ({
   onShareModalOpen,
   onSocialShareModalOpen,
   isClipBatchPage,
-  clipBatchViewMode
+  clipBatchViewMode,
+  selectedParagraphId,
+  onResultClick
 }) => {
   switch (item.type) {
     case 'web-search':
@@ -44,6 +48,8 @@ export const ConversationRenderer: React.FC<ConversationRendererProps> = ({
           onSocialShareModalOpen={onSocialShareModalOpen}
           isClipBatchPage={isClipBatchPage}
           clipBatchViewMode={clipBatchViewMode}
+          selectedParagraphId={selectedParagraphId}
+          onResultClick={onResultClick}
         />
       );
     default:
