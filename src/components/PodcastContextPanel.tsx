@@ -94,6 +94,10 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         setHierarchy(hierarchyData);
         setHighlightedParagraphId(paragraphId);
         setHighlightedChunkIndex(0); // Reset to first chunk when new paragraph is selected
+        
+        // Reset to context view when selecting a new paragraph
+        setViewMode(ViewMode.CONTEXT);
+        setViewHistory([{ mode: ViewMode.CONTEXT }]);
 
         // Scroll to the highlighted paragraph after a brief delay
         setTimeout(() => {
@@ -309,7 +313,16 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
         {/* Right Side - Hierarchy Details */}
         <div className={`flex flex-col bg-[#0A0A0A] ${viewMode === ViewMode.CHAPTER ? 'flex-1' : 'w-[320px]'}`}>
-          <div className="p-3 border-b border-gray-800">
+          <div className="p-3 border-b border-gray-800 flex items-center gap-2">
+            {canGoBack && (
+              <button
+                onClick={popView}
+                className="text-gray-400 hover:text-white transition-colors text-lg"
+                aria-label="Back"
+              >
+                ←
+              </button>
+            )}
             <h3 className="text-sm font-medium text-gray-400">Details</h3>
           </div>
           
@@ -321,17 +334,6 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
             ) : viewMode === ViewMode.CHAPTER && selectedChapter ? (
               /* Chapter View Mode */
               <div className="space-y-6">
-                {/* Back button */}
-                {canGoBack && (
-                  <button
-                    onClick={popView}
-                    className="text-xs text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
-                  >
-                    <ChevronLeft className="w-3 h-3" />
-                    Back
-                  </button>
-                )}
-
                 {/* Hierarchy (same as before) */}
                 <div className="space-y-0">
                   {/* Feed */}
@@ -359,9 +361,36 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                       </div>
                       <div className="flex-1 pb-2">
                         <p className="text-xs text-gray-500 mb-1">EPISODE</p>
-                        <p className="text-sm text-white font-medium leading-tight line-clamp-2">
-                          {hierarchy.hierarchy.episode.metadata.title}
-                        </p>
+                        <div className="flex items-start space-x-2">
+                          {hierarchy.hierarchy.episode.metadata.imageUrl ? (
+                            !imageError ? (
+                              <img
+                                src={hierarchy.hierarchy.episode.metadata.imageUrl}
+                                alt="Episode"
+                                className="w-12 h-12 rounded object-cover flex-shrink-0"
+                                onError={() => setImageError(true)}
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+                                <Podcast className="w-6 h-6 text-gray-600" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+                              <Podcast className="w-6 h-6 text-gray-600" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white font-medium leading-tight line-clamp-2">
+                              {hierarchy.hierarchy.episode.metadata.title}
+                            </p>
+                            {hierarchy.hierarchy.episode.metadata.duration && (
+                              <p className="text-xs text-gray-400 mt-1">
+                                {formatTime(hierarchy.hierarchy.episode.metadata.duration)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
