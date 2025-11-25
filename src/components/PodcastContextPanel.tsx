@@ -9,14 +9,11 @@ interface PodcastContextPanelProps {
   onClose: () => void;
 }
 
-type TabType = 'context' | 'concepts';
-
 const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   paragraphId,
   isOpen,
   onClose
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('context');
   const [paragraphs, setParagraphs] = useState<AdjacentParagraph[]>([]);
   const [hierarchy, setHierarchy] = useState<HierarchyResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -88,7 +85,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   return (
     <div
       className={`fixed top-0 right-0 h-full bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out z-40 ${
-        isOpen ? 'w-[600px] translate-x-0' : 'w-[600px] translate-x-full'
+        isOpen ? 'w-[800px] translate-x-0' : 'w-[800px] translate-x-full'
       }`}
     >
       {/* Header */}
@@ -103,143 +100,180 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-800">
-        <button
-          onClick={() => setActiveTab('context')}
-          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-            activeTab === 'context'
-              ? 'text-white border-b-2 border-white'
-              : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Context
-        </button>
-        <button
-          onClick={() => setActiveTab('concepts')}
-          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-            activeTab === 'concepts'
-              ? 'text-white border-b-2 border-white'
-              : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Concepts
-        </button>
-      </div>
+      {/* Split Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Side - Adjacent Paragraphs */}
+        <div className="flex-1 flex flex-col border-r border-gray-800">
+          <div className="p-3 border-b border-gray-800 bg-[#0A0A0A]">
+            <h3 className="text-sm font-medium text-gray-400">Context</h3>
+          </div>
+          
+          <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
+              </div>
+            ) : error ? (
+              <div className="text-center py-12">
+                <p className="text-red-400 mb-2 text-sm">{error}</p>
+                <button
+                  onClick={() => paragraphId && ContextService.fetchAdjacentParagraphs(paragraphId, 3)}
+                  className="text-sm text-gray-400 hover:text-white underline"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : paragraphs.length > 0 ? (
+              <div className="space-y-1">
+                {paragraphs.map((paragraph, index) => {
+                  const isHighlighted = paragraph.id === highlightedParagraphId;
+                  return (
+                    <div
+                      key={paragraph.id}
+                      data-paragraph-id={paragraph.id}
+                      className={`p-3 rounded-lg transition-all cursor-pointer ${
+                        isHighlighted
+                          ? 'bg-white/10 border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.3)]'
+                          : 'bg-gray-900/50 hover:bg-gray-800/50 border border-transparent'
+                      }`}
+                      onClick={() => {
+                        setHighlightedParagraphId(paragraph.id);
+                        printLog(`Clicked paragraph: ${paragraph.id} at ${paragraph.start_time}s`);
+                      }}
+                    >
+                      <div className="flex items-start space-x-2">
+                        <span className="text-xs text-gray-500 font-mono min-w-[3rem] flex-shrink-0">
+                          {formatTime(paragraph.start_time)}
+                        </span>
+                        <p className="text-sm text-gray-300 leading-relaxed flex-1">
+                          {paragraph.text}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-400 text-sm">
+                <p>No context available</p>
+              </div>
+            )}
+          </div>
+        </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-hidden">
-        {activeTab === 'context' && (
-          <div className="h-full flex flex-col">
-            {/* Hierarchy Breadcrumb */}
-            {hierarchy && (
-              <div className="p-4 border-b border-gray-800 bg-[#0A0A0A]">
-                <div className="flex items-start space-x-3">
-                  {hierarchy.hierarchy.episode?.metadata.imageUrl && (
+        {/* Right Side - Hierarchy Details */}
+        <div className="w-[320px] flex flex-col bg-[#0A0A0A]">
+          <div className="p-3 border-b border-gray-800">
+            <h3 className="text-sm font-medium text-gray-400">Details</h3>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
+              </div>
+            ) : hierarchy ? (
+              <div className="space-y-4">
+                {/* Episode Image & Title */}
+                {hierarchy.hierarchy.episode?.metadata.imageUrl && (
+                  <div className="space-y-2">
                     <img
                       src={hierarchy.hierarchy.episode.metadata.imageUrl}
                       alt="Episode"
-                      className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                      className="w-full rounded-lg object-cover"
                     />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-500 mb-1">
-                      {hierarchy.hierarchy.feed?.metadata.title || 'Unknown Podcast'}
+                  </div>
+                )}
+
+                {/* Feed Title */}
+                {hierarchy.hierarchy.feed && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">FEED</p>
+                    <p className="text-sm text-white font-medium">
+                      {hierarchy.hierarchy.feed.metadata.title}
                     </p>
-                    <p className="text-sm text-white font-medium mb-1 line-clamp-2">
-                      {hierarchy.hierarchy.episode?.metadata.title || 'Unknown Episode'}
+                  </div>
+                )}
+
+                {/* Episode Title */}
+                {hierarchy.hierarchy.episode && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">EPISODE</p>
+                    <p className="text-sm text-white font-medium line-clamp-3">
+                      {hierarchy.hierarchy.episode.metadata.title}
                     </p>
-                    {hierarchy.hierarchy.chapter && (
-                      <div className="mt-2 p-2 bg-black/50 rounded border border-gray-800">
-                        <p className="text-xs text-gray-400 mb-1">
-                          Chapter {hierarchy.hierarchy.chapter.metadata.chapterNumber}
+                    {hierarchy.hierarchy.episode.metadata.duration && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Duration: {formatTime(hierarchy.hierarchy.episode.metadata.duration)}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Chapter Details */}
+                {hierarchy.hierarchy.chapter && (
+                  <div className="p-3 bg-black/50 rounded-lg border border-gray-800">
+                    <p className="text-xs text-gray-500 mb-2">
+                      CHAPTER {hierarchy.hierarchy.chapter.metadata.chapterNumber}
+                    </p>
+                    <p className="text-sm text-white font-medium mb-2">
+                      {hierarchy.hierarchy.chapter.metadata.headline}
+                    </p>
+                    
+                    {/* Chapter Summary */}
+                    {hierarchy.hierarchy.chapter.metadata.summary && (
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-500 mb-1">Summary:</p>
+                        <p className="text-xs text-gray-400 leading-relaxed">
+                          {hierarchy.hierarchy.chapter.metadata.summary}
                         </p>
-                        <p className="text-xs text-white font-medium">
-                          {hierarchy.hierarchy.chapter.metadata.headline}
-                        </p>
-                        {hierarchy.hierarchy.chapter.metadata.keywords.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {hierarchy.hierarchy.chapter.metadata.keywords.map((keyword, idx) => (
-                              <span
-                                key={idx}
-                                className="text-xs px-2 py-0.5 bg-gray-800 text-gray-300 rounded"
-                              >
-                                {keyword}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                      </div>
+                    )}
+
+                    {/* Chapter Time Range */}
+                    <p className="text-xs text-gray-500 mb-2">
+                      {formatTime(hierarchy.hierarchy.chapter.metadata.startTime)} - {formatTime(hierarchy.hierarchy.chapter.metadata.endTime)}
+                      <span className="text-gray-600 ml-2">
+                        ({formatTime(hierarchy.hierarchy.chapter.metadata.duration)})
+                      </span>
+                    </p>
+
+                    {/* Keywords */}
+                    {hierarchy.hierarchy.chapter.metadata.keywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {hierarchy.hierarchy.chapter.metadata.keywords.map((keyword, idx) => (
+                          <span
+                            key={idx}
+                            className="text-xs px-2 py-0.5 bg-gray-800 text-gray-300 rounded"
+                          >
+                            {keyword}
+                          </span>
+                        ))}
                       </div>
                     )}
                   </div>
-                </div>
+                )}
+
+                {/* Paragraph Details */}
+                {hierarchy.hierarchy.paragraph && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">PARAGRAPH</p>
+                    <p className="text-xs text-gray-400">
+                      Sequence: {hierarchy.hierarchy.paragraph.metadata.sequence}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Words: {hierarchy.hierarchy.paragraph.metadata.num_words}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-400 text-sm">
+                <p>No details available</p>
               </div>
             )}
-
-            {/* Paragraphs List */}
-            <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
-                </div>
-              ) : error ? (
-                <div className="text-center py-12">
-                  <p className="text-red-400 mb-2">{error}</p>
-                  <button
-                    onClick={() => paragraphId && ContextService.fetchAdjacentParagraphs(paragraphId, 3)}
-                    className="text-sm text-gray-400 hover:text-white underline"
-                  >
-                    Try again
-                  </button>
-                </div>
-              ) : paragraphs.length > 0 ? (
-                <div className="space-y-1">
-                  {paragraphs.map((paragraph, index) => {
-                    const isHighlighted = paragraph.id === highlightedParagraphId;
-                    return (
-                      <div
-                        key={paragraph.id}
-                        data-paragraph-id={paragraph.id}
-                        className={`p-3 rounded-lg transition-all cursor-pointer ${
-                          isHighlighted
-                            ? 'bg-white/10 border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.3)]'
-                            : 'bg-gray-900/50 hover:bg-gray-800/50 border border-transparent'
-                        }`}
-                        onClick={() => {
-                          setHighlightedParagraphId(paragraph.id);
-                          // TODO: Add audio playback functionality
-                          printLog(`Clicked paragraph: ${paragraph.id} at ${paragraph.start_time}s`);
-                        }}
-                      >
-                        <div className="flex items-start space-x-2">
-                          <span className="text-xs text-gray-500 font-mono min-w-[3rem] flex-shrink-0">
-                            {formatTime(paragraph.start_time)}
-                          </span>
-                          <p className="text-sm text-gray-300 leading-relaxed flex-1">
-                            {paragraph.text}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-400">
-                  <p>No context available</p>
-                </div>
-              )}
-            </div>
           </div>
-        )}
-
-        {activeTab === 'concepts' && (
-          <div className="h-full flex items-center justify-center p-8">
-            <div className="text-center">
-              <p className="text-gray-400 mb-2">Concepts Tab</p>
-              <p className="text-gray-600 text-sm">Coming soon...</p>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

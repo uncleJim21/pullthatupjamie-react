@@ -1909,7 +1909,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         searchMode === 'podcast-search' && 
         searchViewStyle === SearchViewStyle.SPLIT_SCREEN && 
         isContextPanelOpen 
-          ? 'max-w-2xl mr-[600px]' 
+          ? 'max-w-2xl mr-[800px]' 
           : 'max-w-4xl'
       }`}>
         {conversation
