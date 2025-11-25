@@ -139,6 +139,40 @@ export const PodcastSearchResultItem = ({
     return () => window.removeEventListener('closeAllSocialShareModals', handleCloseAllSocialShareModals);
   }, [isShareModalOpen]);
 
+  // Listen for seek events from context panel
+  useEffect(() => {
+    const handleSeekToTimestamp = async (event: CustomEvent) => {
+      const { paragraphId, timestamp } = event.detail;
+      
+      // Check if this is the correct audio item (match by shareLink or id)
+      if ((shareLink && paragraphId === shareLink) || (id && paragraphId === id)) {
+        printLog(`Seeking to timestamp ${timestamp} for ${paragraphId}`);
+        
+        if (audioRef.current) {
+          // Set the current time to the requested timestamp
+          audioRef.current.currentTime = timestamp;
+          setCurrentTime(timestamp);
+          
+          // Start playing if not already playing
+          if (!isPlaying) {
+            try {
+              setIsBuffering(true);
+              onPlayPause(id); // Notify parent to update playing state
+              await audioRef.current.play();
+              setIsBuffering(false);
+            } catch (error) {
+              console.error('Playback error:', error);
+              setIsBuffering(false);
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('seekToTimestamp', handleSeekToTimestamp as EventListener);
+    return () => window.removeEventListener('seekToTimestamp', handleSeekToTimestamp as EventListener);
+  }, [shareLink, id, isPlaying, onPlayPause]);
+
   const handlePlayPause = async () => {
     if (audioRef.current) {
       try {

@@ -1,26 +1,67 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronLeft, Podcast } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Podcast, ChevronDown, ChevronUp, Play } from 'lucide-react';
 import ContextService, { AdjacentParagraph, HierarchyResponse } from '../services/contextService.ts';
+import ChapterService, { Chapter } from '../services/chapterService.ts';
 import { printLog } from '../constants/constants.ts';
+
+enum ViewMode {
+  CONTEXT = 'context',
+  CHAPTER = 'chapter'
+}
+
+interface ViewHistoryItem {
+  mode: ViewMode;
+  selectedChapter?: Chapter | null;
+}
 
 interface PodcastContextPanelProps {
   paragraphId: string | null;
   isOpen: boolean;
   onClose: () => void;
+  smartInterpolation?: boolean;
+  onTimestampClick?: (timestamp: number) => void;
 }
 
 const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   paragraphId,
   isOpen,
-  onClose
+  onClose,
+  smartInterpolation = true,
+  onTimestampClick
 }) => {
   const [paragraphs, setParagraphs] = useState<AdjacentParagraph[]>([]);
   const [hierarchy, setHierarchy] = useState<HierarchyResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [highlightedParagraphId, setHighlightedParagraphId] = useState<string | null>(null);
+  const [highlightedChunkIndex, setHighlightedChunkIndex] = useState<number>(0);
   const [imageError, setImageError] = useState(false);
+  const [episodeChapters, setEpisodeChapters] = useState<Chapter[]>([]);
+  const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
+  const [isLoadingChapters, setIsLoadingChapters] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.CONTEXT);
+  const [viewHistory, setViewHistory] = useState<ViewHistoryItem[]>([{ mode: ViewMode.CONTEXT }]);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Navigation functions for view history
+  const pushView = (mode: ViewMode, chapter?: Chapter | null) => {
+    setViewMode(mode);
+    setViewHistory(prev => [...prev, { mode, selectedChapter: chapter }]);
+  };
+
+  const popView = () => {
+    if (viewHistory.length <= 1) return;
+    
+    const newHistory = [...viewHistory];
+    newHistory.pop(); // Remove current view
+    const previousView = newHistory[newHistory.length - 1];
+    
+    setViewHistory(newHistory);
+    setViewMode(previousView.mode);
+    setSelectedChapter(previousView.selectedChapter || null);
+  };
+
+  const canGoBack = viewHistory.length > 1;
 
   // Fetch data when paragraphId changes
   useEffect(() => {
@@ -52,6 +93,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         setParagraphs(adjacentData.paragraphs);
         setHierarchy(hierarchyData);
         setHighlightedParagraphId(paragraphId);
+        setHighlightedChunkIndex(0); // Reset to first chunk when new paragraph is selected
 
         // Scroll to the highlighted paragraph after a brief delay
         setTimeout(() => {
@@ -68,6 +110,32 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
     fetchData();
   }, [paragraphId, isOpen]);
+
+  // Fetch chapters when hierarchy episode data is available
+  useEffect(() => {
+    const fetchChapters = async () => {
+      if (!hierarchy?.hierarchy.episode?.metadata.guid) {
+        return;
+      }
+
+      const episodeGuid = hierarchy.hierarchy.episode.metadata.guid;
+      printLog(`Fetching chapters for episode: ${episodeGuid}`);
+
+      setIsLoadingChapters(true);
+      try {
+        const response = await ChapterService.fetchEpisodeWithChapters(episodeGuid);
+        setEpisodeChapters(response.chapters);
+        printLog(`Loaded ${response.chapters.length} chapters`);
+      } catch (error) {
+        console.error('Error fetching chapters:', error);
+        printLog(`Error fetching chapters: ${error}`);
+      } finally {
+        setIsLoadingChapters(false);
+      }
+    };
+
+    fetchChapters();
+  }, [hierarchy]);
 
   // Scroll to highlighted paragraph
   const scrollToHighlighted = (targetId: string) => {
@@ -86,10 +154,68 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  // Smart interpolation: break text into chunks on sentence boundaries with interpolated timestamps
+  interface TextChunkWithTime {
+    text: string;
+    startTime: number;
+  }
+
+  const smartBreakText = (
+    text: string, 
+    startTime: number, 
+    endTime: number, 
+    maxChunkLength: number = 300
+  ): TextChunkWithTime[] => {
+    if (!smartInterpolation || text.length <= maxChunkLength) {
+      return [{ text, startTime }];
+    }
+
+    const chunks: TextChunkWithTime[] = [];
+    let currentChunk = '';
+    let chunkStartPosition = 0;
+    
+    // Split on sentence boundaries (. or ?) followed by space
+    const sentences = text.split(/([.?]\s+)/);
+    
+    for (let i = 0; i < sentences.length; i++) {
+      const part = sentences[i];
+      
+      // If adding this part would exceed max length and we have content, start new chunk
+      if (currentChunk.length > 0 && (currentChunk + part).length > maxChunkLength) {
+        // Calculate interpolated timestamp based on character position
+        const chunkEndPosition = chunkStartPosition + currentChunk.length;
+        const progress = chunkStartPosition / text.length;
+        const interpolatedTime = startTime + (endTime - startTime) * progress;
+        
+        chunks.push({
+          text: currentChunk.trim(),
+          startTime: interpolatedTime
+        });
+        
+        chunkStartPosition = chunkEndPosition;
+        currentChunk = part;
+      } else {
+        currentChunk += part;
+      }
+    }
+    
+    // Add remaining chunk
+    if (currentChunk.trim().length > 0) {
+      const progress = chunkStartPosition / text.length;
+      const interpolatedTime = startTime + (endTime - startTime) * progress;
+      chunks.push({
+        text: currentChunk.trim(),
+        startTime: interpolatedTime
+      });
+    }
+    
+    return chunks.length > 0 ? chunks : [{ text, startTime }];
+  };
+
   return (
     <div
       className={`fixed top-0 right-0 h-full bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out z-40 ${
-        isOpen ? 'w-[800px] translate-x-0' : 'w-[800px] translate-x-full'
+        isOpen ? 'w-[600px] translate-x-0' : 'w-[600px] translate-x-full'
       }`}
     >
       {/* Header */}
@@ -106,8 +232,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
       {/* Split Content Area */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Side - Adjacent Paragraphs */}
-        <div className="flex-1 flex flex-col border-r border-gray-800">
+        {/* Left Side - Adjacent Paragraphs (Hidden in Chapter Mode) */}
+        {viewMode !== ViewMode.CHAPTER && (
+          <div className="flex-1 flex flex-col border-r border-gray-800">
           <div className="p-3 border-b border-gray-800 bg-[#0A0A0A]">
             <h3 className="text-sm font-medium text-gray-400">Context</h3>
           </div>
@@ -131,29 +258,43 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               <div className="space-y-1">
                 {paragraphs.map((paragraph, index) => {
                   const isHighlighted = paragraph.id === highlightedParagraphId;
+                  const textChunks = smartBreakText(
+                    paragraph.text, 
+                    paragraph.start_time, 
+                    paragraph.end_time
+                  );
+                  
                   return (
-                    <div
-                      key={paragraph.id}
-                      data-paragraph-id={paragraph.id}
-                      className={`p-3 rounded-lg transition-all cursor-pointer ${
-                        isHighlighted
-                          ? 'bg-white/10 border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.3)]'
-                          : 'bg-gray-900/50 hover:bg-gray-800/50 border border-transparent'
-                      }`}
-                      onClick={() => {
-                        setHighlightedParagraphId(paragraph.id);
-                        printLog(`Clicked paragraph: ${paragraph.id} at ${paragraph.start_time}s`);
-                      }}
-                    >
-                      <div className="flex items-start space-x-2">
-                        <span className="text-xs text-gray-500 font-mono min-w-[3rem] flex-shrink-0">
-                          {formatTime(paragraph.start_time)}
-                        </span>
-                        <p className="text-sm text-gray-300 leading-relaxed flex-1">
-                          {paragraph.text}
-                        </p>
-                      </div>
-                    </div>
+                    <React.Fragment key={paragraph.id}>
+                      {textChunks.map((chunk, chunkIndex) => (
+                        <div
+                          key={`${paragraph.id}-${chunkIndex}`}
+                          data-paragraph-id={chunkIndex === 0 ? paragraph.id : undefined}
+                          className={`p-3 rounded-lg transition-all cursor-pointer ${
+                            isHighlighted && highlightedChunkIndex === chunkIndex
+                              ? 'bg-white/10 border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.3)]'
+                              : 'bg-gray-900/50 hover:bg-gray-800/50 border border-transparent'
+                          }`}
+                          onClick={() => {
+                            setHighlightedParagraphId(paragraph.id);
+                            setHighlightedChunkIndex(chunkIndex);
+                            printLog(`Clicked paragraph: ${paragraph.id}, chunk: ${chunkIndex} at ${chunk.startTime}s`);
+                            if (onTimestampClick) {
+                              onTimestampClick(chunk.startTime);
+                            }
+                          }}
+                        >
+                          <div className="flex items-start space-x-2">
+                            <span className="text-xs text-gray-500 font-mono min-w-[3rem] flex-shrink-0">
+                              {formatTime(chunk.startTime)}
+                            </span>
+                            <p className="text-sm text-gray-300 leading-relaxed flex-1">
+                              {chunk.text}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </React.Fragment>
                   );
                 })}
               </div>
@@ -164,9 +305,10 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
             )}
           </div>
         </div>
+        )}
 
         {/* Right Side - Hierarchy Details */}
-        <div className="w-[320px] flex flex-col bg-[#0A0A0A]">
+        <div className={`flex flex-col bg-[#0A0A0A] ${viewMode === ViewMode.CHAPTER ? 'flex-1' : 'w-[320px]'}`}>
           <div className="p-3 border-b border-gray-800">
             <h3 className="text-sm font-medium text-gray-400">Details</h3>
           </div>
@@ -176,7 +318,174 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
               </div>
+            ) : viewMode === ViewMode.CHAPTER && selectedChapter ? (
+              /* Chapter View Mode */
+              <div className="space-y-6">
+                {/* Back button */}
+                {canGoBack && (
+                  <button
+                    onClick={popView}
+                    className="text-xs text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
+                  >
+                    <ChevronLeft className="w-3 h-3" />
+                    Back
+                  </button>
+                )}
+
+                {/* Hierarchy (same as before) */}
+                <div className="space-y-0">
+                  {/* Feed */}
+                  {hierarchy?.hierarchy.feed && (
+                    <div className="flex items-start space-x-3">
+                      <div className="flex flex-col items-center pt-1">
+                        <div className="w-3 h-3 rounded-full bg-[rgb(245,161,66)] shadow-[0_0_16px_8px_rgba(245,161,66,0.4),0_0_8px_4px_rgba(245,161,66,0.6)] flex-shrink-0"></div>
+                        <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
+                      </div>
+                      <div className="flex-1 pb-2">
+                        <p className="text-xs text-gray-500 mb-1">FEED</p>
+                        <p className="text-sm text-white font-medium leading-tight">
+                          {hierarchy.hierarchy.feed.metadata.title}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Episode */}
+                  {hierarchy?.hierarchy.episode && (
+                    <div className="flex items-start space-x-3">
+                      <div className="flex flex-col items-center pt-1">
+                        <div className="w-3 h-3 rounded-full bg-[rgb(250,208,161)] shadow-[0_0_16px_8px_rgba(250,208,161,0.4),0_0_8px_4px_rgba(250,208,161,0.6)] flex-shrink-0"></div>
+                        <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
+                      </div>
+                      <div className="flex-1 pb-2">
+                        <p className="text-xs text-gray-500 mb-1">EPISODE</p>
+                        <p className="text-sm text-white font-medium leading-tight line-clamp-2">
+                          {hierarchy.hierarchy.episode.metadata.title}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Current Chapter */}
+                  <div className="flex items-start space-x-3">
+                    <div className="flex flex-col items-center pt-1">
+                      <div className="w-3 h-3 rounded-full bg-white shadow-[0_0_16px_8px_rgba(255,255,255,0.4),0_0_8px_4px_rgba(255,255,255,0.6)] flex-shrink-0"></div>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500 mb-1">
+                        CHAPTER {selectedChapter.chapterNumber}
+                      </p>
+                      <p className="text-sm text-white font-medium leading-tight">
+                        {selectedChapter.headline}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selected Chapter Details */}
+                <div className="pt-4 border-t border-gray-800">
+                  <p className="text-xs text-gray-500 mb-2">CHAPTER DETAILS</p>
+                  <div className="space-y-3">
+                    {/* Time Range */}
+                    <div>
+                      <p className="text-xs text-gray-600">Time Range</p>
+                      <p className="text-sm text-gray-300">
+                        {formatTime(selectedChapter.startTime)} - {formatTime(selectedChapter.endTime)}
+                        <span className="text-gray-500 ml-1">
+                          ({formatTime(selectedChapter.metadata.duration)})
+                        </span>
+                      </p>
+                    </div>
+
+                    {selectedChapter.metadata.summary && (
+                      <div>
+                        <p className="text-xs text-gray-600 mb-1">Summary</p>
+                        <p className="text-xs text-gray-400 leading-relaxed">
+                          {selectedChapter.metadata.summary}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Keywords and Listen Button Side by Side */}
+                    {selectedChapter.metadata.keywords && selectedChapter.metadata.keywords.length > 0 && (
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-600 mb-1">Keywords</p>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedChapter.metadata.keywords.map((keyword, idx) => (
+                              <span
+                                key={idx}
+                                className="text-xs px-2 py-0.5 bg-gray-800 text-gray-300 rounded"
+                              >
+                                {keyword}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (onTimestampClick) {
+                              onTimestampClick(selectedChapter.startTime);
+                            }
+                          }}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-white text-black rounded hover:bg-gray-200 transition-colors text-xs font-medium flex-shrink-0 self-end"
+                        >
+                          <Play className="w-3 h-3" />
+                          Listen
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Listen Button Alone (if no keywords) */}
+                    {(!selectedChapter.metadata.keywords || selectedChapter.metadata.keywords.length === 0) && (
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => {
+                            if (onTimestampClick) {
+                              onTimestampClick(selectedChapter.startTime);
+                            }
+                          }}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-white text-black rounded hover:bg-gray-200 transition-colors text-xs font-medium"
+                        >
+                          <Play className="w-3 h-3" />
+                          Listen
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* All Chapters List */}
+                <div className="pt-4 border-t border-gray-800">
+                  <p className="text-xs text-gray-500 mb-3">ALL CHAPTERS ({episodeChapters.length})</p>
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                    {episodeChapters.map((chapter) => (
+                      <div
+                        key={chapter.id}
+                        onClick={() => {
+                          setSelectedChapter(chapter);
+                        }}
+                        className={`p-2 rounded cursor-pointer transition-colors ${
+                          selectedChapter.id === chapter.id
+                            ? 'bg-white/10 border border-white/20'
+                            : 'bg-gray-900/50 hover:bg-gray-800/50 border border-transparent'
+                        }`}
+                      >
+                        <p className="text-xs text-white font-medium line-clamp-1">
+                          {chapter.chapterNumber}. {chapter.headline}
+                        </p>
+                        {chapter.metadata.summary && (
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+                            Summary: {chapter.metadata.summary}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             ) : hierarchy ? (
+              /* Default Context View Mode */
               <div className="space-y-6">
                 {/* Connected Hierarchy Visualization */}
                 <div className="space-y-0">
@@ -241,9 +550,21 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                     </div>
                   )}
 
-                  {/* Chapter */}
+                  {/* Chapter - Now Clickable */}
                   {hierarchy.hierarchy.chapter && (
-                    <div className="flex items-start space-x-3">
+                    <div 
+                      className="flex items-start space-x-3 cursor-pointer hover:bg-gray-800/30 rounded p-2 -m-2 transition-colors"
+                      onClick={() => {
+                        // Find and set the current chapter from the loaded chapters
+                        const currentChapter = episodeChapters.find(
+                          ch => ch.metadata.chapterNumber === hierarchy.hierarchy.chapter?.metadata.chapterNumber
+                        );
+                        if (currentChapter) {
+                          setSelectedChapter(currentChapter);
+                          pushView(ViewMode.CHAPTER, currentChapter);
+                        }
+                      }}
+                    >
                       <div className="flex flex-col items-center pt-1">
                         <div className="w-3 h-3 rounded-full bg-white shadow-[0_0_16px_8px_rgba(255,255,255,0.4),0_0_8px_4px_rgba(255,255,255,0.6)] flex-shrink-0"></div>
                       </div>
@@ -262,8 +583,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                             ({formatTime(hierarchy.hierarchy.chapter.metadata.duration)})
                           </span>
                         </p>
+                        </div>
                       </div>
-                    </div>
                   )}
                 </div>
 

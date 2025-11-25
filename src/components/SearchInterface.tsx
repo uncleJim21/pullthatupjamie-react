@@ -1909,7 +1909,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         searchMode === 'podcast-search' && 
         searchViewStyle === SearchViewStyle.SPLIT_SCREEN && 
         isContextPanelOpen 
-          ? 'max-w-2xl mr-[800px]' 
+          ? 'max-w-2xl mr-[600px]' 
           : 'max-w-4xl'
       }`}>
         {conversation
@@ -2297,6 +2297,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           paragraphId={selectedParagraphId}
           isOpen={isContextPanelOpen}
           onClose={() => setIsContextPanelOpen(false)}
+          smartInterpolation={true}
+          onTimestampClick={(timestamp) => {
+            printLog(`Context panel timestamp clicked: ${timestamp}`);
+            // Dispatch a custom event that PodcastSearchResultItem can listen to
+            window.dispatchEvent(new CustomEvent('seekToTimestamp', { 
+              detail: { 
+                paragraphId: selectedParagraphId, 
+                timestamp 
+              } 
+            }));
+          }}
         />
       )}
 
