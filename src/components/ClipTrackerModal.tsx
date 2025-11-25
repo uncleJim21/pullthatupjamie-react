@@ -356,7 +356,7 @@ export default function ClipTrackerModal({
 
   return (
     <div className={`fixed z-50 transition-all duration-300 ease-in-out
-      xl:right-4 xl:bottom-24 xl:w-[22.5rem] px-4 sm:px-24 xl:left-auto xl:transform-none
+      xl:left-4 xl:bottom-24 xl:w-[22.5rem] px-4 sm:px-24 xl:right-auto xl:transform-none
       left-1/2 -translate-x-1/2 mx-auto w-full max-w-[40rem] sm:px-4
       ${bottomConstraint(isCollapsed,hasSearched)}`}
     >

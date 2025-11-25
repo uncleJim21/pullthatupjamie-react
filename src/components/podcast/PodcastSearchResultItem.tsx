@@ -965,7 +965,7 @@ export const PodcastSearchResultItem = ({
       </div>
   
       <div className="p-4 space-y-2">
-        <div className="text-sm text-gray-300 bg-[#0A0A0A] p-3 rounded-md line-clamp-4 sm:line-clamp-6 pb-1">
+        <div className="text-sm text-gray-300 bg-[#0A0A0A] p-3 rounded-md line-clamp-2 pb-1">
           {quote}
         </div>
         {presentationContext === PresentationContext.search && (
