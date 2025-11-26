@@ -2298,6 +2298,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           isOpen={isContextPanelOpen}
           onClose={() => setIsContextPanelOpen(false)}
           smartInterpolation={true}
+          auth={authConfig || undefined}
           onTimestampClick={(timestamp) => {
             printLog(`Context panel timestamp clicked: ${timestamp}`);
             // Dispatch a custom event that PodcastSearchResultItem can listen to
@@ -2307,6 +2308,90 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 timestamp 
               } 
             }));
+          }}
+          onKeywordSearch={async (keyword, feedId, episodeName, forceSearchAll = false) => {
+            printLog(`Keyword search triggered: keyword="${keyword}", feedId="${feedId}", episodeName="${episodeName}", forceSearchAll="${forceSearchAll}"`);
+            
+            // Clear previous podcast searches just like handleSearch does
+            setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
+            
+            // Set the search query
+            setQuery(keyword);
+            
+            // Prepare search parameters
+            const auth = authConfig || await getAuth() as AuthConfig;
+            
+            if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+              setIsRegisterModalOpen(true);
+              setSearchState(prev => ({ ...prev, isLoading: false }));
+              return;
+            }
+            
+            let feedIdsToUse: string[] = [];
+            
+            if (forceSearchAll) {
+              // Search ALL pods - ignore My Pod mode, use all selected sources
+              feedIdsToUse = Array.from(selectedSources) as string[];
+              printLog(`Force searching all pods with: ${JSON.stringify(feedIdsToUse)}`);
+            } else if (feedId) {
+              // Search this specific feed only
+              const cleanFeedId = feedId.replace(/^feed_/, '');
+              feedIdsToUse = [cleanFeedId];
+              printLog(`Using cleaned feedId: ${cleanFeedId} (original: ${feedId})`);
+            } else if (podcastSearchMode === 'my-pod' && adminFeedId) {
+              // If in my-pod mode, use admin feed
+              feedIdsToUse = [adminFeedId];
+            } else {
+              // Search all selected sources
+              feedIdsToUse = Array.from(selectedSources) as string[];
+            }
+            
+            // Execute the search - match the flow from performQuoteSearch
+            setSearchState(prev => ({ ...prev, isLoading: true }));
+            setSearchHistory(prev => ({ ...prev, [searchMode]: true }));
+            
+            // Create a conversation ID for this search
+            const conversationId = nextConversationId.current++;
+            
+            try {
+              const quoteResults = await handleQuoteSearch(
+                keyword,
+                auth,
+                feedIdsToUse,
+                undefined, // minDate
+                undefined, // maxDate
+                episodeName // episodeName filter
+              );
+              
+              setConversation(prev => [...prev, {
+                id: conversationId,
+                type: 'podcast-search' as const,
+                query: keyword,
+                timestamp: new Date(),
+                isStreaming: false,
+                data: {
+                  quotes: quoteResults.results
+                }
+              }]);
+              
+              // Clear the query input after search, just like normal search
+              setQuery("");
+              
+              setSearchState(prev => ({
+                ...prev,
+                isLoading: false,
+                activeConversationId: conversationId
+              }));
+              
+              printLog("Keyword search completed successfully");
+            } catch (error) {
+              console.error('Keyword search error:', error);
+              setSearchState(prev => ({ 
+                ...prev, 
+                isLoading: false,
+                error: error as Error
+              }));
+            }
           }}
         />
       )}

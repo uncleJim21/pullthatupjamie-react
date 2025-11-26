@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronLeft, Podcast, ChevronDown, ChevronUp, Play } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Podcast, ChevronDown, ChevronUp, Play, ScanSearch } from 'lucide-react';
 import ContextService, { AdjacentParagraph, HierarchyResponse } from '../services/contextService.ts';
 import ChapterService, { Chapter } from '../services/chapterService.ts';
-import { printLog } from '../constants/constants.ts';
+import { printLog, HIERARCHY_COLORS } from '../constants/constants.ts';
+import { KeywordTooltip } from './KeywordTooltip.tsx';
+import { handleQuoteSearch } from '../services/podcastService.ts';
+import { AuthConfig } from '../constants/constants.ts';
 
 enum ViewMode {
   CONTEXT = 'context',
@@ -20,6 +23,8 @@ interface PodcastContextPanelProps {
   onClose: () => void;
   smartInterpolation?: boolean;
   onTimestampClick?: (timestamp: number) => void;
+  onKeywordSearch?: (keyword: string, feedId?: string, episodeName?: string, forceSearchAll?: boolean) => void;
+  auth?: AuthConfig;
 }
 
 const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
@@ -27,7 +32,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   isOpen,
   onClose,
   smartInterpolation = true,
-  onTimestampClick
+  onTimestampClick,
+  onKeywordSearch,
+  auth
 }) => {
   const [paragraphs, setParagraphs] = useState<AdjacentParagraph[]>([]);
   const [hierarchy, setHierarchy] = useState<HierarchyResponse | null>(null);
@@ -41,6 +48,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const [isLoadingChapters, setIsLoadingChapters] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.CONTEXT);
   const [viewHistory, setViewHistory] = useState<ViewHistoryItem[]>([{ mode: ViewMode.CONTEXT }]);
+  const [openTooltipKeyword, setOpenTooltipKeyword] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Navigation functions for view history
@@ -444,12 +452,43 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                           <p className="text-xs text-gray-600 mb-1">Keywords</p>
                           <div className="flex flex-wrap gap-1">
                             {selectedChapter.metadata.keywords.map((keyword, idx) => (
-                              <span
+                              <KeywordTooltip
                                 key={idx}
-                                className="text-xs px-2 py-0.5 bg-gray-800 text-gray-300 rounded"
-                              >
-                                {keyword}
-                              </span>
+                                keyword={keyword}
+                                isOpen={openTooltipKeyword === keyword}
+                                onOpenChange={(isOpen) => setOpenTooltipKeyword(isOpen ? keyword : null)}
+                                options={[
+                                  {
+                                    label: 'Search - All Pods',
+                                    icon: <ScanSearch className="w-3.5 h-3.5" />,
+                                    color: HIERARCHY_COLORS.ALL_PODS,
+                                    onClick: () => {
+                                      printLog(`Searching all pods for keyword: ${keyword}`);
+                                      onKeywordSearch?.(keyword, undefined, undefined, true);
+                                    }
+                                  },
+                                  {
+                                    label: 'Search - This Feed',
+                                    icon: <ScanSearch className="w-3.5 h-3.5" />,
+                                    color: HIERARCHY_COLORS.FEED,
+                                    onClick: () => {
+                                      const feedId = hierarchy?.hierarchy.feed?.id;
+                                      printLog(`Searching this feed (${feedId}) for keyword: ${keyword}`);
+                                      onKeywordSearch?.(keyword, feedId);
+                                    }
+                                  },
+                                  {
+                                    label: 'Search - This Episode',
+                                    icon: <ScanSearch className="w-3.5 h-3.5" />,
+                                    color: HIERARCHY_COLORS.EPISODE,
+                                    onClick: () => {
+                                      const episodeName = hierarchy?.hierarchy.episode?.metadata.title;
+                                      printLog(`Searching this episode (${episodeName}) for keyword: ${keyword}`);
+                                      onKeywordSearch?.(keyword, undefined, episodeName);
+                                    }
+                                  }
+                                ]}
+                              />
                             ))}
                           </div>
                         </div>
@@ -635,12 +674,43 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                     <p className="text-xs text-gray-500 mb-2">KEYWORDS</p>
                     <div className="flex flex-wrap gap-1">
                       {hierarchy.hierarchy.chapter.metadata.keywords.map((keyword, idx) => (
-                        <span
+                        <KeywordTooltip
                           key={idx}
-                          className="text-xs px-2 py-0.5 bg-gray-800 text-gray-300 rounded"
-                        >
-                          {keyword}
-                        </span>
+                          keyword={keyword}
+                          isOpen={openTooltipKeyword === keyword}
+                          onOpenChange={(isOpen) => setOpenTooltipKeyword(isOpen ? keyword : null)}
+                          options={[
+                            {
+                              label: 'Search - All Pods',
+                              icon: <ScanSearch className="w-3.5 h-3.5" />,
+                              color: HIERARCHY_COLORS.ALL_PODS,
+                              onClick: () => {
+                                printLog(`Searching all pods for keyword: ${keyword}`);
+                                onKeywordSearch?.(keyword, undefined, undefined, true);
+                              }
+                            },
+                            {
+                              label: 'Search - This Feed',
+                              icon: <ScanSearch className="w-3.5 h-3.5" />,
+                              color: HIERARCHY_COLORS.FEED,
+                              onClick: () => {
+                                const feedId = hierarchy.hierarchy.feed?.id;
+                                printLog(`Searching this feed (${feedId}) for keyword: ${keyword}`);
+                                onKeywordSearch?.(keyword, feedId);
+                              }
+                            },
+                            {
+                              label: 'Search - This Episode',
+                              icon: <ScanSearch className="w-3.5 h-3.5" />,
+                              color: HIERARCHY_COLORS.EPISODE,
+                              onClick: () => {
+                                const episodeName = hierarchy.hierarchy.episode?.metadata.title;
+                                printLog(`Searching this episode (${episodeName}) for keyword: ${keyword}`);
+                                onKeywordSearch?.(keyword, undefined, episodeName);
+                              }
+                            }
+                          ]}
+                        />
                       ))}
                     </div>
                   </div>

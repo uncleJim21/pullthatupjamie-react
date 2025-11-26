@@ -14,6 +14,21 @@ module.exports = {
       boxShadow: {
         'white-glow': '0 0 10px rgba(255, 255, 255, 0.8)',
       },
+      keyframes: {
+        'tooltip-expand': {
+          '0%': { 
+            opacity: '0', 
+            transform: 'scaleY(0.8)' 
+          },
+          '100%': { 
+            opacity: '1', 
+            transform: 'scaleY(1)' 
+          },
+        },
+      },
+      animation: {
+        'tooltip-expand': 'tooltip-expand 0.15s ease-out',
+      },
       typography: (theme) => ({
         invert: {
           css: {
