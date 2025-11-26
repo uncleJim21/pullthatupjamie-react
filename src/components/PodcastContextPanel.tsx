@@ -90,6 +90,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         ]);
 
         printLog(`Received ${adjacentData.paragraphs.length} paragraphs and hierarchy`);
+        printLog(`Paragraph IDs received: ${adjacentData.paragraphs.map(p => p.id).join(', ')}`);
+        printLog(`Looking for highlightedParagraphId: ${paragraphId}`);
         setParagraphs(adjacentData.paragraphs);
         setHierarchy(hierarchyData);
         setHighlightedParagraphId(paragraphId);
@@ -238,7 +240,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       <div className="flex-1 flex overflow-hidden">
         {/* Left Side - Adjacent Paragraphs (Hidden in Chapter Mode) */}
         {viewMode !== ViewMode.CHAPTER && (
-          <div className="flex-1 flex flex-col border-r border-gray-800">
+          <div className="flex-1 flex flex-col border-r border-gray-800 min-w-0">
           <div className="p-3 border-b border-gray-800 bg-[#0A0A0A]">
             <h3 className="text-sm font-medium text-gray-400">Context</h3>
           </div>
@@ -288,11 +290,11 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                             }
                           }}
                         >
-                          <div className="flex items-start space-x-2">
+                          <div className="flex items-start space-x-2 min-w-0">
                             <span className="text-xs text-gray-500 font-mono min-w-[3rem] flex-shrink-0">
                               {formatTime(chunk.startTime)}
                             </span>
-                            <p className="text-sm text-gray-300 leading-relaxed flex-1">
+                            <p className="text-sm text-gray-300 leading-relaxed flex-1 min-w-0 break-words">
                               {chunk.text}
                             </p>
                           </div>
