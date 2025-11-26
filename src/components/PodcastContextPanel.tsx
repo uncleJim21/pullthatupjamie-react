@@ -220,9 +220,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
   return (
     <div
-      className={`fixed top-0 right-0 h-full bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out z-40 ${
-        isOpen ? 'w-[600px] translate-x-0' : 'w-[600px] translate-x-full'
-      }`}
+      className={`sticky top-0 h-screen bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out ${
+        isOpen ? 'w-[600px]' : 'w-0 border-l-0'
+      } overflow-hidden flex-shrink-0`}
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-800">

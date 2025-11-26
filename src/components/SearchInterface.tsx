@@ -1421,51 +1421,59 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   };
 
   return (
-    <div className="min-h-screen bg-black text-white relative pb-0.5">
-      {/* Welcome Modal */}
-      <WelcomeModal
-        isOpen={isWelcomeOpen}
-        onQuickTour={handleWelcomeQuickTour}
-        onGetStarted={handleWelcomeGetStarted}
-      />
+    <div className="min-h-screen bg-black text-white flex">
+      {/* Main Content Area - Left Side */}
+      <div className={`flex-1 min-w-0 transition-all duration-300 ${
+        searchMode === 'podcast-search' && 
+        searchViewStyle === SearchViewStyle.SPLIT_SCREEN && 
+        isContextPanelOpen 
+          ? 'mr-0' 
+          : ''
+      }`}>
+        {/* Welcome Modal */}
+        <WelcomeModal
+          isOpen={isWelcomeOpen}
+          onQuickTour={handleWelcomeQuickTour}
+          onGetStarted={handleWelcomeGetStarted}
+        />
 
-      {/* Tutorial Modal */}
-      <TutorialModal
-        isOpen={isTutorialOpen}
-        onClose={handleTutorialClose}
-        defaultSection={getDefaultTutorialSection()}
-      />
-      {/* Page Banner */}
-      <PageBanner 
-        logoText="Pull That Up Jamie!" 
-        onConnect={() => initializeLightning()}
-        onSignIn={() => setIsSignInModalOpen(true)}
-        onUpgrade={handleUpgrade}
-        onSignOut={handleSignOut}
-        onTutorialClick={handleTutorialClick}
-        isUserSignedIn={isUserSignedIn}
-        setIsUserSignedIn={setIsUserSignedIn}
-      />
-      
-      {/* Add the PodcastSourceFilterModal component */}
-      <PodcastSourceFilterModal 
-        isOpen={isFilterModalOpen}
-        onClose={() => {
-          // Ensure selection is properly updated after modal is closed
-          // This helps keep the selectedSources state in sync
-          const currentSources = new Set(selectedSources);
-          printLog(`Selection after modal close: ${JSON.stringify(Array.from(currentSources))}`);
-          setIsFilterModalOpen(false);
-        }}
-        selectedSources={selectedSources}
-        setSelectedSources={setSelectedSources}
-        filters={searchFilters}
-        setFilters={setSearchFilters}
-      />
-      
-      {isClipBatchPage && (
-        <div></div>
-      )}
+        {/* Tutorial Modal */}
+        <TutorialModal
+          isOpen={isTutorialOpen}
+          onClose={handleTutorialClose}
+          defaultSection={getDefaultTutorialSection()}
+        />
+        {/* Page Banner */}
+        <PageBanner 
+          logoText="Pull That Up Jamie!" 
+          onConnect={() => initializeLightning()}
+          onSignIn={() => setIsSignInModalOpen(true)}
+          onUpgrade={handleUpgrade}
+          onSignOut={handleSignOut}
+          onTutorialClick={handleTutorialClick}
+          isUserSignedIn={isUserSignedIn}
+          setIsUserSignedIn={setIsUserSignedIn}
+        />
+        
+        {/* Add the PodcastSourceFilterModal component */}
+        <PodcastSourceFilterModal 
+          isOpen={isFilterModalOpen}
+          onClose={() => {
+            // Ensure selection is properly updated after modal is closed
+            // This helps keep the selectedSources state in sync
+            const currentSources = new Set(selectedSources);
+            printLog(`Selection after modal close: ${JSON.stringify(Array.from(currentSources))}`);
+            setIsFilterModalOpen(false);
+          }}
+          selectedSources={selectedSources}
+          setSelectedSources={setSelectedSources}
+          filters={searchFilters}
+          setFilters={setSearchFilters}
+        />
+        
+        {isClipBatchPage && (
+          <div></div>
+        )}
       <SignInModal
         isOpen={isSignInModalOpen}
         onClose={() => setIsSignInModalOpen(false)}
@@ -1905,13 +1913,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         searchMode === 'podcast-search' && conversation.length > 0
           ? 'mb-1 pb-1'
           : 'mb-24 pb-24'
-      } ${
-        searchMode === 'podcast-search' && 
-        searchViewStyle === SearchViewStyle.SPLIT_SCREEN && 
-        isContextPanelOpen 
-          ? 'max-w-2xl mr-[600px]' 
-          : 'max-w-4xl'
-      }`}>
+      } max-w-4xl`}>
         {conversation
           .filter(item => item.type === searchMode)
           .map((item) => (
@@ -2082,11 +2084,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       )}
 
       {searchMode === 'podcast-search' && !isAnyModalOpen() && (
-        <div
-          className={`fixed w-full z-50 transition-all duration-300 ${
-            hasSearchedInMode('podcast-search') ? 'bottom-24' : 'bottom-0'
-          }`}
-        >
           <ClipTrackerModal
             clipProgress={clipProgress}
             hasSearched={hasSearchedInMode('podcast-search')}
@@ -2095,15 +2092,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             auth={authConfig || undefined}
             onShareClick={handleClipShare}
           />
-        </div>
       )}
 
 
 
       {/* Floating Search Bar */}
       {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
-        <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-50">
-          <form onSubmit={handleSearch} className="relative">
+        <div className="fixed sm:bottom-12 bottom-1 z-40 flex justify-center px-4 sm:px-24" style={{
+          left: '0',
+          right: searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isContextPanelOpen ? '600px' : '0'
+        }}>
+          <form onSubmit={handleSearch} className="relative w-full max-w-[40rem]">
             {/* Filter button and toggle - desktop version (outside search bar) */}
             {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
               <div className="absolute -right-14 top-0 z-10 hidden md:block">
@@ -2290,8 +2289,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onComplete={() => {}}
         platform={SocialPlatform.Twitter}
       />
+      </div>
 
-      {/* Context Panel for Split-Screen Mode */}
+      {/* Context Panel for Split-Screen Mode - Now as Sibling */}
       {searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && (
         <PodcastContextPanel
           paragraphId={selectedParagraphId}
