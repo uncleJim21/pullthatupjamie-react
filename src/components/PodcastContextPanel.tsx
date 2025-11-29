@@ -232,18 +232,6 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         isOpen ? 'w-[600px]' : 'w-0 border-l-0'
       } overflow-hidden flex-shrink-0`}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-800">
-        <h2 className="text-white text-lg font-semibold">Clip Context</h2>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-white transition-colors"
-          aria-label="Close panel"
-        >
-          <ChevronRight className="w-6 h-6" />
-        </button>
-      </div>
-
       {/* Split Content Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Side - Adjacent Paragraphs (Hidden in Chapter Mode) */}
@@ -323,17 +311,26 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
         {/* Right Side - Hierarchy Details */}
         <div className={`flex flex-col bg-[#0A0A0A] ${viewMode === ViewMode.CHAPTER ? 'flex-1' : 'w-[320px]'}`}>
-          <div className="p-3 border-b border-gray-800 flex items-center gap-2">
-            {canGoBack && (
-              <button
-                onClick={popView}
-                className="text-gray-400 hover:text-white transition-colors text-lg"
-                aria-label="Back"
-              >
-                ←
-              </button>
-            )}
-            <h3 className="text-sm font-medium text-gray-400">Details</h3>
+          <div className="p-3 border-b border-gray-800 flex items-center gap-2 justify-between">
+            <div className="flex items-center gap-2">
+              {canGoBack && (
+                <button
+                  onClick={popView}
+                  className="text-gray-400 hover:text-white transition-colors text-lg"
+                  aria-label="Back"
+                >
+                  ←
+                </button>
+              )}
+              <h3 className="text-sm font-medium text-gray-400">Details</h3>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white transition-colors"
+              aria-label="Close panel"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4">
