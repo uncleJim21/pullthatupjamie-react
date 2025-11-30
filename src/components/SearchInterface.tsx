@@ -1,7 +1,7 @@
 import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
-import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, SearchViewStyle } from '../constants/constants.ts';
+import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, SearchViewStyle, SearchResultViewStyle } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef} from 'react';
@@ -19,7 +19,7 @@ import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter, List, Grid3X3, X as XIcon } from 'lucide-react';
+import { Filter, List, Grid3X3, X as XIcon, Sparkles } from 'lucide-react';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
 import PageBanner from './PageBanner.tsx';
@@ -31,6 +31,8 @@ import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 import AuthService from '../services/authService.ts';
 import ImageWithLoader from './ImageWithLoader.tsx';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
+import SemanticGalaxyView from './SemanticGalaxyView.tsx';
+import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -198,6 +200,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Context panel state for split-screen view
   const [isContextPanelOpen, setIsContextPanelOpen] = useState(false);
   const [selectedParagraphId, setSelectedParagraphId] = useState<string | null>(null);
+  
+  // Result view style state (List vs Galaxy)
+  const [resultViewStyle, setResultViewStyle] = useState<SearchResultViewStyle>(() => {
+    const saved = localStorage.getItem('searchResultViewStyle');
+    return saved === SearchResultViewStyle.GALAXY ? SearchResultViewStyle.GALAXY : SearchResultViewStyle.LIST;
+  });
   
   // Update state for filter button
   const [filterClicked, setFilterClicked] = useState(false);
@@ -1907,8 +1915,84 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       </div>
 
 
-      {/* Conversation History */}
-      {conversation.length > 0 && (
+      {/* Conversation History / Galaxy View */}
+      {conversation.length > 0 && searchMode === 'podcast-search' && (
+        <div>
+          {/* View Toggle */}
+          <div className="flex justify-center mb-6">
+            <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
+              <button
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                  resultViewStyle === SearchResultViewStyle.LIST
+                    ? 'bg-[#1A1A1A] text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+                onClick={() => {
+                  setResultViewStyle(SearchResultViewStyle.LIST);
+                  localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.LIST);
+                }}
+              >
+                <List className="w-4 h-4" />
+                <span>List</span>
+              </button>
+              <button
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                  resultViewStyle === SearchResultViewStyle.GALAXY
+                    ? 'bg-[#1A1A1A] text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+                onClick={() => {
+                  setResultViewStyle(SearchResultViewStyle.GALAXY);
+                  localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.GALAXY);
+                }}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Galaxy</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Conditional rendering: List or Galaxy view */}
+          {resultViewStyle === SearchResultViewStyle.GALAXY ? (
+            <SemanticGalaxyView
+              results={MOCK_GALAXY_DATA.results}
+              onStarClick={(result) => {
+                printLog(`Star clicked: ${result.shareLink}`);
+                setSelectedParagraphId(result.shareLink);
+                setIsContextPanelOpen(true);
+              }}
+              selectedStarId={selectedParagraphId}
+            />
+          ) : (
+            <div className={`mx-auto px-4 space-y-8 transition-all duration-300 ${
+              searchMode === 'podcast-search' && conversation.length > 0
+                ? 'mb-1 pb-1'
+                : 'mb-24 pb-24'
+            } max-w-4xl`}>
+              {conversation
+                .filter(item => item.type === searchMode)
+                .map((item) => (
+                  <ConversationRenderer 
+                    key={item.id}
+                    item={item} 
+                    clipProgress={clipProgress || null}
+                    onClipProgress={handleClipProgress}
+                    authConfig={authConfig}
+                    onShareModalOpen={setIsShareModalOpen}
+                    onSocialShareModalOpen={setIsSocialShareModalOpen}
+                    isClipBatchPage={isClipBatchPage}
+                    clipBatchViewMode={clipBatchViewMode}
+                    selectedParagraphId={selectedParagraphId}
+                    onResultClick={handleResultClick}
+                  />
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Conversation History for Web Search */}
+      {conversation.length > 0 && searchMode !== 'podcast-search' && (
       <div className={`mx-auto px-4 space-y-8 transition-all duration-300 ${
         searchMode === 'podcast-search' && conversation.length > 0
           ? 'mb-1 pb-1'
