@@ -2,7 +2,7 @@ import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
 import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, SearchViewStyle, SearchResultViewStyle } from '../constants/constants.ts';
-import { handleQuoteSearch } from '../services/podcastService.ts';
+import { handleQuoteSearch, handleQuoteSearch3D } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef} from 'react';
 import { ModelSettingsBar } from './ModelSettingsBar.tsx';
@@ -207,6 +207,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     return saved === SearchResultViewStyle.GALAXY ? SearchResultViewStyle.GALAXY : SearchResultViewStyle.LIST;
   });
   
+  // 3D search results state
+  const [galaxyResults, setGalaxyResults] = useState<any[]>([]);
+  
   // Update state for filter button
   const [filterClicked, setFilterClicked] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
@@ -368,6 +371,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
   const [requestAuthMethod, setRequestAuthMethod] = useState(RequestAuthMethod.FREE);//free, lightning or square
   const [conversation, setConversation] = useState([] as ConversationItem[]);
+  const [galaxy3DResults, setGalaxy3DResults] = useState<any[]>([]);
   
 
   const searchInputRef = useRef<HTMLTextAreaElement>(null);
@@ -835,6 +839,72 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
   }
 
+  const performQuoteSearch3D = async () => {
+    setSearchHistory(prev => ({...prev, [searchMode]: true}));
+    
+    printLog("Starting 3D quote search...");
+    
+    // Determine which sources to use based on podcast search mode
+    let feedIdsToUse: string[];
+    
+    if (podcastSearchMode === 'my-pod' && adminFeedId) {
+      feedIdsToUse = [adminFeedId];
+      printLog(`Using My Pod mode with feedId: ${adminFeedId}`);
+    } else {
+      feedIdsToUse = Array.from(selectedSources) as string[];
+      printLog(`Using Global mode with selected sources: ${JSON.stringify(feedIdsToUse)}`);
+    }
+    
+    printLog(`Using feed IDs for 3D search: ${JSON.stringify(feedIdsToUse,null,2)}`);
+    printLog(`Using filters: ${JSON.stringify(searchFilters)}`);
+
+    const auth = await getAuth() as AuthConfig;
+    if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
+      setIsRegisterModalOpen(true);
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
+    printLog(`Request auth method:${requestAuthMethod}`)
+    
+    try {
+      const quoteResults3D = await handleQuoteSearch3D(
+        query, 
+        auth, 
+        feedIdsToUse,
+        searchFilters.minDate || undefined,
+        searchFilters.maxDate || undefined,
+        searchFilters.episodeName || undefined
+      );
+      
+      // Store 3D results separately
+      setGalaxyResults(quoteResults3D.results || []);
+      
+      // Also update conversation with regular results for list view
+      setConversation(prev => [...prev, {
+        id: searchState.activeConversationId as number,
+        type: 'podcast-search' as const,
+        query: query,
+        timestamp: new Date(),
+        isStreaming: false,
+        data: {
+          quotes: quoteResults3D.results
+        }
+      }]);
+      setQuery("");
+      printLog("3D quote search completed successfully");
+    } catch (error) {
+      console.error("Error during 3D quote search:", error);
+      setSearchState(prev => ({
+        ...prev,
+        error: error as Error,
+        isLoading: false
+      }));
+      return;
+    } finally {
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+    }
+  }
+
   const handleSearch = async (e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
     if (searchMode === 'podcast-search') {
@@ -855,7 +925,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         });
         
         // We'll use this function's closure to capture the current selection state
-        await performQuoteSearch();
+        // Call 3D search if in galaxy mode, otherwise regular search
+        if (resultViewStyle === SearchResultViewStyle.GALAXY) {
+          await performQuoteSearch3D();
+        } else {
+          await performQuoteSearch();
+        }
         return;
       } catch (error) {
         console.error('Quote search error:', error);
@@ -1955,7 +2030,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           {/* Conditional rendering: List or Galaxy view */}
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (
             <SemanticGalaxyView
-              results={MOCK_GALAXY_DATA.results}
+              results={galaxyResults.length > 0 ? galaxyResults : MOCK_GALAXY_DATA.results}
               onStarClick={(result) => {
                 printLog(`Star clicked: ${result.shareLink}`);
                 setSelectedParagraphId(result.shareLink);

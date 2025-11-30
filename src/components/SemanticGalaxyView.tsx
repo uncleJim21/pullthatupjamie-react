@@ -324,32 +324,35 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       {/* Hover preview */}
       <HoverPreview result={hoveredResult} position={mousePosition} />
 
-      {/* Stats overlay */}
+      {/* Stats overlay with Legend */}
       <div className="absolute top-4 right-4 px-3 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 text-sm z-10">
-        <div className="flex flex-col gap-1">
-          <div>Results: {results.length}</div>
-          {selectedStarId && <div className="text-gray-400">Star selected</div>}
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 px-3 py-2 bg-black/80 backdrop-blur-sm rounded-lg border border-gray-700 z-10">
-        <div className="text-xs text-gray-400 mb-2">Hierarchy Levels</div>
-        <div className="flex flex-col gap-1">
-          {Object.entries(HIERARCHY_COLORS).map(([level, color]) => (
-            <div key={level} className="flex items-center gap-2">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{
-                  backgroundColor: color,
-                  boxShadow: `0 0 8px ${color}`,
-                }}
-              />
-              <span className="text-xs text-gray-300 capitalize">
-                {level.replace('_', ' ').toLowerCase()}
-              </span>
+        <div className="flex flex-col gap-3">
+          {/* Stats */}
+          <div className="flex flex-col gap-1">
+            <div>Results: {results.length}</div>
+            {selectedStarId && <div className="text-gray-400">Star selected</div>}
+          </div>
+          
+          {/* Legend */}
+          <div className="border-t border-gray-700 pt-2">
+            <div className="text-xs text-gray-400 mb-2">Hierarchy Levels</div>
+            <div className="flex flex-col gap-1">
+              {Object.entries(HIERARCHY_COLORS).map(([level, color]) => (
+                <div key={level} className="flex items-center gap-2">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{
+                      backgroundColor: color,
+                      boxShadow: `0 0 8px ${color}`,
+                    }}
+                  />
+                  <span className="text-xs text-gray-300 capitalize">
+                    {level.replace('_', ' ').toLowerCase()}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
 
