@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
 import { Calendar } from 'lucide-react';
@@ -35,6 +35,15 @@ interface SemanticGalaxyViewProps {
   results: QuoteResult[];
   onStarClick: (result: QuoteResult) => void;
   selectedStarId: string | null;
+  axisLabels?: {
+    center?: string;
+    xPositive?: string;
+    xNegative?: string;
+    yPositive?: string;
+    yNegative?: string;
+    zPositive?: string;
+    zNegative?: string;
+  } | null;
 }
 
 // Convert hierarchy level to color
@@ -61,6 +70,93 @@ interface StarProps {
   onClick: () => void;
   onHover: (result: QuoteResult | null) => void;
 }
+
+// Component to draw lines connecting results from the same episode
+interface EpisodeConnectionsProps {
+  results: QuoteResult[];
+}
+
+// Component to display axis labels in 3D space
+interface AxisLabelsProps {
+  axisLabels: {
+    center?: string;
+    xPositive?: string;
+    xNegative?: string;
+    yPositive?: string;
+    yNegative?: string;
+    zPositive?: string;
+    zNegative?: string;
+  };
+}
+
+const AxisLabels: React.FC<AxisLabelsProps> = ({ axisLabels }) => {
+  const labelPositions = {
+    center: [0, 0, 0],
+    xPositive: [10, 0, 0],
+    xNegative: [-10, 0, 0],
+    yPositive: [0, 10, 0],
+    yNegative: [0, -10, 0],
+    zPositive: [0, 0, 10],
+    zNegative: [0, 0, -10],
+  };
+
+  return (
+    <>
+      {Object.entries(axisLabels).map(([axis, label]) => {
+        if (!label) return null;
+        const position = labelPositions[axis as keyof typeof labelPositions];
+        
+        return (
+          <Text
+            key={axis}
+            position={position as [number, number, number]}
+            fontSize={0.5}
+            color="white"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.02}
+            outlineColor="#000000"
+          >
+            {label}
+          </Text>
+        );
+      })}
+    </>
+  );
+};
+
+const EpisodeConnections: React.FC<EpisodeConnectionsProps> = ({ results }) => {
+  const lineGeometry = useMemo(() => {
+    const points: THREE.Vector3[] = [];
+    
+    // Create lines between all pairs of points in this episode
+    for (let i = 0; i < results.length; i++) {
+      for (let j = i + 1; j < results.length; j++) {
+        const start = results[i].coordinates3d;
+        const end = results[j].coordinates3d;
+        
+        points.push(
+          new THREE.Vector3(start.x * 10, start.y * 10, start.z * 10),
+          new THREE.Vector3(end.x * 10, end.y * 10, end.z * 10)
+        );
+      }
+    }
+    
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    return geometry;
+  }, [results]);
+
+  return (
+    <lineSegments geometry={lineGeometry}>
+      <lineBasicMaterial 
+        color="#444444" 
+        transparent 
+        opacity={0.2}
+        linewidth={1}
+      />
+    </lineSegments>
+  );
+};
 
 const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, onClick, onHover }) => {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -121,6 +217,23 @@ const CameraResetButton: React.FC<{ onReset: () => void }> = ({ onReset }) => {
       className="absolute top-4 left-4 px-3 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm z-10"
     >
       Reset Camera
+    </button>
+  );
+};
+
+// Label Axes Toggle Button
+const LabelAxesButton: React.FC<{ enabled: boolean; onToggle: () => void }> = ({ enabled, onToggle }) => {
+  return (
+    <button
+      onClick={onToggle}
+      className={`absolute top-16 left-4 px-3 py-2 backdrop-blur-sm text-white rounded-lg border transition-colors text-sm z-10 flex items-center gap-2 ${
+        enabled 
+          ? 'bg-white/20 border-white/40 hover:bg-white/30' 
+          : 'bg-black/80 border-gray-700 hover:bg-black/90'
+      }`}
+    >
+      {enabled && <span className="text-white font-bold">✓</span>}
+      <span>Label Axes</span>
     </button>
   );
 };
@@ -237,7 +350,17 @@ const GalaxyScene: React.FC<{
   selectedStarId: string | null;
   onStarClick: (result: QuoteResult) => void;
   onHover: (result: QuoteResult | null) => void;
-}> = ({ results, selectedStarId, onStarClick, onHover }) => {
+  axisLabels?: {
+    center?: string;
+    xPositive?: string;
+    xNegative?: string;
+    yPositive?: string;
+    yNegative?: string;
+    zPositive?: string;
+    zNegative?: string;
+  } | null;
+  showAxisLabels: boolean;
+}> = ({ results, selectedStarId, onStarClick, onHover, axisLabels, showAxisLabels }) => {
   // Calculate which stars are near the selected one
   const nearbyStars = useMemo(() => {
     if (!selectedStarId) return new Set<string>();
@@ -264,6 +387,21 @@ const GalaxyScene: React.FC<{
     return nearby;
   }, [results, selectedStarId]);
 
+  // Group results by episode
+  const episodeGroups = useMemo(() => {
+    const groups = new Map<string, QuoteResult[]>();
+    
+    results.forEach(result => {
+      const episodeKey = result.episode;
+      if (!groups.has(episodeKey)) {
+        groups.set(episodeKey, []);
+      }
+      groups.get(episodeKey)!.push(result);
+    });
+    
+    return groups;
+  }, [results]);
+
   return (
     <>
       {/* Ambient light */}
@@ -271,6 +409,23 @@ const GalaxyScene: React.FC<{
       
       {/* Point light at origin */}
       <pointLight position={[0, 0, 0]} intensity={0.5} />
+
+      {/* Axis Labels */}
+      {showAxisLabels && axisLabels && (
+        <AxisLabels axisLabels={axisLabels} />
+      )}
+
+      {/* Episode Connection Lines */}
+      {Array.from(episodeGroups.values()).map((episodeResults, groupIndex) => {
+        if (episodeResults.length < 2) return null; // Skip if only one result in episode
+        
+        return (
+          <EpisodeConnections
+            key={`episode-${groupIndex}`}
+            results={episodeResults}
+          />
+        );
+      })}
 
       {/* Stars */}
       {results.map((result) => (
@@ -295,9 +450,25 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   results,
   onStarClick,
   selectedStarId,
+  axisLabels,
 }) => {
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  
+  // Load showAxisLabels from userSettings in localStorage
+  const [showAxisLabels, setShowAxisLabels] = useState<boolean>(() => {
+    try {
+      const userSettings = localStorage.getItem('userSettings');
+      if (userSettings) {
+        const settings = JSON.parse(userSettings);
+        return settings.showAxisLabels ?? false;
+      }
+    } catch (e) {
+      console.error('Error loading showAxisLabels from userSettings:', e);
+    }
+    return false;
+  });
+  
   const cameraRef = useRef<THREE.PerspectiveCamera>(null);
   const controlsRef = useRef<any>(null);
 
@@ -313,10 +484,29 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
     }
   };
 
+  // Toggle axis labels and save to userSettings
+  const handleToggleAxisLabels = () => {
+    const newValue = !showAxisLabels;
+    setShowAxisLabels(newValue);
+    
+    // Save to userSettings in localStorage
+    try {
+      const userSettings = localStorage.getItem('userSettings');
+      const settings = userSettings ? JSON.parse(userSettings) : {};
+      settings.showAxisLabels = newValue;
+      localStorage.setItem('userSettings', JSON.stringify(settings));
+    } catch (e) {
+      console.error('Error saving showAxisLabels to userSettings:', e);
+    }
+  };
+
   return (
     <div className="relative w-full h-screen bg-black" onMouseMove={handleMouseMove}>
       {/* Camera reset button */}
       <CameraResetButton onReset={handleResetCamera} />
+
+      {/* Label Axes button */}
+      <LabelAxesButton enabled={showAxisLabels} onToggle={handleToggleAxisLabels} />
 
       {/* Minimap */}
       <Minimap results={results} selectedStarId={selectedStarId} />
@@ -381,6 +571,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           selectedStarId={selectedStarId}
           onStarClick={onStarClick}
           onHover={setHoveredResult}
+          axisLabels={axisLabels || null}
+          showAxisLabels={showAxisLabels}
         />
       </Canvas>
     </div>

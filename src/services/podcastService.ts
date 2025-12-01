@@ -75,7 +75,8 @@ export const handleQuoteSearch3D = async (
   selectedFeedIds?: string[],
   minDate?: string,
   maxDate?: string,
-  episodeName?: string
+  episodeName?: string,
+  extractAxisLabels?: boolean
 ) => {
   try {
     const headers: Record<string, string> = {
@@ -92,7 +93,7 @@ export const handleQuoteSearch3D = async (
     }
     // FREE tier doesn't need an auth header
 
-    const body: PodcastSearchParams = {
+    const body: any = {
       query: queryToUse,
       limit: 100, // 3D view can handle more results
       feedIds: selectedFeedIds || []
@@ -107,6 +108,9 @@ export const handleQuoteSearch3D = async (
     }
     if (episodeName && episodeName.trim() !== '') {
       body.episodeName = episodeName.trim();
+    }
+    if (extractAxisLabels) {
+      body.extractAxisLabels = true;
     }
 
     const response = await fetch(`${API_URL}/api/search-quotes-3d`, {

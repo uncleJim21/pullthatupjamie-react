@@ -209,6 +209,21 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // 3D search results state
   const [galaxyResults, setGalaxyResults] = useState<any[]>([]);
+  const [axisLabels, setAxisLabels] = useState<any>(null);
+  
+  // Load showAxisLabels from userSettings
+  const getShowAxisLabels = () => {
+    try {
+      const userSettings = localStorage.getItem('userSettings');
+      if (userSettings) {
+        const settings = JSON.parse(userSettings);
+        return settings.showAxisLabels ?? false;
+      }
+    } catch (e) {
+      console.error('Error loading showAxisLabels:', e);
+    }
+    return false;
+  };
   
   // Update state for filter button
   const [filterClicked, setFilterClicked] = useState(false);
@@ -867,17 +882,27 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     printLog(`Request auth method:${requestAuthMethod}`)
     
     try {
+      const shouldExtractAxisLabels = getShowAxisLabels();
+      printLog(`Extracting axis labels: ${shouldExtractAxisLabels}`);
+      
       const quoteResults3D = await handleQuoteSearch3D(
         query, 
         auth, 
         feedIdsToUse,
         searchFilters.minDate || undefined,
         searchFilters.maxDate || undefined,
-        searchFilters.episodeName || undefined
+        searchFilters.episodeName || undefined,
+        shouldExtractAxisLabels // Request axis labels if enabled in settings
       );
       
       // Store 3D results separately
       setGalaxyResults(quoteResults3D.results || []);
+      
+      // Store axis labels if returned
+      if (quoteResults3D.axisLabels) {
+        setAxisLabels(quoteResults3D.axisLabels);
+        printLog(`Received axis labels: ${JSON.stringify(quoteResults3D.axisLabels)}`);
+      }
       
       // Also update conversation with regular results for list view
       setConversation(prev => [...prev, {
@@ -1329,17 +1354,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         const firstResult = latestPodcastSearch.data.quotes[0];
         
         // Use shareLink as fallback if id is undefined
-        const paragraphId = firstResult.id || firstResult.shareLink;
+        const paragraphId = firstResult.id || firstResult.shareLink || null;
         
         printLog(`First result details: id=${firstResult.id}, shareLink=${firstResult.shareLink}`);
         printLog(`Using paragraphId: ${paragraphId}`);
         printLog(`Full first result: ${JSON.stringify(firstResult, null, 2)}`);
         
         // Set the first result as selected and open the context panel
-        setSelectedParagraphId(paragraphId);
-        setIsContextPanelOpen(true);
-        
-        printLog(`Split-screen: Auto-selected first result: ${paragraphId}`);
+        if (paragraphId) {
+          setSelectedParagraphId(paragraphId);
+          setIsContextPanelOpen(true);
+          printLog(`Split-screen: Auto-selected first result: ${paragraphId}`);
+        }
       }
     }
   }, [conversation, searchViewStyle, searchMode]);
@@ -2037,6 +2063,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 setIsContextPanelOpen(true);
               }}
               selectedStarId={selectedParagraphId}
+              axisLabels={axisLabels}
             />
           ) : (
             <div className={`mx-auto px-4 space-y-8 transition-all duration-300 ${
@@ -2068,11 +2095,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
       {/* Conversation History for Web Search */}
       {conversation.length > 0 && searchMode !== 'podcast-search' && (
-      <div className={`mx-auto px-4 space-y-8 transition-all duration-300 ${
-        searchMode === 'podcast-search' && conversation.length > 0
-          ? 'mb-1 pb-1'
-          : 'mb-24 pb-24'
-      } max-w-4xl`}>
+      <div className={`mx-auto px-4 space-y-8 transition-all duration-300 mb-24 pb-24 max-w-4xl`}>
         {conversation
           .filter(item => item.type === searchMode)
           .map((item) => (
