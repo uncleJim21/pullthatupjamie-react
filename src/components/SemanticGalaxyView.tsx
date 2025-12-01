@@ -24,11 +24,16 @@ const STAR_VISUAL_CONFIG = {
   CORE_GLOW_SIZE: 0.12,
   CORE_GLOW_OPACITY: 0.6,
   
-  // Soft halo
+  // Soft bleeding halo (more layers for smooth falloff)
   HALO_LAYERS: [
-    { size: 0.18, opacity: 0.4 },
-    { size: 0.28, opacity: 0.2 },
-    { size: 0.40, opacity: 0.1 },
+    { size: 0.15, opacity: 0.5 },
+    { size: 0.20, opacity: 0.38 },
+    { size: 0.26, opacity: 0.28 },
+    { size: 0.33, opacity: 0.20 },
+    { size: 0.42, opacity: 0.14 },
+    { size: 0.52, opacity: 0.09 },
+    { size: 0.65, opacity: 0.05 },
+    { size: 0.80, opacity: 0.02 },
   ],
   
   // 4 MAIN DIFFRACTION SPIKES (like telescope)
@@ -350,20 +355,17 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, onClick
       {/* 4 MAIN DIFFRACTION SPIKES (telescope cross pattern) */}
       {Array.from({ length: STAR_VISUAL_CONFIG.MAIN_SPIKES.COUNT }).map((_, i) => {
         const angle = (i / STAR_VISUAL_CONFIG.MAIN_SPIKES.COUNT) * Math.PI * 2;
-        const x = Math.cos(angle) * STAR_VISUAL_CONFIG.MAIN_SPIKES.LENGTH / 2;
-        const z = Math.sin(angle) * STAR_VISUAL_CONFIG.MAIN_SPIKES.LENGTH / 2;
         
         return (
           <mesh
             key={`main-spike-${i}`}
             ref={el => mainSpikeRefs.current[i] = el}
-            position={[x, 0, z]}
-            rotation={[0, angle + Math.PI / 2, 0]}
+            rotation={[0, 0, angle]}  // Rotate to point outward at this angle
           >
             <boxGeometry args={[
+              STAR_VISUAL_CONFIG.MAIN_SPIKES.LENGTH,  // Extend along X
               STAR_VISUAL_CONFIG.MAIN_SPIKES.WIDTH,
               STAR_VISUAL_CONFIG.MAIN_SPIKES.WIDTH,
-              STAR_VISUAL_CONFIG.MAIN_SPIKES.LENGTH
             ]} />
             <meshBasicMaterial
               color={color}
@@ -377,19 +379,15 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, onClick
       
       {/* MANY TINY RAYS (subtle spikes around core) */}
       {tinyRayProps.map((ray, i) => {
-        const x = Math.cos(ray.angle) * ray.length / 2;
-        const z = Math.sin(ray.angle) * ray.length / 2;
-        
         return (
           <mesh
             key={`tiny-ray-${i}`}
-            position={[x, 0, z]}
-            rotation={[0, ray.angle + Math.PI / 2, 0]}
+            rotation={[0, 0, ray.angle]}  // Rotate to point outward at this angle
           >
             <boxGeometry args={[
+              ray.length,  // Extend along X
               STAR_VISUAL_CONFIG.TINY_RAYS.WIDTH,
               STAR_VISUAL_CONFIG.TINY_RAYS.WIDTH,
-              ray.length
             ]} />
             <meshBasicMaterial
               color={color}
