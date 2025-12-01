@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS, GALAXY_STAR_THEME, GalaxyStarTheme } from '../constants/constants.ts';
@@ -18,6 +18,118 @@ const BOBBING_CONFIG = {
 // ============================================================================
 // VISUAL APPEARANCE - ASTRONOMICAL DIFFRACTION SPIKES
 // ============================================================================
+
+// Nebula background shaders (ported from Jared Berghold's Shadertoy "Nebula" shader)
+const NEBULA_VERTEX_SHADER = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const NEBULA_FRAGMENT_SHADER = `
+  precision highp float;
+
+  uniform float iTime;
+  uniform vec3 iResolution;
+  uniform vec4 iMouse;
+  varying vec2 vUv;
+
+  const int MAX_ITER = 18;
+
+  float field(vec3 p, float s, int iter)
+  {
+    float accum = s / 4.0;
+    float prev = 0.0;
+    float tw = 0.0;
+    for (int i = 0; i < MAX_ITER; ++i) 
+    {
+      if (i >= iter)
+      {
+        break;
+      }
+      float mag = dot(p, p);
+      p = abs(p) / mag + vec3(-0.5, -0.4, -1.487);
+      float w = exp(-float(i) / 5.0);
+      accum += w * exp(-9.025 * pow(abs(mag - prev), 2.2));
+      tw += w;
+      prev = mag;
+    }
+    return max(0.0, 5.2 * accum / tw - 0.65);
+  }
+
+  vec3 nrand3(vec2 co)
+  {
+    vec3 a = fract(cos(co.x*8.3e-3 + co.y) * vec3(1.3e5, 4.7e5, 2.9e5));
+    vec3 b = fract(sin(co.x*0.3e-3 + co.y) * vec3(8.1e5, 1.0e5, 0.1e5));
+    vec3 c = mix(a, b, 0.5);
+    return c;
+  }
+
+  vec4 starLayer(vec2 p, float time)
+  {
+    vec2 seed = 1.9 * p.xy;
+    seed = floor(seed * max(iResolution.x, 600.0) / 1.5);
+    vec3 rnd = nrand3(seed);
+    vec4 col = vec4(pow(rnd.y, 17.0));
+    float mul = 10.0 * rnd.x;
+    col.xyz *= sin(time * mul + mul) * 0.25 + 1.0;
+    return col;
+  }
+
+  void mainImage( out vec4 fragColor, in vec2 fragCoord )
+  {
+    float time = iTime / (iResolution.x / 1000.0);
+    
+    // first layer of the kaliset fractal
+    vec2 uv = 2.0 * fragCoord / iResolution.xy - 1.0;
+    vec2 uvs = uv * iResolution.xy / max(iResolution.x, iResolution.y);
+    vec3 p = vec3(uvs / 2.5, 0.0) + vec3(0.8, -1.3, 0.0);
+    p += 0.45 * vec3(sin(time / 32.0), sin(time / 24.0), sin(time / 64.0));
+    
+    // adjust first layer position based on mouse movement
+    p.x += mix(-0.02, 0.02, (iMouse.x / iResolution.x));
+    p.y += mix(-0.02, 0.02, (iMouse.y / iResolution.y));
+    
+    float freqs[4];
+    freqs[0] = 0.45;
+    freqs[1] = 0.4;
+    freqs[2] = 0.15;
+    freqs[3] = 0.9;
+
+    float t = field(p, freqs[2], 13);
+    float v = (1.0 - exp((abs(uv.x) - 1.0) * 6.0)) * (1.0 - exp((abs(uv.y) - 1.0) * 6.0));
+    
+    // second layer of the kaliset fractal
+    vec3 p2 = vec3(uvs / (4.0 + sin(time * 0.11) * 0.2 + 0.2 + sin(time * 0.15) * 0.3 + 0.4), 4.0) + vec3(2.0, -1.3, -1.0);
+    p2 += 0.16 * vec3(sin(time / 32.0), sin(time / 24.0), sin(time / 64.0));
+    
+    // adjust second layer position based on mouse movement
+    p2.x += mix(-0.01, 0.01, (iMouse.x / iResolution.x));
+    p2.y += mix(-0.01, 0.01, (iMouse.y / iResolution.y));
+    float t2 = field(p2, freqs[3], 18);
+    vec4 c2 = mix(0.5, 0.2, v) * vec4(5.5 * t2 * t2 * t2, 2.1 * t2 * t2, 2.2 * t2 * freqs[0], t2);
+    
+    // add stars
+    vec4 starColour = vec4(0.0);
+    starColour += starLayer(p.xy, time);
+    starColour += starLayer(p2.xy, time);
+
+    const float brightness = 1.0;
+    vec4 colour = mix(freqs[3] - 0.3, 1.0, v) * vec4(1.5 * freqs[2] * t * t * t, 1.2 * freqs[1] * t * t, freqs[3] * t, 1.0) + c2 + starColour;
+    fragColor = vec4(brightness * colour.xyz, 1.0);
+  }
+
+  void main() {
+    // Reconstruct fragCoord from vUv so the shader behaves like on Shadertoy
+    vec2 fragCoord = vUv * iResolution.xy;
+    vec4 fragColor;
+    mainImage(fragColor, fragCoord);
+    gl_FragColor = fragColor;
+  }
+`;
+
 const STAR_VISUAL_CONFIG = {
   // Bright core
   CORE_SIZE: 0.04,
@@ -63,6 +175,11 @@ const STAR_VISUAL_CONFIG = {
   ENABLE_POINT_LIGHT: true,
   LIGHT_INTENSITY: 2.0,
   LIGHT_DISTANCE: 5,
+};
+
+// Interaction configuration for stars (hit area, etc.)
+const STAR_INTERACTION_CONFIG = {
+  CORE_HIT_RADIUS_MULTIPLIER: 5, // Multiplier for invisible interaction sphere vs visual core
 };
 
 // Generate random tiny ray properties
@@ -171,6 +288,130 @@ interface AxisLabelsProps {
   };
 }
 
+// Nebula background component rendered as a full-screen quad that follows the camera
+const NebulaBackground: React.FC = () => {
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
+  const meshRef = useRef<THREE.Mesh | null>(null);
+  const { camera } = useThree();
+
+  useFrame((state) => {
+    if (!materialRef.current || !meshRef.current) return;
+
+    const { width, height } = state.size;
+
+    // Update shader uniforms
+    materialRef.current.uniforms.iTime.value = state.clock.elapsedTime;
+    materialRef.current.uniforms.iResolution.value.set(width, height, 1.0);
+
+    // Map R3F normalized pointer (-1..1) to pixel coordinates for iMouse
+    const pointer = state.pointer;
+    const mouseX = (pointer.x * 0.5 + 0.5) * width;
+    const mouseY = (pointer.y * -0.5 + 0.5) * height;
+    materialRef.current.uniforms.iMouse.value.set(mouseX, mouseY, 0.0, 0.0);
+
+    // Position the quad in front of the camera and match its orientation
+    const perspectiveCamera = camera as THREE.PerspectiveCamera;
+    const distance = 30; // distance in front of the camera
+
+    const direction = new THREE.Vector3();
+    perspectiveCamera.getWorldDirection(direction);
+
+    const position = new THREE.Vector3()
+      .copy(perspectiveCamera.position)
+      .add(direction.multiplyScalar(distance));
+
+    meshRef.current.position.copy(position);
+    meshRef.current.quaternion.copy(perspectiveCamera.quaternion);
+
+    // Scale the quad so it fully covers the view frustum at this distance
+    const fov = THREE.MathUtils.degToRad(perspectiveCamera.fov);
+    const heightAtDistance = 2 * Math.tan(fov / 2) * distance;
+    const widthAtDistance = heightAtDistance * perspectiveCamera.aspect;
+    meshRef.current.scale.set(widthAtDistance, heightAtDistance, 1);
+  });
+
+  return (
+    <mesh ref={meshRef} renderOrder={-1}>
+      <planeGeometry args={[1, 1, 1, 1]} />
+      <shaderMaterial
+        ref={materialRef}
+        vertexShader={NEBULA_VERTEX_SHADER}
+        fragmentShader={NEBULA_FRAGMENT_SHADER}
+        uniforms={{
+          iTime: { value: 0 },
+          iResolution: { value: new THREE.Vector3(1, 1, 1.0) },
+          iMouse: { value: new THREE.Vector4(0, 0, 0, 0) },
+        }}
+        depthWrite={false}
+        depthTest={false}
+        transparent={false}
+        side={THREE.FrontSide}
+      />
+    </mesh>
+  );
+};
+
+interface AxisLabelWithBackgroundProps {
+  position: [number, number, number];
+  label: string;
+}
+
+const AxisLabelWithBackground: React.FC<AxisLabelWithBackgroundProps> = ({ position, label }) => {
+  const [bgSize, setBgSize] = useState<{ width: number; height: number }>({
+    width: 3,
+    height: 1,
+  });
+
+  const handleSync = (text: any) => {
+    if (!text?.geometry?.boundingBox) return;
+
+    const boundingBox = text.geometry.boundingBox as THREE.Box3;
+    const width = boundingBox.max.x - boundingBox.min.x;
+    const height = boundingBox.max.y - boundingBox.min.y;
+
+    const paddingX = 0.6;
+    const paddingY = 0.3;
+
+    const newWidth = width + paddingX;
+    const newHeight = height + paddingY;
+
+    // Avoid unnecessary state updates every frame
+    if (
+      Math.abs(newWidth - bgSize.width) > 0.01 ||
+      Math.abs(newHeight - bgSize.height) > 0.01
+    ) {
+      setBgSize({ width: newWidth, height: newHeight });
+    }
+  };
+
+  return (
+    <group position={position}>
+      {/* Background quad for label readability */}
+      <mesh position={[0, 0, -0.01]}>
+        <planeGeometry args={[bgSize.width, bgSize.height]} />
+        <meshBasicMaterial
+          color="black"
+          opacity={0.6}
+          transparent
+          depthWrite={false}
+        />
+      </mesh>
+
+      <Text
+        fontSize={0.5}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.02}
+        outlineColor="#000000"
+        onSync={handleSync}
+      >
+        {label}
+      </Text>
+    </group>
+  );
+};
+
 const AxisLabels: React.FC<AxisLabelsProps> = ({ axisLabels }) => {
   const labelPositions = {
     center: [0, 0, 0],
@@ -189,18 +430,11 @@ const AxisLabels: React.FC<AxisLabelsProps> = ({ axisLabels }) => {
         const position = labelPositions[axis as keyof typeof labelPositions];
         
         return (
-          <Text
+          <AxisLabelWithBackground
             key={axis}
             position={position as [number, number, number]}
-            fontSize={0.5}
-            color="white"
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.02}
-            outlineColor="#000000"
-          >
-            {label}
-          </Text>
+            label={label}
+          />
         );
       })}
     </>
@@ -304,7 +538,7 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, onClick
         />
       )}
       
-      {/* Bright Core */}
+      {/* Invisible interaction sphere (larger hit area for hover/click) */}
       <mesh
         onClick={(e) => {
           e.stopPropagation();
@@ -322,6 +556,18 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, onClick
           document.body.style.cursor = 'auto';
         }}
       >
+        <sphereGeometry
+          args={[
+            STAR_VISUAL_CONFIG.CORE_SIZE * STAR_INTERACTION_CONFIG.CORE_HIT_RADIUS_MULTIPLIER,
+            16,
+            16,
+          ]}
+        />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* Bright Core */}
+      <mesh>
         <sphereGeometry args={[STAR_VISUAL_CONFIG.CORE_SIZE, 16, 16]} />
         <meshBasicMaterial color={color} />
       </mesh>
@@ -598,6 +844,9 @@ const GalaxyScene: React.FC<{
 
   return (
     <>
+      {/* Nebula background */}
+      <NebulaBackground />
+
       {/* Ambient light */}
       <ambientLight intensity={0.3} />
       
@@ -632,9 +881,6 @@ const GalaxyScene: React.FC<{
           onHover={onHover}
         />
       ))}
-
-      {/* Grid helper */}
-      <gridHelper args={[20, 20, '#333333', '#1a1a1a']} position={[0, -10, 0]} />
     </>
   );
 };
