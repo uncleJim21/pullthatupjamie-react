@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
-import { HIERARCHY_COLORS } from '../constants/constants.ts';
+import { HIERARCHY_COLORS, GALAXY_STAR_THEME, GalaxyStarTheme } from '../constants/constants.ts';
 import { Calendar } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 
@@ -13,6 +13,73 @@ const BOBBING_CONFIG = {
   BOB_DURATION: 1.8,        // Duration of the bob animation in seconds
   PAUSE_DURATION: 0.0,      // Duration of the pause in seconds
   BOB_DISTANCE: 0.2,      // Vertical distance of the bob (in units)
+};
+
+// ============================================================================
+// VISUAL APPEARANCE - ASTRONOMICAL DIFFRACTION SPIKES
+// ============================================================================
+const STAR_VISUAL_CONFIG = {
+  // Bright core
+  CORE_SIZE: 0.04,
+  CORE_GLOW_SIZE: 0.12,
+  CORE_GLOW_OPACITY: 0.6,
+  
+  // Soft halo
+  HALO_LAYERS: [
+    { size: 0.18, opacity: 0.4 },
+    { size: 0.28, opacity: 0.2 },
+    { size: 0.40, opacity: 0.1 },
+  ],
+  
+  // 4 MAIN DIFFRACTION SPIKES (like telescope)
+  MAIN_SPIKES: {
+    COUNT: 4,                     // Classic cross pattern
+    LENGTH: 1.2,
+    WIDTH: 0.008,
+    OPACITY: 0.6,
+    FADE_START: 0.2,              // Where the fade begins (0-1 along length)
+    PULSE_AMOUNT: 0.3,            // How much they pulse/vary
+    PULSE_SPEED: 0.4,
+  },
+  
+  // MANY TINY RAYS (dozens of subtle spikes)
+  TINY_RAYS: {
+    COUNT: 36,                    // Many small rays
+    LENGTH: 0.15,
+    WIDTH: 0.003,
+    OPACITY: 0.15,
+    RANDOM_LENGTH_VARIANCE: 0.4,  // Some longer, some shorter
+    RANDOM_OPACITY_VARIANCE: 0.5,
+    PULSE_AMOUNT: 0.4,
+    PULSE_SPEED: 0.8,
+  },
+  
+  // Point lights
+  ENABLE_POINT_LIGHT: true,
+  LIGHT_INTENSITY: 2.0,
+  LIGHT_DISTANCE: 5,
+};
+
+// Generate random tiny ray properties
+const generateTinyRayProperties = (starX: number, starY: number, starZ: number) => {
+  const seed = starX * 12.9898 + starY * 78.233 + starZ * 37.719;
+  const random = (offset: number) => {
+    const val = Math.sin(seed + offset) * 43758.5453;
+    return val - Math.floor(val);
+  };
+  
+  return Array.from({ length: STAR_VISUAL_CONFIG.TINY_RAYS.COUNT }).map((_, i) => ({
+    angle: (i / STAR_VISUAL_CONFIG.TINY_RAYS.COUNT) * Math.PI * 2 + random(i) * 0.3,
+    length: STAR_VISUAL_CONFIG.TINY_RAYS.LENGTH * (
+      1 - STAR_VISUAL_CONFIG.TINY_RAYS.RANDOM_LENGTH_VARIANCE +
+      random(i * 2) * STAR_VISUAL_CONFIG.TINY_RAYS.RANDOM_LENGTH_VARIANCE * 2
+    ),
+    opacity: STAR_VISUAL_CONFIG.TINY_RAYS.OPACITY * (
+      1 - STAR_VISUAL_CONFIG.TINY_RAYS.RANDOM_OPACITY_VARIANCE +
+      random(i * 3) * STAR_VISUAL_CONFIG.TINY_RAYS.RANDOM_OPACITY_VARIANCE * 2
+    ),
+    pulseOffset: random(i * 4) * Math.PI * 2,
+  }));
 };
 // ============================================================================
 
@@ -169,64 +236,172 @@ const EpisodeConnections: React.FC<EpisodeConnectionsProps> = ({ results }) => {
 };
 
 const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, onClick, onHover }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
+  const mainSpikeRefs = useRef<(THREE.Mesh | null)[]>([]);
   const [hovered, setHovered] = useState(false);
+  
+  // Generate unique tiny ray properties for this star
+  const tinyRayProps = useMemo(
+    () => generateTinyRayProperties(result.coordinates3d.x, result.coordinates3d.y, result.coordinates3d.z),
+    [result.coordinates3d.x, result.coordinates3d.y, result.coordinates3d.z]
+  );
 
-  // Slow bobbing animation for selected star with configurable pause
+  // Animation: pulsing spikes that vary over time
   useFrame((state) => {
-    if (meshRef.current && isSelected) {
-      const time = state.clock.elapsedTime;
+    if (!groupRef.current) return;
+    
+    const time = state.clock.elapsedTime;
+    
+    // Bobbing for selected
+    let bobOffset = 0;
+    if (isSelected) {
       const cycleTime = BOBBING_CONFIG.BOB_DURATION + BOBBING_CONFIG.PAUSE_DURATION;
       const timeInCycle = time % cycleTime;
-      
-      let bobOffset = 0;
       if (timeInCycle < BOBBING_CONFIG.BOB_DURATION) {
-        // Bob for BOB_DURATION seconds
         bobOffset = Math.sin(timeInCycle * Math.PI / (BOBBING_CONFIG.BOB_DURATION / 2)) * BOBBING_CONFIG.BOB_DISTANCE;
       }
-      // Pause for PAUSE_DURATION seconds
-      
-      meshRef.current.position.setY(result.coordinates3d.y * 10 + bobOffset);
-    } else if (meshRef.current) {
-      // Reset to original position
-      meshRef.current.position.setY(result.coordinates3d.y * 10);
     }
+    
+    groupRef.current.position.setY(result.coordinates3d.y * 10 + bobOffset);
+    
+    const baseScale = isSelected ? 1.8 : hovered ? 1.4 : 1;
+    groupRef.current.scale.setScalar(baseScale);
+    
+    // Animate main spikes - each pulses independently
+    mainSpikeRefs.current.forEach((spike, i) => {
+      if (spike) {
+        const pulsePhase = time * STAR_VISUAL_CONFIG.MAIN_SPIKES.PULSE_SPEED + i * Math.PI * 0.5;
+        const pulse = Math.sin(pulsePhase) * STAR_VISUAL_CONFIG.MAIN_SPIKES.PULSE_AMOUNT;
+        spike.scale.setZ(1 + pulse);
+        
+        const material = spike.material as THREE.MeshBasicMaterial;
+        const intensityMult = isSelected ? 1.5 : hovered ? 1.2 : isNearSelected ? 0.6 : 1;
+        material.opacity = STAR_VISUAL_CONFIG.MAIN_SPIKES.OPACITY * intensityMult * (0.8 + pulse * 0.2);
+      }
+    });
   });
 
   const color = getHierarchyColor(result.hierarchyLevel);
-  const opacity = isSelected ? 1 : isNearSelected ? 0.6 : 1;
-  const scale = isSelected ? 1.5 : hovered ? 1.3 : 1;
+  const intensityMultiplier = isSelected ? 1.5 : hovered ? 1.2 : isNearSelected ? 0.6 : 1;
 
   return (
-    <mesh
-      ref={meshRef}
+    <group 
+      ref={groupRef}
       position={[result.coordinates3d.x * 10, result.coordinates3d.y * 10, result.coordinates3d.z * 10]}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        setHovered(true);
-        onHover(result);
-        document.body.style.cursor = 'pointer';
-      }}
-      onPointerOut={() => {
-        setHovered(false);
-        onHover(null);
-        document.body.style.cursor = 'auto';
-      }}
-      scale={scale}
     >
-      <sphereGeometry args={[0.15, 16, 16]} />
-      <meshStandardMaterial
-        color={color}
-        emissive={color}
-        emissiveIntensity={isSelected ? 0.8 : hovered ? 0.6 : 0.3}
-        opacity={opacity}
-        transparent
-      />
-    </mesh>
+      {/* Point Light */}
+      {STAR_VISUAL_CONFIG.ENABLE_POINT_LIGHT && (isSelected || hovered) && (
+        <pointLight
+          color={color}
+          intensity={STAR_VISUAL_CONFIG.LIGHT_INTENSITY * intensityMultiplier}
+          distance={STAR_VISUAL_CONFIG.LIGHT_DISTANCE}
+          decay={2}
+        />
+      )}
+      
+      {/* Bright Core */}
+      <mesh
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+          onHover(result);
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          onHover(null);
+          document.body.style.cursor = 'auto';
+        }}
+      >
+        <sphereGeometry args={[STAR_VISUAL_CONFIG.CORE_SIZE, 16, 16]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+      
+      {/* Core Glow */}
+      <mesh>
+        <sphereGeometry args={[STAR_VISUAL_CONFIG.CORE_GLOW_SIZE, 16, 16]} />
+        <meshBasicMaterial
+          color={color}
+          opacity={STAR_VISUAL_CONFIG.CORE_GLOW_OPACITY * intensityMultiplier}
+          transparent
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Soft Halos */}
+      {STAR_VISUAL_CONFIG.HALO_LAYERS.map((layer, index) => (
+        <mesh key={`halo-${index}`}>
+          <sphereGeometry args={[layer.size, 16, 16]} />
+          <meshBasicMaterial
+            color={color}
+            opacity={layer.opacity * intensityMultiplier}
+            transparent
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+      ))}
+      
+      {/* 4 MAIN DIFFRACTION SPIKES (telescope cross pattern) */}
+      {Array.from({ length: STAR_VISUAL_CONFIG.MAIN_SPIKES.COUNT }).map((_, i) => {
+        const angle = (i / STAR_VISUAL_CONFIG.MAIN_SPIKES.COUNT) * Math.PI * 2;
+        const x = Math.cos(angle) * STAR_VISUAL_CONFIG.MAIN_SPIKES.LENGTH / 2;
+        const z = Math.sin(angle) * STAR_VISUAL_CONFIG.MAIN_SPIKES.LENGTH / 2;
+        
+        return (
+          <mesh
+            key={`main-spike-${i}`}
+            ref={el => mainSpikeRefs.current[i] = el}
+            position={[x, 0, z]}
+            rotation={[0, angle + Math.PI / 2, 0]}
+          >
+            <boxGeometry args={[
+              STAR_VISUAL_CONFIG.MAIN_SPIKES.WIDTH,
+              STAR_VISUAL_CONFIG.MAIN_SPIKES.WIDTH,
+              STAR_VISUAL_CONFIG.MAIN_SPIKES.LENGTH
+            ]} />
+            <meshBasicMaterial
+              color={color}
+              transparent
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+            />
+          </mesh>
+        );
+      })}
+      
+      {/* MANY TINY RAYS (subtle spikes around core) */}
+      {tinyRayProps.map((ray, i) => {
+        const x = Math.cos(ray.angle) * ray.length / 2;
+        const z = Math.sin(ray.angle) * ray.length / 2;
+        
+        return (
+          <mesh
+            key={`tiny-ray-${i}`}
+            position={[x, 0, z]}
+            rotation={[0, ray.angle + Math.PI / 2, 0]}
+          >
+            <boxGeometry args={[
+              STAR_VISUAL_CONFIG.TINY_RAYS.WIDTH,
+              STAR_VISUAL_CONFIG.TINY_RAYS.WIDTH,
+              ray.length
+            ]} />
+            <meshBasicMaterial
+              color={color}
+              opacity={ray.opacity * intensityMultiplier}
+              transparent
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+            />
+          </mesh>
+        );
+      })}
+    </group>
   );
 };
 
