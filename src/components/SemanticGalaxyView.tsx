@@ -6,6 +6,16 @@ import { HIERARCHY_COLORS } from '../constants/constants.ts';
 import { Calendar } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 
+// ============================================================================
+// ANIMATION CONFIGURATION
+// ============================================================================
+const BOBBING_CONFIG = {
+  BOB_DURATION: 1.8,        // Duration of the bob animation in seconds
+  PAUSE_DURATION: 0.0,      // Duration of the pause in seconds
+  BOB_DISTANCE: 0.2,      // Vertical distance of the bob (in units)
+};
+// ============================================================================
+
 interface QuoteResult {
   shareLink: string;
   shareUrl: string;
@@ -162,13 +172,24 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, onClick
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
-  // Pulsing animation for selected star
+  // Slow bobbing animation for selected star with configurable pause
   useFrame((state) => {
     if (meshRef.current && isSelected) {
-      const pulse = Math.sin(state.clock.elapsedTime * 2) * 0.1 + 1;
-      meshRef.current.scale.set(pulse, pulse, pulse);
+      const time = state.clock.elapsedTime;
+      const cycleTime = BOBBING_CONFIG.BOB_DURATION + BOBBING_CONFIG.PAUSE_DURATION;
+      const timeInCycle = time % cycleTime;
+      
+      let bobOffset = 0;
+      if (timeInCycle < BOBBING_CONFIG.BOB_DURATION) {
+        // Bob for BOB_DURATION seconds
+        bobOffset = Math.sin(timeInCycle * Math.PI / (BOBBING_CONFIG.BOB_DURATION / 2)) * BOBBING_CONFIG.BOB_DISTANCE;
+      }
+      // Pause for PAUSE_DURATION seconds
+      
+      meshRef.current.position.setY(result.coordinates3d.y * 10 + bobOffset);
     } else if (meshRef.current) {
-      meshRef.current.scale.set(1, 1, 1);
+      // Reset to original position
+      meshRef.current.position.setY(result.coordinates3d.y * 10);
     }
   });
 
