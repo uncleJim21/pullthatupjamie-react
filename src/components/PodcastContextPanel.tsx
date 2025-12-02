@@ -25,6 +25,17 @@ interface PodcastContextPanelProps {
   onTimestampClick?: (timestamp: number) => void;
   onKeywordSearch?: (keyword: string, feedId?: string, episodeName?: string, forceSearchAll?: boolean) => void;
   auth?: AuthConfig;
+  // Optional audio context for standalone playback (e.g. Galaxy view)
+  audioUrl?: string;
+  episodeTitle?: string;
+  episodeImage?: string;
+  creator?: string;
+  listenLink?: string;
+  timeContext?: {
+    start_time: number;
+    end_time: number;
+  };
+  date?: string;
 }
 
 const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
@@ -34,7 +45,14 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   smartInterpolation = true,
   onTimestampClick,
   onKeywordSearch,
-  auth
+  auth,
+  audioUrl,
+  episodeTitle,
+  episodeImage,
+  creator,
+  listenLink,
+  timeContext,
+  date
 }) => {
   const [paragraphs, setParagraphs] = useState<AdjacentParagraph[]>([]);
   const [hierarchy, setHierarchy] = useState<HierarchyResponse | null>(null);
@@ -50,6 +68,11 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const [viewHistory, setViewHistory] = useState<ViewHistoryItem[]>([{ mode: ViewMode.CONTEXT }]);
   const [openTooltipKeyword, setOpenTooltipKeyword] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  // Local audio player state for contexts like Galaxy view
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [isAudioBuffering, setIsAudioBuffering] = useState(false);
+  const [audioCurrentTime, setAudioCurrentTime] = useState<number | null>(null);
 
   // Navigation functions for view history
   const pushView = (mode: ViewMode, chapter?: Chapter | null) => {
@@ -226,6 +249,149 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     return chunks.length > 0 ? chunks : [{ text, startTime }];
   };
 
+  const effectiveStartTime = timeContext?.start_time ?? null;
+  const effectiveEndTime = timeContext?.end_time ?? null;
+  const effectiveDuration =
+    effectiveStartTime !== null && effectiveEndTime !== null
+      ? Math.max(effectiveEndTime - effectiveStartTime, 0)
+      : null;
+
+  const handleEpisodePlayPause = async () => {
+    if (!audioUrl || !audioRef.current) return;
+    try {
+      if (!isAudioPlaying) {
+        setIsAudioBuffering(true);
+        // If we have a clip range, start at its beginning
+        if (
+          effectiveStartTime !== null &&
+          Math.abs(audioRef.current.currentTime - effectiveStartTime) > 0.5
+        ) {
+          audioRef.current.currentTime = effectiveStartTime;
+        }
+        await audioRef.current.play();
+        setIsAudioPlaying(true);
+        setIsAudioBuffering(false);
+      } else {
+        audioRef.current.pause();
+        setIsAudioPlaying(false);
+      }
+    } catch (err) {
+      console.error('Context panel playback error:', err);
+      setIsAudioBuffering(false);
+    }
+  };
+
+  const handleEpisodeTimeUpdate = () => {
+    if (!audioRef.current) return;
+    const t = audioRef.current.currentTime;
+    setAudioCurrentTime(t);
+
+    if (
+      effectiveEndTime !== null &&
+      t >= effectiveEndTime
+    ) {
+      audioRef.current.pause();
+      setIsAudioPlaying(false);
+    }
+  };
+
+  const handleEpisodeSeek = (targetTime: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = targetTime;
+    setAudioCurrentTime(targetTime);
+    if (!isAudioPlaying) {
+      // Do not auto-play; user can hit play
+      return;
+    }
+  };
+
+  const handleParagraphOrChunkClick = (targetTime: number) => {
+    // Existing external callback (list view players)
+    if (onTimestampClick) {
+      onTimestampClick(targetTime);
+    }
+    // Also sync local audio player if available (e.g. Galaxy view)
+    if (audioRef.current && audioUrl) {
+      handleEpisodeSeek(targetTime);
+      // If not already playing, start playback from this paragraph
+      if (!isAudioPlaying) {
+        handleEpisodePlayPause();
+      }
+    }
+  };
+
+  const renderEpisodeMiniPlayer = () => {
+    if (!audioUrl) return null;
+    const current =
+      audioCurrentTime !== null
+        ? audioCurrentTime
+        : effectiveStartTime ?? 0;
+    const progressPercent =
+      effectiveDuration && effectiveDuration > 0
+        ? Math.max(
+            0,
+            Math.min(
+              ((current - (effectiveStartTime ?? 0)) / effectiveDuration) *
+                100,
+              100
+            )
+          )
+        : 0;
+
+    const handleBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!effectiveDuration) return;
+      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+      const ratio = (e.clientX - rect.left) / rect.width;
+      const target =
+        (effectiveStartTime ?? 0) + Math.max(0, Math.min(1, ratio)) * effectiveDuration;
+      handleEpisodeSeek(target);
+    };
+
+    return (
+      <div className="mt-3 space-y-2">
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          onTimeUpdate={handleEpisodeTimeUpdate}
+          onEnded={() => {
+            setIsAudioPlaying(false);
+          }}
+        />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleEpisodePlayPause}
+            className={`p-2 rounded-full text-black transition-colors ${
+              audioUrl === 'URL unavailable'
+                ? 'bg-gray-700 cursor-not-allowed'
+                : 'bg-white hover:bg-gray-200'
+            }`}
+            disabled={audioUrl === 'URL unavailable'}
+          >
+            {isAudioBuffering ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black" />
+            ) : isAudioPlaying ? (
+              <span className="text-xs font-semibold">||</span>
+            ) : (
+              <Play className="w-4 h-4" />
+            )}
+          </button>
+          <div
+            className="flex-1 h-1 bg-gray-700 rounded cursor-pointer relative"
+            onClick={handleBarClick}
+          >
+            <div
+              className="h-full bg-white rounded transition-all"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <span className="text-xs text-gray-400 min-w-[64px] text-right font-mono">
+            {formatTime(current)}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       className={`sticky top-0 h-screen bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out ${
@@ -281,9 +447,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                             setHighlightedParagraphId(paragraph.id);
                             setHighlightedChunkIndex(chunkIndex);
                             printLog(`Clicked paragraph: ${paragraph.id}, chunk: ${chunkIndex} at ${chunk.startTime}s`);
-                            if (onTimestampClick) {
-                              onTimestampClick(chunk.startTime);
-                            }
+                            handleParagraphOrChunkClick(chunk.startTime);
                           }}
                         >
                           <div className="flex items-start space-x-2 min-w-0">
@@ -611,6 +775,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                                 {formatTime(hierarchy.hierarchy.episode.metadata.duration)}
                               </p>
                             )}
+                            {/* Mini player for Galaxy/standalone audio context */}
+                            {renderEpisodeMiniPlayer()}
                           </div>
                         </div>
                       </div>

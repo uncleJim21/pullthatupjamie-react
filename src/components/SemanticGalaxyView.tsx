@@ -208,6 +208,7 @@ const generateTinyRayProperties = (starX: number, starY: number, starZ: number) 
 interface QuoteResult {
   shareLink: string;
   shareUrl: string;
+  listenLink: string;
   quote: string;
   episode: string;
   creator: string;

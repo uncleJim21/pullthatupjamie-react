@@ -1529,6 +1529,20 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
   };
 
+  // Selected audio context for podcast results (used e.g. in Galaxy + context panel)
+  const [selectedAudioContext, setSelectedAudioContext] = useState<{
+    audioUrl: string;
+    timeContext: {
+      start_time: number;
+      end_time: number;
+    };
+    episode: string;
+    episodeImage: string;
+    creator: string;
+    listenLink?: string;
+    date?: string;
+  } | null>(null);
+
   return (
     <div className="min-h-screen bg-black text-white flex">
       {/* Main Content Area - Left Side */}
@@ -2060,6 +2074,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               onStarClick={(result) => {
                 printLog(`Star clicked: ${result.shareLink}`);
                 setSelectedParagraphId(result.shareLink);
+                // Store audio context so PodcastContextPanel can render a mini-player
+                setSelectedAudioContext({
+                  audioUrl: result.audioUrl,
+                  timeContext: result.timeContext,
+                  episode: result.episode,
+                  episodeImage: result.episodeImage,
+                  creator: result.creator,
+                  listenLink: result.listenLink,
+                  date: result.date
+                });
                 setIsContextPanelOpen(true);
               }}
               selectedStarId={selectedParagraphId}
@@ -2481,6 +2505,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           onClose={() => setIsContextPanelOpen(false)}
           smartInterpolation={true}
           auth={authConfig || undefined}
+          audioUrl={selectedAudioContext?.audioUrl}
+          episodeTitle={selectedAudioContext?.episode}
+          episodeImage={selectedAudioContext?.episodeImage}
+          creator={selectedAudioContext?.creator}
+          listenLink={selectedAudioContext?.listenLink}
+          timeContext={selectedAudioContext?.timeContext}
+          date={selectedAudioContext?.date}
           onTimestampClick={(timestamp) => {
             printLog(`Context panel timestamp clicked: ${timestamp}`);
             // Dispatch a custom event that PodcastSearchResultItem can listen to
