@@ -6,6 +6,7 @@ import { printLog, HIERARCHY_COLORS } from '../constants/constants.ts';
 import { KeywordTooltip } from './KeywordTooltip.tsx';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { AuthConfig } from '../constants/constants.ts';
+import { useAudioController } from '../context/AudioControllerContext.tsx';
 
 enum ViewMode {
   CONTEXT = 'context',
@@ -71,14 +72,18 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const [viewHistory, setViewHistory] = useState<ViewHistoryItem[]>([{ mode: ViewMode.CONTEXT }]);
   const [openTooltipKeyword, setOpenTooltipKeyword] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  // Local audio player state for contexts like Galaxy view
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
-  const [isAudioBuffering, setIsAudioBuffering] = useState(false);
-  const [audioCurrentTime, setAudioCurrentTime] = useState<number | null>(null);
-  const [audioDuration, setAudioDuration] = useState<number | null>(null);
-  const [hasAppliedInitialTimeContext, setHasAppliedInitialTimeContext] = useState(false);
-  const hasAutoPlayedRef = useRef(false);
+  const {
+    currentTrack,
+    isPlaying: controllerIsPlaying,
+    isBuffering: controllerIsBuffering,
+    currentTime: controllerCurrentTime,
+    duration: controllerDuration,
+    playTrack,
+    togglePlay,
+    pause,
+    seekTo,
+  } = useAudioController();
+  const autoPlayKeyRef = useRef<string | null>(null);
 
   // Navigation functions for view history
   const pushView = (mode: ViewMode, chapter?: Chapter | null) => {
@@ -255,42 +260,49 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     return chunks.length > 0 ? chunks : [{ text, startTime }];
   };
 
-  // When the incoming time context or audio changes (e.g. new galaxy star),
-  // reset the "initial seek" flag so we can re-sync once.
+  const contextTrackId =
+    paragraphId || audioUrl ? `context-${paragraphId || audioUrl}` : 'context-default';
+  const isContextTrackActive = currentTrack?.id === contextTrackId;
+  const contextIsPlaying = isContextTrackActive && controllerIsPlaying;
+  const contextIsBuffering = isContextTrackActive && controllerIsBuffering;
+  const effectiveCurrentTime =
+    isContextTrackActive && controllerCurrentTime
+      ? controllerCurrentTime
+      : timeContext?.start_time ?? 0;
+
+  // Auto-play for Galaxy star clicks using shared controller
   useEffect(() => {
-    setHasAppliedInitialTimeContext(false);
-    hasAutoPlayedRef.current = false;
-  }, [timeContext?.start_time, audioUrl]);
+    if (!audioUrl || !autoPlayOnOpen || !timeContext) return;
+    const key = `${audioUrl}-${timeContext.start_time}-${timeContext.end_time}`;
+    if (autoPlayKeyRef.current === key) return;
+    autoPlayKeyRef.current = key;
+    void playTrack({
+      id: contextTrackId,
+      audioUrl,
+      startTime: timeContext.start_time,
+      endTime: timeContext.end_time,
+    });
+  }, [audioUrl, autoPlayOnOpen, timeContext?.start_time, timeContext?.end_time, contextTrackId, playTrack]);
 
   const handleEpisodePlayPause = async () => {
-    if (!audioUrl || !audioRef.current) return;
+    if (!audioUrl) return;
     try {
-      if (!isAudioPlaying) {
-        setIsAudioBuffering(true);
-        await audioRef.current.play();
-        setIsAudioPlaying(true);
-        setIsAudioBuffering(false);
+      if (!isContextTrackActive) {
+        const start = timeContext?.start_time ?? 0;
+        const end = timeContext?.end_time;
+        await playTrack({
+          id: contextTrackId,
+          audioUrl,
+          startTime: start,
+          endTime: end,
+        });
       } else {
-        audioRef.current.pause();
-        setIsAudioPlaying(false);
+        await togglePlay();
       }
     } catch (err) {
       console.error('Context panel playback error:', err);
-      setIsAudioPlaying(false);
-      setIsAudioBuffering(false);
+      pause();
     }
-  };
-
-  const handleEpisodeTimeUpdate = () => {
-    if (!audioRef.current) return;
-    const t = audioRef.current.currentTime;
-    setAudioCurrentTime(t);
-  };
-
-  const handleEpisodeSeek = (targetTime: number) => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = targetTime;
-    setAudioCurrentTime(targetTime);
   };
 
   const handleParagraphOrChunkClick = (targetTime: number) => {
@@ -298,78 +310,44 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     if (onTimestampClick) {
       onTimestampClick(targetTime);
     }
-    // Also sync local audio player if available (e.g. Galaxy view)
-    if (audioRef.current && audioUrl) {
-      handleEpisodeSeek(targetTime);
-      // If not already playing, start playback from this paragraph
-      if (!isAudioPlaying) {
-        handleEpisodePlayPause();
+    // Also sync shared audio player if available (e.g. Galaxy view)
+    if (audioUrl) {
+      if (!isContextTrackActive) {
+        void playTrack({
+          id: contextTrackId,
+          audioUrl,
+          startTime: targetTime,
+          endTime: timeContext?.end_time,
+        });
+      } else {
+        seekTo(targetTime);
+        if (!contextIsPlaying) {
+          void togglePlay();
+        }
       }
     }
   };
 
   const renderEpisodeMiniPlayer = () => {
     if (!audioUrl) return null;
-    const current = audioCurrentTime !== null ? audioCurrentTime : 0;
+    const current = effectiveCurrentTime;
     const progressPercent =
-      audioDuration && audioDuration > 0
-        ? Math.max(0, Math.min((current / audioDuration) * 100, 100))
+      controllerDuration && controllerDuration > 0
+        ? Math.max(0, Math.min((current / controllerDuration) * 100, 100))
         : 0;
 
     const handleBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!audioDuration || audioDuration <= 0) return;
+      if (!isContextTrackActive) return;
+      if (!controllerDuration || controllerDuration <= 0) return;
       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
       const ratio = (e.clientX - rect.left) / rect.width;
       const clampedRatio = Math.max(0, Math.min(1, ratio));
-      const target = clampedRatio * audioDuration;
-      handleEpisodeSeek(target);
+      const target = clampedRatio * controllerDuration;
+      seekTo(target);
     };
 
     return (
       <div className="mt-3 space-y-2">
-        <audio
-          ref={audioRef}
-          src={audioUrl}
-          onLoadedMetadata={() => {
-            if (audioRef.current) {
-              setAudioDuration(audioRef.current.duration || null);
-              // Apply initial seek from timeContext once when metadata is ready
-              if (
-                timeContext?.start_time !== undefined &&
-                !hasAppliedInitialTimeContext
-              ) {
-                try {
-                  audioRef.current.currentTime = timeContext.start_time;
-                  setAudioCurrentTime(timeContext.start_time);
-                  setHasAppliedInitialTimeContext(true);
-                } catch {
-                  // Some browsers require readyState; ignore if seek fails
-                }
-              }
-              // Auto-play once after metadata is ready, if enabled
-              if (autoPlayOnOpen && !hasAutoPlayedRef.current) {
-                const tryAutoPlay = async () => {
-                  try {
-                    setIsAudioBuffering(true);
-                    await audioRef.current!.play();
-                    setIsAudioPlaying(true);
-                  } catch (err) {
-                    console.error('Context panel auto-play error:', err);
-                    setIsAudioPlaying(false);
-                  } finally {
-                    setIsAudioBuffering(false);
-                    hasAutoPlayedRef.current = true;
-                  }
-                };
-                void tryAutoPlay();
-              }
-            }
-          }}
-          onTimeUpdate={handleEpisodeTimeUpdate}
-          onEnded={() => {
-            setIsAudioPlaying(false);
-          }}
-        />
         <div className="flex items-center gap-3">
           <button
             onClick={handleEpisodePlayPause}
@@ -380,9 +358,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
             }`}
             disabled={audioUrl === 'URL unavailable'}
           >
-            {isAudioBuffering ? (
+            {contextIsBuffering ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black" />
-            ) : isAudioPlaying ? (
+            ) : contextIsPlaying ? (
               <span className="text-xs font-semibold">||</span>
             ) : (
               <Play className="w-4 h-4" />

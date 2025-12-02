@@ -33,6 +33,7 @@ import ImageWithLoader from './ImageWithLoader.tsx';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
 import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
+import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -1545,6 +1546,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [autoPlayContextOnOpen, setAutoPlayContextOnOpen] = useState(false);
 
   return (
+    <AudioControllerProvider>
     <div className="min-h-screen bg-black text-white flex">
       {/* Main Content Area - Left Side */}
       <div className={`flex-1 min-w-0 transition-all duration-300 ${
@@ -2624,5 +2626,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       )}
 
     </div>
+    </AudioControllerProvider>
   );
 }

@@ -9,6 +9,7 @@ import ShareModal from "../ShareModal.tsx";
 import { AuthConfig, AIClipsViewStyle } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
+import { useAudioController } from '../../context/AudioControllerContext.tsx';
 
 export enum PresentationContext {
   search = 'search',
@@ -35,9 +36,6 @@ interface PodcastSearchResultItemProps {
   episodeImage?: string;
   listenLink?: string;
   id: string;
-  isPlaying: boolean;
-  onPlayPause: (id: string) => void;
-  onEnded: (id: string) => void;
   shareUrl:string;
   shareLink:string;
   onClipStart?: (progress: ClipProgress) => void;
@@ -67,9 +65,6 @@ export const PodcastSearchResultItem = ({
   episodeImage = '/podcast-logo.png',
   listenLink,
   id,
-  isPlaying,
-  onPlayPause,
-  onEnded,
   shareUrl,
   shareLink,
   onClipProgress,
@@ -86,9 +81,7 @@ export const PodcastSearchResultItem = ({
   isHighlighted = false,
   onResultClick
 }: PodcastSearchResultItemProps) => {
-  const [currentTime, setCurrentTime] = useState(timeContext.start_time);
   const [showCopied, setShowCopied] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false); // Image loading state
   const [hasEnded, setHasEnded] = useState(false);
   const [isContinuingBeyondClip, setIsContinuingBeyondClip] = useState(false);
@@ -103,27 +96,39 @@ export const PodcastSearchResultItem = ({
   const CLIP_LENGTH_LIMIT_SECONDS = 60 * 10;
   const navigate = useNavigate();
 
-  const audioRef = useRef(null as HTMLAudioElement | null);
   const progressRef = useRef(null as HTMLDivElement | null);
 
-  const duration = timeContext.end_time - timeContext.start_time;
+  const {
+    currentTrack,
+    isPlaying: controllerIsPlaying,
+    isBuffering: controllerIsBuffering,
+    currentTime,
+    playTrack,
+    togglePlay,
+    pause,
+    seekTo,
+    seekBy,
+  } = useAudioController();
+
+  const isActive = currentTrack?.id === id;
+  const isPlaying = isActive && controllerIsPlaying;
+  const isAudioBuffering = isActive && controllerIsBuffering;
+  const clipStart = timeContext.start_time;
+  const clipEnd = timeContext.end_time;
+  const clipDuration = clipEnd - clipStart;
+  const effectiveTime = isActive ? currentTime : clipStart;
   const progress = isContinuingBeyondClip
-  ? 100 // Show full progress when continuing beyond clip
-  : currentTime < timeContext.start_time
-  ? 0 // Show 0% if playback is before the clip start time
-  : Math.min(((currentTime - timeContext.start_time) / duration) * 100, 100);
+    ? 100
+    : effectiveTime < clipStart
+    ? 0
+    : Math.min(((effectiveTime - clipStart) / clipDuration) * 100, 100);
 
   useEffect(() => {
-    if (!isPlaying && audioRef.current) {
-      audioRef.current.pause();
+    // When opening edit modal, pause playback for active track
+    if (isPlaying && isEditModalOpen) {
+      pause();
     }
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if(isPlaying === true && isEditModalOpen === true){//pause playback on modal open
-      onPlayPause(id);
-    }
-  },[isEditModalOpen])
+  }, [isEditModalOpen, isPlaying, pause]);
 
   // Listen for events to close SocialShareModal when other modals open
   useEffect(() => {
@@ -147,61 +152,49 @@ export const PodcastSearchResultItem = ({
       // Check if this is the correct audio item (match by shareLink or id)
       if ((shareLink && paragraphId === shareLink) || (id && paragraphId === id)) {
         printLog(`Seeking to timestamp ${timestamp} for ${paragraphId}`);
-        
-        if (audioRef.current) {
-          // Set the current time to the requested timestamp
-          audioRef.current.currentTime = timestamp;
-          setCurrentTime(timestamp);
-          
-          // Start playing if not already playing
-          if (!isPlaying) {
-            try {
-              setIsBuffering(true);
-              onPlayPause(id); // Notify parent to update playing state
-              await audioRef.current.play();
-              setIsBuffering(false);
-            } catch (error) {
-              console.error('Playback error:', error);
-              setIsBuffering(false);
-            }
-          }
-        }
+        await playTrack({
+          id,
+          audioUrl,
+          startTime: timestamp,
+          endTime: timeContext.end_time,
+        });
+        setHasEnded(false);
+        setIsContinuingBeyondClip(false);
       }
     };
 
     window.addEventListener('seekToTimestamp', handleSeekToTimestamp as EventListener);
     return () => window.removeEventListener('seekToTimestamp', handleSeekToTimestamp as EventListener);
-  }, [shareLink, id, isPlaying, onPlayPause]);
+  }, [shareLink, id, audioUrl, timeContext.end_time, playTrack]);
 
   const handlePlayPause = async () => {
-    if (audioRef.current) {
-      try {
-        if (!isPlaying) {
-          setIsBuffering(true);
-          onPlayPause(id); // Notify parent component to handle playback state
-          audioRef.current.currentTime = timeContext.start_time;
-          await audioRef.current.play();
-          setIsBuffering(false);
-        } else {
-          audioRef.current.pause();
-          onPlayPause(id); // Notify parent component to handle pause state
-        }
-      } catch (error) {
-        console.error('Playback error:', error);
-        setIsBuffering(false);
+    try {
+      if (!isActive) {
+        await playTrack({
+          id,
+          audioUrl,
+          startTime: clipStart,
+          endTime: clipEnd,
+        });
+        setHasEnded(false);
+        setIsContinuingBeyondClip(false);
+      } else {
+        await togglePlay();
       }
+    } catch (error) {
+      console.error('Playback error:', error);
     }
   };
 
   const handleProgressClick = (e: { clientX: number }) => {
-    if (progressRef.current && audioRef.current) {
-      const rect = progressRef.current.getBoundingClientRect();
-      const clickPosition = (e.clientX - rect.left) / rect.width;
-      const newTime = timeContext.start_time + duration * clickPosition;
-  
-      audioRef.current.currentTime = Math.max(newTime, 0); // Allow seeking to any time, even before start_time
-      setCurrentTime(audioRef.current.currentTime);
-    }
+    if (!isActive || !progressRef.current) return;
+    if (!clipDuration || clipDuration <= 0) return;
+
+    const rect = progressRef.current.getBoundingClientRect();
+    const clickPosition = (e.clientX - rect.left) / rect.width;
+    const clamped = Math.max(0, Math.min(1, clickPosition));
+    const newTime = clipStart + clipDuration * clamped;
+    seekTo(newTime);
   };
   
   const handleClip = () => {
@@ -425,53 +418,48 @@ export const PodcastSearchResultItem = ({
   };
 
   const handleSkip = (seconds: number) => {
-    if (audioRef.current) {
-      const newTime = audioRef.current.currentTime + seconds;
-      audioRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
-    }
+    if (!isActive) return;
+    seekBy(seconds);
   };
 
   const handleRestart = async () => {
-    if (audioRef.current) {
-      setHasEnded(false);
-      try {
-        audioRef.current.currentTime = timeContext.start_time;
-        setCurrentTime(timeContext.start_time);
-        await audioRef.current.play();
-        onPlayPause(id);
-      } catch (error) {
-        console.error('Playback error:', error);
-      }
-    }
+    setHasEnded(false);
+    setIsContinuingBeyondClip(false);
+    await playTrack({
+      id,
+      audioUrl,
+      startTime: clipStart,
+      endTime: clipEnd,
+    });
   };
   
   const handleContinuePlaying = async () => {
-    if (audioRef.current) {
-      setHasEnded(false);
-      setIsContinuingBeyondClip(true); // Allow playback beyond the clip segment
-      try {
-        await audioRef.current.play();
-        onPlayPause(id);
-      } catch (error) {
-        console.error('Playback error:', error);
+    setHasEnded(false);
+    setIsContinuingBeyondClip(true); // Allow playback beyond the clip segment
+    if (!isActive) {
+      await playTrack({
+        id,
+        audioUrl,
+        startTime: clipEnd,
+      });
+    } else {
+      seekTo(clipEnd);
+      if (!isPlaying) {
+        await togglePlay();
       }
     }
   };
-  
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      const currentAudioTime = audioRef.current.currentTime;
-      setCurrentTime(currentAudioTime);
-  
-      // Handle clip end logic
-      if (currentAudioTime >= timeContext.end_time && !hasEnded && !isContinuingBeyondClip) {
-        setHasEnded(true);
-        audioRef.current.pause();
-        onEnded(id);
-      }
+
+  // Watch for reaching the end of the clip when not in "continue" mode
+  useEffect(() => {
+    if (!isActive) return;
+    if (isContinuingBeyondClip) return;
+    if (hasEnded) return;
+    if (currentTime >= clipEnd) {
+      setHasEnded(true);
+      pause();
     }
-  };
+  }, [isActive, currentTime, clipEnd, isContinuingBeyondClip, hasEnded, pause]);
   
   // Add conditional rendering based on presentation context
   if (presentationContext === PresentationContext.runHistoryPreview) {
@@ -529,19 +517,6 @@ export const PodcastSearchResultItem = ({
           ? 'border-white shadow-[0_0_20px_rgba(255,255,255,0.5)]' 
           : 'border-gray-800'
       }`}>
-        <audio
-          ref={audioRef}
-          src={audioUrl}
-          onTimeUpdate={handleTimeUpdate}
-          onEnded={() => {
-            if (audioRef.current) {
-              audioRef.current.currentTime = timeContext.start_time;
-              setCurrentTime(timeContext.start_time);
-            }
-            onEnded(id);
-          }}
-        />
-        
         {/* Episode Image with Better Aspect Ratio */}
         <div className="relative h-32 group cursor-pointer" onClick={handlePlayPause}>
           {!imageLoaded && (
@@ -571,7 +546,7 @@ export const PodcastSearchResultItem = ({
               }`}
               disabled={audioUrl === 'URL unavailable'}
             >
-              {isBuffering ? (
+              {isAudioBuffering ? (
                 <Loader className="animate-spin" size={16} />
               ) : isPlaying ? (
                 <Pause size={16} />
@@ -894,18 +869,6 @@ export const PodcastSearchResultItem = ({
   
             {/* Mini Player */}
             <div className="mt-4 pl-0">
-              <audio
-                ref={audioRef}
-                src={audioUrl}
-                onTimeUpdate={handleTimeUpdate}
-                onEnded={() => {
-                  if (audioRef.current) {
-                    audioRef.current.currentTime = timeContext.start_time;
-                    setCurrentTime(timeContext.start_time);
-                  }
-                  onEnded(id);
-                }}
-              />
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-2">
                   {hasEnded && !isContinuingBeyondClip ? (
@@ -947,7 +910,7 @@ export const PodcastSearchResultItem = ({
                         disabled={audioUrl === 'URL unavailable'}
                         title={isPlaying ? 'Pause' : 'Play'}
                       >
-                        {isBuffering ? (
+                        {isAudioBuffering ? (
                           <Loader className="animate-spin" size={16} />
                         ) : isPlaying ? (
                           <Pause size={16} />
