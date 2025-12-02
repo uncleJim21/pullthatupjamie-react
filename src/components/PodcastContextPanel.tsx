@@ -73,6 +73,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [isAudioBuffering, setIsAudioBuffering] = useState(false);
   const [audioCurrentTime, setAudioCurrentTime] = useState<number | null>(null);
+  const [audioDuration, setAudioDuration] = useState<number | null>(null);
+  const [hasAppliedInitialTimeContext, setHasAppliedInitialTimeContext] = useState(false);
 
   // Navigation functions for view history
   const pushView = (mode: ViewMode, chapter?: Chapter | null) => {
@@ -249,25 +251,17 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     return chunks.length > 0 ? chunks : [{ text, startTime }];
   };
 
-  const effectiveStartTime = timeContext?.start_time ?? null;
-  const effectiveEndTime = timeContext?.end_time ?? null;
-  const effectiveDuration =
-    effectiveStartTime !== null && effectiveEndTime !== null
-      ? Math.max(effectiveEndTime - effectiveStartTime, 0)
-      : null;
+  // When the incoming time context or audio changes (e.g. new galaxy star),
+  // reset the "initial seek" flag so we can re-sync once.
+  useEffect(() => {
+    setHasAppliedInitialTimeContext(false);
+  }, [timeContext?.start_time, audioUrl]);
 
   const handleEpisodePlayPause = async () => {
     if (!audioUrl || !audioRef.current) return;
     try {
       if (!isAudioPlaying) {
         setIsAudioBuffering(true);
-        // If we have a clip range, start at its beginning
-        if (
-          effectiveStartTime !== null &&
-          Math.abs(audioRef.current.currentTime - effectiveStartTime) > 0.5
-        ) {
-          audioRef.current.currentTime = effectiveStartTime;
-        }
         await audioRef.current.play();
         setIsAudioPlaying(true);
         setIsAudioBuffering(false);
@@ -285,24 +279,12 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     if (!audioRef.current) return;
     const t = audioRef.current.currentTime;
     setAudioCurrentTime(t);
-
-    if (
-      effectiveEndTime !== null &&
-      t >= effectiveEndTime
-    ) {
-      audioRef.current.pause();
-      setIsAudioPlaying(false);
-    }
   };
 
   const handleEpisodeSeek = (targetTime: number) => {
     if (!audioRef.current) return;
     audioRef.current.currentTime = targetTime;
     setAudioCurrentTime(targetTime);
-    if (!isAudioPlaying) {
-      // Do not auto-play; user can hit play
-      return;
-    }
   };
 
   const handleParagraphOrChunkClick = (targetTime: number) => {
@@ -322,28 +304,18 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
   const renderEpisodeMiniPlayer = () => {
     if (!audioUrl) return null;
-    const current =
-      audioCurrentTime !== null
-        ? audioCurrentTime
-        : effectiveStartTime ?? 0;
+    const current = audioCurrentTime !== null ? audioCurrentTime : 0;
     const progressPercent =
-      effectiveDuration && effectiveDuration > 0
-        ? Math.max(
-            0,
-            Math.min(
-              ((current - (effectiveStartTime ?? 0)) / effectiveDuration) *
-                100,
-              100
-            )
-          )
+      audioDuration && audioDuration > 0
+        ? Math.max(0, Math.min((current / audioDuration) * 100, 100))
         : 0;
 
     const handleBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!effectiveDuration) return;
+      if (!audioDuration || audioDuration <= 0) return;
       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
       const ratio = (e.clientX - rect.left) / rect.width;
-      const target =
-        (effectiveStartTime ?? 0) + Math.max(0, Math.min(1, ratio)) * effectiveDuration;
+      const clampedRatio = Math.max(0, Math.min(1, ratio));
+      const target = clampedRatio * audioDuration;
       handleEpisodeSeek(target);
     };
 
@@ -352,6 +324,24 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         <audio
           ref={audioRef}
           src={audioUrl}
+          onLoadedMetadata={() => {
+            if (audioRef.current) {
+              setAudioDuration(audioRef.current.duration || null);
+              // Apply initial seek from timeContext once when metadata is ready
+              if (
+                timeContext?.start_time !== undefined &&
+                !hasAppliedInitialTimeContext
+              ) {
+                try {
+                  audioRef.current.currentTime = timeContext.start_time;
+                  setAudioCurrentTime(timeContext.start_time);
+                  setHasAppliedInitialTimeContext(true);
+                } catch {
+                  // Some browsers require readyState; ignore if seek fails
+                }
+              }
+            }
+          }}
           onTimeUpdate={handleEpisodeTimeUpdate}
           onEnded={() => {
             setIsAudioPlaying(false);
@@ -360,7 +350,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={handleEpisodePlayPause}
-            className={`p-2 rounded-full text-black transition-colors ${
+            className={`h-8 w-8 flex items-center justify-center rounded-full text-black transition-colors ${
               audioUrl === 'URL unavailable'
                 ? 'bg-gray-700 cursor-not-allowed'
                 : 'bg-white hover:bg-gray-200'
@@ -738,48 +728,50 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
                   {/* Episode with small thumbnail */}
                   {hierarchy.hierarchy.episode && (
-                    <div className="flex items-start space-x-3">
-                      <div className="flex flex-col items-center pt-1">
-                        <div className="w-3 h-3 rounded-full bg-[rgb(250,208,161)] shadow-[0_0_16px_8px_rgba(250,208,161,0.4),0_0_8px_4px_rgba(250,208,161,0.6)] flex-shrink-0"></div>
-                        {hierarchy.hierarchy.chapter && (
-                          <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
-                        )}
-                      </div>
-                      <div className="flex-1 pb-2">
-                        <p className="text-xs text-gray-500 mb-1">EPISODE</p>
-                        <div className="flex items-start space-x-2">
-                          {hierarchy.hierarchy.episode.metadata.imageUrl ? (
-                            !imageError ? (
-                              <img
-                                src={hierarchy.hierarchy.episode.metadata.imageUrl}
-                                alt="Episode"
-                                className="w-12 h-12 rounded object-cover flex-shrink-0"
-                                onError={() => setImageError(true)}
-                              />
+                    <div className="pb-2">
+                      <div className="flex items-start space-x-3">
+                        <div className="flex flex-col items-center pt-1">
+                          <div className="w-3 h-3 rounded-full bg-[rgb(250,208,161)] shadow-[0_0_16px_8px_rgba(250,208,161,0.4),0_0_8px_4px_rgba(250,208,161,0.6)] flex-shrink-0"></div>
+                          {hierarchy.hierarchy.chapter && (
+                            <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs text-gray-500 mb-1">EPISODE</p>
+                          <div className="flex items-start space-x-2">
+                            {hierarchy.hierarchy.episode.metadata.imageUrl ? (
+                              !imageError ? (
+                                <img
+                                  src={hierarchy.hierarchy.episode.metadata.imageUrl}
+                                  alt="Episode"
+                                  className="w-12 h-12 rounded object-cover flex-shrink-0"
+                                  onError={() => setImageError(true)}
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+                                  <Podcast className="w-6 h-6 text-gray-600" />
+                                </div>
+                              )
                             ) : (
                               <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
                                 <Podcast className="w-6 h-6 text-gray-600" />
                               </div>
-                            )
-                          ) : (
-                            <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
-                              <Podcast className="w-6 h-6 text-gray-600" />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-white font-medium line-clamp-2 leading-tight">
-                              {hierarchy.hierarchy.episode.metadata.title}
-                            </p>
-                            {hierarchy.hierarchy.episode.metadata.duration && (
-                              <p className="text-xs text-gray-400 mt-1">
-                                {formatTime(hierarchy.hierarchy.episode.metadata.duration)}
-                              </p>
                             )}
-                            {/* Mini player for Galaxy/standalone audio context */}
-                            {renderEpisodeMiniPlayer()}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-white font-medium line-clamp-2 leading-tight">
+                                {hierarchy.hierarchy.episode.metadata.title}
+                              </p>
+                              {hierarchy.hierarchy.episode.metadata.duration && (
+                                <p className="text-xs text-gray-400 mt-1">
+                                  {formatTime(hierarchy.hierarchy.episode.metadata.duration)}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
+                      {/* Mini player for Galaxy/standalone audio context - full width under episode row */}
+                      {renderEpisodeMiniPlayer()}
                     </div>
                   )}
 
