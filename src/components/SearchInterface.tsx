@@ -1542,6 +1542,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     listenLink?: string;
     date?: string;
   } | null>(null);
+  const [autoPlayContextOnOpen, setAutoPlayContextOnOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-black text-white flex">
@@ -2084,6 +2085,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   listenLink: result.listenLink,
                   date: result.date
                 });
+                // Read auto-play preference from userSettings
+                let autoPlay = false;
+                try {
+                  const settings = localStorage.getItem('userSettings');
+                  if (settings) {
+                    const userSettings = JSON.parse(settings);
+                    autoPlay = !!userSettings.autoPlayOnStarClick;
+                  }
+                } catch (e) {
+                  console.error('Error reading autoPlayOnStarClick from userSettings:', e);
+                }
+                setAutoPlayContextOnOpen(autoPlay);
                 setIsContextPanelOpen(true);
               }}
               selectedStarId={selectedParagraphId}
@@ -2512,6 +2525,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           listenLink={selectedAudioContext?.listenLink}
           timeContext={selectedAudioContext?.timeContext}
           date={selectedAudioContext?.date}
+          autoPlayOnOpen={autoPlayContextOnOpen}
           onTimestampClick={(timestamp) => {
             printLog(`Context panel timestamp clicked: ${timestamp}`);
             // Dispatch a custom event that PodcastSearchResultItem can listen to

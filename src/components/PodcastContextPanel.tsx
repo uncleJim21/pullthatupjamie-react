@@ -36,6 +36,8 @@ interface PodcastContextPanelProps {
     end_time: number;
   };
   date?: string;
+  // If true, auto-play the episode audio shortly after mounting (used for Galaxy star clicks)
+  autoPlayOnOpen?: boolean;
 }
 
 const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
@@ -52,7 +54,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   creator,
   listenLink,
   timeContext,
-  date
+  date,
+  autoPlayOnOpen
 }) => {
   const [paragraphs, setParagraphs] = useState<AdjacentParagraph[]>([]);
   const [hierarchy, setHierarchy] = useState<HierarchyResponse | null>(null);
@@ -75,6 +78,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const [audioCurrentTime, setAudioCurrentTime] = useState<number | null>(null);
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [hasAppliedInitialTimeContext, setHasAppliedInitialTimeContext] = useState(false);
+  const hasAutoPlayedRef = useRef(false);
 
   // Navigation functions for view history
   const pushView = (mode: ViewMode, chapter?: Chapter | null) => {
@@ -255,6 +259,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   // reset the "initial seek" flag so we can re-sync once.
   useEffect(() => {
     setHasAppliedInitialTimeContext(false);
+    hasAutoPlayedRef.current = false;
   }, [timeContext?.start_time, audioUrl]);
 
   const handleEpisodePlayPause = async () => {
@@ -271,6 +276,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       }
     } catch (err) {
       console.error('Context panel playback error:', err);
+      setIsAudioPlaying(false);
       setIsAudioBuffering(false);
     }
   };
@@ -339,6 +345,23 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                 } catch {
                   // Some browsers require readyState; ignore if seek fails
                 }
+              }
+              // Auto-play once after metadata is ready, if enabled
+              if (autoPlayOnOpen && !hasAutoPlayedRef.current) {
+                const tryAutoPlay = async () => {
+                  try {
+                    setIsAudioBuffering(true);
+                    await audioRef.current!.play();
+                    setIsAudioPlaying(true);
+                  } catch (err) {
+                    console.error('Context panel auto-play error:', err);
+                    setIsAudioPlaying(false);
+                  } finally {
+                    setIsAudioBuffering(false);
+                    hasAutoPlayedRef.current = true;
+                  }
+                };
+                void tryAutoPlay();
               }
             }
           }}

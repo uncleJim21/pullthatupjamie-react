@@ -679,6 +679,23 @@ const LabelAxesButton: React.FC<{ enabled: boolean; onToggle: () => void }> = ({
   );
 };
 
+// Auto-play on star click toggle button
+const AutoPlayButton: React.FC<{ enabled: boolean; onToggle: () => void }> = ({ enabled, onToggle }) => {
+  return (
+    <button
+      onClick={onToggle}
+      className={`absolute top-28 left-4 px-3 py-2 backdrop-blur-sm text-white rounded-lg border transition-colors text-sm z-10 flex items-center gap-2 ${
+        enabled 
+          ? 'bg-white/20 border-white/40 hover:bg-white/30' 
+          : 'bg-black/80 border-gray-700 hover:bg-black/90'
+      }`}
+    >
+      {enabled && <span className="text-white font-bold">✓</span>}
+      <span>Auto-Play</span>
+    </button>
+  );
+};
+
 // Minimap component
 const Minimap: React.FC<{ results: QuoteResult[]; selectedStarId: string | null }> = ({ results, selectedStarId }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -909,6 +926,19 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
     }
     return false;
   });
+  // Load autoPlayOnStarClick from userSettings in localStorage
+  const [autoPlayOnStarClick, setAutoPlayOnStarClick] = useState<boolean>(() => {
+    try {
+      const userSettings = localStorage.getItem('userSettings');
+      if (userSettings) {
+        const settings = JSON.parse(userSettings);
+        return settings.autoPlayOnStarClick ?? false;
+      }
+    } catch (e) {
+      console.error('Error loading autoPlayOnStarClick from userSettings:', e);
+    }
+    return false;
+  });
   
   const cameraRef = useRef<THREE.PerspectiveCamera>(null);
   const controlsRef = useRef<any>(null);
@@ -948,6 +978,23 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
 
       {/* Label Axes button */}
       <LabelAxesButton enabled={showAxisLabels} onToggle={handleToggleAxisLabels} />
+
+      {/* Auto-Play on star click button */}
+      <AutoPlayButton
+        enabled={autoPlayOnStarClick}
+        onToggle={() => {
+          const newValue = !autoPlayOnStarClick;
+          setAutoPlayOnStarClick(newValue);
+          try {
+            const userSettings = localStorage.getItem('userSettings');
+            const settings = userSettings ? JSON.parse(userSettings) : {};
+            settings.autoPlayOnStarClick = newValue;
+            localStorage.setItem('userSettings', JSON.stringify(settings));
+          } catch (e) {
+            console.error('Error saving autoPlayOnStarClick to userSettings:', e);
+          }
+        }}
+      />
 
       {/* Minimap */}
       <Minimap results={results} selectedStarId={selectedStarId} />
