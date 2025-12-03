@@ -202,12 +202,13 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         setEpisodeChapters(response.chapters);
         printLog(`Loaded ${response.chapters.length} chapters`);
 
-        // If we started from a chapterId and don't yet have a selectedChapter,
-        // auto-select the matching chapter for CHAPTER view.
-        if (!selectedChapter && hierarchyChapterId) {
-          const match = response.chapters.find(ch => ch.id === hierarchyChapterId);
-          if (match) {
-            setSelectedChapter(match);
+        // Keep selectedChapter in sync with the chapter from hierarchy.
+        if (hierarchyChapterId) {
+          if (!selectedChapter || selectedChapter.id !== hierarchyChapterId) {
+            const match = response.chapters.find(ch => ch.id === hierarchyChapterId);
+            if (match) {
+              setSelectedChapter(match);
+            }
           }
         }
       } catch (error) {
