@@ -1372,10 +1372,25 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   }, [conversation, searchViewStyle, searchMode]);
 
   // Function to handle clicking on a search result (for split-screen context panel)
-  const handleResultClick = (paragraphId: string) => {
+  const handleResultClick = (
+    paragraphId: string,
+    audioContext?: {
+      audioUrl: string;
+      timeContext: { start_time: number; end_time: number };
+      episode: string;
+      episodeImage: string;
+      creator: string;
+      listenLink?: string;
+      date?: string;
+    }
+  ) => {
     if (searchViewStyle === SearchViewStyle.SPLIT_SCREEN && searchMode === 'podcast-search') {
       printLog(`Result clicked, updating context panel with paragraphId: ${paragraphId}`);
       setSelectedParagraphId(paragraphId);
+      if (audioContext) {
+        setSelectedAudioContext(audioContext);
+        setAutoPlayContextOnOpen(false);
+      }
       setIsContextPanelOpen(true);
     }
   };

@@ -51,7 +51,18 @@ interface PodcastSearchResultItemProps {
   onSocialShareModalOpen?: (isOpen: boolean) => void;
   shareable?: boolean;
   isHighlighted?: boolean;
-  onResultClick?: (paragraphId: string) => void;
+  onResultClick?: (
+    paragraphId: string,
+    audioContext?: {
+      audioUrl: string;
+      timeContext: { start_time: number; end_time: number };
+      episode: string;
+      episodeImage: string;
+      creator: string;
+      listenLink?: string;
+      date?: string;
+    }
+  ) => void;
 }
 
 export const PodcastSearchResultItem = ({
@@ -733,7 +744,15 @@ export const PodcastSearchResultItem = ({
         // Call the onResultClick callback if provided (for split-screen context panel)
         if (onResultClick) {
           printLog(`Result clicked: ${shareLink}`);
-          onResultClick(shareLink);
+          onResultClick(shareLink, {
+            audioUrl,
+            timeContext,
+            episode,
+            episodeImage,
+            creator,
+            listenLink,
+            date,
+          });
         }
       }}
     >

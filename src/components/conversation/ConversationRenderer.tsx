@@ -17,7 +17,18 @@ interface ConversationRendererProps {
   isClipBatchPage?: boolean;
   clipBatchViewMode?: AIClipsViewStyle;
   selectedParagraphId?: string | null;
-  onResultClick?: (paragraphId: string) => void;
+  onResultClick?: (
+    paragraphId: string,
+    audioContext?: {
+      audioUrl: string;
+      timeContext: { start_time: number; end_time: number };
+      episode: string;
+      episodeImage: string;
+      creator: string;
+      listenLink?: string;
+      date?: string;
+    }
+  ) => void;
 }
 
 export const ConversationRenderer: React.FC<ConversationRendererProps> = ({ 

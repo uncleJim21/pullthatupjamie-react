@@ -7,6 +7,7 @@ import { createClipShareUrl } from '../../utils/urlUtils.ts';
 import PageBanner from '../PageBanner.tsx';
 import TutorialModal from '../TutorialModal.tsx';
 import WelcomeModal from '../WelcomeModal.tsx';
+import { AudioControllerProvider } from '../../context/AudioControllerContext.tsx';
 
 // Default podcast image to use when none is provided
 const DEFAULT_PODCAST_IMAGE = '/podcast-logo.png'; // Update with your default image path
@@ -16,7 +17,6 @@ const DashboardPage: React.FC = () => {
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [enableFieldFiltering, setEnableFieldFiltering] = useState(false);
   
   // Tutorial and welcome modal states
@@ -54,18 +54,6 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  const handlePlayPause = (id: string) => {
-    if (currentlyPlayingId === id) {
-      setCurrentlyPlayingId(null);
-    } else {
-      setCurrentlyPlayingId(id);
-    }
-  };
-
-  const handleEnded = () => {
-    setCurrentlyPlayingId(null);
-  };
-
   const toggleFieldFiltering = () => {
     setEnableFieldFiltering(!enableFieldFiltering);
   };
@@ -86,6 +74,7 @@ const DashboardPage: React.FC = () => {
   };
 
   return (
+    <AudioControllerProvider>
     <div className="min-h-screen bg-black text-white">
       {/* Page Banner */}
       <PageBanner 
@@ -165,9 +154,6 @@ const DashboardPage: React.FC = () => {
                   }}
                   similarity={{ combined: clip.relevance_score / 100, vector: clip.relevance_score / 100 }}
                   episodeImage={clip.episodeImage || DEFAULT_PODCAST_IMAGE}
-                  isPlaying={currentlyPlayingId === (clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`)}
-                  onPlayPause={handlePlayPause}
-                  onEnded={handleEnded}
                   shareUrl={createClipShareUrl(clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`)}
                   shareLink={clip.paragraph_ids ? clip.paragraph_ids[0] : `clip-${index}`}
                   presentationContext={PresentationContext.dashboard}
@@ -197,6 +183,7 @@ const DashboardPage: React.FC = () => {
         )}
       </div>
     </div>
+    </AudioControllerProvider>
   );
 };
 

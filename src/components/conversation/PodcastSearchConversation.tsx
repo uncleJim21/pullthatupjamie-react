@@ -16,7 +16,18 @@ interface PodcastSearchConversationProps {
   isClipBatchPage?: boolean;
   clipBatchViewMode?: AIClipsViewStyle;
   selectedParagraphId?: string | null;
-  onResultClick?: (paragraphId: string) => void;
+  onResultClick?: (
+    paragraphId: string,
+    audioContext?: {
+      audioUrl: string;
+      timeContext: { start_time: number; end_time: number };
+      episode: string;
+      episodeImage: string;
+      creator: string;
+      listenLink?: string;
+      date?: string;
+    }
+  ) => void;
 }
 
 // PodcastSearchConversation.tsx
@@ -44,7 +55,7 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
               <PodcastSearchResultItem
                 key={index}
                 {...quote}
-                id={`${item.id}-${index}`}
+                id={quoteId}
                 onClipProgress={onClipProgress}
                 authConfig={authConfig}
                 onShareModalOpen={onShareModalOpen}
@@ -72,7 +83,7 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
             <PodcastSearchResultItem
               key={index}
               {...quote}
-              id={`${item.id}-${index}`}
+              id={quoteId}
               onClipProgress={onClipProgress}
               authConfig={authConfig}
               onShareModalOpen={onShareModalOpen}

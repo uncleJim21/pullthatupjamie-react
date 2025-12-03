@@ -260,8 +260,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     return chunks.length > 0 ? chunks : [{ text, startTime }];
   };
 
-  const contextTrackId =
-    paragraphId || audioUrl ? `context-${paragraphId || audioUrl}` : 'context-default';
+  const contextTrackId = paragraphId || audioUrl || 'context-default';
   const isContextTrackActive = currentTrack?.id === contextTrackId;
   const contextIsPlaying = isContextTrackActive && controllerIsPlaying;
   const contextIsBuffering = isContextTrackActive && controllerIsBuffering;
