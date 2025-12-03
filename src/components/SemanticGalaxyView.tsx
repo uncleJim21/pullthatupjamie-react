@@ -133,7 +133,7 @@ const NEBULA_FRAGMENT_SHADER = `
 // Simple config for nebula background post-dimming
 // DIM_OPACITY is a "knob" you can tune between 0 (no dimming) and ~0.7 (quite dark).
 const NEBULA_CONFIG = {
-  DIM_OPACITY: 0.65,
+  DIM_OPACITY: 0.5,
 };
 
 const STAR_VISUAL_CONFIG = {

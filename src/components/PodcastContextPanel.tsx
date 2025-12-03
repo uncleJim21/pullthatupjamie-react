@@ -105,7 +105,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
   const canGoBack = viewHistory.length > 1;
 
-  // Fetch data when paragraphId changes
+  // Fetch data when paragraphId (or implicit chapterId) changes
   useEffect(() => {
     printLog(`PodcastContextPanel effect - paragraphId: ${paragraphId}, isOpen: ${isOpen}`);
     
@@ -114,6 +114,13 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       return;
     }
 
+    // Interpret paragraphId: if it matches the paragraph pattern guid_p{number}, treat as paragraph.
+    // Otherwise, treat it as a chapterId for chapter-level hierarchy.
+    const paragraphIdPattern = /_p\d+$/;
+    const isParagraphId = paragraphIdPattern.test(paragraphId);
+    const effectiveParagraphId = isParagraphId ? paragraphId : null;
+    const effectiveChapterId = !isParagraphId ? paragraphId : null;
+
     // Reset image error state when fetching new data
     setImageError(false);
 
@@ -121,32 +128,51 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       setIsLoading(true);
       setError(null);
       
-      printLog(`Starting fetch for paragraphId: ${paragraphId}`);
+      printLog(
+        `Starting fetch for ${
+          effectiveParagraphId ? `paragraphId: ${effectiveParagraphId}` : `chapterId: ${effectiveChapterId}`
+        }`
+      );
 
       try {
-        // Fetch both adjacent paragraphs and hierarchy in parallel
-        printLog(`Calling ContextService.fetchAdjacentParagraphs and fetchHierarchy...`);
-        const [adjacentData, hierarchyData] = await Promise.all([
-          ContextService.fetchAdjacentParagraphs(paragraphId, 3),
-          ContextService.fetchHierarchy(paragraphId)
-        ]);
+        if (effectiveParagraphId) {
+          // Paragraph-driven mode: fetch adjacent paragraphs + hierarchy from paragraph
+          printLog(`Calling ContextService.fetchAdjacentParagraphs and fetchHierarchyByParagraph...`);
+          const [adjacentData, hierarchyData] = await Promise.all([
+            ContextService.fetchAdjacentParagraphs(effectiveParagraphId, 3),
+            ContextService.fetchHierarchyByParagraph(effectiveParagraphId),
+          ]);
 
-        printLog(`Received ${adjacentData.paragraphs.length} paragraphs and hierarchy`);
-        printLog(`Paragraph IDs received: ${adjacentData.paragraphs.map(p => p.id).join(', ')}`);
-        printLog(`Looking for highlightedParagraphId: ${paragraphId}`);
-        setParagraphs(adjacentData.paragraphs);
-        setHierarchy(hierarchyData);
-        setHighlightedParagraphId(paragraphId);
-        setHighlightedChunkIndex(0); // Reset to first chunk when new paragraph is selected
-        
-        // Reset to context view when selecting a new paragraph
-        setViewMode(ViewMode.CONTEXT);
-        setViewHistory([{ mode: ViewMode.CONTEXT }]);
+          printLog(`Received ${adjacentData.paragraphs.length} paragraphs and hierarchy`);
+          printLog(`Paragraph IDs received: ${adjacentData.paragraphs.map(p => p.id).join(', ')}`);
+          printLog(`Looking for highlightedParagraphId: ${effectiveParagraphId}`);
+          setParagraphs(adjacentData.paragraphs);
+          setHierarchy(hierarchyData);
+          setHighlightedParagraphId(effectiveParagraphId);
+          setHighlightedChunkIndex(0); // Reset to first chunk when new paragraph is selected
+          
+          // Reset to context view when selecting a new paragraph
+          setViewMode(ViewMode.CONTEXT);
+          setViewHistory([{ mode: ViewMode.CONTEXT }]);
 
-        // Scroll to the highlighted paragraph after a brief delay
-        setTimeout(() => {
-          scrollToHighlighted(paragraphId);
-        }, 100);
+          // Scroll to the highlighted paragraph after a brief delay
+          setTimeout(() => {
+            scrollToHighlighted(effectiveParagraphId);
+          }, 100);
+        } else if (effectiveChapterId) {
+          // Chapter-driven mode: no adjacent paragraphs, only hierarchy from chapterId
+          printLog(`Calling ContextService.fetchHierarchyByChapter for chapterId: ${effectiveChapterId}`);
+          const hierarchyData = await ContextService.fetchHierarchyByChapter(effectiveChapterId);
+
+          setParagraphs([]); // No paragraph context in pure chapter mode
+          setHierarchy(hierarchyData);
+          setHighlightedParagraphId(null);
+          setHighlightedChunkIndex(0);
+
+          // Default into CHAPTER view when starting from a chapter
+          setViewMode(ViewMode.CHAPTER);
+          setViewHistory([{ mode: ViewMode.CHAPTER }]);
+        }
       } catch (err) {
         console.error('Error fetching context data:', err);
         printLog(`Error fetching context data: ${err instanceof Error ? err.message : String(err)}`);
@@ -156,7 +182,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       }
     };
 
-    fetchData();
+    void fetchData();
   }, [paragraphId, isOpen]);
 
   // Fetch chapters when hierarchy episode data is available
@@ -167,6 +193,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       }
 
       const episodeGuid = hierarchy.hierarchy.episode.metadata.guid;
+      const hierarchyChapterId = hierarchy.hierarchy.chapter?.id;
       printLog(`Fetching chapters for episode: ${episodeGuid}`);
 
       setIsLoadingChapters(true);
@@ -174,6 +201,15 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         const response = await ChapterService.fetchEpisodeWithChapters(episodeGuid);
         setEpisodeChapters(response.chapters);
         printLog(`Loaded ${response.chapters.length} chapters`);
+
+        // If we started from a chapterId and don't yet have a selectedChapter,
+        // auto-select the matching chapter for CHAPTER view.
+        if (!selectedChapter && hierarchyChapterId) {
+          const match = response.chapters.find(ch => ch.id === hierarchyChapterId);
+          if (match) {
+            setSelectedChapter(match);
+          }
+        }
       } catch (error) {
         console.error('Error fetching chapters:', error);
         printLog(`Error fetching chapters: ${error}`);
@@ -182,8 +218,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       }
     };
 
-    fetchChapters();
-  }, [hierarchy]);
+    void fetchChapters();
+  }, [hierarchy, selectedChapter]);
 
   // Scroll to highlighted paragraph
   const scrollToHighlighted = (targetId: string) => {
@@ -260,6 +296,20 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     return chunks.length > 0 ? chunks : [{ text, startTime }];
   };
 
+  const hierarchyEpisodeAudioUrl = hierarchy?.hierarchy.episode?.metadata.audioUrl;
+  const effectiveAudioUrl =
+    audioUrl && audioUrl !== 'URL unavailable'
+      ? audioUrl
+      : hierarchyEpisodeAudioUrl || undefined;
+
+  // Derive a sensible default clip window:
+  // - prefer explicit timeContext (e.g. from a star / list item)
+  // - otherwise fall back to selectedChapter range when in chapter mode
+  const chapterStartTime = selectedChapter?.startTime;
+  const chapterEndTime = selectedChapter?.endTime;
+  const defaultClipStart = timeContext?.start_time ?? chapterStartTime ?? 0;
+  const defaultClipEnd = timeContext?.end_time ?? chapterEndTime;
+
   const contextTrackId = paragraphId || audioUrl || 'context-default';
   const isContextTrackActive = currentTrack?.id === contextTrackId;
   const contextIsPlaying = isContextTrackActive && controllerIsPlaying;
@@ -267,31 +317,31 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const effectiveCurrentTime =
     isContextTrackActive && controllerCurrentTime
       ? controllerCurrentTime
-      : timeContext?.start_time ?? 0;
+      : defaultClipStart;
 
   // Auto-play for Galaxy star clicks using shared controller
   useEffect(() => {
-    if (!audioUrl || !autoPlayOnOpen || !timeContext) return;
-    const key = `${audioUrl}-${timeContext.start_time}-${timeContext.end_time}`;
+    if (!effectiveAudioUrl || !autoPlayOnOpen || !timeContext) return;
+    const key = `${effectiveAudioUrl}-${timeContext.start_time}-${timeContext.end_time}`;
     if (autoPlayKeyRef.current === key) return;
     autoPlayKeyRef.current = key;
     void playTrack({
       id: contextTrackId,
-      audioUrl,
+      audioUrl: effectiveAudioUrl,
       startTime: timeContext.start_time,
       endTime: timeContext.end_time,
     });
-  }, [audioUrl, autoPlayOnOpen, timeContext?.start_time, timeContext?.end_time, contextTrackId, playTrack]);
+  }, [effectiveAudioUrl, autoPlayOnOpen, timeContext?.start_time, timeContext?.end_time, contextTrackId, playTrack]);
 
   const handleEpisodePlayPause = async () => {
-    if (!audioUrl) return;
+    if (!effectiveAudioUrl) return;
     try {
       if (!isContextTrackActive) {
-        const start = timeContext?.start_time ?? 0;
-        const end = timeContext?.end_time;
+        const start = defaultClipStart;
+        const end = defaultClipEnd;
         await playTrack({
           id: contextTrackId,
-          audioUrl,
+          audioUrl: effectiveAudioUrl,
           startTime: start,
           endTime: end,
         });
@@ -310,11 +360,11 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       onTimestampClick(targetTime);
     }
     // Also sync shared audio player if available (e.g. Galaxy view)
-    if (audioUrl) {
+    if (effectiveAudioUrl) {
       if (!isContextTrackActive) {
         void playTrack({
           id: contextTrackId,
-          audioUrl,
+          audioUrl: effectiveAudioUrl,
           startTime: targetTime,
           endTime: timeContext?.end_time,
         });
@@ -327,8 +377,38 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     }
   };
 
+  const handleChapterListenToggle = () => {
+    if (!effectiveAudioUrl || !selectedChapter) return;
+    const startTime = selectedChapter.startTime;
+    const endTime = selectedChapter.endTime;
+
+    // Notify external listeners (e.g., list view) just like paragraph clicks
+    if (onTimestampClick) {
+      onTimestampClick(startTime);
+    }
+
+    if (isContextTrackActive && contextIsPlaying) {
+      pause();
+      return;
+    }
+
+    if (!isContextTrackActive) {
+      void playTrack({
+        id: contextTrackId,
+        audioUrl: effectiveAudioUrl,
+        startTime,
+        endTime,
+      });
+    } else {
+      seekTo(startTime);
+      if (!contextIsPlaying) {
+        void togglePlay();
+      }
+    }
+  };
+
   const renderEpisodeMiniPlayer = () => {
-    if (!audioUrl) return null;
+    if (!effectiveAudioUrl) return null;
     const current = effectiveCurrentTime;
     const progressPercent =
       controllerDuration && controllerDuration > 0
@@ -644,15 +724,20 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                           </div>
                         </div>
                         <button
-                          onClick={() => {
-                            if (onTimestampClick) {
-                              onTimestampClick(selectedChapter.startTime);
-                            }
-                          }}
+                          onClick={handleChapterListenToggle}
                           className="flex items-center gap-1 px-3 py-1.5 bg-white text-black rounded hover:bg-gray-200 transition-colors text-xs font-medium flex-shrink-0 self-end"
                         >
-                          <Play className="w-3 h-3" />
-                          Listen
+                          {isContextTrackActive && contextIsPlaying ? (
+                            <>
+                              <span className="text-[10px] font-semibold">||</span>
+                              <span>Pause</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-3 h-3" />
+                              <span>Listen</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     )}
@@ -661,15 +746,20 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                     {(!selectedChapter.metadata.keywords || selectedChapter.metadata.keywords.length === 0) && (
                       <div className="flex justify-end">
                         <button
-                          onClick={() => {
-                            if (onTimestampClick) {
-                              onTimestampClick(selectedChapter.startTime);
-                            }
-                          }}
+                          onClick={handleChapterListenToggle}
                           className="flex items-center gap-1 px-3 py-1.5 bg-white text-black rounded hover:bg-gray-200 transition-colors text-xs font-medium"
                         >
-                          <Play className="w-3 h-3" />
-                          Listen
+                          {isContextTrackActive && contextIsPlaying ? (
+                            <>
+                              <span className="text-[10px] font-semibold">||</span>
+                              <span>Pause</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-3 h-3" />
+                              <span>Listen</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     )}

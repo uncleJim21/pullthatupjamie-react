@@ -89,12 +89,12 @@ export interface FeedMetadata {
 }
 
 export interface HierarchyResponse {
-  paragraphId: string;
+  paragraphId: string | null;
   hierarchy: {
     paragraph: {
       id: string;
       metadata: AdjacentParagraph['metadata'];
-    };
+    } | null;
     chapter: {
       id: string;
       metadata: ChapterMetadata;
@@ -154,14 +154,14 @@ class ContextService {
   }
 
   /**
-   * Fetch the complete hierarchy (feed > episode > chapter) for a paragraph
-   * @param paragraphId - The paragraph ID
+   * Fetch the complete hierarchy (feed > episode > chapter > paragraph)
+   * starting from a paragraphId.
    */
-  async fetchHierarchy(paragraphId: string): Promise<HierarchyResponse> {
+  async fetchHierarchyByParagraph(paragraphId: string): Promise<HierarchyResponse> {
     try {
       const url = `${API_URL}/api/get-hierarchy?paragraphId=${encodeURIComponent(paragraphId)}`;
-      console.log(`[ContextService] Fetching hierarchy from: ${url}`);
-      printLog(`Fetching hierarchy: ${url}`);
+      console.log(`[ContextService] Fetching hierarchy (paragraph) from: ${url}`);
+      printLog(`Fetching hierarchy (paragraph): ${url}`);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -170,22 +170,59 @@ class ContextService {
         },
       });
 
-      console.log(`[ContextService] Hierarchy response status: ${response.status}`);
-      printLog(`Hierarchy response status: ${response.status}`);
+      console.log(`[ContextService] Hierarchy (paragraph) response status: ${response.status}`);
+      printLog(`Hierarchy (paragraph) response status: ${response.status}`);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || `HTTP error! status: ${response.status}`;
-        console.error(`[ContextService] Hierarchy error response:`, errorData);
+        console.error(`[ContextService] Hierarchy (paragraph) error response:`, errorData);
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      console.log(`[ContextService] Fetched hierarchy:`, data.path);
-      printLog(`Fetched hierarchy: ${data.path}`);
+      console.log(`[ContextService] Fetched hierarchy (paragraph):`, data.path);
+      printLog(`Fetched hierarchy (paragraph): ${data.path}`);
       return data;
     } catch (error) {
-      console.error('[ContextService] Error fetching hierarchy:', error);
+      console.error('[ContextService] Error fetching hierarchy (paragraph):', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch the complete hierarchy (feed > episode > chapter) starting
+   * from a chapterId (no specific paragraph context).
+   */
+  async fetchHierarchyByChapter(chapterId: string): Promise<HierarchyResponse> {
+    try {
+      const url = `${API_URL}/api/get-hierarchy?chapterId=${encodeURIComponent(chapterId)}`;
+      console.log(`[ContextService] Fetching hierarchy (chapter) from: ${url}`);
+      printLog(`Fetching hierarchy (chapter): ${url}`);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log(`[ContextService] Hierarchy (chapter) response status: ${response.status}`);
+      printLog(`Hierarchy (chapter) response status: ${response.status}`);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `HTTP error! status: ${response.status}`;
+        console.error(`[ContextService] Hierarchy (chapter) error response:`, errorData);
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log(`[ContextService] Fetched hierarchy (chapter):`, data.path);
+      printLog(`Fetched hierarchy (chapter): ${data.path}`);
+      return data;
+    } catch (error) {
+      console.error('[ContextService] Error fetching hierarchy (chapter):', error);
       throw error;
     }
   }
