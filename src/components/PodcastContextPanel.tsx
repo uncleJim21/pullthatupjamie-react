@@ -185,7 +185,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     void fetchData();
   }, [paragraphId, isOpen]);
 
-  // Fetch chapters when hierarchy episode data is available
+  // Fetch chapters when hierarchy episode data is available.
+  // IMPORTANT: this effect only runs when `hierarchy` changes so it
+  // doesn't overwrite the user's manual chapter selection from the list.
   useEffect(() => {
     const fetchChapters = async () => {
       if (!hierarchy?.hierarchy.episode?.metadata.guid) {
@@ -202,13 +204,12 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         setEpisodeChapters(response.chapters);
         printLog(`Loaded ${response.chapters.length} chapters`);
 
-        // Keep selectedChapter in sync with the chapter from hierarchy.
+        // When a new hierarchy arrives (e.g. new star/chapter click),
+        // initialize selectedChapter from that hierarchy's chapter once.
         if (hierarchyChapterId) {
-          if (!selectedChapter || selectedChapter.id !== hierarchyChapterId) {
-            const match = response.chapters.find(ch => ch.id === hierarchyChapterId);
-            if (match) {
-              setSelectedChapter(match);
-            }
+          const match = response.chapters.find(ch => ch.id === hierarchyChapterId);
+          if (match) {
+            setSelectedChapter(match);
           }
         }
       } catch (error) {
@@ -220,7 +221,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     };
 
     void fetchChapters();
-  }, [hierarchy, selectedChapter]);
+  }, [hierarchy]);
 
   // Scroll to highlighted paragraph
   const scrollToHighlighted = (targetId: string) => {
