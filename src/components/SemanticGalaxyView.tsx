@@ -130,6 +130,12 @@ const NEBULA_FRAGMENT_SHADER = `
   }
 `;
 
+// Simple config for nebula background post-dimming
+// DIM_OPACITY is a "knob" you can tune between 0 (no dimming) and ~0.7 (quite dark).
+const NEBULA_CONFIG = {
+  DIM_OPACITY: 0.65,
+};
+
 const STAR_VISUAL_CONFIG = {
   // Bright core
   CORE_SIZE: 0.04,
@@ -292,11 +298,11 @@ interface AxisLabelsProps {
 // Nebula background component rendered as a full-screen quad that follows the camera
 const NebulaBackground: React.FC = () => {
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
-  const meshRef = useRef<THREE.Mesh | null>(null);
+  const groupRef = useRef<THREE.Group | null>(null);
   const { camera } = useThree();
 
   useFrame((state) => {
-    if (!materialRef.current || !meshRef.current) return;
+    if (!materialRef.current || !groupRef.current) return;
 
     const { width, height } = state.size;
 
@@ -321,34 +327,51 @@ const NebulaBackground: React.FC = () => {
       .copy(perspectiveCamera.position)
       .add(direction.multiplyScalar(distance));
 
-    meshRef.current.position.copy(position);
-    meshRef.current.quaternion.copy(perspectiveCamera.quaternion);
+    groupRef.current.position.copy(position);
+    groupRef.current.quaternion.copy(perspectiveCamera.quaternion);
 
     // Scale the quad so it fully covers the view frustum at this distance
     const fov = THREE.MathUtils.degToRad(perspectiveCamera.fov);
     const heightAtDistance = 2 * Math.tan(fov / 2) * distance;
     const widthAtDistance = heightAtDistance * perspectiveCamera.aspect;
-    meshRef.current.scale.set(widthAtDistance, heightAtDistance, 1);
+    groupRef.current.scale.set(widthAtDistance, heightAtDistance, 1);
   });
 
   return (
-    <mesh ref={meshRef} renderOrder={-1}>
-      <planeGeometry args={[1, 1, 1, 1]} />
-      <shaderMaterial
-        ref={materialRef}
-        vertexShader={NEBULA_VERTEX_SHADER}
-        fragmentShader={NEBULA_FRAGMENT_SHADER}
-        uniforms={{
-          iTime: { value: 0 },
-          iResolution: { value: new THREE.Vector3(1, 1, 1.0) },
-          iMouse: { value: new THREE.Vector4(0, 0, 0, 0) },
-        }}
-        depthWrite={false}
-        depthTest={false}
-        transparent={false}
-        side={THREE.FrontSide}
-      />
-    </mesh>
+    <group ref={groupRef} renderOrder={-1}>
+      {/* Nebula shader layer */}
+      <mesh>
+        <planeGeometry args={[1, 1, 1, 1]} />
+        <shaderMaterial
+          ref={materialRef}
+          vertexShader={NEBULA_VERTEX_SHADER}
+          fragmentShader={NEBULA_FRAGMENT_SHADER}
+          uniforms={{
+            iTime: { value: 0 },
+            iResolution: { value: new THREE.Vector3(1, 1, 1.0) },
+            iMouse: { value: new THREE.Vector4(0, 0, 0, 0) },
+          }}
+          depthWrite={false}
+          depthTest={false}
+          transparent={false}
+          side={THREE.FrontSide}
+        />
+      </mesh>
+
+      {/* Configurable dimming overlay (translucent black) */}
+      {NEBULA_CONFIG.DIM_OPACITY > 0 && (
+        <mesh position={[0, 0, 0.01]}>
+          <planeGeometry args={[1, 1, 1, 1]} />
+          <meshBasicMaterial
+            color="black"
+            transparent
+            opacity={NEBULA_CONFIG.DIM_OPACITY}
+            depthWrite={false}
+            depthTest={false}
+          />
+        </mesh>
+      )}
+    </group>
   );
 };
 
