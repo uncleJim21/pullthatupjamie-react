@@ -85,6 +85,13 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   } = useAudioController();
   const autoPlayKeyRef = useRef<string | null>(null);
 
+  // Interpret paragraphId: if it matches the paragraph pattern guid_p{number}, treat as paragraph.
+  // Otherwise, treat it as a chapterId for chapter-level hierarchy.
+  const paragraphIdPattern = /_p\d+$/;
+  const isParagraphId = !!paragraphId && paragraphIdPattern.test(paragraphId);
+  const effectiveParagraphId = isParagraphId ? paragraphId : null;
+  const effectiveChapterId = !isParagraphId ? paragraphId : null;
+
   // Navigation functions for view history
   const pushView = (mode: ViewMode, chapter?: Chapter | null) => {
     setViewMode(mode);
@@ -113,13 +120,6 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       printLog(`Skipping fetch - paragraphId or isOpen is false`);
       return;
     }
-
-    // Interpret paragraphId: if it matches the paragraph pattern guid_p{number}, treat as paragraph.
-    // Otherwise, treat it as a chapterId for chapter-level hierarchy.
-    const paragraphIdPattern = /_p\d+$/;
-    const isParagraphId = paragraphIdPattern.test(paragraphId);
-    const effectiveParagraphId = isParagraphId ? paragraphId : null;
-    const effectiveChapterId = !isParagraphId ? paragraphId : null;
 
     // Reset image error state when fetching new data
     setImageError(false);
@@ -322,6 +322,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
   // Auto-play for Galaxy star clicks using shared controller
   useEffect(() => {
+    // Only allow auto-play in paragraph-driven mode.
+    // In chapter mode this can lead to starting from t=0 or a stale timestamp.
+    if (!isParagraphId) return;
     if (!effectiveAudioUrl || !autoPlayOnOpen || !timeContext) return;
     const key = `${effectiveAudioUrl}-${timeContext.start_time}-${timeContext.end_time}`;
     if (autoPlayKeyRef.current === key) return;

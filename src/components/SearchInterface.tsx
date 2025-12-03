@@ -935,6 +935,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     e.preventDefault();
     if (searchMode === 'podcast-search') {
       try {
+        // New search: collapse context panel and clear any stale audio/UI context
+        resetContextPanelState();
         setGridFadeOut(true);
         
         // Log the selected sources before search starts
@@ -1141,6 +1143,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         // Use the queryParam directly instead of relying on state
         if (searchMode === 'podcast-search') {
           // Set the conversation first
+          resetContextPanelState();
           setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
           setSearchState(prev => ({ ...prev, isLoading: true }));
           setSearchHistory(prev => ({...prev, [searchMode]: true}));
@@ -1559,6 +1562,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     date?: string;
   } | null>(null);
   const [autoPlayContextOnOpen, setAutoPlayContextOnOpen] = useState(false);
+
+  const resetContextPanelState = () => {
+    setIsContextPanelOpen(false);
+    setSelectedParagraphId(null);
+    setSelectedAudioContext(null);
+    setAutoPlayContextOnOpen(false);
+    // Also stop any in-flight audio playback via the shared controller
+    window.dispatchEvent(new Event('stopAllAudio'));
+  };
 
   return (
     <AudioControllerProvider>
@@ -2555,7 +2567,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           }}
           onKeywordSearch={async (keyword, feedId, episodeName, forceSearchAll = false) => {
             printLog(`Keyword search triggered: keyword="${keyword}", feedId="${feedId}", episodeName="${episodeName}", forceSearchAll="${forceSearchAll}"`);
-            
+            // Treat as a new podcast search: collapse context panel and clear stale context
+            resetContextPanelState();
+
             // Clear previous podcast searches just like handleSearch does
             setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
             

@@ -2,6 +2,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
 } from 'react';
@@ -28,6 +29,7 @@ interface AudioController extends AudioControllerState {
   pause: () => void;
   seekTo: (time: number) => void;
   seekBy: (delta: number) => void;
+  stop: () => void;
 }
 
 const AudioControllerContext = createContext<AudioController | null>(null);
@@ -133,6 +135,31 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
     [seekTo]
   );
 
+  const stop = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    try {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+    } catch {
+      // ignore
+    }
+    pendingStartTimeRef.current = null;
+    setCurrentTrack(null);
+    setIsPlaying(false);
+    setIsBuffering(false);
+    setCurrentTime(0);
+    setDuration(0);
+  }, []);
+
+  // Listen for global "stopAllAudio" events (e.g., when a new search starts)
+  useEffect(() => {
+    const handler = () => stop();
+    window.addEventListener('stopAllAudio', handler);
+    return () => window.removeEventListener('stopAllAudio', handler);
+  }, [stop]);
+
   const handleLoadedMetadata = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -175,6 +202,7 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
     pause,
     seekTo,
     seekBy,
+    stop,
   };
 
   return (
