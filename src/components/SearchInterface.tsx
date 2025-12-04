@@ -2100,7 +2100,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
           {/* Conditional rendering: List or Galaxy view */}
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (
-            <div className="relative mx-auto max-w-6xl" style={{ height: 'calc(100vh - 240px)' }}>
+            <div className="relative w-full" style={{ height: 'calc(100vh - 150px)' }}>
               <SemanticGalaxyView
                 results={galaxyResults.length > 0 ? galaxyResults : MOCK_GALAXY_DATA.results}
                 onStarClick={(result) => {
