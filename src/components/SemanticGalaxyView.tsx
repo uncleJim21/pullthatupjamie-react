@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -188,6 +188,15 @@ const STAR_INTERACTION_CONFIG = {
   CORE_HIT_RADIUS_MULTIPLIER: 5, // Multiplier for invisible interaction sphere vs visual core
 };
 
+// Camera intro animation configuration
+const CAMERA_ANIMATION_CONFIG = {
+  duration: 0.3,                 // seconds
+  fromAngle: Math.PI,          // 180 degrees
+  toAngle: 0,                  // 0 degrees (forward)
+  fromDistanceFactor: 0.1,     // start 10x closer than base distance
+  toDistanceFactor: 1.0,       // end at base distance
+};
+
 // Generate random tiny ray properties
 const generateTinyRayProperties = (starX: number, starY: number, starZ: number) => {
   const seed = starX * 12.9898 + starY * 78.233 + starZ * 37.719;
@@ -210,6 +219,16 @@ const generateTinyRayProperties = (starX: number, starY: number, starZ: number) 
   }));
 };
 // ============================================================================
+
+interface CameraAnimationState {
+  startedAt?: number;
+  duration: number;
+  fromAngle: number;
+  toAngle: number;
+  fromDistance: number;
+  toDistance: number;
+  baseYRatio: number;
+}
 
 interface QuoteResult {
   shareLink: string;
@@ -811,6 +830,80 @@ const Minimap: React.FC<{ results: QuoteResult[]; selectedStarId: string | null 
   );
 };
 
+// Component responsible for animating the camera on mount / results change
+const AnimatedCamera: React.FC<{
+  cameraRef: React.RefObject<THREE.PerspectiveCamera>;
+  controlsRef: React.RefObject<any>;
+  animationRef: React.MutableRefObject<CameraAnimationState | null>;
+  isAnimating: boolean;
+  setIsAnimating: (value: boolean) => void;
+}> = ({ cameraRef, controlsRef, animationRef, isAnimating, setIsAnimating }) => {
+  useFrame((state) => {
+    if (!isAnimating) return;
+    const cam = cameraRef.current;
+    const controls = controlsRef.current;
+
+    if (!cam) return;
+
+    // Lazily initialize animation parameters once the camera is ready
+    if (!animationRef.current) {
+      const baseDistance =
+        Math.sqrt(
+          cam.position.x * cam.position.x +
+            cam.position.y * cam.position.y +
+            cam.position.z * cam.position.z,
+        ) || 15;
+
+      const baseYRatio =
+        baseDistance !== 0 ? cam.position.y / baseDistance : 0.33;
+
+      animationRef.current = {
+        duration: CAMERA_ANIMATION_CONFIG.duration,
+        fromAngle: CAMERA_ANIMATION_CONFIG.fromAngle,
+        toAngle: CAMERA_ANIMATION_CONFIG.toAngle,
+        fromDistance:
+          baseDistance * CAMERA_ANIMATION_CONFIG.fromDistanceFactor,
+        toDistance: baseDistance * CAMERA_ANIMATION_CONFIG.toDistanceFactor,
+        baseYRatio,
+      };
+    }
+
+    const anim = animationRef.current;
+    if (!anim) return;
+
+    // Lazily set start time in scene time coordinates
+    if (anim.startedAt === undefined) {
+      anim.startedAt = state.clock.getElapsedTime();
+    }
+
+    const elapsed = state.clock.getElapsedTime() - anim.startedAt;
+    const tRaw = elapsed / anim.duration;
+    const t = Math.min(1, Math.max(0, tRaw));
+
+    const angle = anim.fromAngle + (anim.toAngle - anim.fromAngle) * t;
+    const distance = anim.fromDistance + (anim.toDistance - anim.fromDistance) * t;
+
+    const y = distance * anim.baseYRatio;
+    const x = distance * Math.sin(angle);
+    const z = distance * Math.cos(angle);
+
+    cam.position.set(x, y, z);
+    cam.lookAt(0, 0, 0);
+
+    if (controls && controls.target) {
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+
+    if (t >= 1) {
+      setIsAnimating(false);
+      animationRef.current = null;
+    }
+  });
+
+  return null;
+};
+
 // Hover preview component
 interface HoverPreviewProps {
   result: QuoteResult | null;
@@ -1023,6 +1116,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
 }) => {
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [isAnimatingCamera, setIsAnimatingCamera] = useState(false);
+  const cameraAnimationRef = useRef<CameraAnimationState | null>(null);
   
   // Load showAxisLabels from userSettings in localStorage
   const [showAxisLabels, setShowAxisLabels] = useState<boolean>(() => {
@@ -1058,6 +1153,15 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
   };
+
+  // Prepare camera intro animation whenever a new set of results arrives.
+  // We only signal that an animation should start here; the actual parameters
+  // are initialized lazily inside the AnimatedCamera when the camera ref is ready.
+  useEffect(() => {
+    if (!results || results.length === 0) return;
+    cameraAnimationRef.current = null; // force re-init in AnimatedCamera
+    setIsAnimatingCamera(true);
+  }, [results]);
 
   // Reset camera to default position
   const handleResetCamera = () => {
@@ -1156,6 +1260,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         
         <OrbitControls
           ref={controlsRef}
+          enabled={!isAnimatingCamera}
           enableRotate={false}
           enablePan={true}
           enableZoom={true}
@@ -1163,6 +1268,14 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           zoomSpeed={1}
           minDistance={5}
           maxDistance={50}
+        />
+
+        <AnimatedCamera
+          cameraRef={cameraRef}
+          controlsRef={controlsRef}
+          animationRef={cameraAnimationRef}
+          isAnimating={isAnimatingCamera}
+          setIsAnimating={setIsAnimatingCamera}
         />
 
         <GalaxyScene
