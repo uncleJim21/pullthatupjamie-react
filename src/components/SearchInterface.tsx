@@ -1773,9 +1773,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         Test Registration
       </button>)
       } */}
-      <br></br>
-      <div className={`${hasSearchedInMode(searchMode) ? 'mb-8' : ''} ml-4 mr-4`}>
-        {/* Header with Logo */}
+      <div className={`${!hasSearchedInMode(searchMode) ? 'mb-4' : 'mb-0'} ml-4 mr-4`}>
+        {/* Header with Logo / Hero - hide for main app once a search has been run */}
         {isClipBatchPage ? (
           <div className="relative w-full max-w-4xl mx-auto">
             <div className="flex justify-start md:block mb-4 md:mb-0">
@@ -1829,24 +1828,26 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             </div>
           </div>
         ) : (
-          <div className={`flex justify-center items-center py-8 select-none ${!hasSearchedInMode(searchMode) && 'mt-8'}`}>
-            <div className="flex items-center gap-4">
-              <img
-                src="/jamie-logo.png"
-                alt="Jamie Logo"
-                width={128}
-                height={128}
-                className={`${hasSearchedInMode(searchMode) ? 'w-16 h-16' : ''} w-128 h-128`}
-              />
-              <div>
-                <h1 className="text-3xl font-bold">Pull That Up Jamie!</h1>
-                <p className={`text-gray-400 text-md text-shadow-light-white ${hasSearchedInMode(searchMode) ? 'hidden' : ''}`}>
-                  {searchMode === 'web-search' ? 'Instantly pull up anything with private web search + AI.' : ''}
-                  {searchMode === 'podcast-search' ? 'Find the exact moment of your favorite podcast' : ''}
-                </p>
+          !hasSearchedInMode(searchMode) && (
+            <div className="flex justify-center items-center py-6 select-none mt-4">
+              <div className="flex items-center gap-4">
+                <img
+                  src="/jamie-logo.png"
+                  alt="Jamie Logo"
+                  width={128}
+                  height={128}
+                  className="w-24 h-24"
+                />
+                <div>
+                  <h1 className="text-3xl font-bold">Pull That Up Jamie!</h1>
+                  <p className="text-gray-400 text-md text-shadow-light-white">
+                    {searchMode === 'web-search' ? 'Instantly pull up anything with private web search + AI.' : ''}
+                    {searchMode === 'podcast-search' ? 'Find the exact moment of your favorite podcast' : ''}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )
         )}
 
         {/* Search Modes - Now shown when hasSearched is true */}
@@ -1876,7 +1877,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         )}
         */}
 
-        {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (searchState.isLoading === false) && !isClipBatchPage && (
+        {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (searchState.isLoading === false) && !isClipBatchPage && resultViewStyle !== SearchResultViewStyle.GALAXY && (
           <div>
 
             <AvailableSourcesSection 
@@ -2064,10 +2065,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {conversation.length > 0 && searchMode === 'podcast-search' && (
         <div>
           {/* View Toggle */}
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-3">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               <button
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
                   resultViewStyle === SearchResultViewStyle.LIST
                     ? 'bg-[#1A1A1A] text-white'
                     : 'text-gray-400 hover:text-white'
@@ -2081,7 +2082,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 <span>List</span>
               </button>
               <button
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
                   resultViewStyle === SearchResultViewStyle.GALAXY
                     ? 'bg-[#1A1A1A] text-white'
                     : 'text-gray-400 hover:text-white'
@@ -2099,38 +2100,43 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
           {/* Conditional rendering: List or Galaxy view */}
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (
-            <SemanticGalaxyView
-              results={galaxyResults.length > 0 ? galaxyResults : MOCK_GALAXY_DATA.results}
-              onStarClick={(result) => {
-                printLog(`Star clicked: ${result.shareLink}`);
-                setSelectedParagraphId(result.shareLink);
-                // Store audio context so PodcastContextPanel can render a mini-player
-                setSelectedAudioContext({
-                  audioUrl: result.audioUrl,
-                  timeContext: result.timeContext,
-                  episode: result.episode,
-                  episodeImage: result.episodeImage,
-                  creator: result.creator,
-                  listenLink: result.listenLink,
-                  date: result.date
-                });
-                // Read auto-play preference from userSettings
-                let autoPlay = false;
-                try {
-                  const settings = localStorage.getItem('userSettings');
-                  if (settings) {
-                    const userSettings = JSON.parse(settings);
-                    autoPlay = !!userSettings.autoPlayOnStarClick;
+            <div className="relative mx-auto max-w-6xl" style={{ height: 'calc(100vh - 260px)' }}>
+              <SemanticGalaxyView
+                results={galaxyResults.length > 0 ? galaxyResults : MOCK_GALAXY_DATA.results}
+                onStarClick={(result) => {
+                  printLog(`Star clicked: ${result.shareLink}`);
+                  setSelectedParagraphId(result.shareLink);
+                  // Store audio context so PodcastContextPanel can render a mini-player
+                  setSelectedAudioContext({
+                    audioUrl: result.audioUrl,
+                    timeContext: {
+                      start_time: result.timeContext?.start_time ?? 0,
+                      end_time: result.timeContext?.end_time ?? 0,
+                    },
+                    episode: result.episode,
+                    episodeImage: result.episodeImage || '',
+                    creator: result.creator,
+                    listenLink: result.listenLink,
+                    date: result.date
+                  });
+                  // Read auto-play preference from userSettings
+                  let autoPlay = false;
+                  try {
+                    const settings = localStorage.getItem('userSettings');
+                    if (settings) {
+                      const userSettings = JSON.parse(settings);
+                      autoPlay = !!userSettings.autoPlayOnStarClick;
+                    }
+                  } catch (e) {
+                    console.error('Error reading autoPlayOnStarClick from userSettings:', e);
                   }
-                } catch (e) {
-                  console.error('Error reading autoPlayOnStarClick from userSettings:', e);
-                }
-                setAutoPlayContextOnOpen(autoPlay);
-                setIsContextPanelOpen(true);
-              }}
-              selectedStarId={selectedParagraphId}
-              axisLabels={axisLabels}
-            />
+                  setAutoPlayContextOnOpen(autoPlay);
+                  setIsContextPanelOpen(true);
+                }}
+                selectedStarId={selectedParagraphId}
+                axisLabels={axisLabels}
+              />
+            </div>
           ) : (
             <div className={`mx-auto px-4 space-y-8 transition-all duration-300 ${
               searchMode === 'podcast-search' && conversation.length > 0

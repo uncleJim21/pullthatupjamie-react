@@ -697,7 +697,7 @@ const CameraResetButton: React.FC<{ onReset: () => void }> = ({ onReset }) => {
   return (
     <button
       onClick={onReset}
-      className="absolute top-4 left-4 px-3 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm z-10"
+      className="absolute top-32 left-4 px-3 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm z-10"
     >
       Reset Camera
     </button>
@@ -709,7 +709,7 @@ const LabelAxesButton: React.FC<{ enabled: boolean; onToggle: () => void }> = ({
   return (
     <button
       onClick={onToggle}
-      className={`absolute top-16 left-4 px-3 py-2 backdrop-blur-sm text-white rounded-lg border transition-colors text-sm z-10 flex items-center gap-2 ${
+      className={`absolute top-44 left-4 px-3 py-2 backdrop-blur-sm text-white rounded-lg border transition-colors text-sm z-10 flex items-center gap-2 ${
         enabled 
           ? 'bg-white/20 border-white/40 hover:bg-white/30' 
           : 'bg-black/80 border-gray-700 hover:bg-black/90'
@@ -726,7 +726,7 @@ const AutoPlayButton: React.FC<{ enabled: boolean; onToggle: () => void }> = ({ 
   return (
     <button
       onClick={onToggle}
-      className={`absolute top-28 left-4 px-3 py-2 backdrop-blur-sm text-white rounded-lg border transition-colors text-sm z-10 flex items-center gap-2 ${
+      className={`absolute top-56 left-4 px-3 py-2 backdrop-blur-sm text-white rounded-lg border transition-colors text-sm z-10 flex items-center gap-2 ${
         enabled 
           ? 'bg-white/20 border-white/40 hover:bg-white/30' 
           : 'bg-black/80 border-gray-700 hover:bg-black/90'
@@ -778,7 +778,7 @@ const Minimap: React.FC<{ results: QuoteResult[]; selectedStarId: string | null 
   }, [results, selectedStarId]);
 
   return (
-    <div className="absolute bottom-4 right-4 border border-gray-700 rounded-lg overflow-hidden z-10">
+    <div className="absolute top-4 left-4 border border-gray-700 rounded-lg overflow-hidden z-10">
       <canvas
         ref={canvasRef}
         width={150}
@@ -842,11 +842,11 @@ const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
       <div className="bg-black/95 backdrop-blur-sm border border-gray-700 rounded-lg p-3 max-w-xs shadow-xl">
         <div className="flex items-start gap-3">
           {tooltipImage ? (
-            <img
+          <img
               src={tooltipImage}
               alt={safeTitle}
-              className="w-16 h-16 rounded object-cover flex-shrink-0"
-            />
+            className="w-16 h-16 rounded object-cover flex-shrink-0"
+          />
           ) : (
             <div className="w-16 h-16 rounded bg-gray-800 flex-shrink-0" />
           )}
@@ -1061,7 +1061,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   };
 
   return (
-    <div className="relative w-full h-screen bg-black" onMouseMove={handleMouseMove}>
+    <div className="relative w-full h-full bg-black" onMouseMove={handleMouseMove}>
       {/* Camera reset button */}
       <CameraResetButton onReset={handleResetCamera} />
 
@@ -1097,7 +1097,6 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           {/* Stats */}
           <div className="flex flex-col gap-1">
             <div>Results: {results.length}</div>
-            {selectedStarId && <div className="text-gray-400">Star selected</div>}
           </div>
           
           {/* Legend */}
@@ -1107,19 +1106,19 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
               {Object.entries(HIERARCHY_COLORS)
                 .filter(([level]) => level !== 'ALL_PODS') // ALL_PODS is not used as a star type
                 .map(([level, color]) => (
-                  <div key={level} className="flex items-center gap-2">
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{
-                        backgroundColor: color,
-                        boxShadow: `0 0 8px ${color}`,
-                      }}
-                    />
-                    <span className="text-xs text-gray-300 capitalize">
-                      {level.replace('_', ' ').toLowerCase()}
-                    </span>
-                  </div>
-                ))}
+                <div key={level} className="flex items-center gap-2">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{
+                      backgroundColor: color,
+                      boxShadow: `0 0 8px ${color}`,
+                    }}
+                  />
+                  <span className="text-xs text-gray-300 capitalize">
+                    {level.replace('_', ' ').toLowerCase()}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
