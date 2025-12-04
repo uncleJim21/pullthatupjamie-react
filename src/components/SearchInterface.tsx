@@ -2065,7 +2065,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {conversation.length > 0 && searchMode === 'podcast-search' && (
         <div>
           {/* View Toggle */}
-          <div className="flex justify-center mb-3">
+          <div className="flex justify-center mt-4 mb-3">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               <button
                 className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
@@ -2100,7 +2100,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
           {/* Conditional rendering: List or Galaxy view */}
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (
-            <div className="relative mx-auto max-w-6xl" style={{ height: 'calc(100vh - 260px)' }}>
+            <div className="relative mx-auto max-w-6xl" style={{ height: 'calc(100vh - 240px)' }}>
               <SemanticGalaxyView
                 results={galaxyResults.length > 0 ? galaxyResults : MOCK_GALAXY_DATA.results}
                 onStarClick={(result) => {

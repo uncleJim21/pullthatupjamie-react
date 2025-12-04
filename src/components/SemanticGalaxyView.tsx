@@ -781,8 +781,8 @@ const Minimap: React.FC<{ results: QuoteResult[]; selectedStarId: string | null 
     <div className="absolute top-4 left-4 border border-gray-700 rounded-lg overflow-hidden z-10">
       <canvas
         ref={canvasRef}
-        width={150}
-        height={150}
+        width={105}
+        height={105}
         className="block"
       />
     </div>
