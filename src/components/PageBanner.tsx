@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Headphones, Search, LayoutDashboard } from 'lucide-react';
 import AuthService from '../services/authService.ts';
@@ -42,20 +42,46 @@ const PageBanner: React.FC<PageBannerProps> = ({
   const [isProDashboardModalOpen, setIsProDashboardModalOpen] = useState(false);
   const navigate = useNavigate();
 
-  // Check for screen size
+  // Track banner width, not just window width, so the header can react when
+  // the PodcastContextPanel narrows the main content area.
+  const bannerRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
-    const checkIsMobile = () => {
-      setIsMobile(window.innerWidth <= 1024);
+    const el = bannerRef.current;
+    if (!el) return;
+
+    const MOBILE_BREAKPOINT = 900; // px – roughly "65% width" for typical layouts
+
+    const updateFromWidth = (width: number) => {
+      setIsMobile(width <= MOBILE_BREAKPOINT);
     };
-    
-    // Initial check
-    checkIsMobile();
-    
-    // Add event listener
-    window.addEventListener('resize', checkIsMobile);
-    
-    // Clean up
-    return () => window.removeEventListener('resize', checkIsMobile);
+
+    // Prefer ResizeObserver when available so we respect flex/layout changes.
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver((entries) => {
+        if (!entries.length) return;
+        const entry = entries[0];
+        const width = entry.contentRect?.width ?? el.getBoundingClientRect().width;
+        updateFromWidth(width);
+      });
+      observer.observe(el);
+
+      // Initial measurement
+      const initialWidth = el.getBoundingClientRect().width;
+      updateFromWidth(initialWidth);
+
+      return () => observer.disconnect();
+    } else {
+      // Fallback: window resize (older browsers)
+      const handleResize = () => {
+        const width = el.getBoundingClientRect().width;
+        updateFromWidth(width);
+      };
+
+      handleResize();
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
   }, []);
 
   // Check if user is signed in
@@ -248,7 +274,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
 
   return (
     <>
-      <header className="page-banner" style={{
+      <header ref={bannerRef} className="page-banner" style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -258,7 +284,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
         width: '100%',
         borderBottom: '1px solid #333',
         position: 'relative',
-        zIndex: 10
+        zIndex: 30
       }}>
         <Link to="/" style={{ textDecoration: 'none', color: 'white', display: 'flex', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>

@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS, GALAXY_STAR_THEME, GalaxyStarTheme } from '../constants/constants.ts';
-import { Calendar } from 'lucide-react';
+import { Calendar, RotateCcw, SlidersHorizontal, Check } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 
 // ============================================================================
@@ -697,44 +697,66 @@ const CameraResetButton: React.FC<{ onReset: () => void }> = ({ onReset }) => {
   return (
     <button
       onClick={onReset}
-      className="absolute top-32 left-4 px-3 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm z-10"
+      className="absolute top-32 left-4 px-2.5 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm z-10 flex items-center gap-1"
     >
-      Reset Camera
+      <RotateCcw className="w-4 h-4" />
+      <span className="hidden sm:inline">Reset</span>
     </button>
   );
 };
 
-// Label Axes Toggle Button
-const LabelAxesButton: React.FC<{ enabled: boolean; onToggle: () => void }> = ({ enabled, onToggle }) => {
-  return (
-    <button
-      onClick={onToggle}
-      className={`absolute top-44 left-4 px-3 py-2 backdrop-blur-sm text-white rounded-lg border transition-colors text-sm z-10 flex items-center gap-2 ${
-        enabled 
-          ? 'bg-white/20 border-white/40 hover:bg-white/30' 
-          : 'bg-black/80 border-gray-700 hover:bg-black/90'
-      }`}
-    >
-      {enabled && <span className="text-white font-bold">✓</span>}
-      <span>Label Axes</span>
-    </button>
-  );
-};
+// Options dropdown (Label Axes, Auto-Play, etc.)
+const OptionsMenu: React.FC<{
+  showAxisLabels: boolean;
+  onToggleAxisLabels: () => void;
+  autoPlayOnStarClick: boolean;
+  onToggleAutoPlay: () => void;
+}> = ({ showAxisLabels, onToggleAxisLabels, autoPlayOnStarClick, onToggleAutoPlay }) => {
+  const [open, setOpen] = useState(false);
 
-// Auto-play on star click toggle button
-const AutoPlayButton: React.FC<{ enabled: boolean; onToggle: () => void }> = ({ enabled, onToggle }) => {
   return (
-    <button
-      onClick={onToggle}
-      className={`absolute top-56 left-4 px-3 py-2 backdrop-blur-sm text-white rounded-lg border transition-colors text-sm z-10 flex items-center gap-2 ${
-        enabled 
-          ? 'bg-white/20 border-white/40 hover:bg-white/30' 
-          : 'bg-black/80 border-gray-700 hover:bg-black/90'
-      }`}
-    >
-      {enabled && <span className="text-white font-bold">✓</span>}
-      <span>Auto-Play</span>
-    </button>
+    <div className="absolute top-44 left-4 z-10">
+      <div className="relative">
+        <button
+          onClick={() => setOpen((prev) => !prev)}
+          className="px-3 py-2 backdrop-blur-sm text-white rounded-lg border border-gray-700 bg-black/80 hover:bg-black/90 transition-colors text-sm flex items-center gap-2"
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          <span>Options</span>
+        </button>
+
+        {open && (
+          <div className="mt-2 w-56 bg-black/95 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+            <button
+              onClick={onToggleAxisLabels}
+              className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-200 hover:bg-gray-800/80 transition-colors"
+            >
+              <div
+                className={`w-3 h-3 rounded border border-gray-400 flex items-center justify-center ${
+                  showAxisLabels ? 'bg-white' : 'bg-transparent'
+                }`}
+              >
+                {showAxisLabels && <Check className="w-2 h-2 text-black" />}
+              </div>
+              <span>Label Axes</span>
+            </button>
+            <button
+              onClick={onToggleAutoPlay}
+              className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-200 hover:bg-gray-800/80 transition-colors"
+            >
+              <div
+                className={`w-3 h-3 rounded border border-gray-400 flex items-center justify-center ${
+                  autoPlayOnStarClick ? 'bg-white' : 'bg-transparent'
+                }`}
+              >
+                {autoPlayOnStarClick && <Check className="w-2 h-2 text-black" />}
+              </div>
+              <span>Auto‑play on star click</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -1065,13 +1087,12 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       {/* Camera reset button */}
       <CameraResetButton onReset={handleResetCamera} />
 
-      {/* Label Axes button */}
-      <LabelAxesButton enabled={showAxisLabels} onToggle={handleToggleAxisLabels} />
-
-      {/* Auto-Play on star click button */}
-      <AutoPlayButton
-        enabled={autoPlayOnStarClick}
-        onToggle={() => {
+      {/* Options dropdown (Label Axes, Auto-Play, etc.) */}
+      <OptionsMenu
+        showAxisLabels={showAxisLabels}
+        onToggleAxisLabels={handleToggleAxisLabels}
+        autoPlayOnStarClick={autoPlayOnStarClick}
+        onToggleAutoPlay={() => {
           const newValue = !autoPlayOnStarClick;
           setAutoPlayOnStarClick(newValue);
           try {
