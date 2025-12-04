@@ -214,20 +214,33 @@ const generateTinyRayProperties = (starX: number, starY: number, starZ: number) 
 interface QuoteResult {
   shareLink: string;
   shareUrl: string;
-  listenLink: string;
+  listenLink?: string;
+
+  // Core textual fields
   quote: string;
+  summary?: string;
+  headline?: string;
+
+  // Episode / creator context
   episode: string;
   creator: string;
   audioUrl: string;
-  episodeImage: string;
+  episodeImage?: string;
   date: string;
+  published?: string | null;
+
+  // Tooltip abstraction (preferred by UI)
+  tooltipTitle?: string;
+  tooltipSubtitle?: string;
+  tooltipImage?: string;
+
   similarity: {
     combined: number;
     vector: number;
   };
   timeContext: {
-    start_time: number;
-    end_time: number;
+    start_time: number | null;
+    end_time: number | null;
   };
   hierarchyLevel: 'feed' | 'episode' | 'chapter' | 'paragraph';
   coordinates3d: {
@@ -781,6 +794,37 @@ const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
 
   const hierarchyColor = getHierarchyColor(result.hierarchyLevel);
 
+  // Derive tooltip display fields with sensible fallbacks so chapters and paragraphs
+  // can share the same hover UI.
+  const tooltipImage = result.tooltipImage ?? result.episodeImage;
+
+  // Prefer explicit tooltip title, then chapter headline, then episode title.
+  const rawTitle =
+    result.tooltipTitle ??
+    result.headline ??
+    result.episode ??
+    'Unknown title';
+
+  // Prefer explicit tooltip subtitle, then summary for chapters, then quote.
+  const rawSubtitle =
+    result.tooltipSubtitle ??
+    result.summary ??
+    result.quote ??
+    'Summary not available';
+
+  const safeTitle = rawTitle || 'Unknown title';
+  const safeSubtitle = rawSubtitle || 'Summary not available';
+
+  // Prefer ISO published date if available, otherwise use the human-readable date string.
+  const dateValue = result.published ?? result.date;
+  const hasDate = Boolean(dateValue && dateValue !== 'Date not provided');
+
+  // Normalize similarity to an object
+  const similarityObj =
+    typeof result.similarity === 'number'
+      ? { combined: result.similarity, vector: result.similarity }
+      : result.similarity;
+
   return (
     <div
       className="fixed pointer-events-none z-50"
@@ -791,11 +835,15 @@ const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
     >
       <div className="bg-black/95 backdrop-blur-sm border border-gray-700 rounded-lg p-3 max-w-xs shadow-xl">
         <div className="flex items-start gap-3">
-          <img
-            src={result.episodeImage}
-            alt={result.episode}
-            className="w-16 h-16 rounded object-cover flex-shrink-0"
-          />
+          {tooltipImage ? (
+            <img
+              src={tooltipImage}
+              alt={safeTitle}
+              className="w-16 h-16 rounded object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded bg-gray-800 flex-shrink-0" />
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <div
@@ -807,16 +855,27 @@ const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
               />
               <span className="text-xs text-gray-500 uppercase">{result.hierarchyLevel}</span>
             </div>
-            <h3 className="text-sm font-medium text-white mb-1 line-clamp-2">{result.episode}</h3>
-            <p className="text-xs text-gray-400 line-clamp-2 mb-1">{result.quote}</p>
-            {result.date && (
+            <h3 className="text-sm font-medium text-white mb-1 line-clamp-2">
+              {safeTitle}
+            </h3>
+            <p className="text-xs text-gray-400 line-clamp-3 mb-1">
+              {safeSubtitle}
+            </p>
+            {hasDate && (
               <div className="flex items-center gap-1">
                 <Calendar className="w-3 h-3 text-gray-500" />
-                <span className="text-xs text-gray-500">{formatShortDate(result.date)}</span>
+                <span className="text-xs text-gray-500">
+                  {typeof dateValue === 'string'
+                    ? formatShortDate(dateValue)
+                    : ''}
+                </span>
               </div>
             )}
             <div className="text-xs text-gray-500 mt-1">
-              Similarity: {(result.similarity.combined * 100).toFixed(0)}%
+              Similarity:{' '}
+              {similarityObj && typeof similarityObj.combined === 'number'
+                ? `${(similarityObj.combined * 100).toFixed(0)}%`
+                : 'N/A'}
             </div>
           </div>
         </div>
