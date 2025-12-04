@@ -71,6 +71,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.CONTEXT);
   const [viewHistory, setViewHistory] = useState<ViewHistoryItem[]>([{ mode: ViewMode.CONTEXT }]);
   const [openTooltipKeyword, setOpenTooltipKeyword] = useState<string | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const {
     currentTrack,
@@ -111,6 +112,13 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   };
 
   const canGoBack = viewHistory.length > 1;
+
+  // Reset collapsed state when the panel is closed from the parent.
+  useEffect(() => {
+    if (!isOpen) {
+      setIsCollapsed(false);
+    }
+  }, [isOpen]);
 
   // Fetch data when paragraphId (or implicit chapterId) changes
   useEffect(() => {
@@ -467,13 +475,18 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     );
   };
 
+  const panelWidthClass = !isOpen
+    ? 'w-0 border-l-0'
+    : isCollapsed
+      ? 'w-[32px]'
+      : 'w-[600px]';
+
   return (
     <div
-      className={`sticky top-0 h-screen bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out ${
-        isOpen ? 'w-[600px]' : 'w-0 border-l-0'
-      } overflow-hidden flex-shrink-0`}
+      className={`sticky top-0 h-screen bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out ${panelWidthClass} overflow-hidden flex-shrink-0`}
     >
       {/* Split Content Area */}
+      {!isCollapsed ? (
       <div className="flex-1 flex overflow-hidden">
         {/* Left Side - Adjacent Paragraphs (Hidden in Chapter Mode) */}
         {viewMode !== ViewMode.CHAPTER && (
@@ -564,9 +577,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               <h3 className="text-sm font-medium text-gray-400">Details</h3>
             </div>
             <button
-              onClick={onClose}
+              onClick={() => setIsCollapsed(true)}
               className="text-gray-400 hover:text-white transition-colors"
-              aria-label="Close panel"
+              aria-label="Collapse panel"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -1026,6 +1039,18 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
           </div>
         </div>
       </div>
+      ) : (
+        // Collapsed tray: narrow vertical tab the user can click to re-expand
+        <div className="flex-1 flex items-center justify-center">
+          <button
+            onClick={() => setIsCollapsed(false)}
+            className="h-32 w-full flex items-center justify-center bg-[#0A0A0A] hover:bg-gray-900 border-l border-gray-800 text-gray-300"
+            aria-label="Expand details panel"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
