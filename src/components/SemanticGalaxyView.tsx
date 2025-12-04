@@ -286,6 +286,7 @@ interface StarProps {
   result: QuoteResult;
   isSelected: boolean;
   isNearSelected: boolean;
+  hasSelection: boolean;
   onClick: () => void;
   onHover: (result: QuoteResult | null) => void;
 }
@@ -511,7 +512,7 @@ const EpisodeConnections: React.FC<EpisodeConnectionsProps> = ({ results }) => {
   );
 };
 
-const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, onClick, onHover }) => {
+const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSelection, onClick, onHover }) => {
   const groupRef = useRef<THREE.Group>(null);
   const mainSpikeRefs = useRef<(THREE.Mesh | null)[]>([]);
   const [hovered, setHovered] = useState(false);
@@ -558,7 +559,12 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, onClick
   });
 
   const color = getHierarchyColor(result.hierarchyLevel);
-  const intensityMultiplier = isSelected ? 1.5 : hovered ? 1.2 : isNearSelected ? 0.6 : 1;
+
+  // Make the selected star brighter and slightly dim all others (~20%) when a selection exists.
+  const baseIntensity =
+    isSelected ? 1.8 : hovered ? 1.3 : isNearSelected ? 0.8 : 1;
+  const dimFactor = hasSelection && !isSelected ? 0.4 : 1; // 20% dim for non-selected when something is selected
+  const intensityMultiplier = baseIntensity * dimFactor;
 
   return (
     <group 
@@ -977,6 +983,7 @@ const GalaxyScene: React.FC<{
           result={result}
           isSelected={result.shareLink === selectedStarId}
           isNearSelected={nearbyStars.has(result.shareLink)}
+          hasSelection={Boolean(selectedStarId)}
           onClick={() => onStarClick(result)}
           onHover={onHover}
         />
@@ -1097,20 +1104,22 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           <div className="border-t border-gray-700 pt-2">
             <div className="text-xs text-gray-400 mb-2">Hierarchy Levels</div>
             <div className="flex flex-col gap-1">
-              {Object.entries(HIERARCHY_COLORS).map(([level, color]) => (
-                <div key={level} className="flex items-center gap-2">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{
-                      backgroundColor: color,
-                      boxShadow: `0 0 8px ${color}`,
-                    }}
-                  />
-                  <span className="text-xs text-gray-300 capitalize">
-                    {level.replace('_', ' ').toLowerCase()}
-                  </span>
-                </div>
-              ))}
+              {Object.entries(HIERARCHY_COLORS)
+                .filter(([level]) => level !== 'ALL_PODS') // ALL_PODS is not used as a star type
+                .map(([level, color]) => (
+                  <div key={level} className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{
+                        backgroundColor: color,
+                        boxShadow: `0 0 8px ${color}`,
+                      }}
+                    />
+                    <span className="text-xs text-gray-300 capitalize">
+                      {level.replace('_', ' ').toLowerCase()}
+                    </span>
+                  </div>
+                ))}
             </div>
           </div>
         </div>

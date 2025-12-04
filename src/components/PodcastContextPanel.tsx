@@ -582,32 +582,46 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               <div className="space-y-6">
                 {/* Hierarchy (same as before) */}
                 <div className="space-y-0">
-                  {/* Feed */}
-                  {hierarchy?.hierarchy.feed && (
-                    <div className="flex items-start space-x-3">
-                      <div className="flex flex-col items-center pt-1">
-                        <div className="w-3 h-3 rounded-full bg-[rgb(245,161,66)] shadow-[0_0_16px_8px_rgba(245,161,66,0.4),0_0_8px_4px_rgba(245,161,66,0.6)] flex-shrink-0"></div>
-                        <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
-                      </div>
-                      <div className="flex-1 pb-2">
-                        <p className="text-xs text-gray-500 mb-1">FEED</p>
-                        <p className="text-sm text-white font-medium leading-tight">
-                          {hierarchy.hierarchy.feed.metadata.title}
-                        </p>
-                      </div>
+                {/* Feed */}
+                {hierarchy?.hierarchy.feed && (
+                  <div className="flex items-start space-x-3">
+                    <div className="flex flex-col items-center pt-1">
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{
+                          backgroundColor: HIERARCHY_COLORS.FEED,
+                          boxShadow: `0 0 6px 2px ${HIERARCHY_COLORS.FEED}`,
+                          border: `1px solid ${HIERARCHY_COLORS.FEED}`,
+                        }}
+                      ></div>
+                      <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
                     </div>
-                  )}
+                    <div className="flex-1 pb-2">
+                      <p className="text-xs text-gray-500 mb-1">FEED</p>
+                      <p className="text-sm text-white font-medium leading-tight">
+                        {hierarchy.hierarchy.feed.metadata.title}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-                  {/* Episode */}
-                  {hierarchy?.hierarchy.episode && (
-                    <div className="flex items-start space-x-3">
-                      <div className="flex flex-col items-center pt-1">
-                        <div className="w-3 h-3 rounded-full bg-[rgb(250,208,161)] shadow-[0_0_16px_8px_rgba(250,208,161,0.4),0_0_8px_4px_rgba(250,208,161,0.6)] flex-shrink-0"></div>
-                        <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
-                      </div>
-                      <div className="flex-1 pb-2">
-                        <p className="text-xs text-gray-500 mb-1">EPISODE</p>
-                        <div className="flex items-start space-x-2">
+                {/* Episode */}
+                {hierarchy?.hierarchy.episode && (
+                  <div className="flex items-start space-x-3">
+                    <div className="flex flex-col items-center pt-1">
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{
+                          backgroundColor: HIERARCHY_COLORS.EPISODE,
+                          boxShadow: `0 0 6px 2px ${HIERARCHY_COLORS.EPISODE}`,
+                          border: `1px solid ${HIERARCHY_COLORS.EPISODE}`,
+                        }}
+                      ></div>
+                      <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
+                    </div>
+                    <div className="flex-1 pb-2">
+                      <p className="text-xs text-gray-500 mb-1">EPISODE</p>
+                      <div className="flex items-start space-x-2">
                           {hierarchy.hierarchy.episode.metadata.imageUrl ? (
                             !imageError ? (
                               <img
@@ -644,7 +658,14 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                   {/* Current Chapter */}
                   <div className="flex items-start space-x-3">
                     <div className="flex flex-col items-center pt-1">
-                      <div className="w-3 h-3 rounded-full bg-white shadow-[0_0_16px_8px_rgba(255,255,255,0.4),0_0_8px_4px_rgba(255,255,255,0.6)] flex-shrink-0"></div>
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{
+                          backgroundColor: HIERARCHY_COLORS.CHAPTER,
+                          boxShadow: `0 0 6px 2px ${HIERARCHY_COLORS.CHAPTER}`,
+                          border: `1px solid ${HIERARCHY_COLORS.CHAPTER}`,
+                        }}
+                      ></div>
                     </div>
                     <div className="flex-1">
                       <p className="text-xs text-gray-500 mb-1">
@@ -809,7 +830,14 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                   {hierarchy.hierarchy.feed && (
                     <div className="flex items-start space-x-3">
                       <div className="flex flex-col items-center pt-1">
-                        <div className="w-3 h-3 rounded-full bg-[rgb(245,161,66)] shadow-[0_0_16px_8px_rgba(245,161,66,0.4),0_0_8px_4px_rgba(245,161,66,0.6)] flex-shrink-0"></div>
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{
+                            backgroundColor: HIERARCHY_COLORS.FEED,
+                            boxShadow: `0 0 6px 2px ${HIERARCHY_COLORS.FEED}`,
+                            border: `1px solid ${HIERARCHY_COLORS.FEED}`,
+                          }}
+                        ></div>
                         <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
                       </div>
                       <div className="flex-1 pb-2">
@@ -826,7 +854,14 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                     <div className="pb-2">
                       <div className="flex items-start space-x-3">
                         <div className="flex flex-col items-center pt-1">
-                          <div className="w-3 h-3 rounded-full bg-[rgb(250,208,161)] shadow-[0_0_16px_8px_rgba(250,208,161,0.4),0_0_8px_4px_rgba(250,208,161,0.6)] flex-shrink-0"></div>
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{
+                              backgroundColor: HIERARCHY_COLORS.EPISODE,
+                              boxShadow: `0 0 6px 2px ${HIERARCHY_COLORS.EPISODE}`,
+                              border: `1px solid ${HIERARCHY_COLORS.EPISODE}`,
+                            }}
+                          ></div>
                           {hierarchy.hierarchy.chapter && (
                             <div className="w-0.5 h-8 bg-gray-700 my-1"></div>
                           )}
