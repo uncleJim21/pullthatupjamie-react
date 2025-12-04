@@ -26,7 +26,6 @@ interface ClipTrackerModalProps {
     episodeImage: string;
     lookupHash?: string;
   };
-  hasSearched:boolean;
   isCollapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
   auth?: AuthConfig;
@@ -36,7 +35,6 @@ interface ClipTrackerModalProps {
 export default function ClipTrackerModal({
   clipProgress,
   isCollapsed,
-  hasSearched,
   onCollapsedChange,
   auth,
   onShareClick
@@ -346,20 +344,8 @@ export default function ClipTrackerModal({
     });
   }, [clipProgress]);
 
-  const bottomConstraint = (isCollapsed,hasSearched) => {
-    if(!hasSearched){
-      return 'bottom-[1.0rem]'
-    }
-
-    return isCollapsed ? 'bottom-36 sm:bottom-48' : 'bottom-[8.8rem] sm:bottom-[12.6rem]'
-  }
-
   return (
-    <div className={`fixed z-[100] transition-all duration-300 ease-in-out pointer-events-auto
-      xl:left-4 xl:bottom-24 xl:w-[22.5rem] px-4 sm:px-24 xl:right-auto xl:transform-none
-      left-1/2 -translate-x-1/2 mx-auto w-full max-w-[40rem] sm:px-4
-      ${bottomConstraint(isCollapsed,hasSearched)}`}
-    >
+    <div className="w-full mb-2 pointer-events-auto">
       {/* Current Clip */}
       <div className="bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow">
       <button

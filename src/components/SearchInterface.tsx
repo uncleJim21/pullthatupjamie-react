@@ -1895,6 +1895,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <div className="max-w-3xl mx-auto px-4">
           {!hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && (
             <div>
+            {searchMode === 'podcast-search' && !isAnyModalOpen() && (
+              <ClipTrackerModal
+                clipProgress={clipProgress}
+                isCollapsed={isClipTrackerCollapsed}
+                onCollapsedChange={setIsClipTrackerCollapsed}
+                auth={authConfig || undefined}
+                onShareClick={handleClipShare}
+              />
+            )}
               <form onSubmit={handleSearch} className="relative">
             {/* Filter button and toggle - desktop version (outside search bar) */}
             {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
@@ -2337,26 +2346,23 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         )
       )}
 
-      {searchMode === 'podcast-search' && !isAnyModalOpen() && (
-          <ClipTrackerModal
-            clipProgress={clipProgress}
-            hasSearched={hasSearchedInMode('podcast-search')}
-            isCollapsed={isClipTrackerCollapsed}
-            onCollapsedChange={setIsClipTrackerCollapsed}
-            auth={authConfig || undefined}
-            onShareClick={handleClipShare}
-          />
-      )}
-
-
-
       {/* Floating Search Bar */}
       {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
         <div className="fixed sm:bottom-12 bottom-1 z-40 flex justify-center px-4 sm:px-24" style={{
           left: '0',
           right: searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isContextPanelOpen ? '600px' : '0'
         }}>
-          <form onSubmit={handleSearch} className="relative w-full max-w-[40rem]">
+          <div className="w-full max-w-[40rem] flex flex-col">
+            {searchMode === 'podcast-search' && !isAnyModalOpen() && (
+              <ClipTrackerModal
+                clipProgress={clipProgress}
+                isCollapsed={isClipTrackerCollapsed}
+                onCollapsedChange={setIsClipTrackerCollapsed}
+                auth={authConfig || undefined}
+                onShareClick={handleClipShare}
+              />
+            )}
+          <form onSubmit={handleSearch} className="relative w-full">
             {/* Filter button and toggle - desktop version (outside search bar) */}
             {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
               <div className="absolute -right-14 top-0 z-10 hidden md:block">
@@ -2489,6 +2495,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               </div>
             </div>
           </form>
+          </div>
           
 
 
