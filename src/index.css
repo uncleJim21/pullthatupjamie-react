@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Ensure full-viewport black background to avoid white overscroll on macOS */
+html, body, #root {
+  height: 100%;
+  background-color: #000000;
+}
+
+body {
+  margin: 0;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
