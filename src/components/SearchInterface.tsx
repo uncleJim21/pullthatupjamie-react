@@ -449,6 +449,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   }
 
   const handlePodcastSearchModeChange = (mode: 'global' | 'my-pod') => {
+    printLog(`[handlePodcastSearchModeChange] Called with mode: ${mode}`);
     setPodcastSearchMode(mode);
     const label = mode === 'global' ? 'All Pods' : 'My Pod';
     setPodcastModeLabelText(label);
@@ -463,9 +464,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }, 1500);
   };
 
-  const toggleScopeSlideout = () => {
+  const toggleScopeSlideout = (e?: React.MouseEvent) => {
+    printLog(`[toggleScopeSlideout] Called. Current state: ${showScopeSlideout}`);
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const newState = !showScopeSlideout;
     setShowScopeSlideout(newState);
+    printLog(`[toggleScopeSlideout] New state: ${newState}`);
     
     if (scopeSlideoutTimeoutRef.current) {
       clearTimeout(scopeSlideoutTimeoutRef.current);
@@ -1755,12 +1762,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                       {!!adminFeedId && searchMode === 'podcast-search' && (
                         <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-50">
                           {/* Scope switch with slide animation */}
-                          <div className={`overflow-visible transition-all duration-300 ${
-                            showScopeSlideout ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+                          <div className={`transition-all duration-300 ${
+                            showScopeSlideout 
+                              ? 'max-h-20 opacity-100' 
+                              : 'max-h-0 opacity-0 pointer-events-none'
                           }`}>
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                printLog(`[Scope Switch Button] Clicked. Current mode: ${podcastSearchMode}`);
                                 handlePodcastSearchModeChange(
                                   podcastSearchMode === 'global' ? 'my-pod' : 'global'
                                 );
@@ -1772,6 +1784,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                                   setShowScopeSlideout(false);
                                 }, 5000);
                               }}
+                              disabled={!showScopeSlideout}
                               className="inline-flex rounded-md border border-gray-700 bg-black/90 backdrop-blur-sm text-xs text-gray-200 whitespace-nowrap mb-1 shadow-lg"
                               aria-label={
                                 podcastSearchMode === 'global'
@@ -1807,7 +1820,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                           {/* Arrow toggle button */}
                           <button
                             type="button"
-                            onClick={toggleScopeSlideout}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleScopeSlideout(e);
+                            }}
                             className="w-8 h-6 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
                             aria-label={showScopeSlideout ? 'Collapse scope selector' : 'Expand scope selector'}
                           >
@@ -2110,12 +2127,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 {!!adminFeedId && searchMode === 'podcast-search' && (
                   <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-50">
                     {/* Scope switch with slide animation */}
-                    <div className={`overflow-visible transition-all duration-300 ${
-                      showScopeSlideout ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+                    <div className={`transition-all duration-300 ${
+                      showScopeSlideout 
+                        ? 'max-h-20 opacity-100' 
+                        : 'max-h-0 opacity-0 pointer-events-none'
                     }`}>
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          printLog(`[Scope Switch Button] Clicked. Current mode: ${podcastSearchMode}`);
                           handlePodcastSearchModeChange(
                             podcastSearchMode === 'global' ? 'my-pod' : 'global'
                           );
@@ -2127,6 +2149,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                             setShowScopeSlideout(false);
                           }, 5000);
                         }}
+                        disabled={!showScopeSlideout}
                         className="inline-flex rounded-md border border-gray-700 bg-black/90 backdrop-blur-sm text-xs text-gray-200 whitespace-nowrap mb-1 shadow-lg"
                         aria-label={
                           podcastSearchMode === 'global'
