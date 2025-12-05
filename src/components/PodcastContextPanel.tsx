@@ -39,6 +39,8 @@ interface PodcastContextPanelProps {
   date?: string;
   // If true, auto-play the episode audio shortly after mounting (used for Galaxy star clicks)
   autoPlayOnOpen?: boolean;
+  // Notify parent about current panel width so layout (e.g. floating search bar) can adjust
+  onWidthChange?: (width: number) => void;
 }
 
 const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
@@ -56,7 +58,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   listenLink,
   timeContext,
   date,
-  autoPlayOnOpen
+  autoPlayOnOpen,
+  onWidthChange
 }) => {
   const [paragraphs, setParagraphs] = useState<AdjacentParagraph[]>([]);
   const [hierarchy, setHierarchy] = useState<HierarchyResponse | null>(null);
@@ -480,6 +483,16 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     : isCollapsed
       ? 'w-[32px]'
       : 'w-[600px]';
+
+  // Report current width to parent whenever open/collapsed state changes
+  useEffect(() => {
+    if (!onWidthChange) return;
+    if (!isOpen) {
+      onWidthChange(0);
+      return;
+    }
+    onWidthChange(isCollapsed ? 32 : 600);
+  }, [isOpen, isCollapsed, onWidthChange]);
 
   return (
     <div

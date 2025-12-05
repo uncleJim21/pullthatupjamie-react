@@ -1562,6 +1562,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     date?: string;
   } | null>(null);
   const [autoPlayContextOnOpen, setAutoPlayContextOnOpen] = useState(false);
+  // Track the effective width of the podcast context panel so we can center the floating search bar
+  const [contextPanelWidth, setContextPanelWidth] = useState(0);
 
   const resetContextPanelState = () => {
     setIsContextPanelOpen(false);
@@ -2350,7 +2352,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
         <div className="fixed sm:bottom-12 bottom-1 z-40 flex justify-center px-4 sm:px-24" style={{
           left: '0',
-          right: searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isContextPanelOpen ? '600px' : '0'
+          right: searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isContextPanelOpen
+            ? `${contextPanelWidth}px`
+            : '0'
         }}>
           <div className="w-full max-w-[40rem] flex flex-col">
             {searchMode === 'podcast-search' && !isAnyModalOpen() && (
@@ -2568,6 +2572,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           timeContext={selectedAudioContext?.timeContext}
           date={selectedAudioContext?.date}
           autoPlayOnOpen={autoPlayContextOnOpen}
+          onWidthChange={setContextPanelWidth}
           onTimestampClick={(timestamp) => {
             printLog(`Context panel timestamp clicked: ${timestamp}`);
             // Dispatch a custom event that PodcastSearchResultItem can listen to
