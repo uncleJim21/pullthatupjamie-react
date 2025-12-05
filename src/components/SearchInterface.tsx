@@ -1751,11 +1751,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
                     {/* Button column - fixed width */}
                     <div className="flex flex-col gap-2 relative">
-                      {/* Floating scope switch and arrow - above the grid */}
+                      {/* Floating scope switch and arrow - above the grid, centered on filter button */}
                       {!!adminFeedId && searchMode === 'podcast-search' && (
-                        <div className="absolute bottom-full mb-2 right-0 flex flex-col items-end gap-1">
+                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-50">
                           {/* Scope switch with slide animation */}
-                          <div className={`overflow-hidden transition-all duration-300 ${
+                          <div className={`overflow-visible transition-all duration-300 ${
                             showScopeSlideout ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
                           }`}>
                             <button
@@ -1772,7 +1772,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                                   setShowScopeSlideout(false);
                                 }, 5000);
                               }}
-                              className="inline-flex rounded-md border border-gray-700 bg-black/80 backdrop-blur-sm text-xs text-gray-200 whitespace-nowrap mb-1"
+                              className="inline-flex rounded-md border border-gray-700 bg-black/90 backdrop-blur-sm text-xs text-gray-200 whitespace-nowrap mb-1 shadow-lg"
                               aria-label={
                                 podcastSearchMode === 'global'
                                   ? 'Switch to My Pod scope'
@@ -1783,22 +1783,22 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                                 <div
                                   className={`flex items-center px-2 py-1 transition-colors duration-200 ${
                                     podcastSearchMode === 'global'
-                                      ? 'bg-white text-black'
+                                      ? 'bg-[#1A1A1A] text-white'
                                       : 'bg-black text-gray-400'
                                   }`}
                                 >
                                   <span className="mr-1">🌐</span>
-                                  <span>All Pods</span>
+                                  {podcastSearchMode === 'global' && <span>All Pods</span>}
                                 </div>
                                 <div
                                   className={`flex items-center px-2 py-1 transition-colors duration-200 ${
                                     podcastSearchMode === 'my-pod'
-                                      ? 'bg-white text-black'
+                                      ? 'bg-[#1A1A1A] text-white'
                                       : 'bg-black text-gray-400'
                                   }`}
                                 >
                                   <span className="mr-1">👤</span>
-                                  <span>My Pod</span>
+                                  {podcastSearchMode === 'my-pod' && <span>My Pod</span>}
                                 </div>
                               </div>
                             </button>
@@ -2086,7 +2086,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
       {/* Floating Search Bar */}
       {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
-        <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-40">
+        <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-[60]">
           <form onSubmit={handleSearch}>
             <div className="flex items-start gap-3">
               {/* Textarea - grows to fill available space */}
@@ -2106,11 +2106,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
               {/* Button column - fixed width */}
               <div className="flex flex-col gap-2 relative">
-                {/* Floating scope switch and arrow - above the grid */}
+                {/* Floating scope switch and arrow - above the grid, centered on filter button */}
                 {!!adminFeedId && searchMode === 'podcast-search' && (
-                  <div className="absolute bottom-full mb-2 right-0 flex flex-col items-end gap-1">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-50">
                     {/* Scope switch with slide animation */}
-                    <div className={`overflow-hidden transition-all duration-300 ${
+                    <div className={`overflow-visible transition-all duration-300 ${
                       showScopeSlideout ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
                     }`}>
                       <button
@@ -2127,7 +2127,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                             setShowScopeSlideout(false);
                           }, 5000);
                         }}
-                        className="inline-flex rounded-md border border-gray-700 bg-black/80 backdrop-blur-sm text-xs text-gray-200 whitespace-nowrap mb-1"
+                        className="inline-flex rounded-md border border-gray-700 bg-black/90 backdrop-blur-sm text-xs text-gray-200 whitespace-nowrap mb-1 shadow-lg"
                         aria-label={
                           podcastSearchMode === 'global'
                             ? 'Switch to My Pod scope'
@@ -2138,22 +2138,22 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                           <div
                             className={`flex items-center px-2 py-1 transition-colors duration-200 ${
                               podcastSearchMode === 'global'
-                                ? 'bg-white text-black'
+                                ? 'bg-[#1A1A1A] text-white'
                                 : 'bg-black text-gray-400'
                             }`}
                           >
                             <span className="mr-1">🌐</span>
-                            <span>All Pods</span>
+                            {podcastSearchMode === 'global' && <span>All Pods</span>}
                           </div>
                           <div
                             className={`flex items-center px-2 py-1 transition-colors duration-200 ${
                               podcastSearchMode === 'my-pod'
-                                ? 'bg-white text-black'
+                                ? 'bg-[#1A1A1A] text-white'
                                 : 'bg-black text-gray-400'
                             }`}
                           >
                             <span className="mr-1">👤</span>
-                            <span>My Pod</span>
+                            {podcastSearchMode === 'my-pod' && <span>My Pod</span>}
                           </div>
                         </div>
                       </button>
