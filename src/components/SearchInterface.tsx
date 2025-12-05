@@ -18,7 +18,7 @@ import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter, List, Grid3X3, X as XIcon, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown } from 'lucide-react';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
 import PageBanner from './PageBanner.tsx';
@@ -1750,109 +1750,107 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     />
 
                     {/* Button column - fixed width */}
-                    <div className="flex flex-col gap-2">
-                      {/* Row 1: Filter with slideout scope indicator */}
-                      <div className="flex items-center">
-                        <div className="flex items-center">
-                          <div className="relative">
+                    <div className="flex flex-col gap-2 relative">
+                      {/* Floating scope switch and arrow - above the grid */}
+                      {!!adminFeedId && searchMode === 'podcast-search' && (
+                        <div className="absolute bottom-full mb-2 right-0 flex flex-col items-end gap-1">
+                          {/* Scope switch with slide animation */}
+                          <div className={`overflow-hidden transition-all duration-300 ${
+                            showScopeSlideout ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+                          }`}>
                             <button
                               type="button"
-                              onClick={podcastSearchMode === 'my-pod' ? undefined : handleFilterClick}
-                              disabled={podcastSearchMode === 'my-pod'}
-                              className={`p-3 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
-                                podcastSearchMode === 'my-pod'
-                                  ? 'bg-black/30 border-gray-800 text-gray-600 cursor-not-allowed'
-                                  : 'bg-black/50 backdrop-blur-sm hover:bg-black/70 border-gray-700 text-white'
-                              }`}
-                              aria-label="Filter"
-                              aria-disabled={podcastSearchMode === 'my-pod'}
+                              onClick={() => {
+                                handlePodcastSearchModeChange(
+                                  podcastSearchMode === 'global' ? 'my-pod' : 'global'
+                                );
+                                if (scopeSlideoutTimeoutRef.current) {
+                                  clearTimeout(scopeSlideoutTimeoutRef.current);
+                                }
+                                setShowScopeSlideout(true);
+                                scopeSlideoutTimeoutRef.current = setTimeout(() => {
+                                  setShowScopeSlideout(false);
+                                }, 5000);
+                              }}
+                              className="inline-flex rounded-md border border-gray-700 bg-black/80 backdrop-blur-sm text-xs text-gray-200 whitespace-nowrap mb-1"
+                              aria-label={
+                                podcastSearchMode === 'global'
+                                  ? 'Switch to My Pod scope'
+                                  : 'Switch to All Pods scope'
+                              }
                             >
-                              <Filter className="w-5 h-5" />
+                              <div className="flex text-xs">
+                                <div
+                                  className={`flex items-center px-2 py-1 transition-colors duration-200 ${
+                                    podcastSearchMode === 'global'
+                                      ? 'bg-white text-black'
+                                      : 'bg-black text-gray-400'
+                                  }`}
+                                >
+                                  <span className="mr-1">🌐</span>
+                                  <span>All Pods</span>
+                                </div>
+                                <div
+                                  className={`flex items-center px-2 py-1 transition-colors duration-200 ${
+                                    podcastSearchMode === 'my-pod'
+                                      ? 'bg-white text-black'
+                                      : 'bg-black text-gray-400'
+                                  }`}
+                                >
+                                  <span className="mr-1">👤</span>
+                                  <span>My Pod</span>
+                                </div>
+                              </div>
                             </button>
-                            
-                            {/* Reset filters badge */}
-                            {podcastSearchMode === 'global' && hasActiveFilters() && (
-                              <button
-                                type="button"
-                                onClick={handleResetFilters}
-                                className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors shadow-lg z-10"
-                                aria-label="Reset Filters"
-                              >
-                                <XIcon className="w-3 h-3" />
-                              </button>
-                            )}
                           </div>
 
-                          {/* Arrow and scope toggle - expands to the right */}
-                          {!!adminFeedId && searchMode === 'podcast-search' && (
-                            <div className="flex items-center">
-                              <button
-                                type="button"
-                                onClick={toggleScopeSlideout}
-                                className="ml-1 p-1 text-gray-400 hover:text-white transition-colors"
-                                aria-label={showScopeSlideout ? 'Collapse scope selector' : 'Expand scope selector'}
-                              >
-                                {showScopeSlideout ? (
-                                  <ChevronLeft className="w-4 h-4" />
-                                ) : (
-                                  <ChevronRight className="w-4 h-4" />
-                                )}
-                              </button>
-                              
-                              <div className={`overflow-hidden transition-all duration-300 ${
-                                showScopeSlideout ? 'max-w-[180px] ml-1' : 'max-w-0 ml-0'
-                              }`}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    handlePodcastSearchModeChange(
-                                      podcastSearchMode === 'global' ? 'my-pod' : 'global'
-                                    );
-                                    if (scopeSlideoutTimeoutRef.current) {
-                                      clearTimeout(scopeSlideoutTimeoutRef.current);
-                                    }
-                                    setShowScopeSlideout(true);
-                                    scopeSlideoutTimeoutRef.current = setTimeout(() => {
-                                      setShowScopeSlideout(false);
-                                    }, 5000);
-                                  }}
-                                  className="inline-flex rounded-md border border-gray-700 bg-black/80 backdrop-blur-sm text-xs text-gray-200 whitespace-nowrap"
-                                  aria-label={
-                                    podcastSearchMode === 'global'
-                                      ? 'Switch to My Pod scope'
-                                      : 'Switch to All Pods scope'
-                                  }
-                                >
-                                  <div className="flex text-xs">
-                                    <div
-                                      className={`flex items-center px-2 py-1 transition-colors duration-200 ${
-                                        podcastSearchMode === 'global'
-                                          ? 'bg-white text-black'
-                                          : 'bg-black text-gray-400'
-                                      }`}
-                                    >
-                                      <span className="mr-1">🌐</span>
-                                      <span>All Pods</span>
-                                    </div>
-                                    <div
-                                      className={`flex items-center px-2 py-1 transition-colors duration-200 ${
-                                        podcastSearchMode === 'my-pod'
-                                          ? 'bg-white text-black'
-                                          : 'bg-black text-gray-400'
-                                      }`}
-                                    >
-                                      <span className="mr-1">👤</span>
-                                      <span>My Pod</span>
-                                    </div>
-                                  </div>
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                          {/* Arrow toggle button */}
+                          <button
+                            type="button"
+                            onClick={toggleScopeSlideout}
+                            className="w-8 h-6 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                            aria-label={showScopeSlideout ? 'Collapse scope selector' : 'Expand scope selector'}
+                          >
+                            {showScopeSlideout ? (
+                              <ChevronDown className="w-4 h-4" />
+                            ) : (
+                              <ChevronUp className="w-4 h-4" />
+                            )}
+                          </button>
                         </div>
+                      )}
+
+                      {/* Filter button */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={podcastSearchMode === 'my-pod' ? undefined : handleFilterClick}
+                          disabled={podcastSearchMode === 'my-pod'}
+                          className={`w-12 h-12 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
+                            podcastSearchMode === 'my-pod'
+                              ? 'bg-black/30 border-gray-800 text-gray-600 cursor-not-allowed'
+                              : 'bg-black/50 backdrop-blur-sm hover:bg-black/70 border-gray-700 text-white'
+                          }`}
+                          aria-label="Filter"
+                          aria-disabled={podcastSearchMode === 'my-pod'}
+                        >
+                          <Filter className="w-5 h-5" />
+                        </button>
+                        
+                        {/* Reset filters badge */}
+                        {podcastSearchMode === 'global' && hasActiveFilters() && (
+                          <button
+                            type="button"
+                            onClick={handleResetFilters}
+                            className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors shadow-lg z-10"
+                            aria-label="Reset Filters"
+                          >
+                            <XIcon className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
 
-                      {/* Row 2: Search button */}
+                      {/* Search button */}
                       <button
                         type="submit"
                         className="w-12 h-12 bg-white rounded-full hover:bg-gray-100 transition-colors flex items-center justify-center"
@@ -2107,109 +2105,107 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               />
 
               {/* Button column - fixed width */}
-              <div className="flex flex-col gap-2">
-                {/* Row 1: Filter with slideout scope indicator */}
-                <div className="flex items-center">
-                  <div className="flex items-center">
-                    <div className="relative">
+              <div className="flex flex-col gap-2 relative">
+                {/* Floating scope switch and arrow - above the grid */}
+                {!!adminFeedId && searchMode === 'podcast-search' && (
+                  <div className="absolute bottom-full mb-2 right-0 flex flex-col items-end gap-1">
+                    {/* Scope switch with slide animation */}
+                    <div className={`overflow-hidden transition-all duration-300 ${
+                      showScopeSlideout ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+                    }`}>
                       <button
                         type="button"
-                        onClick={podcastSearchMode === 'my-pod' ? undefined : handleFilterClick}
-                        disabled={podcastSearchMode === 'my-pod'}
-                        className={`p-3 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
-                          podcastSearchMode === 'my-pod'
-                            ? 'bg-black/30 border-gray-800 text-gray-600 cursor-not-allowed'
-                            : 'bg-black/50 backdrop-blur-sm hover:bg-black/70 border-gray-700 text-white'
-                        }`}
-                        aria-label="Filter"
-                        aria-disabled={podcastSearchMode === 'my-pod'}
+                        onClick={() => {
+                          handlePodcastSearchModeChange(
+                            podcastSearchMode === 'global' ? 'my-pod' : 'global'
+                          );
+                          if (scopeSlideoutTimeoutRef.current) {
+                            clearTimeout(scopeSlideoutTimeoutRef.current);
+                          }
+                          setShowScopeSlideout(true);
+                          scopeSlideoutTimeoutRef.current = setTimeout(() => {
+                            setShowScopeSlideout(false);
+                          }, 5000);
+                        }}
+                        className="inline-flex rounded-md border border-gray-700 bg-black/80 backdrop-blur-sm text-xs text-gray-200 whitespace-nowrap mb-1"
+                        aria-label={
+                          podcastSearchMode === 'global'
+                            ? 'Switch to My Pod scope'
+                            : 'Switch to All Pods scope'
+                        }
                       >
-                        <Filter className="w-5 h-5" />
+                        <div className="flex text-xs">
+                          <div
+                            className={`flex items-center px-2 py-1 transition-colors duration-200 ${
+                              podcastSearchMode === 'global'
+                                ? 'bg-white text-black'
+                                : 'bg-black text-gray-400'
+                            }`}
+                          >
+                            <span className="mr-1">🌐</span>
+                            <span>All Pods</span>
+                          </div>
+                          <div
+                            className={`flex items-center px-2 py-1 transition-colors duration-200 ${
+                              podcastSearchMode === 'my-pod'
+                                ? 'bg-white text-black'
+                                : 'bg-black text-gray-400'
+                            }`}
+                          >
+                            <span className="mr-1">👤</span>
+                            <span>My Pod</span>
+                          </div>
+                        </div>
                       </button>
-                      
-                      {/* Reset filters badge */}
-                      {podcastSearchMode === 'global' && hasActiveFilters() && (
-                        <button
-                          type="button"
-                          onClick={handleResetFilters}
-                          className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors shadow-lg z-10"
-                          aria-label="Reset Filters"
-                        >
-                          <XIcon className="w-3 h-3" />
-                        </button>
-                      )}
                     </div>
 
-                    {/* Arrow and scope toggle - expands to the right */}
-                    {!!adminFeedId && searchMode === 'podcast-search' && (
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={toggleScopeSlideout}
-                          className="ml-1 p-1 text-gray-400 hover:text-white transition-colors"
-                          aria-label={showScopeSlideout ? 'Collapse scope selector' : 'Expand scope selector'}
-                        >
-                          {showScopeSlideout ? (
-                            <ChevronLeft className="w-4 h-4" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4" />
-                          )}
-                        </button>
-                        
-                        <div className={`overflow-hidden transition-all duration-300 ${
-                          showScopeSlideout ? 'max-w-[180px] ml-1' : 'max-w-0 ml-0'
-                        }`}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handlePodcastSearchModeChange(
-                                podcastSearchMode === 'global' ? 'my-pod' : 'global'
-                              );
-                              if (scopeSlideoutTimeoutRef.current) {
-                                clearTimeout(scopeSlideoutTimeoutRef.current);
-                              }
-                              setShowScopeSlideout(true);
-                              scopeSlideoutTimeoutRef.current = setTimeout(() => {
-                                setShowScopeSlideout(false);
-                              }, 5000);
-                            }}
-                            className="inline-flex rounded-md border border-gray-700 bg-black/80 backdrop-blur-sm text-xs text-gray-200 whitespace-nowrap"
-                            aria-label={
-                              podcastSearchMode === 'global'
-                                ? 'Switch to My Pod scope'
-                                : 'Switch to All Pods scope'
-                            }
-                          >
-                            <div className="flex text-xs">
-                              <div
-                                className={`flex items-center px-2 py-1 transition-colors duration-200 ${
-                                  podcastSearchMode === 'global'
-                                    ? 'bg-white text-black'
-                                    : 'bg-black text-gray-400'
-                                }`}
-                              >
-                                <span className="mr-1">🌐</span>
-                                <span>All Pods</span>
-                              </div>
-                              <div
-                                className={`flex items-center px-2 py-1 transition-colors duration-200 ${
-                                  podcastSearchMode === 'my-pod'
-                                    ? 'bg-white text-black'
-                                    : 'bg-black text-gray-400'
-                                }`}
-                              >
-                                <span className="mr-1">👤</span>
-                                <span>My Pod</span>
-                              </div>
-                            </div>
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    {/* Arrow toggle button */}
+                    <button
+                      type="button"
+                      onClick={toggleScopeSlideout}
+                      className="w-8 h-6 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                      aria-label={showScopeSlideout ? 'Collapse scope selector' : 'Expand scope selector'}
+                    >
+                      {showScopeSlideout ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronUp className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
+                )}
+
+                {/* Filter button */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={podcastSearchMode === 'my-pod' ? undefined : handleFilterClick}
+                    disabled={podcastSearchMode === 'my-pod'}
+                    className={`w-12 h-12 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
+                      podcastSearchMode === 'my-pod'
+                        ? 'bg-black/30 border-gray-800 text-gray-600 cursor-not-allowed'
+                        : 'bg-black/50 backdrop-blur-sm hover:bg-black/70 border-gray-700 text-white'
+                    }`}
+                    aria-label="Filter"
+                    aria-disabled={podcastSearchMode === 'my-pod'}
+                  >
+                    <Filter className="w-5 h-5" />
+                  </button>
+                  
+                  {/* Reset filters badge */}
+                  {podcastSearchMode === 'global' && hasActiveFilters() && (
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors shadow-lg z-10"
+                      aria-label="Reset Filters"
+                    >
+                      <XIcon className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
 
-                {/* Row 2: Search button */}
+                {/* Search button */}
                 <button
                   type="submit"
                   className="w-12 h-12 bg-white rounded-full hover:bg-gray-100 transition-colors flex items-center justify-center"
