@@ -2427,7 +2427,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
       {/* Floating Search Bar */}
       {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
-        <div className="fixed sm:bottom-12 bottom-1 z-40 flex justify-center px-4 sm:px-24" style={{
+        <div className="fixed sm:bottom-4 bottom-1 z-40 flex justify-center px-4 sm:px-24" style={{
           left: '0',
           right: searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isContextPanelOpen
             ? `${contextPanelWidth}px`
