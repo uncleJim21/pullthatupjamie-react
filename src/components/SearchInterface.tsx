@@ -1844,7 +1844,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             <div className="flex justify-start md:block mb-4 md:mb-0">
               <button 
                 onClick={() => window.location.href = `/app/feed/${feedId}/jamieProHistory`} 
-                className="md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2 h-12 w-12 flex items-center justify-center bg-transparent text-white hover:text-gray-300 focus:outline-none z-10 ml-4 md:ml-0"
+                className="md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2 h-10 w-10 flex items-center justify-center bg-transparent text-white hover:text-gray-300 focus:outline-none z-10 ml-4 md:ml-0"
                 style={{
                   color: '#C0C0C0',
                   textShadow: '0 0 8px #C0C0C0',
@@ -1958,7 +1958,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                         onShareClick={handleClipShare}
                       />
                     </div>
-                    <div className="w-12"></div>
+                    <div className="w-10"></div>
                   </div>
                 )}
                 <form onSubmit={handleSearch}>
@@ -2065,7 +2065,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                           type="button"
                           onClick={podcastSearchMode === 'my-pod' ? undefined : handleFilterClick}
                           disabled={podcastSearchMode === 'my-pod'}
-                          className={`w-12 h-12 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
+                          className={`w-10 h-10 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
                             podcastSearchMode === 'my-pod'
                               ? 'bg-black/30 border-gray-800 text-gray-600 cursor-not-allowed'
                               : 'bg-black/50 backdrop-blur-sm hover:bg-black/70 border-gray-700 text-white'
@@ -2073,7 +2073,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                           aria-label="Filter"
                           aria-disabled={podcastSearchMode === 'my-pod'}
                         >
-                          <Filter className="w-5 h-5" />
+                          <Filter className="w-4 h-4" />
                         </button>
                         
                         {/* Reset filters badge */}
@@ -2092,14 +2092,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                       {/* Search button */}
                       <button
                         type="submit"
-                        className="w-12 h-12 bg-white rounded-full hover:bg-gray-100 transition-colors flex items-center justify-center"
+                        className="w-10 h-10 bg-white rounded-full hover:bg-gray-100 transition-colors flex items-center justify-center"
                         disabled={searchState.isLoading}
                       >
                         {searchState.isLoading ? (
                           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
                         ) : (
                           <svg
-                            className="w-5 h-5 text-black"
+                            className="w-4 h-4 text-black"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -2445,7 +2445,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     onShareClick={handleClipShare}
                   />
                 </div>
-                <div className="w-12"></div>
+                <div className="w-10"></div>
               </div>
             )}
             <form onSubmit={handleSearch}>
@@ -2548,7 +2548,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     type="button"
                     onClick={podcastSearchMode === 'my-pod' ? undefined : handleFilterClick}
                     disabled={podcastSearchMode === 'my-pod'}
-                    className={`w-12 h-12 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
+                    className={`w-10 h-10 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
                       podcastSearchMode === 'my-pod'
                         ? 'bg-black/30 border-gray-800 text-gray-600 cursor-not-allowed'
                         : 'bg-black/50 backdrop-blur-sm hover:bg-black/70 border-gray-700 text-white'
@@ -2556,7 +2556,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     aria-label="Filter"
                     aria-disabled={podcastSearchMode === 'my-pod'}
                   >
-                    <Filter className="w-5 h-5" />
+                    <Filter className="w-4 h-4" />
                   </button>
                   
                   {/* Reset filters badge */}
@@ -2575,14 +2575,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 {/* Search button */}
                 <button
                   type="submit"
-                  className="w-12 h-12 bg-white rounded-full hover:bg-gray-100 transition-colors flex items-center justify-center"
+                  className="w-10 h-10 bg-white rounded-full hover:bg-gray-100 transition-colors flex items-center justify-center"
                   disabled={searchState.isLoading}
                 >
                   {searchState.isLoading ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
                   ) : (
                     <svg
-                      className="w-5 h-5 text-black"
+                      className="w-4 h-4 text-black"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
