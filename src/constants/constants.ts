@@ -1,4 +1,4 @@
-export const DEBUG_MODE = false;
+export const DEBUG_MODE = true;
 
 // More explicit approach to determine FRONTEND_URL
 export const FRONTEND_URL = (() => {
@@ -58,3 +58,20 @@ export enum AIClipsViewStyle {
   GRID = 'grid',
   LIST = 'list'
 }
+
+export enum SearchViewStyle {
+  CLASSIC = 'classic',
+  SPLIT_SCREEN = 'split-screen'
+}
+
+export enum SearchResultViewStyle {
+  LIST = 'list',
+  GALAXY = 'galaxy'
+}
+
+export const HIERARCHY_COLORS = {
+  FEED: '#3b82f6',      // blue-500 - top level
+  EPISODE: '#8b5cf6',   // violet-500 - episode level
+  CHAPTER: '#ec4899',   // pink-500 - chapter level  
+  ALL_PODS: '#10b981'   // emerald-500 - all pods scope
+};

@@ -205,7 +205,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Result view style state (List vs Galaxy)
   const [resultViewStyle, setResultViewStyle] = useState<SearchResultViewStyle>(() => {
     const saved = localStorage.getItem('searchResultViewStyle');
-    return saved === SearchResultViewStyle.GALAXY ? SearchResultViewStyle.GALAXY : SearchResultViewStyle.LIST;
+    return saved === SearchResultViewStyle.LIST ? SearchResultViewStyle.LIST : SearchResultViewStyle.GALAXY;
   });
   
   // 3D search results state
@@ -293,6 +293,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [searchParams] = useSearchParams();
   const modeParam = searchParams.get('mode');
   const queryParam = searchParams.get('q');
+  const isWebSearchDeprecated = modeParam === 'web-search';
   
   const [searchMode, setSearchMode] = useState(
     // Only use the modeParam if it's a valid SearchMode
@@ -1609,6 +1610,25 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           isUserSignedIn={isUserSignedIn}
           setIsUserSignedIn={setIsUserSignedIn}
         />
+
+        {/* Web Search Deprecation Banner */}
+        {isWebSearchDeprecated && (
+          <div className="max-w-3xl mx-auto px-4 mt-4">
+            <div className="bg-yellow-900/40 border border-yellow-700 rounded-lg p-4 text-sm text-yellow-100">
+              <p className="font-semibold mb-1">
+                Web search is no longer available in Jamie.
+              </p>
+              <p className="text-xs sm:text-sm text-gray-200">
+                Podcast search is still fully supported below. If you previously relied on Jamie for web search or need help,
+                you can reach out at{' '}
+                <span className="blur-[2px] hover:blur-none cursor-help">
+                  jim at cascdr dot xyz
+                </span>
+                .
+              </p>
+            </div>
+          </div>
+        )}
         
         {/* Add the PodcastSourceFilterModal component */}
         <PodcastSourceFilterModal 
@@ -1878,20 +1898,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           </div>
         )}
         */}
-
-        {hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (searchState.isLoading === false) && !isClipBatchPage && resultViewStyle !== SearchResultViewStyle.GALAXY && (
-          <div>
-
-            <AvailableSourcesSection 
-              hasSearched={hasSearchedInMode(searchMode)} 
-              selectedSources={selectedSources} 
-              setSelectedSources={setSelectedSources} 
-              isSendingFeedback={isSendingFeedback}
-              setIsSendingFeedback={setIsSendingFeedback}
-              sizeOverride={'24'}
-            /> 
-          </div>
-          )}
 
         {/* Initial Search Form */}
         <div className="max-w-3xl mx-auto px-4">

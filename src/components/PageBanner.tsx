@@ -336,7 +336,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
                   onClick={(e) => {
                     e.preventDefault();
                     // Check if we need to reload by comparing URLs
-                    if (window.location.pathname === '/app' && !window.location.search.includes('mode=web-search')) {
+                    if (window.location.pathname === '/app') {
                       window.location.reload();
                     } else {
                       window.location.href = '/app';
@@ -345,23 +345,6 @@ const PageBanner: React.FC<PageBannerProps> = ({
                 >
                   <Headphones size={24} style={iconStyle} />
                   <span>Search Podcasts</span>
-                </a>
-                <a 
-                  href="/app/?mode=web-search"
-                  style={navLinkStyle}
-                  className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Check if we need to reload by comparing URLs
-                    if (window.location.pathname === '/app' && window.location.search.includes('mode=web-search')) {
-                      window.location.reload();
-                    } else {
-                      window.location.href = '/app/?mode=web-search';
-                    }
-                  }}
-                >
-                  <Search size={24} style={iconStyle} />
-                  <span>Search Web</span>
                 </a>
               </>
             )}
@@ -417,7 +400,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
                       setIsMenuOpen(false);
                       
                       // Check if we need to reload by comparing URLs
-                      if (window.location.pathname === '/app' && !window.location.search.includes('mode=web-search')) {
+                      if (window.location.pathname === '/app') {
                         window.location.reload();
                       } else {
                         window.location.href = '/app';
@@ -426,25 +409,6 @@ const PageBanner: React.FC<PageBannerProps> = ({
                   >
                     <Headphones size={24} style={iconStyle} />
                     <span>Search Podcasts</span>
-                  </a>
-                  <a 
-                    href="/app/?mode=web-search"
-                    style={{ ...navLinkStyle, padding: '8px 12px' }}
-                    className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setIsMenuOpen(false);
-                      
-                      // Check if we need to reload by comparing URLs
-                      if (window.location.pathname === '/app' && window.location.search.includes('mode=web-search')) {
-                        window.location.reload();
-                      } else {
-                        window.location.href = '/app/?mode=web-search';
-                      }
-                    }}
-                  >
-                    <Search size={24} style={iconStyle} />
-                    <span>Search Web</span>
                   </a>
                 </>
               )}
