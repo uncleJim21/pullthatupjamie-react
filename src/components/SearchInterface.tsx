@@ -18,7 +18,7 @@ import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter, List, Grid3X3, X as XIcon } from 'lucide-react';
+import { Filter, List, Grid3X3, X as XIcon, ChevronRight, ChevronLeft } from 'lucide-react';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
 import PageBanner from './PageBanner.tsx';
@@ -463,16 +463,20 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }, 1500);
   };
 
-  const triggerScopeSlideout = () => {
-    setShowScopeSlideout(true);
+  const toggleScopeSlideout = () => {
+    const newState = !showScopeSlideout;
+    setShowScopeSlideout(newState);
     
     if (scopeSlideoutTimeoutRef.current) {
       clearTimeout(scopeSlideoutTimeoutRef.current);
     }
 
-    scopeSlideoutTimeoutRef.current = setTimeout(() => {
-      setShowScopeSlideout(false);
-    }, 5000);
+    // Only set timeout if we're opening (not closing)
+    if (newState) {
+      scopeSlideoutTimeoutRef.current = setTimeout(() => {
+        setShowScopeSlideout(false);
+      }, 5000);
+    }
   };
 
   const handleClipProgress = async (progress: ClipProgress) => {
@@ -1753,7 +1757,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   <button
                     type="button"
                     onClick={podcastSearchMode === 'my-pod' ? undefined : handleFilterClick}
-                    onMouseEnter={!!adminFeedId && searchMode === 'podcast-search' ? triggerScopeSlideout : undefined}
                     disabled={podcastSearchMode === 'my-pod'}
                     className={`p-3 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
                       podcastSearchMode === 'my-pod'
@@ -1778,17 +1781,22 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     </button>
                   )}
 
-                  {/* Animated arrow and slideout scope indicator */}
+                  {/* Arrow toggle and slideout scope indicator */}
                   {!!adminFeedId && searchMode === 'podcast-search' && (
                     <div className="flex items-center">
-                      {/* Arrow indicator */}
-                      <div
-                        className={`transition-all duration-300 ${
-                          showScopeSlideout ? 'opacity-100 ml-1' : 'opacity-0 ml-0 w-0'
-                        }`}
+                      {/* Clickable Arrow indicator */}
+                      <button
+                        type="button"
+                        onClick={toggleScopeSlideout}
+                        className="ml-1 p-1 text-gray-400 hover:text-white transition-colors"
+                        aria-label={showScopeSlideout ? 'Collapse scope selector' : 'Expand scope selector'}
                       >
-                        <span className="text-gray-400">→</span>
-                      </div>
+                        {showScopeSlideout ? (
+                          <ChevronLeft className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </button>
                       
                       {/* Slideout scope toggle */}
                       <button
@@ -1797,7 +1805,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                           handlePodcastSearchModeChange(
                             podcastSearchMode === 'global' ? 'my-pod' : 'global'
                           );
-                          triggerScopeSlideout();
+                          // Keep it open after switching
+                          if (scopeSlideoutTimeoutRef.current) {
+                            clearTimeout(scopeSlideoutTimeoutRef.current);
+                          }
+                          setShowScopeSlideout(true);
+                          scopeSlideoutTimeoutRef.current = setTimeout(() => {
+                            setShowScopeSlideout(false);
+                          }, 5000);
                         }}
                         className={`relative inline-flex rounded-md border border-gray-700 bg-black/80 backdrop-blur-sm text-xs text-gray-200 overflow-hidden transition-all duration-300 ${
                           showScopeSlideout 
@@ -2103,7 +2118,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   <button
                     type="button"
                     onClick={podcastSearchMode === 'my-pod' ? undefined : handleFilterClick}
-                    onMouseEnter={!!adminFeedId && searchMode === 'podcast-search' ? triggerScopeSlideout : undefined}
                     disabled={podcastSearchMode === 'my-pod'}
                     className={`p-3 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
                       podcastSearchMode === 'my-pod'
@@ -2128,17 +2142,22 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     </button>
                   )}
 
-                  {/* Animated arrow and slideout scope indicator */}
+                  {/* Arrow toggle and slideout scope indicator */}
                   {!!adminFeedId && searchMode === 'podcast-search' && (
                     <div className="flex items-center">
-                      {/* Arrow indicator */}
-                      <div
-                        className={`transition-all duration-300 ${
-                          showScopeSlideout ? 'opacity-100 ml-1' : 'opacity-0 ml-0 w-0'
-                        }`}
+                      {/* Clickable Arrow indicator */}
+                      <button
+                        type="button"
+                        onClick={toggleScopeSlideout}
+                        className="ml-1 p-1 text-gray-400 hover:text-white transition-colors"
+                        aria-label={showScopeSlideout ? 'Collapse scope selector' : 'Expand scope selector'}
                       >
-                        <span className="text-gray-400">→</span>
-                      </div>
+                        {showScopeSlideout ? (
+                          <ChevronLeft className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </button>
                       
                       {/* Slideout scope toggle */}
                       <button
@@ -2147,7 +2166,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                           handlePodcastSearchModeChange(
                             podcastSearchMode === 'global' ? 'my-pod' : 'global'
                           );
-                          triggerScopeSlideout();
+                          // Keep it open after switching
+                          if (scopeSlideoutTimeoutRef.current) {
+                            clearTimeout(scopeSlideoutTimeoutRef.current);
+                          }
+                          setShowScopeSlideout(true);
+                          scopeSlideoutTimeoutRef.current = setTimeout(() => {
+                            setShowScopeSlideout(false);
+                          }, 5000);
                         }}
                         className={`relative inline-flex rounded-md border border-gray-700 bg-black/80 backdrop-blur-sm text-xs text-gray-200 overflow-hidden transition-all duration-300 ${
                           showScopeSlideout 
