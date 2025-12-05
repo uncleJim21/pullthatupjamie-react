@@ -70,6 +70,7 @@ export enum SearchResultViewStyle {
 }
 
 export const HIERARCHY_COLORS = {
+  PARAGRAPH: '#10b981',
   FEED: '#3b82f6',      // blue-500 - top level
   EPISODE: '#8b5cf6',   // violet-500 - episode level
   CHAPTER: '#ec4899',   // pink-500 - chapter level  

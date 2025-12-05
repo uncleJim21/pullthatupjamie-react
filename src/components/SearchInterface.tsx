@@ -2599,14 +2599,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             hasSearchedInMode('podcast-search') ? 'bottom-24' : 'bottom-0'
           }`}
         >
-          <ClipTrackerModal
-            clipProgress={clipProgress}
-            hasSearched={hasSearchedInMode('podcast-search')}
-            isCollapsed={isClipTrackerCollapsed}
-            onCollapsedChange={setIsClipTrackerCollapsed}
-            auth={authConfig || undefined}
-            onShareClick={handleClipShare}
-          />
         </div>
       )}
       {searchMode === 'web-search' && (
