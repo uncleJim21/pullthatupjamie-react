@@ -5,7 +5,6 @@ import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef} from 'react';
-import { ModelSettingsBar } from './ModelSettingsBar.tsx';
 import { RegisterModal } from './RegisterModal.tsx';
 import {SignInModal} from './SignInModal.tsx'
 import LightningService from '../services/lightning.ts'
@@ -33,7 +32,6 @@ import ImageWithLoader from './ImageWithLoader.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
-type ModelType = 'gpt-3.5-turbo' | 'claude-3-sonnet';
 let buffer = '';
 
 interface Source {
@@ -186,7 +184,6 @@ interface PodcastStats {
 
 export default function SearchInterface({ isSharePage = false, isClipBatchPage = false }: SearchInterfaceProps) {  
   const [query, setQuery] = useState('');
-  const [model, setModel] = useState('claude-3-sonnet' as ModelType);
   
   // Update state for filter button
   const [filterClicked, setFilterClicked] = useState(false);
@@ -258,11 +255,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const isWebSearchDeprecated = modeParam === 'web-search';
   
   // Force the interface into podcast-search mode even if modeParam=web-search
-  const [searchMode, setSearchMode] = useState<SearchMode>('podcast-search');
+  const [searchMode] = useState<SearchMode>('podcast-search');
   
   // Add state for admin privileges and toggle
   const [adminFeedId, setAdminFeedId] = useState<string | null>(null);
   const [podcastSearchMode, setPodcastSearchMode] = useState<'global' | 'my-pod'>('global');
+  const [showPodcastModeLabel, setShowPodcastModeLabel] = useState(false);
+  const [podcastModeLabelText, setPodcastModeLabelText] = useState('');
+  const [showScopeSlideout, setShowScopeSlideout] = useState(false);
   
   // Add state for clipBatch view mode with localStorage persistence
   const [clipBatchViewMode, setClipBatchViewMode] = useState<AIClipsViewStyle>(() => {
@@ -353,8 +353,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const resultTextRef = useRef('');
   const eventSourceRef = useRef<EventSource | null>(null);
   const nextConversationId = useRef(0);
-  const searchSettingsBarStyle = "bg-[#000000] border-gray-800 border shadow-white-glow rounded-lg mt-2 pt-2 pb-1 max-w-3xl pr-1 mx-auto px-4 flex items-center justify-between relative"
-  const searchButtonStyle = "ml-auto mt-1 mr-1 pl-3 pr-3 bg-white rounded-lg pt-1 pb-1 border-gray-800 hover:border-gray-700"
+  const podcastModeLabelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const scopeSlideoutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   //Lightning related
   const [isLightningInitialized, setIsLightningInitialized] = useState(false);
@@ -447,6 +447,33 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     setIsRegisterModalOpen(false);
     setIsSignInModalOpen(true);
   }
+
+  const handlePodcastSearchModeChange = (mode: 'global' | 'my-pod') => {
+    setPodcastSearchMode(mode);
+    const label = mode === 'global' ? 'All Pods' : 'My Pod';
+    setPodcastModeLabelText(label);
+    setShowPodcastModeLabel(true);
+
+    if (podcastModeLabelTimeoutRef.current) {
+      clearTimeout(podcastModeLabelTimeoutRef.current);
+    }
+
+    podcastModeLabelTimeoutRef.current = setTimeout(() => {
+      setShowPodcastModeLabel(false);
+    }, 1500);
+  };
+
+  const triggerScopeSlideout = () => {
+    setShowScopeSlideout(true);
+    
+    if (scopeSlideoutTimeoutRef.current) {
+      clearTimeout(scopeSlideoutTimeoutRef.current);
+    }
+
+    scopeSlideoutTimeoutRef.current = setTimeout(() => {
+      setShowScopeSlideout(false);
+    }, 5000);
+  };
 
   const handleClipProgress = async (progress: ClipProgress) => {
       if (!progress || !progress.clipId || !progress.lookupHash) return;
@@ -877,6 +904,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     updateAuthMethodAndRegisterModalStatus();    
   }, []);
 
+  // Cleanup for podcast mode label timeout
+  useEffect(() => {
+    return () => {
+      if (podcastModeLabelTimeoutRef.current) {
+        clearTimeout(podcastModeLabelTimeoutRef.current);
+      }
+      if (scopeSlideoutTimeoutRef.current) {
+        clearTimeout(scopeSlideoutTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Add useEffect for checking admin privileges when user signs in
   useEffect(() => {
     if (isUserSignedIn) {
@@ -1004,10 +1043,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     return () => {
     };
   }, []);
-
-  useEffect(() => {
-    printLog(`model:${model}`)
-  }, [model]);
 
   // Auto-search when 'q' parameter is present in URL (e.g., from TryJamieWizard)
   useEffect(() => {
@@ -1688,116 +1723,126 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           </div>
           )}
 
-        {/* Initial Search Form */}
-        <div className="max-w-3xl mx-auto px-4">
-          {!hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && (
-            <div>
-              <form onSubmit={handleSearch} className="relative">
-            {/* Filter button and toggle - desktop version (outside search bar) */}
-            {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
-              <div className="absolute -right-14 top-0 z-10 hidden md:block">
-                <div className="relative">
+        {/* Initial Search Form - only show before first search */}
+        {!hasSearchedInMode(searchMode) && (
+          <div className="max-w-3xl mx-auto px-4">
+            {(searchMode === 'web-search' || searchMode === 'podcast-search') && (
+              <div>
+                <form onSubmit={handleSearch} className="relative">
+            <textarea
+            ref={searchInputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `Search the web privately with LLM summary`}
+            className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-10 md:pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
+            // disabled={searchMode !== "web-search"}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSearch(e);
+              }
+            }}
+            />
+
+            {/* Filter row + search button row */}
+            <div className="absolute right-4 top-2 z-10 flex flex-col space-y-2 md:-right-12 md:top-0">
+              {/* Row 1: Filter with slideout scope indicator */}
+              <div className="flex items-center justify-end md:justify-start">
+                {/* Filter button with arrow and slideout scope */}
+                <div className="relative flex items-center">
                   <button
-                    onClick={handleFilterClick}
-                    className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
+                    type="button"
+                    onClick={podcastSearchMode === 'my-pod' ? undefined : handleFilterClick}
+                    onMouseEnter={!!adminFeedId && searchMode === 'podcast-search' ? triggerScopeSlideout : undefined}
+                    disabled={podcastSearchMode === 'my-pod'}
+                    className={`p-3 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
+                      podcastSearchMode === 'my-pod'
+                        ? 'bg-black/30 border-gray-800 text-gray-600 cursor-not-allowed'
+                        : 'bg-black/50 backdrop-blur-sm hover:bg-black/70 border-gray-700 text-white'
+                    }`}
                     aria-label="Filter"
+                    aria-disabled={podcastSearchMode === 'my-pod'}
                   >
                     <Filter className="w-5 h-5" />
                   </button>
-                  {hasActiveFilters() && (
+                  
+                  {/* Reset filters badge */}
+                  {podcastSearchMode === 'global' && hasActiveFilters() && (
                     <button
+                      type="button"
                       onClick={handleResetFilters}
-                      className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors shadow-lg"
+                      className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors shadow-lg z-10"
                       aria-label="Reset Filters"
                     >
                       <XIcon className="w-3 h-3" />
                     </button>
                   )}
-                </div>
-              </div>
-            )}
-            {/* Filter button - mobile version (inside search bar) */}
-            {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
-              <div className="absolute right-2 top-2 z-10 md:hidden">
-                <div className="relative">
-                  <button
-                    onClick={handleFilterClick}
-                    className="flex items-center justify-center text-white hover:text-gray-300 transition-colors"
-                    aria-label="Filter"
-                  >
-                    <Filter className="w-5 h-5" />
-                  </button>
-                  {hasActiveFilters() && (
-                    <button
-                      onClick={handleResetFilters}
-                      className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors"
-                      aria-label="Reset Filters"
-                    >
-                      <XIcon className="w-2.5 h-2.5" />
-                    </button>
+
+                  {/* Animated arrow and slideout scope indicator */}
+                  {!!adminFeedId && searchMode === 'podcast-search' && (
+                    <div className="flex items-center">
+                      {/* Arrow indicator */}
+                      <div
+                        className={`transition-all duration-300 ${
+                          showScopeSlideout ? 'opacity-100 ml-1' : 'opacity-0 ml-0 w-0'
+                        }`}
+                      >
+                        <span className="text-gray-400">→</span>
+                      </div>
+                      
+                      {/* Slideout scope toggle */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handlePodcastSearchModeChange(
+                            podcastSearchMode === 'global' ? 'my-pod' : 'global'
+                          );
+                          triggerScopeSlideout();
+                        }}
+                        className={`relative inline-flex rounded-md border border-gray-700 bg-black/80 backdrop-blur-sm text-xs text-gray-200 overflow-hidden transition-all duration-300 ${
+                          showScopeSlideout 
+                            ? 'max-w-[120px] opacity-100 ml-1' 
+                            : 'max-w-0 opacity-0 ml-0'
+                        }`}
+                        aria-label={
+                          podcastSearchMode === 'global'
+                            ? 'Switch to My Pod scope'
+                            : 'Switch to All Pods scope'
+                        }
+                      >
+                        <div className="flex text-xs whitespace-nowrap">
+                          {/* All Pods segment */}
+                          <div
+                            className={`flex items-center px-2 py-1 transition-colors duration-200 ${
+                              podcastSearchMode === 'global'
+                                ? 'bg-white text-black'
+                                : 'bg-black text-gray-400'
+                            }`}
+                          >
+                            <span className="mr-1">🌐</span>
+                            <span>All</span>
+                          </div>
+
+                          {/* My Pod segment */}
+                          <div
+                            className={`flex items-center px-2 py-1 transition-colors duration-200 ${
+                              podcastSearchMode === 'my-pod'
+                                ? 'bg-white text-black'
+                                : 'bg-black text-gray-400'
+                            }`}
+                          >
+                            <span className="mr-1">👤</span>
+                            <span>My</span>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
-            )}
-            <textarea
-              ref={searchInputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `Search the web privately with LLM summary`}
-              className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 pl-4 pr-10 md:pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-              // disabled={searchMode !== "web-search"}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSearch(e);
-                }
-              }}
-            />
-            <div className={searchSettingsBarStyle}>
-              {/* Left side - Empty space */}
-              <div className="flex-shrink-0">
-                <div className="w-0" />
-              </div>
-              
-              {/* Right side - Toggle, Settings, and Search Button */}
-              <div className="flex items-center space-x-2">
-                {/* Podcast Mode Toggle - first on the right */}
-                {!!adminFeedId && searchMode === 'podcast-search' && (
-                  <div className="flex-shrink-0">
-                    <div className="inline-flex rounded-md border border-gray-700 p-0.5 bg-transparent">
-                      <button
-                        type="button"
-                        className={`py-1 rounded-sm text-xs transition-all ${
-                          podcastSearchMode === 'global'
-                            ? 'bg-[#1A1A1A] text-white px-2'
-                            : 'text-gray-400 hover:text-white px-4'
-                        }`}
-                        onClick={() => setPodcastSearchMode('global')}
-                      >
-                        {podcastSearchMode === 'global' ? '🌐 All Pods' : '🌐'}
-                      </button>
-                      <button
-                        type="button"
-                        className={`py-1 rounded-sm text-xs transition-all ${
-                          podcastSearchMode === 'my-pod'
-                            ? 'bg-[#1A1A1A] text-white px-2'
-                            : 'text-gray-400 hover:text-white px-4'
-                        }`}
-                        onClick={() => setPodcastSearchMode('my-pod')}
-                      >
-                        {podcastSearchMode === 'my-pod' ? '👤 My Pod' : '👤'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                <ModelSettingsBar
-                  model={model}
-                  setModel={setModel}
-                  searchMode={searchMode}
-                  setSearchMode={setSearchMode}
-                />
-                
+
+              {/* Row 2: Search button */}
+              <div className="flex justify-end md:justify-start">
                 <button
                   type="submit"
                   className="pl-3 pr-3 bg-white rounded-lg py-1 border-gray-800 hover:border-gray-700 flex-shrink-0"
@@ -1824,38 +1869,37 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               </div>
             </div>
           </form>
-          
-
-          </div>
-          )}
-          {/* Stats display for podcast search mode */}
-          {!hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (
-            <div className="text-center mt-8 text-gray-300">
-              <p>Search from over <span className="font-bold">{podcastStats.clipCount.toLocaleString()}</span> podcast moments</p>
-            </div>
-          )}
-
-          {/* Suggested Queries */}
-          {!hasSearchedInMode(searchMode) && searchMode === 'web-search' && (
-            <div className="mt-24 mb-8">
-              <h3 className="text-gray-400 text-sm font-medium mb-4">Suggested</h3>
-              <div className="space-y-4">
-                {SUGGESTED_QUERIES.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    className="w-full text-left p-4 rounded-lg bg-[#111111] border border-gray-800 hover:border-gray-700 transition-colors"
-                  >
-                    <div className="font-medium">{suggestion.title}</div>
-                    <div className="text-sm text-gray-400">{suggestion.subtitle}</div>
-                  </button>
-                ))}
-              </div>
             </div>
           )}
         </div>
-        
-      </div>
+      )}
+
+      {/* Stats display for podcast search mode */}
+      {!hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (
+        <div className="text-center mt-8 text-gray-300">
+          <p>Search from over <span className="font-bold">{podcastStats.clipCount.toLocaleString()}</span> podcast moments</p>
+        </div>
+      )}
+
+      {/* Suggested Queries */}
+      {!hasSearchedInMode(searchMode) && searchMode === 'web-search' && (
+        <div className="mt-24 mb-8">
+          <h3 className="text-gray-400 text-sm font-medium mb-4">Suggested</h3>
+          <div className="space-y-4">
+            {SUGGESTED_QUERIES.map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => handleSuggestionClick(suggestion)}
+                className="w-full text-left p-4 rounded-lg bg-[#111111] border border-gray-800 hover:border-gray-700 transition-colors"
+              >
+                <div className="font-medium">{suggestion.title}</div>
+                <div className="text-sm text-gray-400">{suggestion.subtitle}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
 
 
       {/* Conversation History */}
@@ -2032,82 +2076,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         )
       )}
 
-      {searchMode === 'podcast-search' && !isAnyModalOpen() && (
-        <div
-          className={`fixed w-full z-50 transition-all duration-300 ${
-            hasSearchedInMode('podcast-search') ? 'bottom-24' : 'bottom-0'
-          }`}
-        >
-          <ClipTrackerModal
-            clipProgress={clipProgress}
-            hasSearched={hasSearchedInMode('podcast-search')}
-            isCollapsed={isClipTrackerCollapsed}
-            onCollapsedChange={setIsClipTrackerCollapsed}
-            auth={authConfig || undefined}
-            onShareClick={handleClipShare}
-          />
-        </div>
-      )}
-
-
-
       {/* Floating Search Bar */}
       {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
         <div className="fixed sm:bottom-12 bottom-1 left-1/2 transform -translate-x-1/2 w-full max-w-[40rem] px-4 sm:px-24 z-40">
           <form onSubmit={handleSearch} className="relative">
-            {/* Filter button and toggle - desktop version (outside search bar) */}
-            {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
-              <div className="absolute -right-14 top-0 z-10 hidden md:block">
-                <div className="relative">
-                  <button
-                    onClick={handleFilterClick}
-                    className="p-3 bg-black/50 backdrop-blur-sm hover:bg-black/70 rounded-full transition-colors duration-200 flex items-center justify-center text-white border border-gray-700 shadow-lg"
-                    aria-label="Filter"
-                  >
-                    <Filter className="w-5 h-5" />
-                  </button>
-                  {hasActiveFilters() && (
-                    <button
-                      onClick={handleResetFilters}
-                      className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors shadow-lg"
-                      aria-label="Reset Filters"
-                    >
-                      <XIcon className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-            {/* Filter button - mobile version (inside search bar) */}
-            {searchMode === 'podcast-search' && podcastSearchMode === 'global' && (
-              <div className="absolute right-2 top-2 z-10 md:hidden">
-                <div className="relative">
-                  <button
-                    onClick={handleFilterClick}
-                    className="flex items-center justify-center text-white hover:text-gray-300 transition-colors"
-                    aria-label="Filter"
-                  >
-                    <Filter className="w-5 h-5" />
-                  </button>
-                  {hasActiveFilters() && (
-                    <button
-                      onClick={handleResetFilters}
-                      className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors"
-                      aria-label="Reset Filters"
-                    >
-                      <XIcon className="w-2.5 h-2.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
             <textarea
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `Search the web privately with LLM summary`}
-              className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 pl-4 pr-32 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-              // disabled={searchMode === 'web-search'}
+              className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 pl-4 pr-10 md:pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -2115,52 +2093,106 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 }
               }}
             />
-            <div className={searchSettingsBarStyle}>
-              {/* Left side - Empty space */}
-              <div className="flex-shrink-0">
-                <div className="w-0" />
-              </div>
-              
-              {/* Right side - Toggle, Settings, and Search Button */}
-              <div className="flex items-center space-x-2">
-                {/* Podcast Mode Toggle - first on the right */}
-                {!!adminFeedId && searchMode === 'podcast-search' && (
-                  <div className="flex-shrink-0">
-                    <div className="inline-flex rounded-md border border-gray-700 p-0.5 bg-transparent">
+
+            {/* Filter row + search button row */}
+            <div className="absolute right-4 top-2 z-10 flex flex-col space-y-2 md:-right-12 md:top-0">
+              {/* Row 1: Filter with slideout scope indicator */}
+              <div className="flex items-center justify-end md:justify-start">
+                {/* Filter button with arrow and slideout scope */}
+                <div className="relative flex items-center">
+                  <button
+                    type="button"
+                    onClick={podcastSearchMode === 'my-pod' ? undefined : handleFilterClick}
+                    onMouseEnter={!!adminFeedId && searchMode === 'podcast-search' ? triggerScopeSlideout : undefined}
+                    disabled={podcastSearchMode === 'my-pod'}
+                    className={`p-3 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
+                      podcastSearchMode === 'my-pod'
+                        ? 'bg-black/30 border-gray-800 text-gray-600 cursor-not-allowed'
+                        : 'bg-black/50 backdrop-blur-sm hover:bg-black/70 border-gray-700 text-white'
+                    }`}
+                    aria-label="Filter"
+                    aria-disabled={podcastSearchMode === 'my-pod'}
+                  >
+                    <Filter className="w-5 h-5" />
+                  </button>
+                  
+                  {/* Reset filters badge */}
+                  {podcastSearchMode === 'global' && hasActiveFilters() && (
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="absolute -top-1 -right-1 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-0.5 transition-colors shadow-lg z-10"
+                      aria-label="Reset Filters"
+                    >
+                      <XIcon className="w-3 h-3" />
+                    </button>
+                  )}
+
+                  {/* Animated arrow and slideout scope indicator */}
+                  {!!adminFeedId && searchMode === 'podcast-search' && (
+                    <div className="flex items-center">
+                      {/* Arrow indicator */}
+                      <div
+                        className={`transition-all duration-300 ${
+                          showScopeSlideout ? 'opacity-100 ml-1' : 'opacity-0 ml-0 w-0'
+                        }`}
+                      >
+                        <span className="text-gray-400">→</span>
+                      </div>
+                      
+                      {/* Slideout scope toggle */}
                       <button
                         type="button"
-                        className={`px-2 py-1 rounded-sm text-xs transition-all ${
+                        onClick={() => {
+                          handlePodcastSearchModeChange(
+                            podcastSearchMode === 'global' ? 'my-pod' : 'global'
+                          );
+                          triggerScopeSlideout();
+                        }}
+                        className={`relative inline-flex rounded-md border border-gray-700 bg-black/80 backdrop-blur-sm text-xs text-gray-200 overflow-hidden transition-all duration-300 ${
+                          showScopeSlideout 
+                            ? 'max-w-[120px] opacity-100 ml-1' 
+                            : 'max-w-0 opacity-0 ml-0'
+                        }`}
+                        aria-label={
                           podcastSearchMode === 'global'
-                            ? 'bg-[#1A1A1A] text-white'
-                            : 'text-gray-400 hover:text-white'
-                        }`}
-                        onClick={() => setPodcastSearchMode('global')}
+                            ? 'Switch to My Pod scope'
+                            : 'Switch to All Pods scope'
+                        }
                       >
-                        {podcastSearchMode === 'global' ? '🌐 All Pods' : '🌐'}
-                      </button>
-                      <button
-                        type="button"
-                        className={`px-2 py-1 rounded-sm text-xs transition-all ${
-                          podcastSearchMode === 'my-pod'
-                            ? 'bg-[#1A1A1A] text-white'
-                            : 'text-gray-400 hover:text-white'
-                        }`}
-                        onClick={() => setPodcastSearchMode('my-pod')}
-                      >
-                        {podcastSearchMode === 'my-pod' ? '👤 My Pod' : '👤'}
+                        <div className="flex text-xs whitespace-nowrap">
+                          {/* All Pods segment */}
+                          <div
+                            className={`flex items-center px-2 py-1 transition-colors duration-200 ${
+                              podcastSearchMode === 'global'
+                                ? 'bg-white text-black'
+                                : 'bg-black text-gray-400'
+                            }`}
+                          >
+                            <span className="mr-1">🌐</span>
+                            <span>All</span>
+                          </div>
+
+                          {/* My Pod segment */}
+                          <div
+                            className={`flex items-center px-2 py-1 transition-colors duration-200 ${
+                              podcastSearchMode === 'my-pod'
+                                ? 'bg-white text-black'
+                                : 'bg-black text-gray-400'
+                            }`}
+                          >
+                            <span className="mr-1">👤</span>
+                            <span>My</span>
+                          </div>
+                        </div>
                       </button>
                     </div>
-                  </div>
-                )}
-                
-                <ModelSettingsBar
-                  model={model}
-                  setModel={setModel}
-                  searchMode={searchMode}
-                  setSearchMode={setSearchMode}
-                  dropUp={true}
-                />
-                
+                  )}
+                </div>
+              </div>
+
+              {/* Row 2: Search button */}
+              <div className="flex justify-end md:justify-start">
                 <button
                   type="submit"
                   className="pl-3 pr-3 bg-white rounded-lg py-1 border-gray-800 hover:border-gray-700 flex-shrink-0"
@@ -2187,9 +2219,23 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               </div>
             </div>
           </form>
-          
+        </div>
+      )}
 
-
+      {searchMode === 'podcast-search' && !isAnyModalOpen() && (
+        <div
+          className={`fixed w-full z-50 transition-all duration-300 ${
+            hasSearchedInMode('podcast-search') ? 'bottom-24' : 'bottom-0'
+          }`}
+        >
+          <ClipTrackerModal
+            clipProgress={clipProgress}
+            hasSearched={hasSearchedInMode('podcast-search')}
+            isCollapsed={isClipTrackerCollapsed}
+            onCollapsedChange={setIsClipTrackerCollapsed}
+            auth={authConfig || undefined}
+            onShareClick={handleClipShare}
+          />
         </div>
       )}
       {searchMode === 'web-search' && (
