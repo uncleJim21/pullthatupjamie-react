@@ -1948,13 +1948,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             {searchMode === 'podcast-search' && (
               <div>
                 {!isAnyModalOpen() && (
-                  <ClipTrackerModal
-                    clipProgress={clipProgress}
-                    isCollapsed={isClipTrackerCollapsed}
-                    onCollapsedChange={setIsClipTrackerCollapsed}
-                    auth={authConfig || undefined}
-                    onShareClick={handleClipShare}
-                  />
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <ClipTrackerModal
+                        clipProgress={clipProgress}
+                        isCollapsed={isClipTrackerCollapsed}
+                        onCollapsedChange={setIsClipTrackerCollapsed}
+                        auth={authConfig || undefined}
+                        onShareClick={handleClipShare}
+                      />
+                    </div>
+                    <div className="w-12"></div>
+                  </div>
                 )}
                 <form onSubmit={handleSearch}>
                   <div className="flex items-start gap-3">
@@ -2430,13 +2435,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         }}>
           <div className="w-full max-w-[40rem] flex flex-col">
             {searchMode === 'podcast-search' && !isAnyModalOpen() && (
-              <ClipTrackerModal
-                clipProgress={clipProgress}
-                isCollapsed={isClipTrackerCollapsed}
-                onCollapsedChange={setIsClipTrackerCollapsed}
-                auth={authConfig || undefined}
-                onShareClick={handleClipShare}
-              />
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <ClipTrackerModal
+                    clipProgress={clipProgress}
+                    isCollapsed={isClipTrackerCollapsed}
+                    onCollapsedChange={setIsClipTrackerCollapsed}
+                    auth={authConfig || undefined}
+                    onShareClick={handleClipShare}
+                  />
+                </div>
+                <div className="w-12"></div>
+              </div>
             )}
             <form onSubmit={handleSearch}>
             <div className="flex items-start gap-3">
