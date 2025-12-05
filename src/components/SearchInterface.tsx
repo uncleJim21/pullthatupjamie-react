@@ -251,17 +251,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   };
   
   // Get the mode from URL parameters if available
-  // This allows users to specify the search mode via URL parameter, e.g. ?mode=web-search or ?mode=podcast-search
+  // Historically supported ?mode=web-search, but web search is now deprecated.
   const [searchParams] = useSearchParams();
   const modeParam = searchParams.get('mode');
   const queryParam = searchParams.get('q');
+  const isWebSearchDeprecated = modeParam === 'web-search';
   
-  const [searchMode, setSearchMode] = useState(
-    // Only use the modeParam if it's a valid SearchMode
-    modeParam && ['web-search', 'podcast-search'].includes(modeParam) 
-      ? modeParam as SearchMode 
-      : (isSharePage || isClipBatchPage ? 'podcast-search' as SearchMode : 'podcast-search' as SearchMode)
-  );
+  // Force the interface into podcast-search mode even if modeParam=web-search
+  const [searchMode, setSearchMode] = useState<SearchMode>('podcast-search');
   
   // Add state for admin privileges and toggle
   const [adminFeedId, setAdminFeedId] = useState<string | null>(null);
@@ -1389,6 +1386,25 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         isUserSignedIn={isUserSignedIn}
         setIsUserSignedIn={setIsUserSignedIn}
       />
+
+      {/* Web Search Deprecation Banner */}
+      {isWebSearchDeprecated && (
+        <div className="max-w-3xl mx-auto px-4 mt-4">
+          <div className="bg-yellow-900/40 border border-yellow-700 rounded-lg p-4 text-sm text-yellow-100">
+            <p className="font-semibold mb-1">
+              Web search is no longer available in Jamie.
+            </p>
+            <p className="text-xs sm:text-sm text-gray-200">
+              Podcast search is still fully supported below. If you previously relied on Jamie for web search or need help,
+              you can reach out at{' '}
+              <span className="blur-[2px] hover:blur-none cursor-help">
+                jim at cascdr dot xyz
+              </span>
+              .
+            </p>
+          </div>
+        </div>
+      )}
       
       {/* Add the PodcastSourceFilterModal component */}
       <PodcastSourceFilterModal 
