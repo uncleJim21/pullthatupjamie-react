@@ -1760,7 +1760,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     <div className="flex flex-col gap-2 relative">
                       {/* Floating scope switch and arrow - above the grid, centered on filter button */}
                       {!!adminFeedId && searchMode === 'podcast-search' && (
-                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-50">
+                        <div className="absolute bottom-full mb-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-50">
                           {/* Scope switch with slide animation */}
                           <div className={`transition-all duration-300 ${
                             showScopeSlideout 
@@ -2125,7 +2125,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               <div className="flex flex-col gap-2 relative">
                 {/* Floating scope switch and arrow - above the grid, centered on filter button */}
                 {!!adminFeedId && searchMode === 'podcast-search' && (
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-50">
+                  <div className="absolute bottom-full mb-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-50">
                     {/* Scope switch with slide animation */}
                     <div className={`transition-all duration-300 ${
                       showScopeSlideout 
