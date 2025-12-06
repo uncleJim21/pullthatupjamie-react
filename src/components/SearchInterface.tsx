@@ -862,7 +862,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         feedIdsToUse,
         searchFilters.minDate || undefined,
         searchFilters.maxDate || undefined,
-        searchFilters.episodeName || undefined
+        searchFilters.episodeName || undefined,
+        ['chapter', 'paragraph'] // Include both chapters and paragraphs
       );
       setConversation(prev => [...prev, {
         id: searchState.activeConversationId as number,
@@ -2691,6 +2692,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           }}
           onKeywordSearch={async (keyword, feedId, episodeName, forceSearchAll = false) => {
             printLog(`Keyword search triggered: keyword="${keyword}", feedId="${feedId}", episodeName="${episodeName}", forceSearchAll="${forceSearchAll}"`);
+            printLog(`Current resultViewStyle: ${resultViewStyle}, searchViewStyle: ${searchViewStyle}`);
             // Treat as a new podcast search: collapse context panel and clear stale context
             resetContextPanelState();
 
@@ -2711,8 +2713,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             
             let feedIdsToUse: string[] = [];
             
-            if (forceSearchAll) {
-              // Search ALL pods - ignore My Pod mode, use all selected sources
+            // When filtering by episode name, don't pass feedIds - let the episode filter do the work
+            if (episodeName) {
+              // "Search This Episode" - use episode name filter only, no feedIds
+              feedIdsToUse = [];
+              printLog(`Searching this episode: "${episodeName}" with no feed restrictions`);
+            } else if (forceSearchAll) {
+              // Search ALL pods - use all selected sources
               feedIdsToUse = Array.from(selectedSources) as string[];
               printLog(`Force searching all pods with: ${JSON.stringify(feedIdsToUse)}`);
             } else if (feedId) {
@@ -2724,7 +2731,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               // If in my-pod mode, use admin feed
               feedIdsToUse = [adminFeedId];
             } else {
-              // Search all selected sources
+              // Default: search all selected sources
               feedIdsToUse = Array.from(selectedSources) as string[];
             }
             
@@ -2736,25 +2743,66 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             const conversationId = nextConversationId.current++;
             
             try {
-              const quoteResults = await handleQuoteSearch(
-                keyword,
-                auth,
-                feedIdsToUse,
-                undefined, // minDate
-                undefined, // maxDate
-                episodeName // episodeName filter
-              );
-              
-              setConversation(prev => [...prev, {
-                id: conversationId,
-                type: 'podcast-search' as const,
-                query: keyword,
-                timestamp: new Date(),
-                isStreaming: false,
-                data: {
-                  quotes: quoteResults.results
+              // Always use 3D search if result view style is Galaxy, regardless of search view style
+              if (resultViewStyle === SearchResultViewStyle.GALAXY) {
+                printLog(`Using 3D search for galaxy view (resultViewStyle: ${resultViewStyle})`);
+                const quoteResults = await handleQuoteSearch3D(
+                  keyword,
+                  auth,
+                  feedIdsToUse,
+                  undefined, // minDate
+                  undefined, // maxDate
+                  episodeName, // episodeName filter
+                  ['chapter', 'paragraph'], // Include both chapters and paragraphs
+                  true // extractAxisLabels
+                );
+                
+                printLog(`3D search returned ${quoteResults.results?.length || 0} results`);
+                printLog(`First result from 3D search: ${quoteResults.results?.[0]?.episode || 'none'}`);
+                
+                // UPDATE GALAXY RESULTS STATE - THIS IS CRITICAL!
+                setGalaxyResults(quoteResults.results || []);
+                
+                // Store axis labels if returned
+                if (quoteResults.axisLabels) {
+                  setAxisLabels(quoteResults.axisLabels);
+                  printLog(`Received axis labels from keyword search: ${JSON.stringify(quoteResults.axisLabels)}`);
                 }
-              }]);
+                
+                setConversation(prev => [...prev, {
+                  id: conversationId,
+                  type: 'podcast-search' as const,
+                  query: keyword,
+                  timestamp: new Date(),
+                  isStreaming: false,
+                  data: {
+                    quotes: quoteResults.results
+                  },
+                  axisLabels: quoteResults.axisLabels || null
+                }]);
+              } else {
+                printLog(`Using regular 2D search for list view (resultViewStyle: ${resultViewStyle})`);
+                const quoteResults = await handleQuoteSearch(
+                  keyword,
+                  auth,
+                  feedIdsToUse,
+                  undefined, // minDate
+                  undefined, // maxDate
+                  episodeName, // episodeName filter
+                  ['chapter', 'paragraph'] // Include both chapters and paragraphs
+                );
+                
+                setConversation(prev => [...prev, {
+                  id: conversationId,
+                  type: 'podcast-search' as const,
+                  query: keyword,
+                  timestamp: new Date(),
+                  isStreaming: false,
+                  data: {
+                    quotes: quoteResults.results
+                  }
+                }]);
+              }
               
               // Clear the query input after search, just like normal search
               setQuery("");
@@ -2768,6 +2816,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               printLog("Keyword search completed successfully");
             } catch (error) {
               console.error('Keyword search error:', error);
+              printLog(`Keyword search error: ${error}`);
               setSearchState(prev => ({ 
                 ...prev, 
                 isLoading: false,

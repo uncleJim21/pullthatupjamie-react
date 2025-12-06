@@ -7,6 +7,7 @@ export interface PodcastSearchParams {
   minDate?: string;
   maxDate?: string;
   episodeName?: string;
+  hierarchyLevels?: string[]; // Filter by hierarchy levels: ['chapter', 'paragraph', etc.]
 }
 
 export const handleQuoteSearch = async (
@@ -15,7 +16,8 @@ export const handleQuoteSearch = async (
   selectedFeedIds?: string[],
   minDate?: string,
   maxDate?: string,
-  episodeName?: string
+  episodeName?: string,
+  hierarchyLevels?: string[]
 ) => {
   try{
     const headers: Record<string, string> = {
@@ -48,6 +50,9 @@ export const handleQuoteSearch = async (
     if (episodeName && episodeName.trim() !== '') {
       body.episodeName = episodeName.trim();
     }
+    if (hierarchyLevels && hierarchyLevels.length > 0) {
+      body.hierarchyLevels = hierarchyLevels;
+    }
 
     const response = await fetch(`${API_URL}/api/search-quotes`, {
       method: 'POST',
@@ -76,6 +81,7 @@ export const handleQuoteSearch3D = async (
   minDate?: string,
   maxDate?: string,
   episodeName?: string,
+  hierarchyLevels?: string[],
   extractAxisLabels?: boolean
 ) => {
   try {
@@ -111,6 +117,9 @@ export const handleQuoteSearch3D = async (
     }
     if (extractAxisLabels) {
       body.extractAxisLabels = true;
+    }
+    if (hierarchyLevels && hierarchyLevels.length > 0) {
+      body.hierarchyLevels = hierarchyLevels;
     }
 
     const response = await fetch(`${API_URL}/api/search-quotes-3d`, {
