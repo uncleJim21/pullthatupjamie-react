@@ -199,6 +199,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [isContextPanelOpen, setIsContextPanelOpen] = useState(false);
   const [selectedParagraphId, setSelectedParagraphId] = useState<string | null>(null);
   
+  // Track warp speed deceleration completion
+  const [isDecelerationComplete, setIsDecelerationComplete] = useState(true);
+  
   // Result view style state (List vs Galaxy)
   const [resultViewStyle, setResultViewStyle] = useState<SearchResultViewStyle>(() => {
     const saved = localStorage.getItem('searchResultViewStyle');
@@ -985,6 +988,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
         await new Promise(resolve => {
           setSearchState(prev => ({ ...prev, isLoading: true }));
+          setIsDecelerationComplete(false); // Reset deceleration flag when starting new search
           setTimeout(resolve, 0);
         });
         
@@ -2229,6 +2233,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 isLoading={searchState.isLoading && searchMode === 'podcast-search'}
                 onDecelerationComplete={() => {
                   printLog('Deceleration complete from galaxy view');
+                  setIsDecelerationComplete(true); // Allow context panel to appear
                 }}
               />
             </div>
@@ -2670,7 +2675,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       </div>
 
       {/* Context Panel for Split-Screen Mode - Now as Sibling */}
-      {searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && (
+      {searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isDecelerationComplete && (
         <PodcastContextPanel
           paragraphId={selectedParagraphId}
           isOpen={isContextPanelOpen}

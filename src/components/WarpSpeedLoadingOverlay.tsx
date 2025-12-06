@@ -306,7 +306,7 @@ export const WarpSpeedLoadingOverlay: React.FC<WarpSpeedLoadingOverlayProps> = (
 
   return (
     <div 
-      className="absolute inset-0 z-10 pointer-events-none"
+      className="absolute inset-0 z-10 pointer-events-none bg-black"
       style={{
         // No opacity transition - stay fully visible until deceleration completes
         opacity: (!isLoading && !isDecelerating) ? 0 : 1,
