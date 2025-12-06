@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
 import { Calendar, RotateCcw, SlidersHorizontal, Check } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
+import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 
 // ============================================================================
 // ANIMATION CONFIGURATION
@@ -289,6 +290,8 @@ interface SemanticGalaxyViewProps {
     zPositive?: string;
     zNegative?: string;
   } | null;
+  isLoading?: boolean;
+  onDecelerationComplete?: () => void;
 }
 
 // Convert hierarchy level to color
@@ -1210,11 +1213,14 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   onStarClick,
   selectedStarId,
   axisLabels,
+  isLoading = false,
+  onDecelerationComplete,
 }) => {
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isAnimatingCamera, setIsAnimatingCamera] = useState(false);
   const cameraAnimationRef = useRef<CameraAnimationState | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Load showAxisLabels from userSettings in localStorage
   const [showAxisLabels, setShowAxisLabels] = useState<boolean>(() => {
@@ -1284,7 +1290,13 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full bg-black" onMouseMove={handleMouseMove}>
+    <div ref={containerRef} className="relative w-full h-full bg-black" onMouseMove={handleMouseMove}>
+      {/* Warp Speed Loading Overlay - always on top when active */}
+      <WarpSpeedLoadingOverlay 
+        isLoading={isLoading}
+        onDecelerationComplete={onDecelerationComplete}
+      />
+      
       {/* Camera reset button */}
       <CameraResetButton onReset={handleResetCamera} />
 
@@ -1347,7 +1359,10 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       </div>
 
       {/* 3D Canvas */}
-      <Canvas>
+      <Canvas
+        style={{ width: '100%', height: '100%' }}
+        resize={{ scroll: false, debounce: 0 }}
+      >
         <PerspectiveCamera
           ref={cameraRef}
           makeDefault

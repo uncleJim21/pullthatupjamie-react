@@ -33,7 +33,6 @@ import PodcastContextPanel from './PodcastContextPanel.tsx';
 import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
-import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -1623,13 +1622,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     <AudioControllerProvider>
     <div className="min-h-screen bg-black text-white flex">
       {/* Main Content Area - Left Side */}
-      <div className={`flex-1 min-w-0 transition-all duration-300 ${
-        searchMode === 'podcast-search' && 
-        searchViewStyle === SearchViewStyle.SPLIT_SCREEN && 
-        isContextPanelOpen 
-          ? 'mr-0' 
-          : ''
-      }`}>
+      <div className="flex-1 min-w-0 transition-all duration-300">
+        {/* Welcome Modal */}
+        <WelcomeModal
+          isOpen={isWelcomeOpen}
+          onQuickTour={handleWelcomeQuickTour}
+          onGetStarted={handleWelcomeGetStarted}
+        />
         {/* Welcome Modal */}
         <WelcomeModal
           isOpen={isWelcomeOpen}
@@ -2192,10 +2191,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
           {/* Conditional rendering: List or Galaxy view */}
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (
-            <div className="relative w-full" style={{ height: 'calc(100vh - 150px)' }}>
-              {/* Warp Speed Loading Overlay */}
-              <WarpSpeedLoadingOverlay isLoading={searchState.isLoading && searchMode === 'podcast-search'} />
-              
+            <div className="relative w-full transition-all duration-300 ease-in-out" style={{ height: 'calc(100vh - 150px)' }}>
               <SemanticGalaxyView
                 results={galaxyResults.length > 0 ? galaxyResults : MOCK_GALAXY_DATA.results}
                 onStarClick={(result) => {
@@ -2230,6 +2226,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 }}
                 selectedStarId={selectedParagraphId}
                 axisLabels={axisLabels}
+                isLoading={searchState.isLoading && searchMode === 'podcast-search'}
+                onDecelerationComplete={() => {
+                  printLog('Deceleration complete from galaxy view');
+                }}
               />
             </div>
           ) : (

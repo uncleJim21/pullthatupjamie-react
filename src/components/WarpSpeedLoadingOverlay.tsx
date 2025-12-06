@@ -193,14 +193,31 @@ export const WarpSpeedLoadingOverlay: React.FC<WarpSpeedLoadingOverlayProps> = (
     <div 
       className="absolute inset-0 z-50 pointer-events-none"
       style={{
-        opacity: 1 - decelerationProgress,
-        transition: decelerationProgress > 0 ? 'opacity 0.3s ease-out' : 'none',
+        // No opacity transition - stay fully visible until deceleration completes
+        opacity: (!isLoading && !isDecelerating) ? 0 : 1,
+        transition: (!isLoading && !isDecelerating) ? 'opacity 0.1s ease-out' : 'none',
       }}
     >
-      <Canvas camera={{ position: [0, 0, 0], fov: 75 }}>
-        <color attach="background" args={['#000000']} />
-        <WarpParticles decelerationProgress={decelerationProgress} />
-      </Canvas>
+      {/* Canvas fills entire container */}
+      <div className="absolute inset-0">
+        <Canvas 
+          camera={{ position: [0, 0, 0], fov: 75 }}
+          style={{ width: '100%', height: '100%' }}
+          resize={{ scroll: false, debounce: 0 }}
+        >
+          <color attach="background" args={['#000000']} />
+          <WarpParticles decelerationProgress={decelerationProgress} />
+        </Canvas>
+      </div>
+      
+      {/* Centered loading text */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="bg-black/80 backdrop-blur-sm border border-gray-800 rounded-lg px-8 py-4">
+          <p className="text-white text-xl font-medium text-center">
+            Searching moments from thousands of conversations...
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
