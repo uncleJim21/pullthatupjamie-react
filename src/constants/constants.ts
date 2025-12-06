@@ -70,9 +70,9 @@ export enum SearchResultViewStyle {
 }
 
 export const HIERARCHY_COLORS = {
-  PARAGRAPH: '#10b981',
-  FEED: '#3b82f6',      // blue-500 - top level
-  EPISODE: '#8b5cf6',   // violet-500 - episode level
-  CHAPTER: '#ec4899',   // pink-500 - chapter level  
-  ALL_PODS: '#10b981'   // emerald-500 - all pods scope
+  ALL_PODS: '#3366ff',  // deeper blue (more saturated, visible)
+  FEED: '#b8cbff',      // medium blue-white (interpolated between ALL_PODS and EPISODE)
+  EPISODE: '#ffffff',   // pure white (center anchor)
+  CHAPTER: '#ffaa66',   // distinct peachy-orange
+  PARAGRAPH: '#cc4400'  // deep reddish-orange (deepest nebula tone)
 };

@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
-import { HIERARCHY_COLORS, GALAXY_STAR_THEME, GalaxyStarTheme } from '../constants/constants.ts';
+import { HIERARCHY_COLORS } from '../constants/constants.ts';
 import { Calendar, RotateCcw, SlidersHorizontal, Check } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 
@@ -13,6 +13,13 @@ const BOBBING_CONFIG = {
   BOB_DURATION: 1.8,        // Duration of the bob animation in seconds
   PAUSE_DURATION: 0.0,      // Duration of the pause in seconds
   BOB_DISTANCE: 0.2,      // Vertical distance of the bob (in units)
+};
+
+// ============================================================================
+// SELECTION DIMMING CONFIGURATION
+// ============================================================================
+const SELECTION_CONFIG = {
+  NON_SELECTED_DIM_FACTOR: 0.4, // How much to dim non-selected stars when a selection exists (0.0 = invisible, 1.0 = no dimming)
 };
 
 // ============================================================================
@@ -579,10 +586,10 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSele
 
   const color = getHierarchyColor(result.hierarchyLevel);
 
-  // Make the selected star brighter and slightly dim all others (~20%) when a selection exists.
+  // Make the selected star brighter and dim all others when a selection exists.
   const baseIntensity =
     isSelected ? 1.8 : hovered ? 1.3 : isNearSelected ? 0.8 : 1;
-  const dimFactor = hasSelection && !isSelected ? 0.4 : 1; // 20% dim for non-selected when something is selected
+  const dimFactor = hasSelection && !isSelected ? SELECTION_CONFIG.NON_SELECTED_DIM_FACTOR : 1;
   const intensityMultiplier = baseIntensity * dimFactor;
 
   return (
