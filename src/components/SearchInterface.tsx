@@ -33,6 +33,7 @@ import PodcastContextPanel from './PodcastContextPanel.tsx';
 import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
+import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -2151,45 +2152,50 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
 
       {/* Conversation History / Galaxy View */}
-      {conversation.length > 0 && searchMode === 'podcast-search' && (
+      {((conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && searchMode === 'podcast-search') && (
         <div>
-          {/* View Toggle */}
-          <div className="flex justify-center mt-4 mb-3">
-            <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
-              <button
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-                  resultViewStyle === SearchResultViewStyle.LIST
-                    ? 'bg-[#1A1A1A] text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                onClick={() => {
-                  setResultViewStyle(SearchResultViewStyle.LIST);
-                  localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.LIST);
-                }}
-              >
-                <List className="w-4 h-4" />
-                <span>List</span>
-              </button>
-              <button
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-                  resultViewStyle === SearchResultViewStyle.GALAXY
-                    ? 'bg-[#1A1A1A] text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                onClick={() => {
-                  setResultViewStyle(SearchResultViewStyle.GALAXY);
-                  localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.GALAXY);
-                }}
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Galaxy</span>
-              </button>
+          {/* View Toggle - only show when we have results or finished loading */}
+          {conversation.length > 0 && (
+            <div className="flex justify-center mt-4 mb-3">
+              <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
+                <button
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                    resultViewStyle === SearchResultViewStyle.LIST
+                      ? 'bg-[#1A1A1A] text-white'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                  onClick={() => {
+                    setResultViewStyle(SearchResultViewStyle.LIST);
+                    localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.LIST);
+                  }}
+                >
+                  <List className="w-4 h-4" />
+                  <span>List</span>
+                </button>
+                <button
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                    resultViewStyle === SearchResultViewStyle.GALAXY
+                      ? 'bg-[#1A1A1A] text-white'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                  onClick={() => {
+                    setResultViewStyle(SearchResultViewStyle.GALAXY);
+                    localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.GALAXY);
+                  }}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Galaxy</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Conditional rendering: List or Galaxy view */}
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (
             <div className="relative w-full" style={{ height: 'calc(100vh - 150px)' }}>
+              {/* Warp Speed Loading Overlay */}
+              <WarpSpeedLoadingOverlay isLoading={searchState.isLoading && searchMode === 'podcast-search'} />
+              
               <SemanticGalaxyView
                 results={galaxyResults.length > 0 ? galaxyResults : MOCK_GALAXY_DATA.results}
                 onStarClick={(result) => {
@@ -2359,7 +2365,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         </div>
       )}
 
-      {searchMode === 'podcast-search' && searchState.isLoading && (
+      {searchMode === 'podcast-search' && searchState.isLoading && resultViewStyle === SearchResultViewStyle.LIST && (
         isClipBatchPage ? (
           <div className="flex flex-col items-center justify-center w-full py-8">
             <h2 className="text-gray-500 text-xl mb-8 text-center">

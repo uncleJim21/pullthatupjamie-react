@@ -1012,6 +1012,96 @@ const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
   );
 };
 
+// Warp Speed Effect Component for Loading State
+interface WarpSpeedEffectProps {
+  isActive: boolean;
+  decelerationProgress: number; // 0 = full speed, 1 = stopped
+}
+
+const WarpSpeedEffect: React.FC<WarpSpeedEffectProps> = ({ isActive, decelerationProgress }) => {
+  const particlesRef = useRef<THREE.Points>(null);
+  const particlePositions = useRef<Float32Array | null>(null);
+  const particleVelocities = useRef<Float32Array | null>(null);
+
+  // Initialize particle positions and velocities
+  const particleData = useMemo(() => {
+    const positions = new Float32Array(WARP_SPEED_CONFIG.PARTICLE_COUNT * 3);
+    const velocities = new Float32Array(WARP_SPEED_CONFIG.PARTICLE_COUNT);
+    
+    for (let i = 0; i < WARP_SPEED_CONFIG.PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      
+      // Random position in cylindrical spread around camera direction
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * WARP_SPEED_CONFIG.SPREAD;
+      
+      positions[i3] = Math.cos(angle) * radius;     // x
+      positions[i3 + 1] = Math.sin(angle) * radius; // y
+      positions[i3 + 2] = Math.random() * -200 - 50; // z (behind camera initially)
+      
+      // Random velocity for variation
+      velocities[i] = 0.5 + Math.random() * 0.5;
+    }
+    
+    particlePositions.current = positions;
+    particleVelocities.current = velocities;
+    
+    return { positions, velocities };
+  }, []);
+
+  // Animate particles moving toward camera
+  useFrame((state) => {
+    if (!particlesRef.current || !particlePositions.current || !particleVelocities.current) return;
+    
+    const positions = particlePositions.current;
+    const velocities = particleVelocities.current;
+    const speed = WARP_SPEED_CONFIG.SPEED * (1 - decelerationProgress);
+    
+    for (let i = 0; i < WARP_SPEED_CONFIG.PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      
+      // Move particle forward (positive z direction)
+      positions[i3 + 2] += speed * velocities[i] * 0.016; // approximate 60fps delta
+      
+      // Reset particle when it passes the camera
+      if (positions[i3 + 2] > 50) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * WARP_SPEED_CONFIG.SPREAD;
+        
+        positions[i3] = Math.cos(angle) * radius;
+        positions[i3 + 1] = Math.sin(angle) * radius;
+        positions[i3 + 2] = -200;
+      }
+    }
+    
+    particlesRef.current.geometry.attributes.position.needsUpdate = true;
+  });
+
+  if (!isActive && decelerationProgress >= 1) return null;
+
+  return (
+    <points ref={particlesRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={WARP_SPEED_CONFIG.PARTICLE_COUNT}
+          array={particleData.positions}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={WARP_SPEED_CONFIG.PARTICLE_SIZE}
+        color="#ffffff"
+        transparent
+        opacity={0.8 * (1 - decelerationProgress * 0.5)}
+        sizeAttenuation
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
+    </points>
+  );
+};
+
 // Scene component with stars
 const GalaxyScene: React.FC<{
   results: QuoteResult[];
