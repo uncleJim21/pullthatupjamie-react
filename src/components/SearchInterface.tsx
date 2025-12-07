@@ -932,6 +932,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         searchFilters.minDate || undefined,
         searchFilters.maxDate || undefined,
         searchFilters.episodeName || undefined,
+        undefined, // hierarchyLevels - not currently used
         shouldExtractAxisLabels // Request axis labels if enabled in settings
       );
       
@@ -2159,38 +2160,38 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <div>
           {/* View Toggle - only show when we have results or finished loading */}
           {conversation.length > 0 && (
-            <div className="flex justify-center mt-4 mb-3">
-              <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
-                <button
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-                    resultViewStyle === SearchResultViewStyle.LIST
-                      ? 'bg-[#1A1A1A] text-white'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                  onClick={() => {
-                    setResultViewStyle(SearchResultViewStyle.LIST);
-                    localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.LIST);
-                  }}
-                >
-                  <List className="w-4 h-4" />
-                  <span>List</span>
-                </button>
-                <button
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-                    resultViewStyle === SearchResultViewStyle.GALAXY
-                      ? 'bg-[#1A1A1A] text-white'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                  onClick={() => {
-                    setResultViewStyle(SearchResultViewStyle.GALAXY);
-                    localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.GALAXY);
-                  }}
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>Galaxy</span>
-                </button>
-              </div>
+          <div className="flex justify-center mt-4 mb-3">
+            <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
+              <button
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                  resultViewStyle === SearchResultViewStyle.LIST
+                    ? 'bg-[#1A1A1A] text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+                onClick={() => {
+                  setResultViewStyle(SearchResultViewStyle.LIST);
+                  localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.LIST);
+                }}
+              >
+                <List className="w-4 h-4" />
+                <span>List</span>
+              </button>
+              <button
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                  resultViewStyle === SearchResultViewStyle.GALAXY
+                    ? 'bg-[#1A1A1A] text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+                onClick={() => {
+                  setResultViewStyle(SearchResultViewStyle.GALAXY);
+                  localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.GALAXY);
+                }}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Galaxy</span>
+              </button>
             </div>
+          </div>
           )}
 
           {/* Conditional rendering: List or Galaxy view */}

@@ -198,11 +198,12 @@ const STAR_INTERACTION_CONFIG = {
 
 // Camera intro animation configuration
 const CAMERA_ANIMATION_CONFIG = {
-  duration: 0.3,                 // seconds
+  startDelay: 1.5,             // seconds to wait before starting animation (configurable for testing)
+  duration: 0.25,               // seconds (longer to see the zoom effect)
   fromAngle: Math.PI,          // 180 degrees
   toAngle: 0,                  // 0 degrees (forward)
-  fromDistanceFactor: 0.1,     // start 10x closer than base distance
-  toDistanceFactor: 1.0,       // end at base distance
+  fromDistanceFactor: 0.5,    // start closer (easier to see zoom out)
+  toDistanceFactor: 1.0,       // zoom out slightly beyond base distance for effect
 };
 
 // Generate random tiny ray properties
@@ -887,7 +888,26 @@ const AnimatedCamera: React.FC<{
     }
 
     const elapsed = state.clock.getElapsedTime() - anim.startedAt;
-    const tRaw = elapsed / anim.duration;
+    
+    // Apply start delay before beginning animation
+    if (elapsed < CAMERA_ANIMATION_CONFIG.startDelay) {
+      // During delay, keep camera at starting position
+      const angle = anim.fromAngle;
+      const distance = anim.fromDistance;
+      const y = distance * anim.baseYRatio;
+      const x = distance * Math.sin(angle);
+      const z = distance * Math.cos(angle);
+      cam.position.set(x, y, z);
+      cam.lookAt(0, 0, 0);
+      if (controls && controls.target) {
+        controls.target.set(0, 0, 0);
+      }
+      return;
+    }
+    
+    // After delay, run the animation
+    const animationElapsed = elapsed - CAMERA_ANIMATION_CONFIG.startDelay;
+    const tRaw = animationElapsed / anim.duration;
     const t = Math.min(1, Math.max(0, tRaw));
 
     const angle = anim.fromAngle + (anim.toAngle - anim.fromAngle) * t;
