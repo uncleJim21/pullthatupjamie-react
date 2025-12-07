@@ -2192,8 +2192,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {/* Conversation History / Galaxy View */}
       {((conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && searchMode === 'podcast-search') && (
         <div>
-          {/* View Toggle - only show when we have results or finished loading */}
-          {conversation.length > 0 && (
+          {/* View Toggle - show during loading in galaxy mode OR when we have results */}
+          {(conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && (
           <div className="flex justify-center mt-4 mb-3">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               <button

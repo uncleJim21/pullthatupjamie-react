@@ -27,10 +27,10 @@ const EASING = {
 // ============================================================================
 const WARP_CONFIG = {
   // Particle settings
-  PARTICLE_COUNT: 400,             // Number of light streaks
-  SPEED: 400,                      // MUCH faster base speed
+  PARTICLE_COUNT: 150,             // Number of light streaks (more sparse)
+  SPEED: 800,                      // MUCH faster base speed
   SPREAD: 150,                     // Cylindrical spread radius
-  STREAK_LENGTH: 25,               // Longer streaks for faster speed
+  STREAK_LENGTH: 35,               // Longer streaks for faster speed
   
   // Deceleration settings
   DECELERATION_DURATION: 1.0,      // How long deceleration takes (seconds)

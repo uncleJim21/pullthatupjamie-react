@@ -213,7 +213,7 @@ const CAMERA_ANIMATION_CONFIG = {
   fromAngle: Math.PI,          // 180 degrees
   toAngle: 0,                  // 0 degrees (forward)
   fromDistanceFactor: 0.5,    // start closer (easier to see zoom out)
-  toDistanceFactor: 1.0,       // zoom out slightly beyond base distance for effect
+  toDistanceFactor: 1.2,       // zoom out slightly beyond base distance for effect
 };
 
 // Generate random tiny ray properties
@@ -1291,6 +1291,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   // Prepare camera intro animation whenever a new set of results arrives.
   // We only signal that an animation should start here; the actual parameters
   // are initialized lazily inside the AnimatedCamera when the camera ref is ready.
+  // DISABLED: Camera animation causes visible "frame jump" when results load during warp speed
   useEffect(() => {
     if (!results || results.length === 0) return;
     cameraAnimationRef.current = null; // force re-init in AnimatedCamera
