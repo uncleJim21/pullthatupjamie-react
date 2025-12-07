@@ -24,6 +24,16 @@ const SELECTION_CONFIG = {
 };
 
 // ============================================================================
+// WARP SPEED CONFIGURATION
+// ============================================================================
+const WARP_SPEED_CONFIG = {
+  PARTICLE_COUNT: 300,      // Number of particles
+  SPEED: 5,                 // Base speed of particles
+  SPREAD: 100,              // Spread radius
+  PARTICLE_SIZE: 2,         // Size of each particle
+};
+
+// ============================================================================
 // VISUAL APPEARANCE - ASTRONOMICAL DIFFRACTION SPIKES
 // ============================================================================
 
@@ -1141,7 +1151,8 @@ const GalaxyScene: React.FC<{
     zNegative?: string;
   } | null;
   showAxisLabels: boolean;
-}> = ({ results, selectedStarId, onStarClick, onHover, axisLabels, showAxisLabels }) => {
+  isAnimatingCamera: boolean;
+}> = ({ results, selectedStarId, onStarClick, onHover, axisLabels, showAxisLabels, isAnimatingCamera }) => {
   // Calculate which stars are near the selected one
   const nearbyStars = useMemo(() => {
     if (!selectedStarId) return new Set<string>();
@@ -1194,8 +1205,8 @@ const GalaxyScene: React.FC<{
       {/* Point light at origin */}
       <pointLight position={[0, 0, 0]} intensity={0.5} />
 
-      {/* Axis Labels */}
-      {showAxisLabels && axisLabels && (
+      {/* Axis Labels - Hidden during camera animation */}
+      {showAxisLabels && axisLabels && !isAnimatingCamera && (
         <AxisLabels axisLabels={axisLabels} />
       )}
 
@@ -1417,6 +1428,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           onHover={setHoveredResult}
           axisLabels={axisLabels || null}
           showAxisLabels={showAxisLabels}
+          isAnimatingCamera={isAnimatingCamera}
         />
       </Canvas>
     </div>
