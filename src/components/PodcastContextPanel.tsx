@@ -120,6 +120,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setIsCollapsed(false);
+      // Reset auto-play key when panel closes so next open can auto-play
+      autoPlayKeyRef.current = null;
     }
   }, [isOpen]);
 
@@ -334,12 +336,46 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
   // Auto-play for Galaxy star clicks using shared controller
   useEffect(() => {
+    printLog(`[AutoPlay Effect] Triggered - isParagraphId: ${isParagraphId}, isOpen: ${isOpen}, autoPlayOnOpen: ${autoPlayOnOpen}`);
+    printLog(`[AutoPlay Effect] effectiveAudioUrl: ${effectiveAudioUrl}`);
+    printLog(`[AutoPlay Effect] timeContext: ${JSON.stringify(timeContext)}`);
+    
     // Only allow auto-play in paragraph-driven mode.
     // In chapter mode this can lead to starting from t=0 or a stale timestamp.
-    if (!isParagraphId) return;
-    if (!effectiveAudioUrl || !autoPlayOnOpen || !timeContext) return;
+    if (!isParagraphId) {
+      printLog('[AutoPlay Effect] Skipped - not paragraph ID');
+      return;
+    }
+    if (!effectiveAudioUrl || !autoPlayOnOpen || !timeContext) {
+      printLog(`[AutoPlay Effect] Skipped - missing required values: audioUrl=${!!effectiveAudioUrl}, autoPlay=${autoPlayOnOpen}, timeContext=${!!timeContext}`);
+      return;
+    }
+    if (!isOpen) {
+      printLog('[AutoPlay Effect] Skipped - panel not open');
+      return;
+    }
+    
+    // Only proceed if we have valid timestamps
+    if (timeContext.start_time === undefined || timeContext.start_time < 0) {
+      printLog(`[AutoPlay Effect] Skipped - invalid start_time: ${timeContext.start_time}`);
+      console.warn('Auto-play skipped: invalid start_time', timeContext);
+      return;
+    }
+    
     const key = `${effectiveAudioUrl}-${timeContext.start_time}-${timeContext.end_time}`;
-    if (autoPlayKeyRef.current === key) return;
+    if (autoPlayKeyRef.current === key) {
+      printLog(`[AutoPlay Effect] Skipped - already played this key: ${key}`);
+      return;
+    }
+    
+    printLog(`[AutoPlay Effect] PLAYING - contextTrackId: ${contextTrackId}, startTime: ${timeContext.start_time}, endTime: ${timeContext.end_time}`);
+    console.log('Auto-playing track:', { 
+      contextTrackId, 
+      audioUrl: effectiveAudioUrl, 
+      startTime: timeContext.start_time, 
+      endTime: timeContext.end_time 
+    });
+    
     autoPlayKeyRef.current = key;
     void playTrack({
       id: contextTrackId,
@@ -347,7 +383,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       startTime: timeContext.start_time,
       endTime: timeContext.end_time,
     });
-  }, [effectiveAudioUrl, autoPlayOnOpen, timeContext?.start_time, timeContext?.end_time, contextTrackId, playTrack]);
+  }, [effectiveAudioUrl, autoPlayOnOpen, timeContext?.start_time, timeContext?.end_time, contextTrackId, playTrack, isOpen, isParagraphId]);
 
   const handleEpisodePlayPause = async () => {
     if (!effectiveAudioUrl) return;

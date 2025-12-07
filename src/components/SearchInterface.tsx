@@ -1416,8 +1416,42 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         // Set the first result as selected and open the context panel
         if (paragraphId) {
           setSelectedParagraphId(paragraphId);
-          setIsContextPanelOpen(true);
-          printLog(`Split-screen: Auto-selected first result: ${paragraphId}`);
+          
+          // IMPORTANT: Also set audio context for auto-play to work
+          const audioContext = {
+            audioUrl: firstResult.audioUrl,
+            timeContext: {
+              start_time: firstResult.timeContext?.start_time ?? 0,
+              end_time: firstResult.timeContext?.end_time ?? 0,
+            },
+            episode: firstResult.episode,
+            episodeImage: firstResult.episodeImage || '',
+            creator: firstResult.creator,
+            listenLink: firstResult.listenLink,
+            date: firstResult.date
+          };
+          printLog(`[AutoSelect] Setting audio context for first result: ${JSON.stringify(audioContext)}`);
+          setSelectedAudioContext(audioContext);
+          
+          // Read auto-play preference
+          let autoPlay = false;
+          try {
+            const settings = localStorage.getItem('userSettings');
+            if (settings) {
+              const userSettings = JSON.parse(settings);
+              autoPlay = !!userSettings.autoPlayOnStarClick;
+            }
+          } catch (e) {
+            console.error('Error reading autoPlayOnStarClick from userSettings:', e);
+          }
+          printLog(`[AutoSelect] AutoPlay setting: ${autoPlay}`);
+          setAutoPlayContextOnOpen(autoPlay);
+          
+          // Small delay to ensure state updates propagate
+          setTimeout(() => {
+            setIsContextPanelOpen(true);
+            printLog(`[AutoSelect] Split-screen: Auto-selected first result: ${paragraphId}`);
+          }, 0);
         }
       }
     }
@@ -2200,10 +2234,30 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               <SemanticGalaxyView
                 results={galaxyResults.length > 0 ? galaxyResults : MOCK_GALAXY_DATA.results}
                 onStarClick={(result) => {
-                  printLog(`Star clicked: ${result.shareLink}`);
+                  printLog(`[StarClick] Star clicked: ${result.shareLink}`);
+                  printLog(`[StarClick] Audio URL: ${result.audioUrl}`);
+                  printLog(`[StarClick] Time context: ${JSON.stringify(result.timeContext)}`);
+                  
                   setSelectedParagraphId(result.shareLink);
+                  
+                  // Read auto-play preference from userSettings
+                  let autoPlay = false;
+                  try {
+                    const settings = localStorage.getItem('userSettings');
+                    printLog(`[StarClick] Raw userSettings from localStorage: ${settings}`);
+                    if (settings) {
+                      const userSettings = JSON.parse(settings);
+                      printLog(`[StarClick] Parsed userSettings: ${JSON.stringify(userSettings)}`);
+                      autoPlay = !!userSettings.autoPlayOnStarClick;
+                      printLog(`[StarClick] autoPlayOnStarClick from settings: ${userSettings.autoPlayOnStarClick}, coerced to: ${autoPlay}`);
+                    }
+                  } catch (e) {
+                    console.error('Error reading autoPlayOnStarClick from userSettings:', e);
+                  }
+                  printLog(`[StarClick] Final AutoPlay setting: ${autoPlay}`);
+                  
                   // Store audio context so PodcastContextPanel can render a mini-player
-                  setSelectedAudioContext({
+                  const audioContext = {
                     audioUrl: result.audioUrl,
                     timeContext: {
                       start_time: result.timeContext?.start_time ?? 0,
@@ -2214,20 +2268,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     creator: result.creator,
                     listenLink: result.listenLink,
                     date: result.date
-                  });
-                  // Read auto-play preference from userSettings
-                  let autoPlay = false;
-                  try {
-                    const settings = localStorage.getItem('userSettings');
-                    if (settings) {
-                      const userSettings = JSON.parse(settings);
-                      autoPlay = !!userSettings.autoPlayOnStarClick;
-                    }
-                  } catch (e) {
-                    console.error('Error reading autoPlayOnStarClick from userSettings:', e);
-                  }
+                  };
+                  printLog(`[StarClick] Setting audio context: ${JSON.stringify(audioContext)}`);
+                  setSelectedAudioContext(audioContext);
                   setAutoPlayContextOnOpen(autoPlay);
-                  setIsContextPanelOpen(true);
+                  
+                  // Small delay to ensure state updates propagate before opening panel
+                  setTimeout(() => {
+                    setIsContextPanelOpen(true);
+                    printLog(`[StarClick] Panel opened after state updates`);
+                  }, 0);
                 }}
                 selectedStarId={selectedParagraphId}
                 axisLabels={axisLabels}
