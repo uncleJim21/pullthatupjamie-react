@@ -440,6 +440,15 @@ const AxisLabelWithBackground: React.FC<AxisLabelWithBackgroundProps> = ({ posit
     width: 3,
     height: 1,
   });
+  const groupRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
+
+  // Make the label always face the camera (billboarding)
+  useFrame(() => {
+    if (groupRef.current) {
+      groupRef.current.quaternion.copy(camera.quaternion);
+    }
+  });
 
   const handleSync = (text: any) => {
     if (!text?.geometry?.boundingBox) return;
@@ -464,7 +473,7 @@ const AxisLabelWithBackground: React.FC<AxisLabelWithBackgroundProps> = ({ posit
   };
 
   return (
-    <group position={position}>
+    <group ref={groupRef} position={position}>
       {/* Background quad for label readability */}
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[bgSize.width, bgSize.height]} />
