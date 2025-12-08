@@ -1,4 +1,5 @@
 export const DEBUG_MODE = true;
+export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
 
 // More explicit approach to determine FRONTEND_URL
 export const FRONTEND_URL = (() => {

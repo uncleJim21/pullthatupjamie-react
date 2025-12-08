@@ -1,7 +1,7 @@
 import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
-import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, SearchViewStyle, SearchResultViewStyle } from '../constants/constants.ts';
+import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, SearchViewStyle, SearchResultViewStyle, DISABLE_CLIPPING } from '../constants/constants.ts';
 import { handleQuoteSearch, handleQuoteSearch3D } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef} from 'react';
@@ -1989,7 +1989,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           <div className="max-w-3xl mx-auto px-4">
             {searchMode === 'podcast-search' && (
               <div>
-                {!isAnyModalOpen() && (
+                {!DISABLE_CLIPPING && !isAnyModalOpen() && (
                   <div className="flex gap-3">
                     <div className="flex-1">
                       <ClipTrackerModal
@@ -2504,7 +2504,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             : '0'
         }}>
           <div className="w-full max-w-[40rem] flex flex-col">
-            {searchMode === 'podcast-search' && !isAnyModalOpen() && (
+            {!DISABLE_CLIPPING && searchMode === 'podcast-search' && !isAnyModalOpen() && (
               <div className="flex gap-3">
                 <div className="flex-1">
                   <ClipTrackerModal
