@@ -73,7 +73,7 @@ export const HIERARCHY_COLORS = {
   ALL_PODS: '#3366ff',  // deeper blue (more saturated, visible)
   FEED: '#b8cbff',      // medium blue-white (interpolated between ALL_PODS and EPISODE)
   EPISODE: '#ffffff',   // pure white (center anchor)
-  CHAPTER: '#ffaa66',   // distinct peachy-orange
+  CHAPTER: '#f08b47',   // distinct peachy-orange (30% closer to paragraph)
   PARAGRAPH: '#cc4400'  // deep reddish-orange (deepest nebula tone)
 };
 

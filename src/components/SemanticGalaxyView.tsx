@@ -20,7 +20,7 @@ const BOBBING_CONFIG = {
 // SELECTION DIMMING CONFIGURATION
 // ============================================================================
 const SELECTION_CONFIG = {
-  NON_SELECTED_DIM_FACTOR: 0.4, // How much to dim non-selected stars when a selection exists (0.0 = invisible, 1.0 = no dimming)
+  NON_SELECTED_DIM_FACTOR: 0.6, // How much to dim non-selected stars when a selection exists (0.0 = invisible, 1.0 = no dimming)
 };
 
 // ============================================================================
@@ -203,7 +203,7 @@ const STAR_VISUAL_CONFIG = {
 
 // Interaction configuration for stars (hit area, etc.)
 const STAR_INTERACTION_CONFIG = {
-  CORE_HIT_RADIUS_MULTIPLIER: 5, // Multiplier for invisible interaction sphere vs visual core
+  CORE_HIT_RADIUS_MULTIPLIER: 10, // Multiplier for invisible interaction sphere vs visual core
 };
 
 // Camera intro animation configuration
@@ -305,6 +305,24 @@ interface SemanticGalaxyViewProps {
   onDecelerationComplete?: () => void;
   query?: string;
 }
+
+// Transform color to compensate for additive blending brightening
+// This darkens/saturates colors so they look correct after being brightened
+const transformColorForBlending = (hexColor: string, factor: number = 0.5): string => {
+  // Parse hex color
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  
+  // Darken by multiplying each channel by the factor
+  const newR = Math.round(r * factor);
+  const newG = Math.round(g * factor);
+  const newB = Math.round(b * factor);
+  
+  // Convert back to hex
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
 
 // Convert hierarchy level to color
 const getHierarchyColor = (level: string): string => {
@@ -608,7 +626,11 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSele
     });
   });
 
-  const color = getHierarchyColor(result.hierarchyLevel);
+  const baseColor = getHierarchyColor(result.hierarchyLevel);
+  
+  // Apply transform to compensate for additive blending brightening
+  // Use a moderate darkening factor (0.65) to compensate for both the intensity multiplier and layer stacking
+  const color = transformColorForBlending(baseColor, 0.65);
 
   // Make the selected star brighter and dim all others when a selection exists.
   const baseIntensity =
