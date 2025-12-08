@@ -1,4 +1,4 @@
-import { API_URL, AuthConfig, RequestAuthMethod } from "../constants/constants.ts";
+import { API_URL, AuthConfig, RequestAuthMethod, SEARCH_LIMITS } from "../constants/constants.ts";
 
 export interface PodcastSearchParams {
   query: string;
@@ -36,7 +36,7 @@ export const handleQuoteSearch = async (
 
     const body: PodcastSearchParams = { 
       query: queryToUse,
-      limit: 20,
+      limit: SEARCH_LIMITS.LIST_VIEW,
       feedIds: selectedFeedIds || []
     };
 
@@ -101,7 +101,7 @@ export const handleQuoteSearch3D = async (
 
     const body: any = {
       query: queryToUse,
-      limit: 100, // 3D view can handle more results
+      limit: SEARCH_LIMITS.GALAXY_VIEW,
       feedIds: selectedFeedIds || []
     };
 
@@ -122,6 +122,8 @@ export const handleQuoteSearch3D = async (
       body.hierarchyLevels = hierarchyLevels;
     }
 
+    console.log(`[3D Search Request] Sending to API with limit: ${body.limit}, feedIds: ${body.feedIds?.length || 0}`);
+
     const response = await fetch(`${API_URL}/api/search-quotes-3d`, {
       method: 'POST',
       headers,
@@ -133,6 +135,7 @@ export const handleQuoteSearch3D = async (
     }
 
     const data = await response.json();
+    console.log(`[3D Search Response] Received ${data.results?.length || 0} results from backend`);
     return data;
   } catch (error) {
     console.error('3D quote search error:', error);

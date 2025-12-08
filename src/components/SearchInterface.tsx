@@ -936,6 +936,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         shouldExtractAxisLabels // Request axis labels if enabled in settings
       );
       
+      printLog(`[3D Search] Received ${quoteResults3D.results?.length || 0} results from API`);
+      
       // Store 3D results separately
       setGalaxyResults(quoteResults3D.results || []);
       

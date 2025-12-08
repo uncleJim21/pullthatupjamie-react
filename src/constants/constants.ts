@@ -76,3 +76,9 @@ export const HIERARCHY_COLORS = {
   CHAPTER: '#ffaa66',   // distinct peachy-orange
   PARAGRAPH: '#cc4400'  // deep reddish-orange (deepest nebula tone)
 };
+
+// Search result limits
+export const SEARCH_LIMITS = {
+  LIST_VIEW: 20,      // List view limit (2D search)
+  GALAXY_VIEW: 100,   // Galaxy view limit (3D search)
+};
