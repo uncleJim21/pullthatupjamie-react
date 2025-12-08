@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
-import { Calendar, RotateCcw, SlidersHorizontal, Check } from 'lucide-react';
+import { Calendar, RotateCcw, SlidersHorizontal, Check, Search } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 
@@ -303,6 +303,7 @@ interface SemanticGalaxyViewProps {
   } | null;
   isLoading?: boolean;
   onDecelerationComplete?: () => void;
+  query?: string;
 }
 
 // Convert hierarchy level to color
@@ -1246,6 +1247,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   axisLabels,
   isLoading = false,
   onDecelerationComplete,
+  query,
 }) => {
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -1358,8 +1360,24 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       <HoverPreview result={hoveredResult} position={mousePosition} />
 
       {/* Stats overlay with Legend */}
-      <div className="absolute top-4 right-4 px-3 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 text-sm z-10">
+      <div className="absolute top-4 right-4 px-3 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 text-sm z-10 max-w-[140px]">
         <div className="flex flex-col gap-3">
+          {/* Query Display */}
+          {query && (
+            <>
+              <div className="flex items-start gap-2 min-w-0 group relative">
+                <Search className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400" />
+                <div 
+                  className="text-xs text-gray-200 line-clamp-2 break-words overflow-hidden flex-1 cursor-help"
+                  title={query}
+                >
+                  {query}
+                </div>
+              </div>
+              <div className="border-t border-gray-700" />
+            </>
+          )}
+          
           {/* Stats */}
           <div className="flex flex-col gap-1">
             <div>Results: {results.length}</div>

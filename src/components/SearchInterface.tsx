@@ -2286,6 +2286,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   printLog('Deceleration complete from galaxy view');
                   setIsDecelerationComplete(true); // Allow context panel to appear
                 }}
+                query={
+                  [...conversation]
+                    .reverse()
+                    .find(item => item.type === 'podcast-search')?.query || undefined
+                }
               />
             </div>
           ) : (
