@@ -350,9 +350,10 @@ interface StarProps {
   onHover: (result: QuoteResult | null) => void;
 }
 
-// Component to draw lines connecting results from the same episode
-interface EpisodeConnectionsProps {
+// Component to draw lines connecting results from the same episode, chapter, or feed
+interface HierarchyConnectionsProps {
   results: QuoteResult[];
+  hierarchyLevel: 'feed' | 'episode' | 'chapter';
 }
 
 // Component to display axis labels in 3D space
@@ -547,11 +548,11 @@ const AxisLabels: React.FC<AxisLabelsProps> = ({ axisLabels }) => {
   );
 };
 
-const EpisodeConnections: React.FC<EpisodeConnectionsProps> = ({ results }) => {
+const HierarchyConnections: React.FC<HierarchyConnectionsProps> = ({ results, hierarchyLevel }) => {
   const lineGeometry = useMemo(() => {
     const points: THREE.Vector3[] = [];
     
-    // Create lines between all pairs of points in this episode
+    // Create lines between all pairs of points in this group
     for (let i = 0; i < results.length; i++) {
       for (let j = i + 1; j < results.length; j++) {
         const start = results[i].coordinates3d;
@@ -568,15 +569,91 @@ const EpisodeConnections: React.FC<EpisodeConnectionsProps> = ({ results }) => {
     return geometry;
   }, [results]);
 
+  // Get raw color and apply minimal darkening for INTENSE fluorescence
+  const color = useMemo(() => {
+    let baseColor: string;
+    let darkeningFactor: number;
+    
+    switch (hierarchyLevel) {
+      case 'feed':
+        baseColor = HIERARCHY_COLORS.FEED;
+        darkeningFactor = 0.7;  // Less darkening = MORE brightness
+        break;
+      case 'episode':
+        baseColor = HIERARCHY_COLORS.EPISODE;
+        darkeningFactor = 0.8;  // Very bright white
+        break;
+      case 'chapter':
+        baseColor = HIERARCHY_COLORS.CHAPTER;
+        darkeningFactor = 0.75; // Intense orange
+        break;
+      default:
+        baseColor = HIERARCHY_COLORS.EPISODE;
+        darkeningFactor = 0.8;
+    }
+    
+    // Transform color for additive blending (same technique used for stars)
+    return transformColorForBlending(baseColor, darkeningFactor);
+  }, [hierarchyLevel]);
+
+  // ETHEREAL fluorescent effect with translucent alpha
+  const baseOpacity = useMemo(() => {
+    switch (hierarchyLevel) {
+      case 'feed':
+        return 0.25;   // Blue lines - subtle, ethereal
+      case 'episode':
+        return 0.35;   // White lines - ghostly
+      case 'chapter':
+        return 0.45;   // Orange lines - most visible but still translucent
+      default:
+        return 0.35;
+    }
+  }, [hierarchyLevel]);
+
+  // Many layers for THICK but ETHEREAL, TRANSLUCENT fluorescent glow
+  const glowLayers = [
+    { scale: 1.0, opacity: baseOpacity },       // Core 1 - soft brightness
+    { scale: 1.0, opacity: baseOpacity * 0.95 }, // Core 2
+    { scale: 1.0, opacity: baseOpacity * 0.9 },  // Core 3
+    { scale: 1.0, opacity: baseOpacity * 0.85 }, // Inner glow 1
+    { scale: 1.0, opacity: baseOpacity * 0.8 },  // Inner glow 2
+    { scale: 1.0, opacity: baseOpacity * 0.75 }, // Inner glow 3
+    { scale: 1.0, opacity: baseOpacity * 0.7 },  // Mid glow 1
+    { scale: 1.0, opacity: baseOpacity * 0.65 }, // Mid glow 2
+    { scale: 1.0, opacity: baseOpacity * 0.6 },  // Mid glow 3
+    { scale: 1.0, opacity: baseOpacity * 0.55 }, // Mid glow 4
+    { scale: 1.0, opacity: baseOpacity * 0.5 },  // Mid glow 5
+    { scale: 1.0, opacity: baseOpacity * 0.45 }, // Outer glow 1
+    { scale: 1.0, opacity: baseOpacity * 0.4 },  // Outer glow 2
+    { scale: 1.0, opacity: baseOpacity * 0.35 }, // Outer glow 3
+    { scale: 1.0, opacity: baseOpacity * 0.3 },  // Outer glow 4
+    { scale: 1.0, opacity: baseOpacity * 0.25 }, // Far glow 1
+    { scale: 1.0, opacity: baseOpacity * 0.2 },  // Far glow 2
+    { scale: 1.0, opacity: baseOpacity * 0.15 }, // Far glow 3
+    { scale: 1.0, opacity: baseOpacity * 0.12 }, // Very far glow 1
+    { scale: 1.0, opacity: baseOpacity * 0.1 },  // Very far glow 2
+    { scale: 1.0, opacity: baseOpacity * 0.08 }, // Extreme glow 1
+    { scale: 1.0, opacity: baseOpacity * 0.06 }, // Extreme glow 2
+    { scale: 1.0, opacity: baseOpacity * 0.04 }, // Ultra far glow
+    { scale: 1.0, opacity: baseOpacity * 0.02 }, // Whisper glow
+  ];
+
   return (
-    <lineSegments geometry={lineGeometry}>
-      <lineBasicMaterial 
-        color="#444444" 
-        transparent 
-        opacity={0.2}
-        linewidth={1}
-      />
-    </lineSegments>
+    <group>
+      {/* Render multiple overlapping lines to create thick fluorescent effect */}
+      {glowLayers.map((layer, index) => (
+        <lineSegments key={index} geometry={lineGeometry}>
+          <lineBasicMaterial 
+            color={color}
+            transparent 
+            opacity={layer.opacity}
+            blending={THREE.AdditiveBlending}  // Additive blending for fluorescent glow
+            depthWrite={false}
+            linewidth={10} // Hint for thickness (may not work on all platforms)
+          />
+        </lineSegments>
+      ))}
+    </group>
   );
 };
 
@@ -1211,19 +1288,36 @@ const GalaxyScene: React.FC<{
     return nearby;
   }, [results, selectedStarId]);
 
-  // Group results by episode
-  const episodeGroups = useMemo(() => {
-    const groups = new Map<string, QuoteResult[]>();
+  // Group results by hierarchy levels (feed, episode, chapter)
+  const hierarchyGroups = useMemo(() => {
+    const feedGroups = new Map<string, QuoteResult[]>();
+    const episodeGroups = new Map<string, QuoteResult[]>();
+    const chapterGroups = new Map<string, QuoteResult[]>();
     
     results.forEach(result => {
-      const episodeKey = result.episode;
-      if (!groups.has(episodeKey)) {
-        groups.set(episodeKey, []);
+      // Group by feed (using creator as feed identifier)
+      const feedKey = result.creator;
+      if (!feedGroups.has(feedKey)) {
+        feedGroups.set(feedKey, []);
       }
-      groups.get(episodeKey)!.push(result);
+      feedGroups.get(feedKey)!.push(result);
+      
+      // Group by episode
+      const episodeKey = result.episode;
+      if (!episodeGroups.has(episodeKey)) {
+        episodeGroups.set(episodeKey, []);
+      }
+      episodeGroups.get(episodeKey)!.push(result);
+      
+      // Group by chapter (using headline if available, otherwise episode)
+      const chapterKey = result.headline || result.episode;
+      if (!chapterGroups.has(chapterKey)) {
+        chapterGroups.set(chapterKey, []);
+      }
+      chapterGroups.get(chapterKey)!.push(result);
     });
     
-    return groups;
+    return { feedGroups, episodeGroups, chapterGroups };
   }, [results]);
 
   return (
@@ -1242,14 +1336,41 @@ const GalaxyScene: React.FC<{
         <AxisLabels axisLabels={axisLabels} />
       )}
 
-      {/* Episode Connection Lines */}
-      {Array.from(episodeGroups.values()).map((episodeResults, groupIndex) => {
+      {/* Hierarchy Connection Lines - Feed Level (most subtle) */}
+      {Array.from(hierarchyGroups.feedGroups.values()).map((feedResults, groupIndex) => {
+        if (feedResults.length < 2) return null; // Skip if only one result in feed
+        
+        return (
+          <HierarchyConnections
+            key={`feed-${groupIndex}`}
+            results={feedResults}
+            hierarchyLevel="feed"
+          />
+        );
+      })}
+      
+      {/* Hierarchy Connection Lines - Episode Level (medium) */}
+      {Array.from(hierarchyGroups.episodeGroups.values()).map((episodeResults, groupIndex) => {
         if (episodeResults.length < 2) return null; // Skip if only one result in episode
         
         return (
-          <EpisodeConnections
+          <HierarchyConnections
             key={`episode-${groupIndex}`}
             results={episodeResults}
+            hierarchyLevel="episode"
+          />
+        );
+      })}
+      
+      {/* Hierarchy Connection Lines - Chapter Level (most visible) */}
+      {Array.from(hierarchyGroups.chapterGroups.values()).map((chapterResults, groupIndex) => {
+        if (chapterResults.length < 2) return null; // Skip if only one result in chapter
+        
+        return (
+          <HierarchyConnections
+            key={`chapter-${groupIndex}`}
+            results={chapterResults}
+            hierarchyLevel="chapter"
           />
         );
       })}
