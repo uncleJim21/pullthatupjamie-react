@@ -1,4 +1,6 @@
 export const DEBUG_MODE = false;
+export const DEBUG_TRANSCRIPTION = false;
+export const TFTC_FEED_URL = "https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9"
 
 // More explicit approach to determine FRONTEND_URL
 export const FRONTEND_URL = (() => {
