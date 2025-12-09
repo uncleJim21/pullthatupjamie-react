@@ -1530,6 +1530,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     // Check if this is the user's first visit
     const settings = localStorage.getItem('userSettings');
     const userSettings = settings ? JSON.parse(settings) : {};
+    
+    // Initialize defaults for first-time users on mount
+    if (userSettings.isFirstVisit !== false) {
+      // Set defaults if not already set
+      if (userSettings.showAxisLabels === undefined) {
+        userSettings.showAxisLabels = true;
+      }
+      if (userSettings.autoPlayOnStarClick === undefined) {
+        userSettings.autoPlayOnStarClick = true;
+      }
+      localStorage.setItem('userSettings', JSON.stringify(userSettings));
+    }
+    
     return userSettings.isFirstVisit !== false; // Default to true if not set
   });
 
