@@ -2511,6 +2511,75 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     }
   }, [mentionResults, mentionSearchQuery, currentMentionPlatform]);
 
+  // Garbage-collect mention mappings based on current content to avoid stale cross-platform state
+  useEffect(() => {
+    // Fast exit if there's no content and no mappings
+    if (!content) {
+      if (Object.keys(mentionDictionary).length === 0 && Object.keys(nprofileToDisplayName).length === 0) {
+        return;
+      }
+
+      if (Object.keys(mentionDictionary).length > 0) {
+        setMentionDictionary({});
+      }
+      if (Object.keys(nprofileToDisplayName).length > 0) {
+        setNprofileToDisplayName({});
+      }
+      return;
+    }
+
+    // Collect all display labels currently present in backticked mentions: `@Label`
+    const activeLabels = new Set<string>();
+    const mentionRegex = /`(@[^`]+)`/g;
+    let match;
+    while ((match = mentionRegex.exec(content)) !== null) {
+      const raw = match[1]; // @Label
+      const cleanLabel = raw.slice(1); // remove leading @
+      if (cleanLabel) {
+        activeLabels.add(cleanLabel);
+      }
+    }
+
+    // Rebuild a minimal mentionDictionary and nprofileToDisplayName containing only
+    // entries that are actually referenced in the current content.
+    const nextDictionary: typeof mentionDictionary = {};
+    const nextNprofileMap: typeof nprofileToDisplayName = {};
+
+    activeLabels.forEach((label) => {
+      const entry = mentionDictionary[label];
+      if (!entry) return;
+
+      // Always keep the label we found in content
+      nextDictionary[label] = entry;
+
+      // Re-add helpful alias keys for cross-platform mentions
+      if (entry.platform === 'both') {
+        const twitterUsername = entry.twitterHandle?.replace('@', '');
+        if (twitterUsername && !nextDictionary[twitterUsername]) {
+          nextDictionary[twitterUsername] = entry;
+        }
+        if (entry.nostrDisplayName && !nextDictionary[entry.nostrDisplayName]) {
+          nextDictionary[entry.nostrDisplayName] = entry;
+        }
+      }
+
+      // Rebuild nprofile → displayName mapping from surviving entries
+      if ((entry.platform === 'nostr' || entry.platform === 'both') && entry.nostrNprofile && entry.nostrDisplayName) {
+        nextNprofileMap[entry.nostrNprofile] = entry.nostrDisplayName;
+      }
+    });
+
+    const dictChanged = JSON.stringify(nextDictionary) !== JSON.stringify(mentionDictionary);
+    const mapChanged = JSON.stringify(nextNprofileMap) !== JSON.stringify(nprofileToDisplayName);
+
+    if (dictChanged) {
+      setMentionDictionary(nextDictionary);
+    }
+    if (mapChanged) {
+      setNprofileToDisplayName(nextNprofileMap);
+    }
+  }, [content, mentionDictionary, nprofileToDisplayName]);
+
   // Update platform-specific text variables when content or dictionary changes
   useEffect(() => {
     const newTwitterText = buildPlatformText('twitter');
