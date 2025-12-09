@@ -1,4 +1,4 @@
-export const DEBUG_MODE = true;
+export const DEBUG_MODE = false;
 export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
 
 // More explicit approach to determine FRONTEND_URL
@@ -24,7 +24,7 @@ console.log('Constants loaded:', {
   hostname: typeof window !== 'undefined' ? window.location.hostname : 'not in browser'
 });
 
-export const API_URL = DEBUG_MODE ? "http://localhost:4132" : "https://pullthatupjamie-nsh57.ondigitalocean.app";
+export const API_URL = DEBUG_MODE ? "http://localhost:4132" : "https://pullthatupjamie-explore-alpha-xns9k.ondigitalocean.app";
 export const MONTHLY_PRICE_STRING = "$9.99"
 
 export const printLog = (log:string) =>{
