@@ -12,7 +12,8 @@ export interface UserPreferences {
   searchViewStyle?: 'classic' | 'split_screen';
   searchResultViewStyle?: 'list' | 'galaxy';
   preferredAIClipsViewStyle?: 'list' | 'grid';
-  showAxisLabels?: boolean; // Display axis labels in galaxy view
+  showAxisLabels?: boolean; // Display axis labels in galaxy view (default: true for new users)
+  autoPlayOnStarClick?: boolean; // Auto-play audio when clicking a star in galaxy view (default: true for new users)
   
   // Admin Settings
   adminFeedId?: string;

@@ -218,12 +218,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       const userSettings = localStorage.getItem('userSettings');
       if (userSettings) {
         const settings = JSON.parse(userSettings);
-        return settings.showAxisLabels ?? false;
+        // Default to true for first-time users (when showAxisLabels is undefined)
+        return settings.showAxisLabels ?? true;
       }
     } catch (e) {
       console.error('Error loading showAxisLabels:', e);
     }
-    return false;
+    // Default to true for new users
+    return true;
   };
   
   // Update state for filter button
@@ -1436,12 +1438,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           setSelectedAudioContext(audioContext);
           
           // Read auto-play preference
-          let autoPlay = false;
+          let autoPlay = true; // Default to true for first-time users
           try {
             const settings = localStorage.getItem('userSettings');
             if (settings) {
               const userSettings = JSON.parse(settings);
-              autoPlay = !!userSettings.autoPlayOnStarClick;
+              // Use nullish coalescing to default to true when undefined
+              autoPlay = userSettings.autoPlayOnStarClick ?? true;
             }
           } catch (e) {
             console.error('Error reading autoPlayOnStarClick from userSettings:', e);
@@ -1551,20 +1554,34 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   };
 
   const handleWelcomeGetStarted = () => {
-    // Mark that the user has visited before
+    // Mark that the user has visited before and set defaults for first-time users
     const settings = localStorage.getItem('userSettings');
     const userSettings = settings ? JSON.parse(settings) : {};
     userSettings.isFirstVisit = false;
+    // Set defaults for first-time users
+    if (userSettings.showAxisLabels === undefined) {
+      userSettings.showAxisLabels = true;
+    }
+    if (userSettings.autoPlayOnStarClick === undefined) {
+      userSettings.autoPlayOnStarClick = true;
+    }
     localStorage.setItem('userSettings', JSON.stringify(userSettings));
     
     setIsWelcomeOpen(false);
   };
 
   const handleTutorialClose = () => {
-    // Mark that the user has visited before
+    // Mark that the user has visited before and set defaults for first-time users
     const settings = localStorage.getItem('userSettings');
     const userSettings = settings ? JSON.parse(settings) : {};
     userSettings.isFirstVisit = false;
+    // Set defaults for first-time users
+    if (userSettings.showAxisLabels === undefined) {
+      userSettings.showAxisLabels = true;
+    }
+    if (userSettings.autoPlayOnStarClick === undefined) {
+      userSettings.autoPlayOnStarClick = true;
+    }
     localStorage.setItem('userSettings', JSON.stringify(userSettings));
     
     setIsTutorialOpen(false);
@@ -2243,14 +2260,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   setSelectedParagraphId(result.shareLink);
                   
                   // Read auto-play preference from userSettings
-                  let autoPlay = false;
+                  let autoPlay = true; // Default to true for first-time users
                   try {
                     const settings = localStorage.getItem('userSettings');
                     printLog(`[StarClick] Raw userSettings from localStorage: ${settings}`);
                     if (settings) {
                       const userSettings = JSON.parse(settings);
                       printLog(`[StarClick] Parsed userSettings: ${JSON.stringify(userSettings)}`);
-                      autoPlay = !!userSettings.autoPlayOnStarClick;
+                      // Use nullish coalescing to default to true when undefined
+                      autoPlay = userSettings.autoPlayOnStarClick ?? true;
                       printLog(`[StarClick] autoPlayOnStarClick from settings: ${userSettings.autoPlayOnStarClick}, coerced to: ${autoPlay}`);
                     }
                   } catch (e) {

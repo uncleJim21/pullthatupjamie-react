@@ -213,7 +213,7 @@ const CAMERA_ANIMATION_CONFIG = {
   fromAngle: Math.PI,          // 180 degrees
   toAngle: 0,                  // 0 degrees (forward)
   fromDistanceFactor: 0.3,    // start closer (easier to see zoom out)
-  toDistanceFactor: 0.7,       // zoom out slightly beyond base distance for effect
+  toDistanceFactor: 0.9,       // zoom out slightly beyond base distance for effect
 };
 
 // Generate random tiny ray properties
