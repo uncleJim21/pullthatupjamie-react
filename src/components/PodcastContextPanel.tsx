@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronLeft, Podcast, ChevronDown, ChevronUp, Play, ScanSearch } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Podcast, ChevronDown, ChevronUp, Play, ScanSearch, RotateCcw, RotateCw } from 'lucide-react';
 import ContextService, { AdjacentParagraph, HierarchyResponse } from '../services/contextService.ts';
 import ChapterService, { Chapter } from '../services/chapterService.ts';
 import { printLog, HIERARCHY_COLORS } from '../constants/constants.ts';
@@ -86,6 +86,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     togglePlay,
     pause,
     seekTo,
+    seekBy,
   } = useAudioController();
   const autoPlayKeyRef = useRef<string | null>(null);
 
@@ -479,26 +480,55 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
     return (
       <div className="mt-3 space-y-2">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleEpisodePlayPause}
-            className={`h-8 w-8 flex items-center justify-center rounded-full text-black transition-colors ${
-              audioUrl === 'URL unavailable'
-                ? 'bg-gray-700 cursor-not-allowed'
-                : 'bg-white hover:bg-gray-200'
-            }`}
-            disabled={audioUrl === 'URL unavailable'}
-          >
-            {contextIsBuffering ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black" />
-            ) : contextIsPlaying ? (
-              <span className="text-xs font-semibold">||</span>
-            ) : (
-              <Play className="w-4 h-4" />
-            )}
-          </button>
+        <div className="flex items-center gap-2">
+          {/* Play/Pause and Skip buttons column */}
+          <div className="flex flex-col gap-1">
+            {/* Row 1: Play/Pause */}
+            <button
+              onClick={handleEpisodePlayPause}
+              className={`h-8 w-8 ml-1 flex items-center justify-center rounded-full text-black transition-colors ${
+                audioUrl === 'URL unavailable'
+                  ? 'bg-gray-700 cursor-not-allowed'
+                  : 'bg-white hover:bg-gray-200'
+              }`}
+              disabled={audioUrl === 'URL unavailable'}
+            >
+              {contextIsBuffering ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black" />
+              ) : contextIsPlaying ? (
+                <span className="text-xs font-semibold">||</span>
+              ) : (
+                <Play className="w-4 h-4" />
+              )}
+            </button>
+
+            {/* Row 2: Skip buttons side by side */}
+            <div className="flex gap-1">
+              {/* Skip Back 5s */}
+              <button
+                onClick={() => isContextTrackActive && seekBy(-5)}
+                className="p-1 rounded-full text-white transition-colors hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!isContextTrackActive || audioUrl === 'URL unavailable'}
+                title="Back 5 seconds"
+              >
+                <RotateCcw size={10} />
+              </button>
+
+              {/* Skip Forward 5s */}
+              <button
+                onClick={() => isContextTrackActive && seekBy(5)}
+                className="p-1 rounded-full text-white transition-colors hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!isContextTrackActive || audioUrl === 'URL unavailable'}
+                title="Forward 5 seconds"
+              >
+                <RotateCw size={10} />
+              </button>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
           <div
-            className="flex-1 h-1 bg-gray-700 rounded cursor-pointer relative"
+            className="flex-1 h-1 bg-gray-700 rounded cursor-pointer relative mb-4"
             onClick={handleBarClick}
           >
             <div
@@ -506,7 +536,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <span className="text-xs text-gray-400 min-w-[64px] text-right font-mono">
+
+          {/* Time Display */}
+          <span className="text-xs text-gray-400 min-w-[48px] text-right font-mono mb-4">
             {formatTime(current)}
           </span>
         </div>
