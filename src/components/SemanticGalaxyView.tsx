@@ -354,6 +354,7 @@ interface StarProps {
 interface HierarchyConnectionsProps {
   results: QuoteResult[];
   hierarchyLevel: 'feed' | 'episode' | 'chapter';
+  selectedStarId: string | null;
 }
 
 // Component to display axis labels in 3D space
@@ -548,111 +549,123 @@ const AxisLabels: React.FC<AxisLabelsProps> = ({ axisLabels }) => {
   );
 };
 
-const HierarchyConnections: React.FC<HierarchyConnectionsProps> = ({ results, hierarchyLevel }) => {
-  const lineGeometry = useMemo(() => {
-    const points: THREE.Vector3[] = [];
+// Configuration for glowing connection threads (diffuse, soft aesthetic)
+const BASE_THREAD_OPACITY = 0.06
+const THREAD_CONFIG = {
+  CORE_RADIUS: 0.008,
+  CORE_OPACITY: 0.3,
+  GLOW_LAYERS: [
+    { radius: 0.03, opacity: BASE_THREAD_OPACITY / (1 + 3.2 * Math.log(1 + 0.03 * 10)) },
+    { radius: 0.06, opacity: BASE_THREAD_OPACITY / (1 + 3.2 * Math.log(1 + 0.06 * 10)) },
+    { radius: 0.10, opacity: BASE_THREAD_OPACITY / (1 + 3.2 * Math.log(1 + 0.10 * 10)) },
+    { radius: 0.15, opacity: BASE_THREAD_OPACITY / (1 + 3.2 * Math.log(1 + 0.15 * 10)) },
+    { radius: 0.22, opacity: BASE_THREAD_OPACITY / (1 + 3.2 * Math.log(1 + 0.22 * 10)) },
+    { radius: 0.30, opacity: BASE_THREAD_OPACITY / (1 + 3.2 * Math.log(1 + 0.30 * 10)) },
+    { radius: 0.40, opacity: BASE_THREAD_OPACITY / (1 + 3.2 * Math.log(1 + 0.40 * 10)) },
+    { radius: 0.52, opacity: BASE_THREAD_OPACITY / (1 + 3.2 * Math.log(1 + 0.52 * 10)) },
+    { radius: 0.66, opacity: BASE_THREAD_OPACITY / (1 + 3.2 * Math.log(1 + 0.66 * 10)) },
+    { radius: 0.82, opacity: BASE_THREAD_OPACITY / (1 + 3.2 * Math.log(1 + 0.82 * 10)) },
+    { radius: 1.00, opacity: BASE_THREAD_OPACITY / (1 + 3.2 * Math.log(1 + 1.00 * 10)) },
+  ],
+};
+
+const HierarchyConnections: React.FC<HierarchyConnectionsProps> = ({ results, hierarchyLevel, selectedStarId }) => {
+  // Create individual connection pairs - only show connections involving the selected star
+  const connections = useMemo(() => {
+    const pairs: Array<{ start: THREE.Vector3; end: THREE.Vector3 }> = [];
     
-    // Create lines between all pairs of points in this group
-    for (let i = 0; i < results.length; i++) {
-      for (let j = i + 1; j < results.length; j++) {
-        const start = results[i].coordinates3d;
-        const end = results[j].coordinates3d;
-        
-        points.push(
-          new THREE.Vector3(start.x * 10, start.y * 10, start.z * 10),
-          new THREE.Vector3(end.x * 10, end.y * 10, end.z * 10)
-        );
-      }
+    // If no star is selected, don't show any connections
+    if (!selectedStarId) {
+      return pairs;
     }
     
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    return geometry;
-  }, [results]);
-
-  // Get raw color and apply minimal darkening for INTENSE fluorescence
-  const color = useMemo(() => {
-    let baseColor: string;
-    let darkeningFactor: number;
+    // Find the selected result in this group
+    const selectedIndex = results.findIndex(r => r.shareLink === selectedStarId);
+    if (selectedIndex === -1) {
+      return pairs; // Selected star is not in this group
+    }
     
+    // Only create connections between the selected star and other stars in the same group
+    const selectedResult = results[selectedIndex];
+    for (let j = 0; j < results.length; j++) {
+      if (j === selectedIndex) continue; // Skip self
+      
+      const start = selectedResult.coordinates3d;
+      const end = results[j].coordinates3d;
+      
+      pairs.push({
+        start: new THREE.Vector3(start.x * 10, start.y * 10, start.z * 10),
+        end: new THREE.Vector3(end.x * 10, end.y * 10, end.z * 10)
+      });
+    }
+    
+    return pairs;
+  }, [results, selectedStarId]);
+
+  // Get color based on hierarchy - 1 (use the color of one level below)
+  // Same chapter → use paragraph color
+  // Same episode → use chapter color
+  // Same feed → use episode color
+  const baseColor = useMemo(() => {
     switch (hierarchyLevel) {
       case 'feed':
-        baseColor = HIERARCHY_COLORS.FEED;
-        darkeningFactor = 0.7;  // Less darkening = MORE brightness
-        break;
+        return HIERARCHY_COLORS.EPISODE;  // Feed connections use episode color
       case 'episode':
-        baseColor = HIERARCHY_COLORS.EPISODE;
-        darkeningFactor = 0.8;  // Very bright white
-        break;
+        return HIERARCHY_COLORS.CHAPTER;  // Episode connections use chapter color
       case 'chapter':
-        baseColor = HIERARCHY_COLORS.CHAPTER;
-        darkeningFactor = 0.75; // Intense orange
-        break;
+        return HIERARCHY_COLORS.PARAGRAPH; // Chapter connections use paragraph color
       default:
-        baseColor = HIERARCHY_COLORS.EPISODE;
-        darkeningFactor = 0.8;
-    }
-    
-    // Transform color for additive blending (same technique used for stars)
-    return transformColorForBlending(baseColor, darkeningFactor);
-  }, [hierarchyLevel]);
-
-  // ETHEREAL fluorescent effect with translucent alpha
-  const baseOpacity = useMemo(() => {
-    switch (hierarchyLevel) {
-      case 'feed':
-        return 0.25;   // Blue lines - subtle, ethereal
-      case 'episode':
-        return 0.35;   // White lines - ghostly
-      case 'chapter':
-        return 0.45;   // Orange lines - most visible but still translucent
-      default:
-        return 0.35;
+        return HIERARCHY_COLORS.CHAPTER;
     }
   }, [hierarchyLevel]);
 
-  // Many layers for THICK but ETHEREAL, TRANSLUCENT fluorescent glow
-  const glowLayers = [
-    { scale: 1.0, opacity: baseOpacity },       // Core 1 - soft brightness
-    { scale: 1.0, opacity: baseOpacity * 0.95 }, // Core 2
-    { scale: 1.0, opacity: baseOpacity * 0.9 },  // Core 3
-    { scale: 1.0, opacity: baseOpacity * 0.85 }, // Inner glow 1
-    { scale: 1.0, opacity: baseOpacity * 0.8 },  // Inner glow 2
-    { scale: 1.0, opacity: baseOpacity * 0.75 }, // Inner glow 3
-    { scale: 1.0, opacity: baseOpacity * 0.7 },  // Mid glow 1
-    { scale: 1.0, opacity: baseOpacity * 0.65 }, // Mid glow 2
-    { scale: 1.0, opacity: baseOpacity * 0.6 },  // Mid glow 3
-    { scale: 1.0, opacity: baseOpacity * 0.55 }, // Mid glow 4
-    { scale: 1.0, opacity: baseOpacity * 0.5 },  // Mid glow 5
-    { scale: 1.0, opacity: baseOpacity * 0.45 }, // Outer glow 1
-    { scale: 1.0, opacity: baseOpacity * 0.4 },  // Outer glow 2
-    { scale: 1.0, opacity: baseOpacity * 0.35 }, // Outer glow 3
-    { scale: 1.0, opacity: baseOpacity * 0.3 },  // Outer glow 4
-    { scale: 1.0, opacity: baseOpacity * 0.25 }, // Far glow 1
-    { scale: 1.0, opacity: baseOpacity * 0.2 },  // Far glow 2
-    { scale: 1.0, opacity: baseOpacity * 0.15 }, // Far glow 3
-    { scale: 1.0, opacity: baseOpacity * 0.12 }, // Very far glow 1
-    { scale: 1.0, opacity: baseOpacity * 0.1 },  // Very far glow 2
-    { scale: 1.0, opacity: baseOpacity * 0.08 }, // Extreme glow 1
-    { scale: 1.0, opacity: baseOpacity * 0.06 }, // Extreme glow 2
-    { scale: 1.0, opacity: baseOpacity * 0.04 }, // Ultra far glow
-    { scale: 1.0, opacity: baseOpacity * 0.02 }, // Whisper glow
-  ];
+  // Apply color transformation for additive blending (same as stars)
+  const color = transformColorForBlending(baseColor, 0.65);
 
   return (
     <group>
-      {/* Render multiple overlapping lines to create thick fluorescent effect */}
-      {glowLayers.map((layer, index) => (
-        <lineSegments key={index} geometry={lineGeometry}>
-          <lineBasicMaterial 
-            color={color}
-            transparent 
-            opacity={layer.opacity}
-            blending={THREE.AdditiveBlending}  // Additive blending for fluorescent glow
-            depthWrite={false}
-            linewidth={10} // Hint for thickness (may not work on all platforms)
-          />
-        </lineSegments>
-      ))}
+      {connections.map((connection, connIndex) => {
+        const direction = new THREE.Vector3().subVectors(connection.end, connection.start);
+        const length = direction.length();
+        const midpoint = new THREE.Vector3().addVectors(connection.start, connection.end).multiplyScalar(0.5);
+        
+        // Calculate orientation
+        const axis = new THREE.Vector3(0, 1, 0);
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(
+          axis,
+          direction.clone().normalize()
+        );
+
+        return (
+          <group key={connIndex} position={midpoint} quaternion={quaternion}>
+            {/* Core thread - soft center */}
+            <mesh>
+              <cylinderGeometry args={[THREAD_CONFIG.CORE_RADIUS, THREAD_CONFIG.CORE_RADIUS, length, 8]} />
+              <meshBasicMaterial
+                color={color}
+                transparent
+                opacity={THREAD_CONFIG.CORE_OPACITY}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+              />
+            </mesh>
+
+            {/* Multiple glow layers - soft halo (same technique as stars) */}
+            {THREAD_CONFIG.GLOW_LAYERS.map((layer, layerIndex) => (
+              <mesh key={layerIndex}>
+                <cylinderGeometry args={[layer.radius, layer.radius, length, 8]} />
+                <meshBasicMaterial
+                  color={color}
+                  transparent
+                  opacity={layer.opacity}
+                  blending={THREE.AdditiveBlending}
+                  depthWrite={false}
+                />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
     </group>
   );
 };
@@ -1345,6 +1358,7 @@ const GalaxyScene: React.FC<{
             key={`feed-${groupIndex}`}
             results={feedResults}
             hierarchyLevel="feed"
+            selectedStarId={selectedStarId}
           />
         );
       })}
@@ -1358,6 +1372,7 @@ const GalaxyScene: React.FC<{
             key={`episode-${groupIndex}`}
             results={episodeResults}
             hierarchyLevel="episode"
+            selectedStarId={selectedStarId}
           />
         );
       })}
@@ -1371,6 +1386,7 @@ const GalaxyScene: React.FC<{
             key={`chapter-${groupIndex}`}
             results={chapterResults}
             hierarchyLevel="chapter"
+            selectedStarId={selectedStarId}
           />
         );
       })}

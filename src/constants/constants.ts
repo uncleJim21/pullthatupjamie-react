@@ -70,6 +70,12 @@ export enum SearchResultViewStyle {
   GALAXY = 'galaxy'
 }
 
+// Numerical hierarchy levels (higher = broader scope)
+export const HIERARCHY_LEVEL_FEED = 3;
+export const HIERARCHY_LEVEL_EPISODE = 2;
+export const HIERARCHY_LEVEL_CHAPTER = 1;
+export const HIERARCHY_LEVEL_PARAGRAPH = 0;
+
 export const HIERARCHY_COLORS = {
   ALL_PODS: '#3366ff',  // deeper blue (more saturated, visible)
   FEED: '#b8cbff',      // medium blue-white (interpolated between ALL_PODS and EPISODE)
