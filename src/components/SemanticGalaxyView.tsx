@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
-import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Bookmark, ChevronDown, ChevronUp, X, Podcast } from 'lucide-react';
+import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Bookmark, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2 } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
@@ -1724,91 +1724,82 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
               {!isResearchCollapsed && (
                 <>
                   {researchSessionItems.length > 0 ? (
-                    <>
-                      <div 
-                        className="space-y-2 overflow-y-auto"
-                        style={{
-                          maxHeight: researchSessionItems.length > RESEARCH_SESSION_CONFIG.MAX_VISIBLE_ITEMS 
-                            ? `${RESEARCH_SESSION_CONFIG.MAX_VISIBLE_ITEMS * 38}px` // ~38px per item (including gap)
-                            : 'none'
-                        }}
-                      >
-                        {researchSessionItems.map((item) => {
-                          // Use same logic as HoverPreview for content preview
-                          const contentPreview = item.summary || item.quote || 'No preview';
-                          const hierarchyColor = getHierarchyColor(item.hierarchyLevel);
-                          
-                          return (
-                            <div
-                              key={item.shareLink}
-                              className="bg-gray-900/50 rounded p-1.5 hover:bg-gray-900/70 transition-colors group"
-                              onMouseEnter={(e) => {
-                                // Clear any existing timeout
-                                if (researchHoverTimeoutRef.current) {
-                                  clearTimeout(researchHoverTimeoutRef.current);
-                                }
-                                
-                                setHoveredResearchItem(item);
-                                setMousePosition({ x: e.clientX, y: e.clientY });
-                                
-                                // Set timeout for 2 seconds before showing tooltip
-                                researchHoverTimeoutRef.current = setTimeout(() => {
-                                  setShowResearchTooltip(true);
-                                }, 1000);
-                              }}
-                              onMouseMove={(e) => {
-                                setMousePosition({ x: e.clientX, y: e.clientY });
-                              }}
-                              onMouseLeave={() => {
-                                // Clear timeout if user moves away before 2 seconds
-                                if (researchHoverTimeoutRef.current) {
-                                  clearTimeout(researchHoverTimeoutRef.current);
-                                }
-                                setHoveredResearchItem(null);
-                                setShowResearchTooltip(false);
-                              }}
-                            >
-                              <div className="flex gap-1.5 items-start">
-                                {/* Hierarchy Dot */}
-                                <div
-                                  className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5"
-                                  style={{
-                                    backgroundColor: hierarchyColor,
-                                    boxShadow: `0 0 4px 1px ${hierarchyColor}`,
-                                    border: `1px solid ${hierarchyColor}`,
-                                  }}
-                                />
-                                
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between gap-1">
-                                    <p className="text-[0.65rem] text-gray-300 line-clamp-1 leading-tight">
-                                      {contentPreview}
-                                    </p>
-                                    <button
-                                      onClick={() => onRemoveFromResearch?.(item.shareLink)}
-                                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-400 flex-shrink-0"
-                                      aria-label="Remove"
-                                    >
-                                      <X className="w-2.5 h-2.5" />
-                                    </button>
-                                  </div>
-                                  <p className="text-[0.6rem] text-gray-500 mt-0.5 leading-tight line-clamp-1">
-                                    {item.episode}
+                    <div 
+                      className="space-y-2 overflow-y-auto"
+                      style={{
+                        maxHeight: researchSessionItems.length > RESEARCH_SESSION_CONFIG.MAX_VISIBLE_ITEMS 
+                          ? `${RESEARCH_SESSION_CONFIG.MAX_VISIBLE_ITEMS * 38}px` // ~38px per item (including gap)
+                          : 'none'
+                      }}
+                    >
+                      {researchSessionItems.map((item) => {
+                        // Use same logic as HoverPreview for content preview
+                        const contentPreview = item.summary || item.quote || 'No preview';
+                        const hierarchyColor = getHierarchyColor(item.hierarchyLevel);
+                        
+                        return (
+                          <div
+                            key={item.shareLink}
+                            className="bg-gray-900/50 rounded p-1.5 hover:bg-gray-900/70 transition-colors group"
+                            onMouseEnter={(e) => {
+                              // Clear any existing timeout
+                              if (researchHoverTimeoutRef.current) {
+                                clearTimeout(researchHoverTimeoutRef.current);
+                              }
+                              
+                              setHoveredResearchItem(item);
+                              setMousePosition({ x: e.clientX, y: e.clientY });
+                              
+                              // Set timeout for 2 seconds before showing tooltip
+                              researchHoverTimeoutRef.current = setTimeout(() => {
+                                setShowResearchTooltip(true);
+                              }, 1000);
+                            }}
+                            onMouseMove={(e) => {
+                              setMousePosition({ x: e.clientX, y: e.clientY });
+                            }}
+                            onMouseLeave={() => {
+                              // Clear timeout if user moves away before 2 seconds
+                              if (researchHoverTimeoutRef.current) {
+                                clearTimeout(researchHoverTimeoutRef.current);
+                              }
+                              setHoveredResearchItem(null);
+                              setShowResearchTooltip(false);
+                            }}
+                          >
+                            <div className="flex gap-1.5 items-start">
+                              {/* Hierarchy Dot */}
+                              <div
+                                className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5"
+                                style={{
+                                  backgroundColor: hierarchyColor,
+                                  boxShadow: `0 0 4px 1px ${hierarchyColor}`,
+                                  border: `1px solid ${hierarchyColor}`,
+                                }}
+                              />
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-1">
+                                  <p className="text-[0.65rem] text-gray-300 line-clamp-1 leading-tight">
+                                    {contentPreview}
                                   </p>
+                                  <button
+                                    onClick={() => onRemoveFromResearch?.(item.shareLink)}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-400 flex-shrink-0"
+                                    aria-label="Remove"
+                                  >
+                                    <X className="w-2.5 h-2.5" />
+                                  </button>
                                 </div>
+                                <p className="text-[0.6rem] text-gray-500 mt-0.5 leading-tight line-clamp-1">
+                                  {item.episode}
+                                </p>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                      
-                      <button
-                        onClick={onClearResearch}
-                        className="w-full text-[0.65rem] px-2 py-1 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors mt-2"
-                      >
-                        Clear All
-                      </button>
-                    </>
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : (
                     <div className="text-[0.65rem] text-gray-500 text-center py-2">
                       No items yet
@@ -1818,6 +1809,68 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
                     </div>
                   )}
                 </>
+              )}
+
+              {/* Action buttons - visible even when collapsed */}
+              {researchSessionItems.length > 0 && (
+                <div className="flex gap-1 mt-2">
+                  <button
+                    onClick={onClearResearch}
+                    className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
+                    title="Clear all items"
+                    aria-label="Clear all items"
+                  >
+                    <X className="w-3.5 h-3.5 mx-auto" />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      Clear All
+                    </span>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      // TODO: Implement save functionality
+                      console.log('Save research session');
+                    }}
+                    className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
+                    title="Save session"
+                    aria-label="Save session"
+                  >
+                    <Save className="w-3.5 h-3.5 mx-auto" />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      Save
+                    </span>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      // TODO: Implement AI analysis functionality
+                      console.log('Analyze with AI');
+                    }}
+                    className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
+                    title="Analyze with AI"
+                    aria-label="Analyze with AI"
+                  >
+                    <BrainCircuit className="w-3.5 h-3.5 mx-auto" />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      Analyze with AI
+                    </span>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      // TODO: Implement share functionality
+                      console.log('Share research session');
+                    }}
+                    className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
+                    title="Share session"
+                    aria-label="Share session"
+                  >
+                    <Share2 className="w-3.5 h-3.5 mx-auto" />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      Share
+                    </span>
+                  </button>
+                </div>
               )}
             </div>
           </div>
