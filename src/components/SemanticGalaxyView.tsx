@@ -7,7 +7,7 @@ import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Bookmark, 
 import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
-import { saveResearchSession, clearLocalSession, ResearchSessionItem } from '../services/researchSessionService.ts';
+import { saveResearchSession, clearLocalSession, ResearchSessionItem, MAX_RESEARCH_ITEMS } from '../services/researchSessionService.ts';
 
 // ============================================================================
 // RESEARCH SESSION CONFIGURATION
@@ -1726,7 +1726,9 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
                   <Bookmark className="w-3.5 h-3.5" />
                   <span className="text-[0.65rem] font-medium">Research</span>
                   {researchSessionItems.length > 0 && (
-                    <span className="text-[0.6rem] text-gray-400">({researchSessionItems.length})</span>
+                    <span className="text-[0.6rem] text-gray-400">
+                      ({researchSessionItems.length}/{MAX_RESEARCH_ITEMS})
+                    </span>
                   )}
                 </div>
                 {isResearchCollapsed ? (

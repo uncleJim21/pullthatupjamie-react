@@ -5,6 +5,9 @@ import { v4 as uuidv4 } from 'uuid';
 const CLIENT_ID_KEY = 'research_client_id';
 const SESSION_ID_KEY = 'research_session_id';
 
+// Maximum items per research session
+export const MAX_RESEARCH_ITEMS = 50;
+
 // Types for research session
 export interface ResearchSessionItem {
   shareLink: string;
@@ -17,6 +20,22 @@ export interface ResearchSessionItem {
   date: string;
   hierarchyLevel: 'feed' | 'episode' | 'chapter' | 'paragraph';
   addedAt?: Date; // Optional since it's used by UI but not sent to API
+}
+
+// Backend schema types
+export interface ResearchSessionItemPayload {
+  pineconeId: string;
+  metadata: {
+    title?: string;
+    quote?: string;
+    summary?: string;
+    headline?: string;
+    episode: string;
+    creator: string;
+    episodeImage?: string;
+    date: string;
+    hierarchyLevel: string;
+  };
 }
 
 export interface LastItemMetadata {
@@ -37,6 +56,7 @@ export interface ResearchSession {
   userId?: string | null;
   clientId?: string;
   pineconeIds: string[];
+  items?: ResearchSessionItemPayload[];
   pineconeIdsCount?: number;
   lastItemMetadata?: LastItemMetadata;
   createdAt?: string;
@@ -109,6 +129,26 @@ function itemsToPineconeIds(items: ResearchSessionItem[]): string[] {
 }
 
 /**
+ * Convert research session items to backend item format with metadata
+ */
+function itemsToPayload(items: ResearchSessionItem[]): ResearchSessionItemPayload[] {
+  return items.map(item => ({
+    pineconeId: item.shareLink,
+    metadata: {
+      title: item.headline || item.quote || 'Research Item',
+      quote: item.quote,
+      summary: item.summary,
+      headline: item.headline,
+      episode: item.episode,
+      creator: item.creator,
+      episodeImage: item.episodeImage,
+      date: item.date,
+      hierarchyLevel: item.hierarchyLevel,
+    }
+  }));
+}
+
+/**
  * Build last item metadata from the most recent item
  */
 function buildLastItemMetadata(items: ResearchSessionItem[]): LastItemMetadata | undefined {
@@ -131,13 +171,20 @@ function buildLastItemMetadata(items: ResearchSessionItem[]): LastItemMetadata |
  */
 export async function createResearchSession(items: ResearchSessionItem[]): Promise<ResearchSessionResponse> {
   try {
+    // Enforce 50 item limit
+    if (items.length > MAX_RESEARCH_ITEMS) {
+      throw new Error(`Maximum ${MAX_RESEARCH_ITEMS} items allowed per session`);
+    }
+    
     const token = localStorage.getItem('auth_token');
     const clientId = token ? undefined : getOrCreateClientId();
     const pineconeIds = itemsToPineconeIds(items);
+    const itemsPayload = itemsToPayload(items);
     const lastItemMetadata = buildLastItemMetadata(items);
     
     const payload: Record<string, unknown> = {
       pineconeIds,
+      items: itemsPayload,
       lastItemMetadata,
     };
     
@@ -179,13 +226,20 @@ export async function updateResearchSession(
   items: ResearchSessionItem[]
 ): Promise<ResearchSessionResponse> {
   try {
+    // Enforce 50 item limit
+    if (items.length > MAX_RESEARCH_ITEMS) {
+      throw new Error(`Maximum ${MAX_RESEARCH_ITEMS} items allowed per session`);
+    }
+    
     const token = localStorage.getItem('auth_token');
     const clientId = token ? undefined : getOrCreateClientId();
     const pineconeIds = itemsToPineconeIds(items);
+    const itemsPayload = itemsToPayload(items);
     const lastItemMetadata = buildLastItemMetadata(items);
     
     const payload: Record<string, unknown> = {
       pineconeIds,
+      items: itemsPayload,
       lastItemMetadata,
     };
     

@@ -18,7 +18,7 @@ import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles, CheckCircle} from 'lucide-react';
+import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles, CheckCircle, AlertCircle} from 'lucide-react';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
 import PageBanner from './PageBanner.tsx';
@@ -34,7 +34,7 @@ import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import { ResearchSessionItem } from './ResearchSessionCollector.tsx';
-import { clearLocalSession } from '../services/researchSessionService.ts';
+import { clearLocalSession, MAX_RESEARCH_ITEMS } from '../services/researchSessionService.ts';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -217,7 +217,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Research session state
   const [researchSessionItems, setResearchSessionItems] = useState<ResearchSessionItem[]>([]);
   const [showResearchToast, setShowResearchToast] = useState(false);
+  const [showResearchLimitToast, setShowResearchLimitToast] = useState(false);
   const researchToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const researchLimitToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Load showAxisLabels from userSettings
   const getShowAxisLabels = () => {
@@ -2797,6 +2799,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           <div className="bg-black/95 backdrop-blur-sm border border-gray-700 text-white rounded-lg px-3 py-2 shadow-lg flex items-center gap-2">
             <CheckCircle className="w-4 h-4" />
             <span className="text-xs font-medium">Added to Research</span>
+          </div>
+        </div>
+      )}
+
+      {/* Research Session Limit Toast - only show outside galaxy view */}
+      {showResearchLimitToast && resultViewStyle !== SearchResultViewStyle.GALAXY && (
+        <div className="fixed bottom-24 right-4 z-50 animate-slide-in-right">
+          <div className="bg-red-900/95 backdrop-blur-sm border border-red-700 text-white rounded-lg px-3 py-2 shadow-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            <span className="text-xs font-medium">Maximum {MAX_RESEARCH_ITEMS} items per session</span>
           </div>
         </div>
       )}
