@@ -18,7 +18,7 @@ import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles} from 'lucide-react';
+import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles, CheckCircle} from 'lucide-react';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
 import PageBanner from './PageBanner.tsx';
@@ -33,6 +33,7 @@ import PodcastContextPanel from './PodcastContextPanel.tsx';
 import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
+import { ResearchSessionItem } from './ResearchSessionCollector.tsx';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -211,6 +212,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // 3D search results state
   const [galaxyResults, setGalaxyResults] = useState<any[]>([]);
   const [axisLabels, setAxisLabels] = useState<any>(null);
+  
+  // Research session state
+  const [researchSessionItems, setResearchSessionItems] = useState<ResearchSessionItem[]>([]);
+  const [showResearchToast, setShowResearchToast] = useState(false);
+  const researchToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Load showAxisLabels from userSettings
   const getShowAxisLabels = () => {
@@ -506,6 +512,51 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     podcastModeLabelTimeoutRef.current = setTimeout(() => {
       setShowPodcastModeLabel(false);
     }, 1500);
+  };
+
+  // Research session handlers
+  const handleAddToResearchSession = (result: any) => {
+    // Check if item already exists
+    const exists = researchSessionItems.some(item => item.shareLink === result.shareLink);
+    if (exists) {
+      printLog(`[ResearchSession] Item already in session: ${result.shareLink}`);
+      return;
+    }
+
+    const newItem: ResearchSessionItem = {
+      shareLink: result.shareLink,
+      quote: result.quote,
+      summary: result.summary,
+      headline: result.headline,
+      episode: result.episode,
+      creator: result.creator,
+      episodeImage: result.episodeImage,
+      date: result.date,
+      hierarchyLevel: result.hierarchyLevel,
+      addedAt: new Date(),
+    };
+
+    setResearchSessionItems(prev => [...prev, newItem]);
+    printLog(`[ResearchSession] Added item: ${result.shareLink}`);
+    
+    // Show toast notification
+    setShowResearchToast(true);
+    if (researchToastTimeoutRef.current) {
+      clearTimeout(researchToastTimeoutRef.current);
+    }
+    researchToastTimeoutRef.current = setTimeout(() => {
+      setShowResearchToast(false);
+    }, 2000);
+  };
+
+  const handleRemoveFromResearchSession = (shareLink: string) => {
+    setResearchSessionItems(prev => prev.filter(item => item.shareLink !== shareLink));
+    printLog(`[ResearchSession] Removed item: ${shareLink}`);
+  };
+
+  const handleClearResearchSession = () => {
+    setResearchSessionItems([]);
+    printLog(`[ResearchSession] Cleared all items`);
   };
 
   const toggleScopeSlideout = (e?: React.MouseEvent) => {
@@ -2324,6 +2375,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     .reverse()
                     .find(item => item.type === 'podcast-search')?.query || undefined
                 }
+                onAddToResearch={handleAddToResearchSession}
+                researchSessionShareLinks={researchSessionItems.map(item => item.shareLink)}
+                researchSessionItems={researchSessionItems}
+                onRemoveFromResearch={handleRemoveFromResearchSession}
+                onClearResearch={handleClearResearchSession}
+                showResearchToast={showResearchToast}
               />
             </div>
           ) : (
@@ -2731,6 +2788,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         </div>
       </div>
     )}
+
+      {/* Research Session Toast Notification - only show outside galaxy view */}
+      {showResearchToast && resultViewStyle !== SearchResultViewStyle.GALAXY && (
+        <div className="fixed bottom-24 right-4 z-50 animate-slide-in-right">
+          <div className="bg-black/95 backdrop-blur-sm border border-gray-700 text-white rounded-lg px-3 py-2 shadow-lg flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            <span className="text-xs font-medium">Added to Research</span>
+          </div>
+        </div>
+      )}
 
       <ShareModal
         isOpen={isShareModalOpen}

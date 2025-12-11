@@ -3,9 +3,17 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
-import { Calendar, RotateCcw, SlidersHorizontal, Check, Search } from 'lucide-react';
+import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Bookmark, ChevronDown, ChevronUp, X, Podcast } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
+import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
+
+// ============================================================================
+// RESEARCH SESSION CONFIGURATION
+// ============================================================================
+const RESEARCH_SESSION_CONFIG = {
+  MAX_VISIBLE_ITEMS: 3, // Maximum number of items visible before scrolling
+};
 
 // ============================================================================
 // ANIMATION CONFIGURATION
@@ -304,6 +312,21 @@ interface SemanticGalaxyViewProps {
   isLoading?: boolean;
   onDecelerationComplete?: () => void;
   query?: string;
+  onAddToResearch?: (result: QuoteResult) => void;
+  researchSessionShareLinks?: string[];
+  researchSessionItems?: Array<{
+    shareLink: string;
+    quote?: string;
+    summary?: string;
+    headline?: string;
+    episode: string;
+    creator: string;
+    episodeImage?: string;
+    date: string;
+    hierarchyLevel: string;
+  }>;
+  onRemoveFromResearch?: (shareLink: string) => void;
+  onClearResearch?: () => void;
 }
 
 // Transform color to compensate for additive blending brightening
@@ -347,6 +370,7 @@ interface StarProps {
   isNearSelected: boolean;
   hasSelection: boolean;
   onClick: () => void;
+  onRightClick: (event: any) => void;
   onHover: (result: QuoteResult | null) => void;
 }
 
@@ -670,7 +694,7 @@ const HierarchyConnections: React.FC<HierarchyConnectionsProps> = ({ results, hi
   );
 };
 
-const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSelection, onClick, onHover }) => {
+const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSelection, onClick, onRightClick, onHover }) => {
   const groupRef = useRef<THREE.Group>(null);
   const mainSpikeRefs = useRef<(THREE.Mesh | null)[]>([]);
   const [hovered, setHovered] = useState(false);
@@ -748,6 +772,10 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSele
         onClick={(e) => {
           e.stopPropagation();
           onClick();
+        }}
+        onContextMenu={(e) => {
+          e.stopPropagation();
+          onRightClick(e as any);
         }}
         onPointerOver={(e) => {
           e.stopPropagation();
@@ -1073,6 +1101,15 @@ interface HoverPreviewProps {
 }
 
 const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  
+  // Reset image states when result changes
+  useEffect(() => {
+    setImageError(false);
+    setImageLoaded(false);
+  }, [result]);
+
   if (!result) return null;
 
   const hierarchyColor = getHierarchyColor(result.hierarchyLevel);
@@ -1119,13 +1156,27 @@ const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
       <div className="bg-black/95 backdrop-blur-sm border border-gray-700 rounded-lg p-3 max-w-xs shadow-xl">
         <div className="flex items-start gap-3">
           {tooltipImage ? (
-          <img
-              src={tooltipImage}
-              alt={safeTitle}
-            className="w-16 h-16 rounded object-cover flex-shrink-0"
-          />
+            <div className="w-16 h-16 rounded overflow-hidden flex-shrink-0 relative">
+              {!imageLoaded && !imageError && (
+                <div className="w-full h-full bg-gray-800 animate-pulse" />
+              )}
+              <img
+                src={tooltipImage}
+                alt={safeTitle}
+                className={`w-full h-full object-cover ${imageLoaded ? 'block' : 'hidden'}`}
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageError(true)}
+              />
+              {imageError && (
+                <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                  <Podcast className="w-8 h-8 text-gray-600" />
+                </div>
+              )}
+            </div>
           ) : (
-            <div className="w-16 h-16 rounded bg-gray-800 flex-shrink-0" />
+            <div className="w-16 h-16 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+              <Podcast className="w-8 h-8 text-gray-600" />
+            </div>
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -1159,6 +1210,11 @@ const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
               {similarityObj && typeof similarityObj.combined === 'number'
                 ? `${(similarityObj.combined * 100).toFixed(0)}%`
                 : 'N/A'}
+            </div>
+
+            {/* Right-click hint */}
+            <div className="text-xs text-gray-600 mt-2 italic">
+              Right-click to add to research
             </div>
           </div>
         </div>
@@ -1262,6 +1318,7 @@ const GalaxyScene: React.FC<{
   results: QuoteResult[];
   selectedStarId: string | null;
   onStarClick: (result: QuoteResult) => void;
+  onStarRightClick: (result: QuoteResult, event: any) => void;
   onHover: (result: QuoteResult | null) => void;
   axisLabels?: {
     center?: string;
@@ -1274,7 +1331,7 @@ const GalaxyScene: React.FC<{
   } | null;
   showAxisLabels: boolean;
   isAnimatingCamera: boolean;
-}> = ({ results, selectedStarId, onStarClick, onHover, axisLabels, showAxisLabels, isAnimatingCamera }) => {
+}> = ({ results, selectedStarId, onStarClick, onStarRightClick, onHover, axisLabels, showAxisLabels, isAnimatingCamera }) => {
   // Calculate which stars are near the selected one
   const nearbyStars = useMemo(() => {
     if (!selectedStarId) return new Set<string>();
@@ -1400,6 +1457,7 @@ const GalaxyScene: React.FC<{
           isNearSelected={nearbyStars.has(result.shareLink)}
           hasSelection={Boolean(selectedStarId)}
           onClick={() => onStarClick(result)}
+          onRightClick={(e) => onStarRightClick(result, e)}
           onHover={onHover}
         />
       ))}
@@ -1416,12 +1474,28 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   isLoading = false,
   onDecelerationComplete,
   query,
+  onAddToResearch,
+  researchSessionShareLinks = [],
+  researchSessionItems = [],
+  onRemoveFromResearch,
+  onClearResearch,
 }) => {
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isAnimatingCamera, setIsAnimatingCamera] = useState(false);
   const cameraAnimationRef = useRef<CameraAnimationState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ result: QuoteResult; position: { x: number; y: number } } | null>(null);
+  
+  // Research session collapsed state
+  const [isResearchCollapsed, setIsResearchCollapsed] = useState(true);
+  
+  // Research item hover state with delay
+  const [hoveredResearchItem, setHoveredResearchItem] = useState<any | null>(null);
+  const [showResearchTooltip, setShowResearchTooltip] = useState(false);
+  const researchHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Load showAxisLabels from userSettings in localStorage
   const [showAxisLabels, setShowAxisLabels] = useState<boolean>(() => {
@@ -1457,6 +1531,22 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
   };
+  
+  // Handle right-click on star
+  const handleStarRightClick = (result: QuoteResult, event: any) => {
+    // R3F event handling - prevent default context menu
+    if (event.nativeEvent) {
+      event.nativeEvent.preventDefault();
+    }
+    // Get client position from the event
+    const clientX = event.clientX || (event.nativeEvent && event.nativeEvent.clientX) || 0;
+    const clientY = event.clientY || (event.nativeEvent && event.nativeEvent.clientY) || 0;
+    
+    setContextMenu({
+      result,
+      position: { x: clientX, y: clientY }
+    });
+  };
 
   // Prepare camera intro animation whenever a new set of results arrives.
   // We only signal that an animation should start here; the actual parameters
@@ -1491,6 +1581,15 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
     }
   };
 
+  // Cleanup research hover timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (researchHoverTimeoutRef.current) {
+        clearTimeout(researchHoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div ref={containerRef} className="relative w-full h-full bg-black" onMouseMove={handleMouseMove}>
       {/* Warp Speed Loading Overlay - always on top when active */}
@@ -1524,53 +1623,202 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       {/* Minimap */}
       <Minimap results={results} selectedStarId={selectedStarId} />
 
-      {/* Hover preview */}
-      <HoverPreview result={hoveredResult} position={mousePosition} />
+      {/* Hover preview for stars */}
+      <HoverPreview 
+        result={hoveredResult} 
+        position={mousePosition}
+      />
 
-      {/* Stats overlay with Legend */}
-      <div className="absolute top-4 right-4 px-3 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 text-sm z-10 max-w-[140px]">
-        <div className="flex flex-col gap-3">
-          {/* Query Display */}
-          {query && (
-            <>
-              <div className="flex items-start gap-2 min-w-0 group relative">
-                <Search className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400" />
-                <div 
-                  className="text-xs text-gray-200 line-clamp-2 break-words overflow-hidden flex-1 cursor-help"
-                  title={query}
-                >
-                  {query}
+      {/* Hover preview for research items (with delay) */}
+      {showResearchTooltip && hoveredResearchItem && (
+        <HoverPreview 
+          result={{
+            shareLink: hoveredResearchItem.shareLink,
+            quote: hoveredResearchItem.quote,
+            summary: hoveredResearchItem.summary,
+            headline: hoveredResearchItem.headline,
+            episode: hoveredResearchItem.episode,
+            creator: hoveredResearchItem.creator,
+            episodeImage: hoveredResearchItem.episodeImage,
+            date: hoveredResearchItem.date,
+            hierarchyLevel: hoveredResearchItem.hierarchyLevel,
+            // Add dummy values for required fields
+            shareUrl: '',
+            audioUrl: '',
+            timeContext: { start_time: null, end_time: null },
+            similarity: { combined: 0, vector: 0 },
+            coordinates3d: { x: 0, y: 0, z: 0 },
+          }}
+          position={mousePosition}
+        />
+      )}
+
+      {/* Stats overlay with Legend and Research Session */}
+      <div className="absolute top-2 right-4 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 text-sm z-10 max-w-[200px] max-h-[calc(100vh-8rem)] flex flex-col">
+        <div className="overflow-y-auto flex-1 px-3 py-2">
+          <div className="flex flex-col gap-3">
+            {/* Query Display */}
+            {query && (
+              <>
+                <div className="flex items-start gap-2 min-w-0 group relative">
+                  <Search className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400" />
+                  <div 
+                    className="text-xs text-gray-200 line-clamp-2 break-words overflow-hidden flex-1 cursor-help"
+                    title={query}
+                  >
+                    {query}
+                  </div>
                 </div>
+                <div className="border-t border-gray-700" />
+              </>
+            )}
+            
+            {/* Stats */}
+            <div className="flex flex-col gap-1 text-xs">
+              <div>Results: {results.length}</div>
+            </div>
+            
+            {/* Legend */}
+            <div className="border-t border-gray-700 pt-2">
+              <div className="text-xs text-gray-400 mb-2">Hierarchy Levels</div>
+              <div className="flex flex-col gap-1">
+                {Object.entries(HIERARCHY_COLORS)
+                  .filter(([level]) => level !== 'ALL_PODS')
+                  .map(([level, color]) => (
+                  <div key={level} className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{
+                        backgroundColor: color,
+                        boxShadow: `0 0 8px ${color}`,
+                      }}
+                    />
+                    <span className="text-xs text-gray-300 capitalize">
+                      {level.replace('_', ' ').toLowerCase()}
+                    </span>
+                  </div>
+                ))}
               </div>
-              <div className="border-t border-gray-700" />
-            </>
-          )}
-          
-          {/* Stats */}
-          <div className="flex flex-col gap-1">
-            <div>Results: {results.length}</div>
-          </div>
-          
-          {/* Legend */}
-          <div className="border-t border-gray-700 pt-2">
-            <div className="text-xs text-gray-400 mb-2">Hierarchy Levels</div>
-            <div className="flex flex-col gap-1">
-              {Object.entries(HIERARCHY_COLORS)
-                .filter(([level]) => level !== 'ALL_PODS') // ALL_PODS is not used as a star type
-                .map(([level, color]) => (
-                <div key={level} className="flex items-center gap-2">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{
-                      backgroundColor: color,
-                      boxShadow: `0 0 8px ${color}`,
-                    }}
-                  />
-                  <span className="text-xs text-gray-300 capitalize">
-                    {level.replace('_', ' ').toLowerCase()}
-                  </span>
+            </div>
+
+            {/* Research Session Section */}
+            <div className="border-t border-gray-700 pt-2">
+              <button
+                onClick={() => setIsResearchCollapsed(!isResearchCollapsed)}
+                className="w-full flex items-center justify-between mb-2 hover:text-gray-300 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Bookmark className="w-3.5 h-3.5" />
+                  <span className="text-[0.65rem] font-medium">Research</span>
+                  {researchSessionItems.length > 0 && (
+                    <span className="text-[0.6rem] text-gray-400">({researchSessionItems.length})</span>
+                  )}
                 </div>
-              ))}
+                {isResearchCollapsed ? (
+                  <ChevronDown className="w-3 h-3" />
+                ) : (
+                  <ChevronUp className="w-3 h-3" />
+                )}
+              </button>
+
+              {!isResearchCollapsed && (
+                <>
+                  {researchSessionItems.length > 0 ? (
+                    <>
+                      <div 
+                        className="space-y-2 overflow-y-auto"
+                        style={{
+                          maxHeight: researchSessionItems.length > RESEARCH_SESSION_CONFIG.MAX_VISIBLE_ITEMS 
+                            ? `${RESEARCH_SESSION_CONFIG.MAX_VISIBLE_ITEMS * 38}px` // ~38px per item (including gap)
+                            : 'none'
+                        }}
+                      >
+                        {researchSessionItems.map((item) => {
+                          // Use same logic as HoverPreview for content preview
+                          const contentPreview = item.summary || item.quote || 'No preview';
+                          const hierarchyColor = getHierarchyColor(item.hierarchyLevel);
+                          
+                          return (
+                            <div
+                              key={item.shareLink}
+                              className="bg-gray-900/50 rounded p-1.5 hover:bg-gray-900/70 transition-colors group"
+                              onMouseEnter={(e) => {
+                                // Clear any existing timeout
+                                if (researchHoverTimeoutRef.current) {
+                                  clearTimeout(researchHoverTimeoutRef.current);
+                                }
+                                
+                                setHoveredResearchItem(item);
+                                setMousePosition({ x: e.clientX, y: e.clientY });
+                                
+                                // Set timeout for 2 seconds before showing tooltip
+                                researchHoverTimeoutRef.current = setTimeout(() => {
+                                  setShowResearchTooltip(true);
+                                }, 1000);
+                              }}
+                              onMouseMove={(e) => {
+                                setMousePosition({ x: e.clientX, y: e.clientY });
+                              }}
+                              onMouseLeave={() => {
+                                // Clear timeout if user moves away before 2 seconds
+                                if (researchHoverTimeoutRef.current) {
+                                  clearTimeout(researchHoverTimeoutRef.current);
+                                }
+                                setHoveredResearchItem(null);
+                                setShowResearchTooltip(false);
+                              }}
+                            >
+                              <div className="flex gap-1.5 items-start">
+                                {/* Hierarchy Dot */}
+                                <div
+                                  className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5"
+                                  style={{
+                                    backgroundColor: hierarchyColor,
+                                    boxShadow: `0 0 4px 1px ${hierarchyColor}`,
+                                    border: `1px solid ${hierarchyColor}`,
+                                  }}
+                                />
+                                
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-1">
+                                    <p className="text-[0.65rem] text-gray-300 line-clamp-1 leading-tight">
+                                      {contentPreview}
+                                    </p>
+                                    <button
+                                      onClick={() => onRemoveFromResearch?.(item.shareLink)}
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-400 flex-shrink-0"
+                                      aria-label="Remove"
+                                    >
+                                      <X className="w-2.5 h-2.5" />
+                                    </button>
+                                  </div>
+                                  <p className="text-[0.6rem] text-gray-500 mt-0.5 leading-tight line-clamp-1">
+                                    {item.episode}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      <button
+                        onClick={onClearResearch}
+                        className="w-full text-[0.65rem] px-2 py-1 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors mt-2"
+                      >
+                        Clear All
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-[0.65rem] text-gray-500 text-center py-2">
+                      No items yet
+                      <div className="text-[0.6rem] text-gray-600 mt-1">
+                        Right-click stars to add
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1612,12 +1860,31 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           results={results}
           selectedStarId={selectedStarId}
           onStarClick={onStarClick}
+          onStarRightClick={handleStarRightClick}
           onHover={setHoveredResult}
           axisLabels={axisLabels || null}
           showAxisLabels={showAxisLabels}
           isAnimatingCamera={isAnimatingCamera}
         />
       </Canvas>
+      
+      {/* Context Menu */}
+      {contextMenu && onAddToResearch && (
+        <ContextMenu
+          options={[
+            {
+              label: researchSessionShareLinks.includes(contextMenu.result.shareLink)
+                ? 'Already in Research'
+                : 'Add to Research',
+              icon: <Bookmark className="w-4 h-4" />,
+              onClick: () => onAddToResearch(contextMenu.result),
+              disabled: researchSessionShareLinks.includes(contextMenu.result.shareLink),
+            },
+          ]}
+          position={contextMenu.position}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 };
