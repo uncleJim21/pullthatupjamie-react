@@ -34,6 +34,7 @@ import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import { ResearchSessionItem } from './ResearchSessionCollector.tsx';
+import { clearLocalSession } from '../services/researchSessionService.ts';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -556,7 +557,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   const handleClearResearchSession = () => {
     setResearchSessionItems([]);
-    printLog(`[ResearchSession] Cleared all items`);
+    clearLocalSession(); // Clear the stored session ID
+    printLog(`[ResearchSession] Cleared all items and session ID`);
   };
 
   const toggleScopeSlideout = (e?: React.MouseEvent) => {

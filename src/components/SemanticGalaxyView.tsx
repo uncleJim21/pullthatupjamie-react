@@ -3,10 +3,11 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
-import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Bookmark, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2 } from 'lucide-react';
+import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Bookmark, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
+import { saveResearchSession, clearLocalSession, ResearchSessionItem } from '../services/researchSessionService.ts';
 
 // ============================================================================
 // RESEARCH SESSION CONFIGURATION
@@ -314,19 +315,10 @@ interface SemanticGalaxyViewProps {
   query?: string;
   onAddToResearch?: (result: QuoteResult) => void;
   researchSessionShareLinks?: string[];
-  researchSessionItems?: Array<{
-    shareLink: string;
-    quote?: string;
-    summary?: string;
-    headline?: string;
-    episode: string;
-    creator: string;
-    episodeImage?: string;
-    date: string;
-    hierarchyLevel: string;
-  }>;
+  researchSessionItems?: ResearchSessionItem[];
   onRemoveFromResearch?: (shareLink: string) => void;
   onClearResearch?: () => void;
+  showResearchToast?: boolean;
 }
 
 // Transform color to compensate for additive blending brightening
@@ -1479,6 +1471,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   researchSessionItems = [],
   onRemoveFromResearch,
   onClearResearch,
+  showResearchToast = false,
 }) => {
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -1496,6 +1489,14 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   const [hoveredResearchItem, setHoveredResearchItem] = useState<any | null>(null);
   const [showResearchTooltip, setShowResearchTooltip] = useState(false);
   const researchHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Save toast state
+  const [saveToast, setSaveToast] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({
+    show: false,
+    type: 'success',
+    message: ''
+  });
+  const saveToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Load showAxisLabels from userSettings in localStorage
   const [showAxisLabels, setShowAxisLabels] = useState<boolean>(() => {
@@ -1587,8 +1588,22 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       if (researchHoverTimeoutRef.current) {
         clearTimeout(researchHoverTimeoutRef.current);
       }
+      if (saveToastTimeoutRef.current) {
+        clearTimeout(saveToastTimeoutRef.current);
+      }
     };
   }, []);
+
+  // Helper to show save toast
+  const showSaveToast = (type: 'success' | 'error', message: string) => {
+    setSaveToast({ show: true, type, message });
+    if (saveToastTimeoutRef.current) {
+      clearTimeout(saveToastTimeoutRef.current);
+    }
+    saveToastTimeoutRef.current = setTimeout(() => {
+      setSaveToast({ show: false, type: 'success', message: '' });
+    }, 3000);
+  };
 
   return (
     <div ref={containerRef} className="relative w-full h-full bg-black" onMouseMove={handleMouseMove}>
@@ -1826,20 +1841,28 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
                     </span>
                   </button>
                   
-                  <button
-                    onClick={() => {
-                      // TODO: Implement save functionality
-                      console.log('Save research session');
-                    }}
-                    className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
-                    title="Save session"
-                    aria-label="Save session"
-                  >
-                    <Save className="w-3.5 h-3.5 mx-auto" />
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      Save
-                    </span>
-                  </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const result = await saveResearchSession((researchSessionItems || []) as ResearchSessionItem[]);
+                              if (result.success) {
+                                console.log('Research session saved:', result.data);
+                                showSaveToast('success', 'Session saved');
+                              }
+                            } catch (error) {
+                              console.error('Failed to save research session:', error);
+                              showSaveToast('error', 'Save failed');
+                            }
+                          }}
+                          className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
+                          title="Save session"
+                          aria-label="Save session"
+                        >
+                          <Save className="w-3.5 h-3.5 mx-auto" />
+                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            Save
+                          </span>
+                        </button>
                   
                   <button
                     onClick={() => {
@@ -1937,6 +1960,34 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           position={contextMenu.position}
           onClose={() => setContextMenu(null)}
         />
+      )}
+
+      {/* Research Session Toast - "Added to Research" */}
+      {showResearchToast && (
+        <div className="absolute top-2 right-4 z-[60] pointer-events-none animate-slide-in-right" style={{ marginTop: 'calc(var(--stats-panel-height, 300px) + 0.5rem)' }}>
+          <div className="bg-black/95 backdrop-blur-sm border border-gray-700 text-white rounded-lg px-3 py-2 shadow-lg flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            <span className="text-xs font-medium">Added to Research</span>
+          </div>
+        </div>
+      )}
+
+      {/* Save Session Toast - Success/Error */}
+      {saveToast.show && (
+        <div className="absolute top-2 right-4 z-[60] pointer-events-none animate-slide-in-right" style={{ marginTop: 'calc(var(--stats-panel-height, 300px) + 0.5rem)' }}>
+          <div className={`backdrop-blur-sm border rounded-lg px-3 py-2 shadow-lg flex items-center gap-2 ${
+            saveToast.type === 'success' 
+              ? 'bg-black/95 border-gray-700 text-white' 
+              : 'bg-red-900/95 border-red-700 text-white'
+          }`}>
+            {saveToast.type === 'success' ? (
+              <CheckCircle className="w-4 h-4" />
+            ) : (
+              <AlertCircle className="w-4 h-4" />
+            )}
+            <span className="text-xs font-medium">{saveToast.message}</span>
+          </div>
+        </div>
       )}
     </div>
   );
