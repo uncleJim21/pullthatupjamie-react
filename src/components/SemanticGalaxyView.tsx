@@ -3,11 +3,12 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
-import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Bookmark, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Bookmark, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
 import { saveResearchSession, clearLocalSession, ResearchSessionItem, MAX_RESEARCH_ITEMS } from '../services/researchSessionService.ts';
+import ResearchAnalysisPanel from './ResearchAnalysisModal.tsx';
 
 // ============================================================================
 // RESEARCH SESSION CONFIGURATION
@@ -319,6 +320,8 @@ interface SemanticGalaxyViewProps {
   onRemoveFromResearch?: (shareLink: string) => void;
   onClearResearch?: () => void;
   showResearchToast?: boolean;
+  isContextPanelOpen?: boolean;
+  onCloseContextPanel?: () => void;
 }
 
 // Transform color to compensate for additive blending brightening
@@ -1472,6 +1475,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   onRemoveFromResearch,
   onClearResearch,
   showResearchToast = false,
+  isContextPanelOpen = false,
+  onCloseContextPanel,
 }) => {
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -1491,12 +1496,16 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   const researchHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Save toast state
-  const [saveToast, setSaveToast] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({
+  const [saveToast, setSaveToast] = useState<{ show: boolean; type: 'success' | 'error' | 'loading'; message: string }>({
     show: false,
     type: 'success',
     message: ''
   });
   const saveToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Analysis modal state
+  const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
   
   // Load showAxisLabels from userSettings in localStorage
   const [showAxisLabels, setShowAxisLabels] = useState<boolean>(() => {
@@ -1595,14 +1604,17 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   }, []);
 
   // Helper to show save toast
-  const showSaveToast = (type: 'success' | 'error', message: string) => {
+  const showSaveToast = (type: 'success' | 'error' | 'loading', message: string) => {
     setSaveToast({ show: true, type, message });
     if (saveToastTimeoutRef.current) {
       clearTimeout(saveToastTimeoutRef.current);
     }
-    saveToastTimeoutRef.current = setTimeout(() => {
-      setSaveToast({ show: false, type: 'success', message: '' });
-    }, 3000);
+    // Only auto-hide success and error toasts, not loading
+    if (type !== 'loading') {
+      saveToastTimeoutRef.current = setTimeout(() => {
+        setSaveToast({ show: false, type: 'success', message: '' });
+      }, 3000);
+    }
   };
 
   return (
@@ -1845,18 +1857,27 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
                   
                         <button
                           onClick={async () => {
+                            if (isSaving) return; // Prevent double-click
+                            
                             try {
+                              setIsSaving(true);
+                              showSaveToast('loading', 'Saving...');
+                              
                               const result = await saveResearchSession((researchSessionItems || []) as ResearchSessionItem[]);
+                              
+                              setIsSaving(false);
                               if (result.success) {
                                 console.log('Research session saved:', result.data);
                                 showSaveToast('success', 'Session saved');
                               }
                             } catch (error) {
+                              setIsSaving(false);
                               console.error('Failed to save research session:', error);
                               showSaveToast('error', 'Save failed');
                             }
                           }}
-                          className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
+                          disabled={isSaving}
+                          className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Save session"
                           aria-label="Save session"
                         >
@@ -1868,8 +1889,11 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
                   
                   <button
                     onClick={() => {
-                      // TODO: Implement AI analysis functionality
-                      console.log('Analyze with AI');
+                      setIsAnalysisModalOpen(true);
+                      // Close context panel if it's open
+                      if (isContextPanelOpen && onCloseContextPanel) {
+                        onCloseContextPanel();
+                      }
                     }}
                     className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
                     title="Analyze with AI"
@@ -1974,23 +1998,33 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         </div>
       )}
 
-      {/* Save Session Toast - Success/Error */}
+      {/* Save Session Toast - Loading/Success/Error */}
       {saveToast.show && (
         <div className="absolute top-2 right-4 z-[60] pointer-events-none animate-slide-in-right" style={{ marginTop: 'calc(var(--stats-panel-height, 300px) + 0.5rem)' }}>
           <div className={`backdrop-blur-sm border rounded-lg px-3 py-2 shadow-lg flex items-center gap-2 ${
             saveToast.type === 'success' 
-              ? 'bg-black/95 border-gray-700 text-white' 
-              : 'bg-red-900/95 border-red-700 text-white'
+              ? 'bg-black/95 border-gray-700 text-white'
+              : saveToast.type === 'error'
+              ? 'bg-red-900/95 border-red-700 text-white'
+              : 'bg-blue-900/95 border-blue-700 text-white'
           }`}>
             {saveToast.type === 'success' ? (
               <CheckCircle className="w-4 h-4" />
-            ) : (
+            ) : saveToast.type === 'error' ? (
               <AlertCircle className="w-4 h-4" />
+            ) : (
+              <Loader className="w-4 h-4 animate-spin" />
             )}
             <span className="text-xs font-medium">{saveToast.message}</span>
           </div>
         </div>
       )}
+
+      {/* Research Analysis Panel */}
+      <ResearchAnalysisPanel 
+        isOpen={isAnalysisModalOpen && !isContextPanelOpen}
+        onClose={() => setIsAnalysisModalOpen(false)}
+      />
     </div>
   );
 };

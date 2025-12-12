@@ -2385,6 +2385,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 onRemoveFromResearch={handleRemoveFromResearchSession}
                 onClearResearch={handleClearResearchSession}
                 showResearchToast={showResearchToast}
+                isContextPanelOpen={isContextPanelOpen}
+                onCloseContextPanel={() => setIsContextPanelOpen(false)}
               />
             </div>
           ) : (
