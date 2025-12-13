@@ -30,6 +30,7 @@ import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 import AuthService from '../services/authService.ts';
 import ImageWithLoader from './ImageWithLoader.tsx';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
+import UnifiedSidePanel from './UnifiedSidePanel.tsx';
 import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
@@ -200,6 +201,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Context panel state for split-screen view
   const [isContextPanelOpen, setIsContextPanelOpen] = useState(false);
   const [selectedParagraphId, setSelectedParagraphId] = useState<string | null>(null);
+  
+  // Analysis panel state
+  const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
   
   // Track warp speed deceleration completion
   const [isDecelerationComplete, setIsDecelerationComplete] = useState(true);
@@ -2387,6 +2391,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 showResearchToast={showResearchToast}
                 isContextPanelOpen={isContextPanelOpen}
                 onCloseContextPanel={() => setIsContextPanelOpen(false)}
+                onOpenAnalysisPanel={() => setIsAnalysisPanelOpen(true)}
               />
             </div>
           ) : (
@@ -2846,12 +2851,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       />
       </div>
 
-      {/* Context Panel for Split-Screen Mode - Now as Sibling */}
+      {/* Unified Side Panel (Context + Analysis) for Split-Screen Mode */}
       {searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isDecelerationComplete && (
-        <PodcastContextPanel
+        <UnifiedSidePanel
           paragraphId={selectedParagraphId}
-          isOpen={isContextPanelOpen}
-          onClose={() => setIsContextPanelOpen(false)}
+          isContextOpen={isContextPanelOpen}
+          onCloseContext={() => setIsContextPanelOpen(false)}
           smartInterpolation={true}
           auth={authConfig || undefined}
           audioUrl={selectedAudioContext?.audioUrl}
@@ -2862,10 +2867,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           timeContext={selectedAudioContext?.timeContext}
           date={selectedAudioContext?.date}
           autoPlayOnOpen={autoPlayContextOnOpen}
+          isAnalysisOpen={isAnalysisPanelOpen}
+          onCloseAnalysis={() => setIsAnalysisPanelOpen(false)}
           onWidthChange={setContextPanelWidth}
           onTimestampClick={(timestamp) => {
             printLog(`Context panel timestamp clicked: ${timestamp}`);
-            // Dispatch a custom event that PodcastSearchResultItem can listen to
             window.dispatchEvent(new CustomEvent('seekToTimestamp', { 
               detail: { 
                 paragraphId: selectedParagraphId, 
@@ -2876,140 +2882,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           onKeywordSearch={async (keyword, feedId, episodeName, forceSearchAll = false) => {
             printLog(`Keyword search triggered: keyword="${keyword}", feedId="${feedId}", episodeName="${episodeName}", forceSearchAll="${forceSearchAll}"`);
             printLog(`Current resultViewStyle: ${resultViewStyle}, searchViewStyle: ${searchViewStyle}`);
-            // Treat as a new podcast search: collapse context panel and clear stale context
             resetContextPanelState();
-
-            // Clear previous podcast searches just like handleSearch does
             setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
-            
-            // Set the search query
-            setQuery(keyword);
-            
-            // Prepare search parameters
-            const auth = authConfig || await getAuth() as AuthConfig;
-            
-            if(requestAuthMethod === RequestAuthMethod.FREE_EXPENDED){
-              setIsRegisterModalOpen(true);
-              setSearchState(prev => ({ ...prev, isLoading: false }));
-              return;
-            }
-            
-            let feedIdsToUse: string[] = [];
-            
-            // When filtering by episode name, don't pass feedIds - let the episode filter do the work
-            if (episodeName) {
-              // "Search This Episode" - use episode name filter only, no feedIds
-              feedIdsToUse = [];
-              printLog(`Searching this episode: "${episodeName}" with no feed restrictions`);
-            } else if (forceSearchAll) {
-              // Search ALL pods - use all selected sources
-              feedIdsToUse = Array.from(selectedSources) as string[];
-              printLog(`Force searching all pods with: ${JSON.stringify(feedIdsToUse)}`);
-            } else if (feedId) {
-              // Search this specific feed only
-              const cleanFeedId = feedId.replace(/^feed_/, '');
-              feedIdsToUse = [cleanFeedId];
-              printLog(`Using cleaned feedId: ${cleanFeedId} (original: ${feedId})`);
-            } else if (podcastSearchMode === 'my-pod' && adminFeedId) {
-              // If in my-pod mode, use admin feed
-              feedIdsToUse = [adminFeedId];
-            } else {
-              // Default: search all selected sources
-              feedIdsToUse = Array.from(selectedSources) as string[];
-            }
-            
-            // Execute the search - match the flow from performQuoteSearch
-            setSearchState(prev => ({ ...prev, isLoading: true }));
-            setSearchHistory(prev => ({ ...prev, [searchMode]: true }));
-            
-            // Create a conversation ID for this search
-            const conversationId = nextConversationId.current++;
-            
-            try {
-              // Always use 3D search if result view style is Galaxy, regardless of search view style
-              if (resultViewStyle === SearchResultViewStyle.GALAXY) {
-                printLog(`Using 3D search for galaxy view (resultViewStyle: ${resultViewStyle})`);
-                const quoteResults = await handleQuoteSearch3D(
-                  keyword,
-                  auth,
-                  feedIdsToUse,
-                  undefined, // minDate
-                  undefined, // maxDate
-                  episodeName, // episodeName filter
-                  ['chapter', 'paragraph'], // Include both chapters and paragraphs
-                  true // extractAxisLabels
-                );
-                
-                printLog(`3D search returned ${quoteResults.results?.length || 0} results`);
-                printLog(`First result from 3D search: ${quoteResults.results?.[0]?.episode || 'none'}`);
-                
-                // UPDATE GALAXY RESULTS STATE - THIS IS CRITICAL!
-                setGalaxyResults(quoteResults.results || []);
-                
-                // Store axis labels if returned
-                if (quoteResults.axisLabels) {
-                  setAxisLabels(quoteResults.axisLabels);
-                  printLog(`Received axis labels from keyword search: ${JSON.stringify(quoteResults.axisLabels)}`);
-                }
-                
-                setConversation(prev => [...prev, {
-                  id: conversationId,
-                  type: 'podcast-search' as const,
-                  query: keyword,
-                  timestamp: new Date(),
-                  isStreaming: false,
-                  data: {
-                    quotes: quoteResults.results
-                  },
-                  axisLabels: quoteResults.axisLabels || null
-                }]);
-              } else {
-                printLog(`Using regular 2D search for list view (resultViewStyle: ${resultViewStyle})`);
-                const quoteResults = await handleQuoteSearch(
-                  keyword,
-                  auth,
-                  feedIdsToUse,
-                  undefined, // minDate
-                  undefined, // maxDate
-                  episodeName, // episodeName filter
-                  ['chapter', 'paragraph'] // Include both chapters and paragraphs
-                );
-                
-                setConversation(prev => [...prev, {
-                  id: conversationId,
-                  type: 'podcast-search' as const,
-                  query: keyword,
-                  timestamp: new Date(),
-                  isStreaming: false,
-                  data: {
-                    quotes: quoteResults.results
-                  }
-                }]);
-              }
-              
-              // Clear the query input after search, just like normal search
-              setQuery("");
-              
-              setSearchState(prev => ({
-                ...prev,
-                isLoading: false,
-                activeConversationId: conversationId
-              }));
-              
-              printLog("Keyword search completed successfully");
-            } catch (error) {
-              console.error('Keyword search error:', error);
-              printLog(`Keyword search error: ${error}`);
-              setSearchState(prev => ({ 
-                ...prev, 
-                isLoading: false,
-                error: error as Error
-              }));
-            }
+            await handleSearch(keyword, feedId, episodeName, forceSearchAll);
           }}
         />
       )}
-
     </div>
     </AudioControllerProvider>
   );

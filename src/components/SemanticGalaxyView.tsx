@@ -322,6 +322,7 @@ interface SemanticGalaxyViewProps {
   showResearchToast?: boolean;
   isContextPanelOpen?: boolean;
   onCloseContextPanel?: () => void;
+  onOpenAnalysisPanel?: () => void;
 }
 
 // Transform color to compensate for additive blending brightening
@@ -1477,6 +1478,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   showResearchToast = false,
   isContextPanelOpen = false,
   onCloseContextPanel,
+  onOpenAnalysisPanel,
 }) => {
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -1889,11 +1891,16 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
                   
                   <button
                     onClick={() => {
-                      setIsAnalysisModalOpen(true);
-                      // Close context panel if it's open
-                      if (isContextPanelOpen && onCloseContextPanel) {
-                        onCloseContextPanel();
+                      // Open analysis panel first, then close context
+                      if (onOpenAnalysisPanel) {
+                        onOpenAnalysisPanel();
                       }
+                      // Small delay to ensure analysis opens before context closes
+                      setTimeout(() => {
+                        if (onCloseContextPanel) {
+                          onCloseContextPanel();
+                        }
+                      }, 0);
                     }}
                     className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
                     title="Analyze with AI"
@@ -2019,12 +2026,6 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           </div>
         </div>
       )}
-
-      {/* Research Analysis Panel */}
-      <ResearchAnalysisPanel 
-        isOpen={isAnalysisModalOpen && !isContextPanelOpen}
-        onClose={() => setIsAnalysisModalOpen(false)}
-      />
     </div>
   );
 };
