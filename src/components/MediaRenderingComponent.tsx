@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Scissors, Share, Filter } from 'lucide-react';
 import TranscriptionService, { generateHash } from '../services/transcriptionService.ts';
 import VideoEditService, { ChildEdit, SubtitleSegment } from '../services/videoEditService.ts';
@@ -36,9 +36,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   const [showTranscript, setShowTranscript] = useState(true);
   const [showChildrenClips, setShowChildrenClips] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [isMediaLoading, setIsMediaLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [matchingIndices, setMatchingIndices] = useState<number[]>([]);
   const [isFilterEnabled, setIsFilterEnabled] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
@@ -907,71 +910,93 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     setCurrentParentUrl(null);
   };
 
-  // Filter transcript data based on search query and filter toggle
-  const filteredTranscriptData = isFilterEnabled 
-    ? transcriptData.filter(item =>
-        searchQuery === '' || item.text.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : transcriptData;
-
-  // Filter children clips data based on search query, and sort chronologically (newest first)
-  const filteredChildrenClipsData = childrenClips
-    .filter(clip =>
-      searchQuery === '' || clip.editRange.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .sort((a, b) => {
-      // Sort by creation date, newest first
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
-      return dateB - dateA;
-    });
-
-  // Get all matching indices for the current search query
-  const getMatchingIndices = (query: string) => {
-    if (query.trim() === '') return [];
+  // Filter transcript data based on DEBOUNCED search query and filter toggle
+  // This only re-runs when debouncedSearchQuery changes (after 500ms of no typing)
+  const filteredTranscriptData = useMemo(() => {
+    if (!isFilterEnabled) return transcriptData;
+    if (debouncedSearchQuery === '') return transcriptData;
     
-    return transcriptData
-      .map((item, index) => ({ item, index }))
-      .filter(({ item }) => item.text.toLowerCase().includes(query.toLowerCase()))
-      .map(({ index }) => index);
+    return transcriptData.filter(item =>
+      item.text.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+    );
+  }, [isFilterEnabled, debouncedSearchQuery, transcriptData]);
+
+  // Filter children clips data based on DEBOUNCED search query, and sort chronologically (newest first)
+  // This only re-runs when debouncedSearchQuery changes (after 500ms of no typing)
+  const filteredChildrenClipsData = useMemo(() => {
+    const lowerQuery = debouncedSearchQuery.toLowerCase();
+    
+    return childrenClips
+      .filter(clip => 
+        debouncedSearchQuery === '' || clip.editRange.toLowerCase().includes(lowerQuery)
+      )
+      .sort((a, b) => {
+        // Sort by creation date, newest first
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+  }, [debouncedSearchQuery, childrenClips]);
+
+  // Optimized search function - only called after debounce
+  const performSearch = (query: string) => {
+    if (query.trim() === '') {
+      setMatchingIndices([]);
+      setHighlightedIndex(null);
+      setCurrentMatchIndex(0);
+      setIsSearching(false);
+      return;
+    }
+
+    // Perform the search
+    const lowerQuery = query.toLowerCase();
+    const matches: number[] = [];
+    
+    for (let i = 0; i < transcriptData.length; i++) {
+      if (transcriptData[i].text.toLowerCase().includes(lowerQuery)) {
+        matches.push(i);
+      }
+    }
+    
+    setMatchingIndices(matches);
+    
+    if (matches.length > 0) {
+      const targetIndex = matches[0];
+      setHighlightedIndex(targetIndex);
+      setCurrentMatchIndex(0);
+      
+      // Scroll to first match
+      setTimeout(() => {
+        const contentArea = contentAreaRef.current;
+        if (contentArea) {
+          const matchingElement = contentArea.querySelector(`[data-index="${targetIndex}"]`);
+          if (matchingElement) {
+            matchingElement.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            });
+          }
+        }
+      }, 50);
+    } else {
+      setHighlightedIndex(null);
+      setCurrentMatchIndex(0);
+    }
+    
+    setIsSearching(false);
   };
 
-  // Handle search with "Find Next" functionality
-  const handleSearch = (query: string, isNext: boolean = false) => {
-    setSearchQuery(query);
+  // Handle "Find Next" functionality
+  const handleFindNext = () => {
+    if (matchingIndices.length === 0) return;
     
-    if (query.trim() === '') {
-      setHighlightedIndex(null);
-      setCurrentMatchIndex(0);
-      return;
-    }
-
-    const matchingIndices = getMatchingIndices(query);
+    const nextPosition = (currentMatchIndex + 1) % matchingIndices.length;
+    const targetIndex = matchingIndices[nextPosition];
     
-    if (matchingIndices.length === 0) {
-      setHighlightedIndex(null);
-      setCurrentMatchIndex(0);
-      return;
-    }
-
-    let targetIndex: number;
-    
-    if (isNext) {
-      // Find next match (cycle through results)
-      const currentIndex = highlightedIndex !== null ? highlightedIndex : -1;
-      const currentPosition = matchingIndices.indexOf(currentIndex);
-      const nextPosition = (currentPosition + 1) % matchingIndices.length;
-      targetIndex = matchingIndices[nextPosition];
-      setCurrentMatchIndex(nextPosition);
-    } else {
-      // First search - go to first match
-      targetIndex = matchingIndices[0];
-      setCurrentMatchIndex(0);
-    }
-
     setHighlightedIndex(targetIndex);
+    setCurrentMatchIndex(nextPosition);
     
-    // Scroll to the matching entry after a brief delay
+    // Scroll to the match
     setTimeout(() => {
       const contentArea = contentAreaRef.current;
       if (contentArea) {
@@ -983,70 +1008,51 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           });
         }
       }
-    }, 100);
+    }, 50);
   };
 
   // Handle automatic scrolling after user stops typing (non-filter mode)
   const handleAutoScroll = (query: string) => {
-    if (query.trim() === '') {
-      setHighlightedIndex(null);
-      setCurrentMatchIndex(0);
-      return;
-    }
-
-    const matchingIndices = getMatchingIndices(query);
-    
-    if (matchingIndices.length === 0) {
-      setHighlightedIndex(null);
-      setCurrentMatchIndex(0);
-      return;
-    }
-
-    // Go to first match and scroll to it
-    const targetIndex = matchingIndices[0];
-    setHighlightedIndex(targetIndex);
-    setCurrentMatchIndex(0);
-    
-    // Scroll to the matching entry after a brief delay
-    setTimeout(() => {
-      const contentArea = contentAreaRef.current;
-      if (contentArea) {
-        const matchingElement = contentArea.querySelector(`[data-index="${targetIndex}"]`);
-        if (matchingElement) {
-          matchingElement.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center' 
-          });
-        }
-      }
-    }, 100);
+    setDebouncedSearchQuery(query);
+    performSearch(query);
   };
 
-  // Handle search input change with debounced auto-scroll
+  // Handle search input change with debounced search
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
     
-    // Clear existing timeout
+    // Clear existing timeout to cancel any pending search
     if (searchTimeout) {
       clearTimeout(searchTimeout);
     }
     
-    // Set new timeout for auto-scroll (only in non-filter mode)
-    if (!isFilterEnabled) {
-      const timeout = setTimeout(() => {
-        handleAutoScroll(query);
-      }, 500); // 500ms delay after user stops typing
-      
-      setSearchTimeout(timeout);
+    // If query is empty, immediately clear everything
+    if (query.trim() === '') {
+      setDebouncedSearchQuery('');
+      setMatchingIndices([]);
+      setHighlightedIndex(null);
+      setCurrentMatchIndex(0);
+      setIsSearching(false);
+      return;
     }
+    
+    // Show loading state immediately
+    setIsSearching(true);
+    
+    // Set new timeout - search will only execute after 500ms of no typing
+    const timeout = setTimeout(() => {
+      handleAutoScroll(query);
+    }, 500);
+    
+    setSearchTimeout(timeout);
   };
 
   // Handle Enter key press in search input (Find Next)
   const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleSearch(e.currentTarget.value, true); // true = find next
+      handleFindNext();
     }
   };
 
@@ -1126,24 +1132,8 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     };
   }, [isVideo, isAudio, highlightedIndex, searchQuery, transcriptData]);
 
-  // Handle real-time search as user types (first match only)
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setHighlightedIndex(null);
-      setCurrentMatchIndex(0);
-      return;
-    }
-
-    const matchingIndices = getMatchingIndices(searchQuery);
-    
-    if (matchingIndices.length > 0) {
-      setHighlightedIndex(matchingIndices[0]);
-      setCurrentMatchIndex(0);
-    } else {
-      setHighlightedIndex(null);
-      setCurrentMatchIndex(0);
-    }
-  }, [searchQuery]);
+  // REMOVED: Real-time search useEffect that was causing lag
+  // All search operations now happen only after 500ms debounce delay
 
   // Clear active index when auto-scroll is disabled - REMOVED
   // We now always highlight the current entry regardless of auto-scroll setting
@@ -1360,17 +1350,24 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           {/* Search bar */}
           <div className="p-4 border-b border-gray-800">
             <div className="flex items-center space-x-2">
-              <input
-                type="text"
-                placeholder={showChildrenClips ? "Search not available for clips" : "Search"}
-                value={searchQuery}
-                onChange={handleSearchInputChange}
-                onKeyPress={handleSearchKeyPress}
-                disabled={showChildrenClips}
-                className={`flex-1 bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent ${
-                  showChildrenClips ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              />
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder={showChildrenClips ? "Search not available for clips" : "Search transcript..."}
+                  value={searchQuery}
+                  onChange={handleSearchInputChange}
+                  onKeyPress={handleSearchKeyPress}
+                  disabled={showChildrenClips}
+                  className={`w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 pr-10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent ${
+                    showChildrenClips ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                />
+                {isSearching && !showChildrenClips && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => setIsFilterEnabled(!isFilterEnabled)}
                 disabled={showChildrenClips}
@@ -1385,9 +1382,9 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
               >
                 <Filter size={16} />
               </button>
-              {searchQuery.trim() !== '' && highlightedIndex !== null && (
+              {!isSearching && matchingIndices.length > 0 && (
                 <div className="text-gray-400 text-sm whitespace-nowrap">
-                  {currentMatchIndex + 1} of {getMatchingIndices(searchQuery).length}
+                  {currentMatchIndex + 1} of {matchingIndices.length}
                 </div>
               )}
             </div>
@@ -1455,7 +1452,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           <div ref={contentAreaRef} className="flex-1 overflow-y-auto p-4">
             {showTranscript ? (
               <div className="space-y-1">
-                {transcriptData.length === 0 ? (
+                {(() => {
+                  // Calculate current entry ONCE for the entire list, not per item
+                  const currentEntry = getCurrentTranscriptEntry(currentTime);
+                  const currentActiveIndex = currentEntry.index;
+                  
+                  return transcriptData.length === 0 ? (
                   <div className="text-center text-gray-400 py-12">
                     <p className="select-none mb-6">No transcript yet</p>
                     {isCheckingExistingTranscript ? (
@@ -1493,11 +1495,8 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                     const isHighlighted = highlightedIndex === originalIndex;
                     const isSelected = selectedEntries.has(originalIndex);
                     
-                    // Use the same DRY logic as subtitles - direct calculation, no state dependency
-                    const currentEntry = getCurrentTranscriptEntry(currentTime);
-                    const isActive = currentEntry.index === originalIndex;
-                    
-                    printLog(`Entry ${originalIndex}: time=${item.time}, isActive=${isActive}, currentEntryIndex=${currentEntry.index}, currentTime=${currentTime}`);
+                    // Use pre-calculated current entry index (computed once per render, not per item)
+                    const isActive = currentActiveIndex === originalIndex;
                     
                     return (
                       <div 
@@ -1531,7 +1530,8 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                   <div className="text-center text-gray-400 py-8">
                     <p className="select-none">No matching transcript entries found</p>
                   </div>
-                )}
+                );
+                })()}
               </div>
             ) : (
               <div className="space-y-3">

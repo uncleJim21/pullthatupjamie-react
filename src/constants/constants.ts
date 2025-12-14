@@ -1,6 +1,11 @@
-export const DEBUG_MODE = false;
+export const DEBUG_MODE = true;
 export const DEBUG_TRANSCRIPTION = false;
-export const TFTC_FEED_URL = "https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9"
+// export const TFTC_FEED_URL = "https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9"//TFTC
+// export const TFTC_FEED_URL = "https://feeds.fountain.fm/VV0f6IwusQoi5kOqvNCx"//Walker
+export const TFTC_FEED_URL = "https://feeds.fountain.fm/VV0f6IwusQoi5kOqvNCx"//Walker
+
+
+export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
 
 // More explicit approach to determine FRONTEND_URL
 export const FRONTEND_URL = (() => {
