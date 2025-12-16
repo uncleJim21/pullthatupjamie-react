@@ -4,9 +4,13 @@ import { v4 as uuidv4 } from 'uuid';
 // Storage key for client ID
 const CLIENT_ID_KEY = 'research_client_id';
 const SESSION_ID_KEY = 'research_session_id';
+const SESSION_TIMESTAMP_KEY = 'research_session_timestamp';
 
 // Maximum items per research session
 export const MAX_RESEARCH_ITEMS = 50;
+
+// Session expiry time in milliseconds (24 hours)
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 // Types for research session
 export interface ResearchSessionItem {
@@ -84,17 +88,35 @@ function getOrCreateClientId(): string {
 }
 
 /**
- * Get the current session ID if it exists
+ * Get the current session ID if it exists and is not expired
  */
 function getSessionId(): string | null {
-  return localStorage.getItem(SESSION_ID_KEY);
+  const sessionId = localStorage.getItem(SESSION_ID_KEY);
+  const timestamp = localStorage.getItem(SESSION_TIMESTAMP_KEY);
+  
+  if (!sessionId || !timestamp) {
+    return null;
+  }
+  
+  // Check if session has expired (24 hours)
+  const now = Date.now();
+  const sessionTime = parseInt(timestamp, 10);
+  
+  if (now - sessionTime > SESSION_EXPIRY_MS) {
+    console.log('Research session expired (24h), will create new session');
+    clearSessionId();
+    return null;
+  }
+  
+  return sessionId;
 }
 
 /**
- * Store the session ID after creation
+ * Store the session ID after creation with current timestamp
  */
 function setSessionId(sessionId: string): void {
   localStorage.setItem(SESSION_ID_KEY, sessionId);
+  localStorage.setItem(SESSION_TIMESTAMP_KEY, Date.now().toString());
 }
 
 /**
@@ -102,6 +124,7 @@ function setSessionId(sessionId: string): void {
  */
 function clearSessionId(): void {
   localStorage.removeItem(SESSION_ID_KEY);
+  localStorage.removeItem(SESSION_TIMESTAMP_KEY);
 }
 
 /**
@@ -301,4 +324,68 @@ export function getCurrentClientId(): string | null {
  */
 export function getCurrentSessionId(): string | null {
   return getSessionId();
+}
+
+/**
+ * Fetch a research session by ID
+ */
+export async function fetchResearchSession(sessionId: string): Promise<ResearchSession | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/research-sessions/${sessionId}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.log('Research session not found, clearing local session ID');
+        clearSessionId();
+        return null;
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.success ? data.data : null;
+  } catch (error) {
+    console.error('Fetch research session error:', error);
+    return null;
+  }
+}
+
+/**
+ * Convert backend items to frontend format
+ */
+export function backendItemsToFrontend(backendItems: ResearchSessionItemPayload[]): ResearchSessionItem[] {
+  return backendItems.map(item => ({
+    shareLink: item.pineconeId,
+    quote: item.metadata.quote,
+    summary: item.metadata.summary,
+    headline: item.metadata.headline,
+    episode: item.metadata.episode,
+    creator: item.metadata.creator,
+    episodeImage: item.metadata.episodeImage,
+    date: item.metadata.date,
+    hierarchyLevel: item.metadata.hierarchyLevel as 'feed' | 'episode' | 'chapter' | 'paragraph',
+    addedAt: new Date(), // We don't have the original timestamp, use current
+  }));
+}
+
+/**
+ * Load the current session from backend and return items
+ */
+export async function loadCurrentSession(): Promise<ResearchSessionItem[]> {
+  const sessionId = getSessionId();
+  
+  if (!sessionId) {
+    return [];
+  }
+  
+  const session = await fetchResearchSession(sessionId);
+  
+  if (!session || !session.items || session.items.length === 0) {
+    return [];
+  }
+  
+  return backendItemsToFrontend(session.items);
 }

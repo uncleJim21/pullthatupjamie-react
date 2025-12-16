@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw, Podcast } from 'lucide-react';
+import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw } from 'lucide-react';
 import { analyzeResearchSession } from '../services/researchSessionAnalysisService.ts';
 import { getCurrentSessionId } from '../services/researchSessionService.ts';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
@@ -63,7 +63,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   sessionId: propSessionId,
   onWidthChange
 }) => {
-  // Determine which panel should be open and active mode
+  // Determine which mode is active
   const [activeMode, setActiveMode] = useState<PanelMode>(PanelMode.CONTEXT);
   const isPanelOpen = isContextOpen || isAnalysisOpen;
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -76,7 +76,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const sessionId = propSessionId || getCurrentSessionId();
   
-  // Update active mode based on which panel is being opened
+  // Update active mode based on which panel is being opened from parent
   useEffect(() => {
     if (isContextOpen && !isAnalysisOpen) {
       setActiveMode(PanelMode.CONTEXT);
@@ -84,14 +84,19 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
       setActiveMode(PanelMode.ANALYSIS);
     }
   }, [isContextOpen, isAnalysisOpen]);
+  
+  // Handle tab clicks - just switch mode, don't close anything
+  const handleModeSwitch = (mode: PanelMode) => {
+    setActiveMode(mode);
+  };
 
   // Reset analysis when panel closes
   useEffect(() => {
-    if (!isAnalysisOpen) {
+    if (!isPanelOpen) {
       setAnalysis('');
       setError(null);
     }
-  }, [isAnalysisOpen]);
+  }, [isPanelOpen]);
 
   const handleAnalyze = async () => {
     if (!sessionId) {
@@ -123,10 +128,10 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
 
   // Auto-analyze when analysis mode opens
   useEffect(() => {
-    if (activeMode === PanelMode.ANALYSIS && isAnalysisOpen && !analysis && !isAnalyzing && !error && sessionId) {
+    if (activeMode === PanelMode.ANALYSIS && isPanelOpen && !analysis && !isAnalyzing && !error && sessionId) {
       handleAnalyze();
     }
-  }, [activeMode, isAnalysisOpen]);
+  }, [activeMode, isPanelOpen]);
 
   // Parse the analysis into title and content
   const lines = analysis.split('\n');
@@ -137,175 +142,199 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
     .join('\n')
     .trim();
 
+  const isContextMode = activeMode === PanelMode.CONTEXT;
+
+  // Calculate panel width including tabs
+  const panelWidth = !isPanelOpen ? 0 : isCollapsed ? 32 : 600;
+  const tabsWidth = isPanelOpen && !isCollapsed ? 60 : 0;
+  const totalWidth = panelWidth + tabsWidth;
+
+  // Report total width to parent
+  useEffect(() => {
+    onWidthChange?.(totalWidth);
+  }, [totalWidth, onWidthChange]);
+
   const panelWidthClass = !isPanelOpen
     ? 'w-0 border-l-0'
     : isCollapsed
       ? 'w-[32px]'
       : 'w-[600px]';
 
-  const currentWidth = !isPanelOpen ? 0 : isCollapsed ? 32 : 600;
-
-  useEffect(() => {
-    onWidthChange?.(currentWidth);
-  }, [currentWidth, onWidthChange]);
-
-  // If in context mode, just render the context panel directly
-  if (activeMode === PanelMode.CONTEXT) {
-    return (
-      <PodcastContextPanel
-        paragraphId={paragraphId}
-        isOpen={isPanelOpen}
-        onClose={onCloseContext}
-        smartInterpolation={smartInterpolation}
-        onTimestampClick={onTimestampClick}
-        onKeywordSearch={onKeywordSearch}
-        auth={auth}
-        audioUrl={audioUrl}
-        episodeTitle={episodeTitle}
-        episodeImage={episodeImage}
-        creator={creator}
-        listenLink={listenLink}
-        timeContext={timeContext}
-        date={date}
-        autoPlayOnOpen={autoPlayOnOpen}
-        onWidthChange={onWidthChange}
-        onSwitchToAnalysis={() => {
-          setActiveMode(PanelMode.ANALYSIS);
-          onCloseContext();
-        }}
-      />
-    );
-  }
-
-  // Analysis mode - render panel with same structure as PodcastContextPanel
+  // Render single unified container with tabs always visible
   return (
-    <div
-      className={`absolute top-0 right-0 h-full bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out ${panelWidthClass} overflow-hidden flex-shrink-0 z-50`}
-    >
-      {/* Collapsed State - Tab */}
-      {isCollapsed && isPanelOpen && (
-        <button
-          onClick={() => setIsCollapsed(false)}
-          className="flex items-center justify-center h-full hover:bg-gray-900 transition-colors group"
-          aria-label="Expand panel"
-        >
-          <div className="flex flex-col items-center gap-2">
-            <BrainCircuit className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
-            <div className="writing-mode-vertical text-xs text-gray-400 group-hover:text-white transition-colors whitespace-nowrap">
-              AI Analysis
-            </div>
-          </div>
-        </button>
+    <div className="flex h-screen">
+      {/* Folder-style tabs - ALWAYS visible when panel is open and not collapsed */}
+      {isPanelOpen && !isCollapsed && (
+        <div className="flex flex-col gap-1 pt-4 pr-0 bg-transparent">
+          <button
+            onClick={() => handleModeSwitch(PanelMode.CONTEXT)}
+            className={`
+              px-3 py-6 rounded-l-lg border-l border-t border-b transition-all
+              ${isContextMode 
+                ? 'bg-black border-gray-700 text-white -mr-[1px] z-20' 
+                : 'bg-gray-900 border-gray-800 text-gray-500 hover:text-gray-300'
+              }
+            `}
+            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+            title="Context"
+          >
+            <span className="text-xs font-medium">Context</span>
+          </button>
+          
+          <button
+            onClick={() => handleModeSwitch(PanelMode.ANALYSIS)}
+            className={`
+              px-3 py-6 rounded-l-lg border-l border-t border-b transition-all
+              ${!isContextMode 
+                ? 'bg-black border-gray-700 text-white -mr-[1px] z-20' 
+                : 'bg-gray-900 border-gray-800 text-gray-500 hover:text-gray-300'
+              }
+            `}
+            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+            title="AI Analysis"
+          >
+            <span className="text-xs font-medium">AI Analysis</span>
+          </button>
+        </div>
       )}
 
-      {/* Expanded State - Full Panel */}
-      {!isCollapsed && isPanelOpen && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Header with Tabs */}
-          <div className="p-3 border-b border-gray-800 bg-[#0A0A0A]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <BrainCircuit className="w-4 h-4 text-blue-400" />
-                <h3 className="text-sm font-medium text-gray-400">Research Analysis</h3>
+      {/* Panel Content - Context or Analysis */}
+      {isContextMode ? (
+        <PodcastContextPanel
+          paragraphId={paragraphId}
+          isOpen={isPanelOpen}
+          onClose={onCloseContext}
+          smartInterpolation={smartInterpolation}
+          onTimestampClick={onTimestampClick}
+          onKeywordSearch={onKeywordSearch}
+          auth={auth}
+          audioUrl={audioUrl}
+          episodeTitle={episodeTitle}
+          episodeImage={episodeImage}
+          creator={creator}
+          listenLink={listenLink}
+          timeContext={timeContext}
+          date={date}
+          autoPlayOnOpen={autoPlayOnOpen}
+          onWidthChange={() => {}} // We handle width reporting at the wrapper level
+        />
+      ) : (
+        // Analysis Panel - matching PodcastContextPanel structure exactly
+        <div
+          className={`sticky top-0 h-screen bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out ${panelWidthClass} overflow-hidden flex-shrink-0`}
+        >
+          {/* Collapsed State - Tab */}
+          {isCollapsed ? (
+            <button
+              onClick={() => setIsCollapsed(false)}
+              className="flex items-center justify-center h-full hover:bg-gray-900 transition-colors group"
+              aria-label="Expand panel"
+            >
+              <div className="flex flex-col items-center gap-2">
+                <BrainCircuit className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                <div
+                  style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+                  className="text-xs text-gray-400 group-hover:text-white transition-colors whitespace-nowrap"
+                >
+                  AI Analysis
+                </div>
               </div>
-              <button
-                onClick={() => setIsCollapsed(true)}
-                className="text-gray-400 hover:text-white transition-colors"
-                aria-label="Collapse panel"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-            
-            {/* Tab Buttons */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setActiveMode(PanelMode.CONTEXT);
-                  onCloseAnalysis();
-                }}
-                className="flex-1 px-3 py-1.5 text-xs rounded transition-colors text-gray-400 hover:text-white hover:bg-gray-800"
-              >
-                <div className="flex items-center justify-center gap-1.5">
-                  <Podcast className="w-3.5 h-3.5" />
-                  <span>Context</span>
+            </button>
+          ) : (
+            /* Expanded State - Full Panel matching PodcastContextPanel structure */
+            <div className="flex-1 flex overflow-hidden">
+              {/* Left Side - Main Content */}
+              <div className="flex-1 flex flex-col border-r border-gray-800 min-w-0">
+                <div className="p-3 border-b border-gray-800 bg-[#0A0A0A]">
+                  <h3 className="text-sm font-medium text-gray-400">AI Analysis</h3>
                 </div>
-              </button>
-              <button
-                className="flex-1 px-3 py-1.5 text-xs rounded transition-colors bg-gray-700 text-white"
-              >
-                <div className="flex items-center justify-center gap-1.5">
-                  <BrainCircuit className="w-3.5 h-3.5" />
-                  <span>AI Analysis</span>
-                </div>
-              </button>
-            </div>
-          </div>
 
-          {/* Content Area */}
-          <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
-            {error ? (
-              <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-300">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-medium mb-1 text-sm">Analysis Error</div>
-                    <div className="text-xs">{error}</div>
-                  </div>
+                <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
+                  {!sessionId ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                      <BrainCircuit className="w-12 h-12 mb-4 opacity-50" />
+                      <p className="text-sm text-center px-8">
+                        Add items to your research session to perform AI analysis
+                      </p>
+                      <p className="text-xs text-gray-600 text-center px-8 mt-2">
+                        Right-click stars in the galaxy and select "Add to Research"
+                      </p>
+                    </div>
+                  ) : error ? (
+                    <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-300">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <div className="font-medium mb-1 text-sm">Analysis Error</div>
+                          <div className="text-xs">{error}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : isAnalyzing && !analysis ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <Loader className="w-8 h-8 animate-spin mb-4" />
+                      <p className="text-sm">Analyzing research session...</p>
+                    </div>
+                  ) : analysis ? (
+                    <div className="space-y-4">
+                      {title && (
+                        <div className="pb-4 border-b border-gray-800">
+                          <h3 className="text-lg font-bold text-white leading-tight">{title}</h3>
+                        </div>
+                      )}
+                      <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                        {content}
+                      </div>
+                      {isAnalyzing && (
+                        <div className="flex items-center gap-2 text-blue-400 text-sm pt-4">
+                          <Loader className="w-4 h-4 animate-spin" />
+                          <span>Generating...</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                      <BrainCircuit className="w-12 h-12 mb-4" />
+                      <p className="text-sm mb-4">No analysis available</p>
+                      <button
+                        onClick={handleAnalyze}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                      >
+                        Analyze Session
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ) : isAnalyzing && !analysis ? (
-              <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                <Loader className="w-8 h-8 animate-spin mb-4" />
-                <p className="text-sm">Analyzing research session...</p>
-              </div>
-            ) : analysis ? (
-              <div className="space-y-4">
-                {title && (
-                  <div className="pb-4 border-b border-gray-800">
-                    <h3 className="text-lg font-bold text-white leading-tight">{title}</h3>
+
+                {/* Footer - Re-analyze Button */}
+                {!isAnalyzing && analysis && (
+                  <div className="border-t border-gray-800 p-3 bg-[#0A0A0A]">
+                    <button
+                      onClick={handleAnalyze}
+                      disabled={!sessionId}
+                      className="w-full px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-900 disabled:cursor-not-allowed text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Re-analyze
+                    </button>
                   </div>
                 )}
-                <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap space-y-4">
-                  {content}
-                </div>
-                {isAnalyzing && (
-                  <div className="flex items-center gap-2 text-blue-400 text-sm pt-4">
-                    <Loader className="w-4 h-4 animate-spin" />
-                    <span>Generating...</span>
-                  </div>
-                )}
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-                <BrainCircuit className="w-12 h-12 mb-4" />
-                <p className="text-sm">No analysis available</p>
-              </div>
-            )}
-          </div>
 
-          {/* Footer - Re-analyze Button */}
-          {!isAnalyzing && analysis && (
-            <div className="border-t border-gray-800 p-3 bg-[#0A0A0A]">
-              <button
-                onClick={handleAnalyze}
-                disabled={!sessionId}
-                className="w-full px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-900 disabled:cursor-not-allowed text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Re-analyze
-              </button>
+              {/* Right Side - Close/Collapse Controls */}
+              <div className="w-[40px] bg-[#0A0A0A] border-l border-gray-800 flex flex-col items-center py-3">
+                <button
+                  onClick={() => setIsCollapsed(true)}
+                  className="text-gray-400 hover:text-white transition-colors mb-2"
+                  aria-label="Collapse panel"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           )}
         </div>
       )}
-
-      <style>{`
-        .writing-mode-vertical {
-          writing-mode: vertical-rl;
-          text-orientation: mixed;
-        }
-      `}</style>
     </div>
   );
 };

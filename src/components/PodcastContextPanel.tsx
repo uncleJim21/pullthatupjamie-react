@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronLeft, Podcast, ChevronDown, ChevronUp, Play, ScanSearch, RotateCcw, RotateCw, BrainCircuit } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Podcast, ChevronDown, ChevronUp, Play, ScanSearch, RotateCcw, RotateCw } from 'lucide-react';
 import ContextService, { AdjacentParagraph, HierarchyResponse } from '../services/contextService.ts';
 import ChapterService, { Chapter } from '../services/chapterService.ts';
 import { printLog, HIERARCHY_COLORS } from '../constants/constants.ts';
@@ -61,8 +61,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   timeContext,
   date,
   autoPlayOnOpen,
-  onWidthChange,
-  onSwitchToAnalysis
+  onWidthChange
 }) => {
   const [paragraphs, setParagraphs] = useState<AdjacentParagraph[]>([]);
   const [hierarchy, setHierarchy] = useState<HierarchyResponse | null>(null);
@@ -576,30 +575,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         {viewMode !== ViewMode.CHAPTER && (
           <div className="flex-1 flex flex-col border-r border-gray-800 min-w-0">
           <div className="p-3 border-b border-gray-800 bg-[#0A0A0A]">
-            <h3 className="text-sm font-medium text-gray-400 mb-3">Context</h3>
-            
-            {/* Tab Buttons */}
-            {onSwitchToAnalysis && (
-              <div className="flex gap-2">
-                <button
-                  className="flex-1 px-3 py-1.5 text-xs rounded transition-colors bg-gray-700 text-white"
-                >
-                  <div className="flex items-center justify-center gap-1.5">
-                    <Podcast className="w-3.5 h-3.5" />
-                    <span>Context</span>
-                  </div>
-                </button>
-                <button
-                  onClick={onSwitchToAnalysis}
-                  className="flex-1 px-3 py-1.5 text-xs rounded transition-colors text-gray-400 hover:text-white hover:bg-gray-800"
-                >
-                  <div className="flex items-center justify-center gap-1.5">
-                    <BrainCircuit className="w-3.5 h-3.5" />
-                    <span>AI Analysis</span>
-                  </div>
-                </button>
-              </div>
-            )}
+            <h3 className="text-sm font-medium text-gray-400">Context</h3>
           </div>
           
           <div ref={contentRef} className="flex-1 overflow-y-auto p-4">

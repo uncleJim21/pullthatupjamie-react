@@ -35,7 +35,7 @@ import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import { ResearchSessionItem } from './ResearchSessionCollector.tsx';
-import { clearLocalSession, MAX_RESEARCH_ITEMS } from '../services/researchSessionService.ts';
+import { clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession } from '../services/researchSessionService.ts';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -224,7 +224,24 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [showResearchLimitToast, setShowResearchLimitToast] = useState(false);
   const researchToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const researchLimitToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
+  // Load research session from backend on mount
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const items = await loadCurrentSession();
+        if (items.length > 0) {
+          setResearchSessionItems(items);
+          printLog(`[ResearchSession] Loaded ${items.length} items from existing session`);
+        }
+      } catch (error) {
+        console.error('Failed to load research session:', error);
+      }
+    };
+    
+    loadSession();
+  }, []); // Run once on mount
+
   // Load showAxisLabels from userSettings
   const getShowAxisLabels = () => {
     try {
@@ -522,11 +539,23 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   };
 
   // Research session handlers
-  const handleAddToResearchSession = (result: any) => {
+  const handleAddToResearchSession = async (result: any) => {
     // Check if item already exists
     const exists = researchSessionItems.some(item => item.shareLink === result.shareLink);
     if (exists) {
       printLog(`[ResearchSession] Item already in session: ${result.shareLink}`);
+      return;
+    }
+
+    // Check 50 item limit
+    if (researchSessionItems.length >= MAX_RESEARCH_ITEMS) {
+      setShowResearchLimitToast(true);
+      if (researchLimitToastTimeoutRef.current) {
+        clearTimeout(researchLimitToastTimeoutRef.current);
+      }
+      researchLimitToastTimeoutRef.current = setTimeout(() => {
+        setShowResearchLimitToast(false);
+      }, 3000);
       return;
     }
 
@@ -543,9 +572,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       addedAt: new Date(),
     };
 
-    setResearchSessionItems(prev => [...prev, newItem]);
+    const updatedItems = [...researchSessionItems, newItem];
+    setResearchSessionItems(updatedItems);
     printLog(`[ResearchSession] Added item: ${result.shareLink}`);
-    
+
+    // Auto-save session after adding item
+    try {
+      await saveResearchSession(updatedItems);
+      printLog(`[ResearchSession] Auto-saved session with ${updatedItems.length} items`);
+    } catch (error) {
+      console.error('Failed to auto-save research session:', error);
+    }
+
     // Show toast notification
     setShowResearchToast(true);
     if (researchToastTimeoutRef.current) {
@@ -556,9 +594,24 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }, 2000);
   };
 
-  const handleRemoveFromResearchSession = (shareLink: string) => {
-    setResearchSessionItems(prev => prev.filter(item => item.shareLink !== shareLink));
+  const handleRemoveFromResearchSession = async (shareLink: string) => {
+    const updatedItems = researchSessionItems.filter(item => item.shareLink !== shareLink);
+    setResearchSessionItems(updatedItems);
     printLog(`[ResearchSession] Removed item: ${shareLink}`);
+    
+    // If no items left, clear the session
+    if (updatedItems.length === 0) {
+      clearLocalSession();
+      printLog(`[ResearchSession] Auto-cleared session ID - no items remaining`);
+    } else {
+      // Auto-save the updated session
+      try {
+        await saveResearchSession(updatedItems);
+        printLog(`[ResearchSession] Auto-saved session after removal, ${updatedItems.length} items remaining`);
+      } catch (error) {
+        console.error('Failed to auto-save research session after removal:', error);
+      }
+    }
   };
 
   const handleClearResearchSession = () => {
