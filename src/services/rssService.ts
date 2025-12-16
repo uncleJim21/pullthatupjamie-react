@@ -136,8 +136,10 @@ class RssService {
    */
   async getVideoUrlsFromFeed(feedUrl: string = TFTC_FEED_URL): Promise<RssVideoItem[]> {
     try {
-      // Fetch the RSS feed XML
-      const response = await fetch(feedUrl);
+      // Fetch the RSS feed XML - cache: 'no-store' prevents caching without triggering CORS preflight
+      const response = await fetch(feedUrl, {
+        cache: 'no-store'
+      });
       
       if (!response.ok) {
         throw new Error(`Error fetching RSS feed: ${response.status}`);

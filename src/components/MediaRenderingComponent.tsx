@@ -921,22 +921,15 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     );
   }, [isFilterEnabled, debouncedSearchQuery, transcriptData]);
 
-  // Filter children clips data based on DEBOUNCED search query, and sort chronologically (newest first)
-  // This only re-runs when debouncedSearchQuery changes (after 500ms of no typing)
-  const filteredChildrenClipsData = useMemo(() => {
-    const lowerQuery = debouncedSearchQuery.toLowerCase();
-    
-    return childrenClips
-      .filter(clip => 
-        debouncedSearchQuery === '' || clip.editRange.toLowerCase().includes(lowerQuery)
-      )
-      .sort((a, b) => {
-        // Sort by creation date, newest first
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return dateB - dateA;
-      });
-  }, [debouncedSearchQuery, childrenClips]);
+  // Sort children clips chronologically (newest first) - NO FILTERING
+  const sortedChildrenClipsData = useMemo(() => {
+    return childrenClips.sort((a, b) => {
+      // Sort by creation date, newest first
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateB - dateA;
+    });
+  }, [childrenClips]);
 
   // Optimized search function - only called after debounce
   const performSearch = (query: string) => {
@@ -1553,8 +1546,8 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                       Try Again
                     </button>
                   </div>
-                ) : filteredChildrenClipsData.length > 0 ? (
-                  filteredChildrenClipsData.map((clip) => {
+                ) : sortedChildrenClipsData.length > 0 ? (
+                  sortedChildrenClipsData.map((clip) => {
                     const isPolling = pollingClips.has(clip.lookupHash);
                     const isProcessing = clip.status === 'processing' || clip.status === 'queued';
                     const isFailed = clip.status === 'failed';
@@ -1622,14 +1615,10 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                   })
                 ) : (
                   <div className="text-center text-gray-400 py-8">
-                    <p className="select-none">
-                      {searchQuery ? 'No matching clips found' : 'No child clips yet'}
+                    <p className="select-none">No child clips yet</p>
+                    <p className="text-gray-500 text-sm mt-2 select-none">
+                      Use the Clip button to create clips from this video
                     </p>
-                    {!searchQuery && (
-                      <p className="text-gray-500 text-sm mt-2 select-none">
-                        Use the Clip button to create clips from this video
-                      </p>
-                    )}
                   </div>
                 )}
               </div>

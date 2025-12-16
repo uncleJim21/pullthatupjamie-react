@@ -393,7 +393,9 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       // HACK: Fetch thumbnails directly here since RSS service isn't updating
       console.log('Fetching RSS feed directly to get thumbnails...');
       try {
-        const feedResponse = await fetch(TFTC_FEED_URL);
+        const feedResponse = await fetch(TFTC_FEED_URL, {
+          cache: 'no-store'
+        });
         const xmlText = await feedResponse.text();
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
@@ -456,9 +458,29 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       });
       console.log('===== END THUMBNAILS =====');
       
-      
-      setRssVideos(uniqueVideos);
-      printLog('RSS videos set to state');
+      // Upsert logic: merge new entries with existing ones
+      setRssVideos(prevVideos => {
+        // Create a map of existing videos by their unique key (episodeGuid or videoUrl)
+        const existingMap = new Map<string, RssVideoItem>();
+        prevVideos.forEach(video => {
+          const key = video.episodeGuid || video.videoUrl;
+          existingMap.set(key, video);
+        });
+        
+        // Update or add new videos
+        uniqueVideos.forEach(video => {
+          const key = video.episodeGuid || video.videoUrl;
+          existingMap.set(key, video); // This will update existing or add new
+        });
+        
+        // Convert back to array
+        const mergedVideos = Array.from(existingMap.values());
+        console.log(`Upserted RSS videos: ${prevVideos.length} existing + ${uniqueVideos.length} fetched = ${mergedVideos.length} total`);
+        printLog(`Upserted RSS videos: ${prevVideos.length} existing + ${uniqueVideos.length} fetched = ${mergedVideos.length} total`);
+        
+        return mergedVideos;
+      });
+      printLog('RSS videos upserted to state');
     } catch (error) {
       console.error('Error fetching RSS videos:', error);
       printLog('ERROR fetching RSS videos: ' + (error instanceof Error ? error.message : String(error)));
@@ -480,6 +502,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         setCurrentPage(1);
         fetchUploads();
       } else if (uploadsView === 'rss-feed') {
+        // Fetch and merge fresh RSS data with existing entries
         fetchRssVideos();
       }
     }
