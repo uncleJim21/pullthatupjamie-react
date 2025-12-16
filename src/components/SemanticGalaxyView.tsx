@@ -1207,11 +1207,6 @@ const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
                 ? `${(similarityObj.combined * 100).toFixed(0)}%`
                 : 'N/A'}
             </div>
-
-            {/* Right-click hint */}
-            <div className="text-xs text-gray-600 mt-2 italic">
-              Right-click to add to research
-            </div>
           </div>
         </div>
       </div>

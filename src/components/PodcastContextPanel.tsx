@@ -41,8 +41,9 @@ interface PodcastContextPanelProps {
   autoPlayOnOpen?: boolean;
   // Notify parent about current panel width so layout (e.g. floating search bar) can adjust
   onWidthChange?: (width: number) => void;
-  // Callback to switch to AI analysis mode
-  onSwitchToAnalysis?: () => void;
+  // External collapse control (when part of UnifiedSidePanel)
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
@@ -61,7 +62,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   timeContext,
   date,
   autoPlayOnOpen,
-  onWidthChange
+  onWidthChange,
+  isCollapsed: externalIsCollapsed,
+  onToggleCollapse
 }) => {
   const [paragraphs, setParagraphs] = useState<AdjacentParagraph[]>([]);
   const [hierarchy, setHierarchy] = useState<HierarchyResponse | null>(null);
@@ -76,7 +79,10 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.CONTEXT);
   const [viewHistory, setViewHistory] = useState<ViewHistoryItem[]>([{ mode: ViewMode.CONTEXT }]);
   const [openTooltipKeyword, setOpenTooltipKeyword] = useState<string | null>(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Use external collapse state if provided, otherwise manage internally
+  const [internalIsCollapsed, setInternalIsCollapsed] = useState(false);
+  const isCollapsed = externalIsCollapsed !== undefined ? externalIsCollapsed : internalIsCollapsed;
+  const setIsCollapsed = onToggleCollapse || setInternalIsCollapsed;
   const contentRef = useRef<HTMLDivElement>(null);
   const {
     currentTrack,

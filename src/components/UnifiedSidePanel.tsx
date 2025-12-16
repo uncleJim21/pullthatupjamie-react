@@ -217,6 +217,8 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           date={date}
           autoPlayOnOpen={autoPlayOnOpen}
           onWidthChange={() => {}} // We handle width reporting at the wrapper level
+          isCollapsed={isCollapsed}
+          onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
         />
       ) : (
         // Analysis Panel - matching PodcastContextPanel structure exactly
