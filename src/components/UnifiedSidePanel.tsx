@@ -183,15 +183,17 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           
           <button
             onClick={() => handleModeSwitch(PanelMode.ANALYSIS)}
+            disabled={true}
             className={`
               px-3 py-6 rounded-l-lg border-l border-t border-b transition-all
+              disabled:opacity-50 disabled:cursor-not-allowed
               ${!isContextMode 
                 ? 'bg-black border-gray-700 text-white -mr-[1px] z-20' 
                 : 'bg-gray-900 border-gray-800 text-gray-500 hover:text-gray-300'
               }
             `}
             style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
-            title="AI Analysis"
+            title="AI Analysis (Coming Soon)"
           >
             <span className="text-xs font-medium">AI Analysis</span>
           </button>
@@ -229,14 +231,15 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           {isCollapsed ? (
             <button
               onClick={() => setIsCollapsed(false)}
-              className="flex items-center justify-center h-full hover:bg-gray-900 transition-colors group"
+              className="flex items-center justify-center h-full hover:bg-gray-900 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Expand panel"
+              disabled={true}
             >
               <div className="flex flex-col items-center gap-2">
                 <BrainCircuit className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
                 <div
                   style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
-                  className="text-xs text-gray-400 group-hover:text-white transition-colors whitespace-nowrap"
+                  className="text-xs text-gray-800 group-hover:text-white transition-colors whitespace-nowrap"
                 >
                   AI Analysis
                 </div>
