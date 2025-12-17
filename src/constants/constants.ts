@@ -1,30 +1,17 @@
-export const DEBUG_MODE = false;
-export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
+// Import shared URL configuration
+import { FRONTEND_URL, API_URL, DEBUG_MODE } from '../config/urls.js';
 
-// More explicit approach to determine FRONTEND_URL
-export const FRONTEND_URL = (() => {
-  // Force localhost in development mode regardless of actual origin
-  if (DEBUG_MODE) {
-    return 'http://localhost:3000';
-  }
-  
-  // In production, use the actual origin or default to the production URL
-  const result = typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-    ? 'https://pullthatupjamie-react-kha196lqu-cascdr-9169e8b8.vercel.app'//'https://pullthatupjamie.ai' 
-    : 'http://localhost:3000';
-  
-  return result;
-})();
+export { DEBUG_MODE, FRONTEND_URL, API_URL };
+export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
 
 // Debug output to verify the configuration
 console.log('Constants loaded:', { 
   DEBUG_MODE, 
   FRONTEND_URL,
+  API_URL,
   currentOrigin: typeof window !== 'undefined' ? window.location.origin : 'not in browser',
   hostname: typeof window !== 'undefined' ? window.location.hostname : 'not in browser'
 });
-
-export const API_URL = DEBUG_MODE ? "http://localhost:4132" : "https://pullthatupjamie-explore-alpha-xns9k.ondigitalocean.app";
 export const MONTHLY_PRICE_STRING = "$9.99"
 
 export const printLog = (log:string) =>{

@@ -5,16 +5,14 @@
  */
 
 const fetch = require('node-fetch');
+const { FRONTEND_URL, API_URL } = require('../../src/config/urls.js');
 
 module.exports = async function handler(req, res) {
   const { shareId } = req.query;
 
-  // Determine the backend URL based on environment
-  const backendUrl = process.env.BACKEND_BASE_URL || 'http://localhost:4132';
-  
-  // Use localhost in dev (vercel dev), production URL otherwise
-  const isDev = !process.env.VERCEL_ENV || process.env.VERCEL_ENV === 'development';
-  const frontendUrl = isDev ? 'http://localhost:3000' : (process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://pullthatupjamie.ai');
+  // Use shared URL configuration
+  const backendUrl = API_URL;
+  const frontendUrl = FRONTEND_URL;
   
   try {
     console.log('[SharedSession] Fetching:', `${backendUrl}/api/shared-research-sessions/${shareId}`);
