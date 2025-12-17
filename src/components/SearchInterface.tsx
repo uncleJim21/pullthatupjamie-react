@@ -36,6 +36,7 @@ import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import { ResearchSessionItem } from './ResearchSessionCollector.tsx';
 import { clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession } from '../services/researchSessionService.ts';
+import { fetchSharedResearchSession } from '../services/researchSessionShareService.ts';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -1269,6 +1270,77 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       loadSharedClip();
     }
   }, [isSharePage, clipId]);
+
+  // Load shared research session from URL parameter
+  const sharedSessionId = searchParams.get('sharedSession');
+  useEffect(() => {
+    const loadSharedSession = async () => {
+      if (sharedSessionId) {
+        try {
+          printLog(`[SharedSession] Loading shared session: ${sharedSessionId}`);
+          const sharedSession = await fetchSharedResearchSession(sharedSessionId);
+          
+          if (sharedSession && sharedSession.nodes && sharedSession.nodes.length > 0) {
+            printLog(`[SharedSession] Loaded ${sharedSession.nodes.length} nodes`);
+            
+            // Use lastItemMetadata as fallback for display information
+            const fallbackMetadata = sharedSession.lastItemMetadata || {};
+            
+            // Transform nodes into galaxy results format
+            const galaxyResults = sharedSession.nodes.map((node: any) => ({
+              shareLink: node.pineconeId,
+              shareUrl: node.metadata?.shareUrl || fallbackMetadata.shareUrl || '',
+              listenLink: node.metadata?.listenLink || fallbackMetadata.listenLink,
+              quote: node.metadata?.quote || fallbackMetadata.quote || '',
+              summary: node.metadata?.summary || fallbackMetadata.summary || '',
+              headline: node.metadata?.headline || fallbackMetadata.headline || '',
+              episode: node.metadata?.episode || fallbackMetadata.episode || 'Shared Research Item',
+              creator: node.metadata?.creator || fallbackMetadata.creator || 'Research Session',
+              audioUrl: node.metadata?.audioUrl || fallbackMetadata.audioUrl || '',
+              episodeImage: node.metadata?.episodeImage || fallbackMetadata.episodeImage,
+              date: node.metadata?.date || fallbackMetadata.date || fallbackMetadata.publishedDate || '',
+              published: node.metadata?.published || fallbackMetadata.published || fallbackMetadata.publishedDate || null,
+              tooltipTitle: node.metadata?.headline || node.metadata?.title || fallbackMetadata.headline || fallbackMetadata.title || node.metadata?.quote || fallbackMetadata.quote || 'Research Item',
+              tooltipSubtitle: node.metadata?.summary || fallbackMetadata.summary || node.metadata?.quote || fallbackMetadata.quote || '',
+              tooltipImage: node.metadata?.episodeImage || fallbackMetadata.episodeImage,
+              similarity: node.metadata?.similarity || fallbackMetadata.similarity || { combined: 0, vector: 0 },
+              timeContext: node.metadata?.timeContext || fallbackMetadata.timeContext || { start_time: null, end_time: null },
+              hierarchyLevel: (node.metadata?.hierarchyLevel || fallbackMetadata.hierarchyLevel || 'paragraph') as 'feed' | 'episode' | 'chapter' | 'paragraph',
+              coordinates3d: {
+                x: node.x,
+                y: node.y,
+                z: node.z
+              }
+            }));
+            
+            // Set galaxy results and switch to galaxy view
+            setGalaxyResults(galaxyResults);
+            setResultViewStyle(SearchResultViewStyle.GALAXY);
+            setQuery(sharedSession.title || 'Shared Research Session');
+            
+            // Mark as searched so UI updates appropriately
+            setSearchHistory(prev => ({
+              ...prev,
+              'podcast-search': true
+            }));
+            
+            printLog('[SharedSession] Loaded successfully into galaxy view');
+          }
+        } catch (error) {
+          console.error('Error loading shared research session:', error);
+          setSearchState(prev => ({
+            ...prev,
+            error: error as Error,
+            isLoading: false
+          }));
+        }
+      }
+    };
+
+    if (sharedSessionId) {
+      loadSharedSession();
+    }
+  }, [sharedSessionId]);
 
   
   useEffect(() => {

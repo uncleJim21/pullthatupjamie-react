@@ -116,12 +116,39 @@ export async function shareCurrentSession(
   
   const request: ShareResearchSessionRequest = {
     title,
-    visibility: 'unlisted',
+    visibility: 'public',
     nodes,
     camera
   };
   
   return shareResearchSession(sessionId, request);
+}
+
+/**
+ * Fetch a shared research session by shareId (public access)
+ */
+export async function fetchSharedResearchSession(shareId: string): Promise<any> {
+  try {
+    const response = await fetch(`${API_URL}/api/shared-research-sessions/${shareId}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Shared session not found');
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.data;
+  } catch (error) {
+    console.error('Fetch shared research session error:', error);
+    throw error;
+  }
 }
 
 /**
