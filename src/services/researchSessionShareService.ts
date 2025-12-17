@@ -41,12 +41,17 @@ function getAuthHeaders(): Record<string, string> {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   };
-  
+
   const token = localStorage.getItem('auth_token');
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
+  // Send frontend origin so backend knows which URL to use for shareUrl
+  if (typeof window !== 'undefined') {
+    headers['X-Requested-With'] = window.location.origin;
+  }
+
   return headers;
 }
 
