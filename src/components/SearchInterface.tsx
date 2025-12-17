@@ -1303,12 +1303,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           if (sharedSessionId) {
             const sharedSession = await fetchSharedResearchSession(sharedSessionId);
             
-            if (!sharedSession || !sharedSession.id) {
-              throw new Error('Session not found or invalid');
+            if (!sharedSession || !sharedSession.researchSessionId) {
+              throw new Error('Session not found or invalid - backend must return researchSessionId');
             }
             
-            printLog(`[SharedSession] Found session ID: ${sharedSession.id}`);
-            mongoDbId = sharedSession.id;
+            printLog(`[SharedSession] Found research session ID: ${sharedSession.researchSessionId}`);
+            mongoDbId = sharedSession.researchSessionId;
             sessionTitle = sharedSession.title || 'Shared Research Session';
           }
           

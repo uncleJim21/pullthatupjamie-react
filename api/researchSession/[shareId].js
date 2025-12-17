@@ -11,7 +11,10 @@ module.exports = async function handler(req, res) {
 
   // Determine the backend URL based on environment
   const backendUrl = process.env.BACKEND_BASE_URL || 'http://localhost:4132';
-  const frontendUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://pullthatupjamie.ai';
+  
+  // Use localhost in dev (vercel dev), production URL otherwise
+  const isDev = !process.env.VERCEL_ENV || process.env.VERCEL_ENV === 'development';
+  const frontendUrl = isDev ? 'http://localhost:3000' : (process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://pullthatupjamie.ai');
   
   try {
     console.log('[SharedSession] Fetching:', `${backendUrl}/api/shared-research-sessions/${shareId}`);
