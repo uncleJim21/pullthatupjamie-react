@@ -36,7 +36,7 @@ import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import { ResearchSessionItem } from './ResearchSessionCollector.tsx';
 import { clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession } from '../services/researchSessionService.ts';
-import { fetchSharedResearchSession } from '../services/researchSessionShareService.ts';
+import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -1271,61 +1271,77 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
   }, [isSharePage, clipId]);
 
-  // Load shared research session from URL parameter
+  // Load shared research session from URL parameter with warp speed animation
   const sharedSessionId = searchParams.get('sharedSession');
+  const researchSessionId = searchParams.get('researchSessionId');
+  
   useEffect(() => {
-    const loadSharedSession = async () => {
-      if (sharedSessionId) {
+    const loadSharedSessionWithWarpSpeed = async () => {
+      const sessionId = sharedSessionId || researchSessionId;
+      if (sessionId) {
         try {
-          printLog(`[SharedSession] Loading shared session: ${sharedSessionId}`);
-          const sharedSession = await fetchSharedResearchSession(sharedSessionId);
+          printLog(`[SharedSession] Starting warp speed for session: ${sessionId}`);
           
-          if (sharedSession && sharedSession.nodes && sharedSession.nodes.length > 0) {
-            printLog(`[SharedSession] Loaded ${sharedSession.nodes.length} nodes`);
+          // Hide initial search UI and prepare for warp speed (do this first!)
+          setSearchHistory(prev => ({
+            ...prev,
+            'podcast-search': true
+          }));
+          setGridFadeOut(true);
+          resetContextPanelState();
+          setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
+          
+          // Start warp speed animation
+          setSearchState(prev => ({ ...prev, isLoading: true }));
+          setIsDecelerationComplete(false);
+          setResultViewStyle(SearchResultViewStyle.GALAXY); // Switch to galaxy view immediately
+          
+          let mongoDbId = sessionId;
+          let sessionTitle = 'Research Session';
+          
+          // If using sharedSession (short ID), fetch metadata first
+          if (sharedSessionId) {
+            const sharedSession = await fetchSharedResearchSession(sharedSessionId);
             
-            // Use lastItemMetadata as fallback for display information
-            const fallbackMetadata = sharedSession.lastItemMetadata || {};
+            if (!sharedSession || !sharedSession.id) {
+              throw new Error('Session not found or invalid');
+            }
             
-            // Transform nodes into galaxy results format
-            const galaxyResults = sharedSession.nodes.map((node: any) => ({
-              shareLink: node.pineconeId,
-              shareUrl: node.metadata?.shareUrl || fallbackMetadata.shareUrl || '',
-              listenLink: node.metadata?.listenLink || fallbackMetadata.listenLink,
-              quote: node.metadata?.quote || fallbackMetadata.quote || '',
-              summary: node.metadata?.summary || fallbackMetadata.summary || '',
-              headline: node.metadata?.headline || fallbackMetadata.headline || '',
-              episode: node.metadata?.episode || fallbackMetadata.episode || 'Shared Research Item',
-              creator: node.metadata?.creator || fallbackMetadata.creator || 'Research Session',
-              audioUrl: node.metadata?.audioUrl || fallbackMetadata.audioUrl || '',
-              episodeImage: node.metadata?.episodeImage || fallbackMetadata.episodeImage,
-              date: node.metadata?.date || fallbackMetadata.date || fallbackMetadata.publishedDate || '',
-              published: node.metadata?.published || fallbackMetadata.published || fallbackMetadata.publishedDate || null,
-              tooltipTitle: node.metadata?.headline || node.metadata?.title || fallbackMetadata.headline || fallbackMetadata.title || node.metadata?.quote || fallbackMetadata.quote || 'Research Item',
-              tooltipSubtitle: node.metadata?.summary || fallbackMetadata.summary || node.metadata?.quote || fallbackMetadata.quote || '',
-              tooltipImage: node.metadata?.episodeImage || fallbackMetadata.episodeImage,
-              similarity: node.metadata?.similarity || fallbackMetadata.similarity || { combined: 0, vector: 0 },
-              timeContext: node.metadata?.timeContext || fallbackMetadata.timeContext || { start_time: null, end_time: null },
-              hierarchyLevel: (node.metadata?.hierarchyLevel || fallbackMetadata.hierarchyLevel || 'paragraph') as 'feed' | 'episode' | 'chapter' | 'paragraph',
-              coordinates3d: {
-                x: node.x,
-                y: node.y,
-                z: node.z
-              }
-            }));
-            
-            // Set galaxy results and switch to galaxy view
-            setGalaxyResults(galaxyResults);
-            setResultViewStyle(SearchResultViewStyle.GALAXY);
-            setQuery(sharedSession.title || 'Shared Research Session');
-            
-            // Mark as searched so UI updates appropriately
-            setSearchHistory(prev => ({
-              ...prev,
-              'podcast-search': true
-            }));
-            
-            printLog('[SharedSession] Loaded successfully into galaxy view');
+            printLog(`[SharedSession] Found session ID: ${sharedSession.id}`);
+            mongoDbId = sharedSession.id;
+            sessionTitle = sharedSession.title || 'Shared Research Session';
           }
+          
+          // Now fetch with 3D coordinates from the research endpoint
+          const research3DData = await fetchResearchSessionWith3D(mongoDbId);
+          
+          printLog(`[SharedSession] Loaded ${research3DData.results?.length || 0} results with 3D coordinates`);
+          
+          // Set galaxy results from the 3D endpoint response
+          setGalaxyResults(research3DData.results || []);
+          
+          // Store axis labels if returned
+          if (research3DData.axisLabels) {
+            setAxisLabels(research3DData.axisLabels);
+            printLog(`[SharedSession] Received axis labels: ${JSON.stringify(research3DData.axisLabels)}`);
+          }
+          
+          // Set query to session title
+          setQuery(sessionTitle);
+          
+          // Also update conversation for consistency
+          setConversation(prev => [...prev, {
+            id: nextConversationId.current++,
+            type: 'podcast-search' as const,
+            query: sessionTitle,
+            timestamp: new Date(),
+            isStreaming: false,
+            data: {
+              quotes: research3DData.results || []
+            }
+          }]);
+          
+          printLog('[SharedSession] Loaded successfully with warp speed!');
         } catch (error) {
           console.error('Error loading shared research session:', error);
           setSearchState(prev => ({
@@ -1333,14 +1349,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             error: error as Error,
             isLoading: false
           }));
+        } finally {
+          // Stop warp speed (triggers deceleration)
+          setSearchState(prev => ({ ...prev, isLoading: false }));
         }
       }
     };
 
-    if (sharedSessionId) {
-      loadSharedSession();
+    if (sharedSessionId || researchSessionId) {
+      loadSharedSessionWithWarpSpeed();
     }
-  }, [sharedSessionId]);
+  }, [sharedSessionId, researchSessionId]);
 
   
   useEffect(() => {

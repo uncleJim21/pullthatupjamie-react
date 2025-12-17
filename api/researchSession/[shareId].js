@@ -93,6 +93,8 @@ function generateHTML({ title, description, previewImageUrl, canonicalUrl, share
     <meta property="og:title" content="${escapeHtml(title)}" />
     <meta property="og:description" content="${escapeHtml(description)}" />
     <meta property="og:image" content="${escapeHtml(previewImageUrl)}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="${escapeHtml(title)}" />
     <meta property="og:site_name" content="Pull That Up Jamie" />
     
@@ -112,8 +114,9 @@ function generateHTML({ title, description, previewImageUrl, canonicalUrl, share
     <script>
       // Only redirect if this is a browser with JavaScript enabled
       // Scrapers typically don't execute JavaScript
+      // Use replace() instead of href to prevent share URL from staying in back-button history
       if (typeof window !== 'undefined') {
-        window.location.href = '${frontendUrl}/app?sharedSession=${encodeURIComponent(shareId)}';
+        window.location.replace('${frontendUrl}/app?sharedSession=${encodeURIComponent(shareId)}');
       }
     </script>
     

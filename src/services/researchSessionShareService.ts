@@ -152,6 +152,40 @@ export async function fetchSharedResearchSession(shareId: string): Promise<any> 
 }
 
 /**
+ * Fetch research session with 3D coordinates (for warp speed animation)
+ * Calls POST /api/fetch-research-id to get session data with coordinates
+ */
+export async function fetchResearchSessionWith3D(researchSessionId: string): Promise<any> {
+  try {
+    const response = await fetch(`${API_URL}/api/fetch-research-id`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        researchSessionId,
+        fastMode: true,
+        extractAxisLabels: true
+      })
+    });
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Research session not found');
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Fetch research session 3D error:', error);
+    throw error;
+  }
+}
+
+/**
  * Copy text to clipboard with fallback
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
