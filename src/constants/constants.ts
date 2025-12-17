@@ -10,7 +10,7 @@ export const FRONTEND_URL = (() => {
   
   // In production, use the actual origin or default to the production URL
   const result = typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-    ? 'https://pullthatupjamie.ai' 
+    ? 'https://pullthatupjamie-react-kha196lqu-cascdr-9169e8b8.vercel.app'//'https://pullthatupjamie.ai' 
     : 'http://localhost:3000';
   
   return result;
