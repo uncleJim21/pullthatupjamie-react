@@ -8,6 +8,7 @@ import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
 import { saveResearchSession, clearLocalSession, ResearchSessionItem, MAX_RESEARCH_ITEMS } from '../services/researchSessionService.ts';
+import { shareCurrentSession, copyToClipboard, ShareNode } from '../services/researchSessionShareService.ts';
 import ResearchAnalysisPanel from './ResearchAnalysisModal.tsx';
 
 // ============================================================================
@@ -1500,6 +1501,15 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   });
   const saveToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Share toast state
+  const [shareToast, setShareToast] = useState<{ show: boolean; type: 'success' | 'error' | 'loading'; message: string }>({
+    show: false,
+    type: 'success',
+    message: ''
+  });
+  const shareToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
   
   // Analysis modal state
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
@@ -1611,6 +1621,82 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       saveToastTimeoutRef.current = setTimeout(() => {
         setSaveToast({ show: false, type: 'success', message: '' });
       }, 3000);
+    }
+  };
+
+  const showShareToast = (type: 'success' | 'error' | 'loading', message: string) => {
+    setShareToast({ show: true, type, message });
+    if (shareToastTimeoutRef.current) {
+      clearTimeout(shareToastTimeoutRef.current);
+    }
+    // Only auto-hide success and error toasts, not loading
+    if (type !== 'loading') {
+      shareToastTimeoutRef.current = setTimeout(() => {
+        setShareToast({ show: false, type: 'success', message: '' });
+      }, 3000);
+    }
+  };
+
+  // Handle sharing the research session
+  const handleShareSession = async () => {
+    if (isSharing) return;
+    if (!researchSessionItems || researchSessionItems.length === 0) {
+      showShareToast('error', 'No items to share');
+      return;
+    }
+
+    try {
+      setIsSharing(true);
+      showShareToast('loading', 'Creating share link...');
+
+      // Build nodes array from research session items with their galaxy coordinates
+      const nodes: ShareNode[] = researchSessionItems
+        .map(item => {
+          // Find the result in the galaxy view to get coordinates and color
+          const result = results.find(r => r.shareLink === item.shareLink);
+          if (!result || !result.coordinates3d) {
+            return null;
+          }
+
+          return {
+            pineconeId: item.shareLink,
+            x: result.coordinates3d.x,
+            y: result.coordinates3d.y,
+            z: result.coordinates3d.z,
+            color: getHierarchyColor(result.hierarchyLevel)
+          };
+        })
+        .filter((node): node is ShareNode => node !== null);
+
+      if (nodes.length === 0) {
+        showShareToast('error', 'No valid items to share');
+        setIsSharing(false);
+        return;
+      }
+
+      // Create the share with an optional title from the last item
+      const lastItem = researchSessionItems[researchSessionItems.length - 1];
+      const title = lastItem.headline || lastItem.summary || undefined;
+
+      const response = await shareCurrentSession(title, nodes);
+
+      if (response.success && response.data) {
+        // Copy share URL to clipboard
+        const copied = await copyToClipboard(response.data.shareUrl);
+        if (copied) {
+          showShareToast('success', 'Link copied to clipboard!');
+        } else {
+          showShareToast('success', 'Share link created');
+        }
+      } else {
+        showShareToast('error', 'Failed to create share link');
+      }
+    } catch (error) {
+      console.error('Share session error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to share session';
+      showShareToast('error', message);
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -1909,11 +1995,9 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
                   </button>
                   
                   <button
-                    onClick={() => {
-                      // TODO: Implement share functionality
-                      console.log('Share research session');
-                    }}
-                    className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
+                    onClick={handleShareSession}
+                    disabled={isSharing || !researchSessionItems || researchSessionItems.length === 0}
+                    className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Share session"
                     aria-label="Share session"
                   >
@@ -2005,7 +2089,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       {saveToast.show && (
         <div className="absolute top-2 right-4 z-[60] pointer-events-none animate-slide-in-right" style={{ marginTop: 'calc(var(--stats-panel-height, 300px) + 0.5rem)' }}>
           <div className={`backdrop-blur-sm border rounded-lg px-3 py-2 shadow-lg flex items-center gap-2 ${
-            saveToast.type === 'success' 
+            saveToast.type === 'success'
               ? 'bg-black/95 border-gray-700 text-white'
               : saveToast.type === 'error'
               ? 'bg-red-900/95 border-red-700 text-white'
@@ -2019,6 +2103,28 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
               <Loader className="w-4 h-4 animate-spin" />
             )}
             <span className="text-xs font-medium">{saveToast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Share Session Toast - Loading/Success/Error */}
+      {shareToast.show && (
+        <div className="absolute top-2 right-4 z-[60] pointer-events-none animate-slide-in-right" style={{ marginTop: 'calc(var(--stats-panel-height, 300px) + 3.5rem)' }}>
+          <div className={`backdrop-blur-sm border rounded-lg px-3 py-2 shadow-lg flex items-center gap-2 ${
+            shareToast.type === 'success'
+              ? 'bg-black/95 border-gray-700 text-white'
+              : shareToast.type === 'error'
+              ? 'bg-red-900/95 border-red-700 text-white'
+              : 'bg-blue-900/95 border-blue-700 text-white'
+          }`}>
+            {shareToast.type === 'success' ? (
+              <CheckCircle className="w-4 h-4" />
+            ) : shareToast.type === 'error' ? (
+              <AlertCircle className="w-4 h-4" />
+            ) : (
+              <Loader className="w-4 h-4 animate-spin" />
+            )}
+            <span className="text-xs font-medium">{shareToast.message}</span>
           </div>
         </div>
       )}
