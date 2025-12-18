@@ -1052,7 +1052,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       );
       
       printLog(`[3D Search] Received ${quoteResults3D.results?.length || 0} results from API`);
-      
+
       // Store 3D results separately
       setGalaxyResults(quoteResults3D.results || []);
       
@@ -1316,7 +1316,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           const research3DData = await fetchResearchSessionWith3D(mongoDbId);
           
           printLog(`[SharedSession] Loaded ${research3DData.results?.length || 0} results with 3D coordinates`);
-          
+
           // Set galaxy results from the 3D endpoint response
           setGalaxyResults(research3DData.results || []);
           
@@ -2467,7 +2467,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (
             <div className="relative w-full transition-all duration-300 ease-in-out" style={{ height: 'calc(100vh - 150px)' }}>
               <SemanticGalaxyView
-                results={galaxyResults.length > 0 ? galaxyResults : MOCK_GALAXY_DATA.results}
+                results={galaxyResults}
                 onStarClick={(result) => {
                   printLog(`[StarClick] Star clicked: ${result.shareLink}`);
                   printLog(`[StarClick] Audio URL: ${result.audioUrl}`);

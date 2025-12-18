@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
-import { HIERARCHY_COLORS } from '../constants/constants.ts';
+import { HIERARCHY_COLORS, printLog } from '../constants/constants.ts';
 import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Bookmark, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
@@ -224,7 +224,7 @@ const CAMERA_ANIMATION_CONFIG = {
   fromAngle: Math.PI,          // 180 degrees
   toAngle: 0,                  // 0 degrees (forward)
   fromDistanceFactor: 0.3,    // start closer (easier to see zoom out)
-  toDistanceFactor: 0.9,       // zoom out slightly beyond base distance for effect
+  toDistanceFactor: 1.35,      // zoom out 50% more (was 0.9, now 1.35)
 };
 
 // Generate random tiny ray properties
@@ -258,6 +258,7 @@ interface CameraAnimationState {
   fromDistance: number;
   toDistance: number;
   baseYRatio: number;
+  completed?: boolean;
 }
 
 interface QuoteResult {
@@ -1006,15 +1007,17 @@ const AnimatedCamera: React.FC<{
   isAnimating: boolean;
   setIsAnimating: (value: boolean) => void;
 }> = ({ cameraRef, controlsRef, animationRef, isAnimating, setIsAnimating }) => {
+  const hasCompletedRef = useRef(false);
+  
   useFrame((state) => {
-    if (!isAnimating) return;
+    if (!isAnimating || hasCompletedRef.current) return;
     const cam = cameraRef.current;
     const controls = controlsRef.current;
 
     if (!cam) return;
 
     // Lazily initialize animation parameters once the camera is ready
-    if (!animationRef.current) {
+    if (!animationRef.current || animationRef.current.completed) {
       const baseDistance =
         Math.sqrt(
           cam.position.x * cam.position.x +
@@ -1083,8 +1086,10 @@ const AnimatedCamera: React.FC<{
     }
 
     if (t >= 1) {
+      // NUCLEAR OPTION: Stop useFrame from running entirely
+      hasCompletedRef.current = true;
+      
       setIsAnimating(false);
-      animationRef.current = null;
     }
   });
 
@@ -1479,6 +1484,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isAnimatingCamera, setIsAnimatingCamera] = useState(false);
+  const [cameraAnimKey, setCameraAnimKey] = useState(0); // Force remount on results change
   const cameraAnimationRef = useRef<CameraAnimationState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -1571,8 +1577,15 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   // DISABLED: Camera animation causes visible "frame jump" when results load during warp speed
   useEffect(() => {
     if (!results || results.length === 0) return;
+    
+    // Don't restart animation if one is already in progress
+    if (isAnimatingCamera) {
+      return;
+    }
+    
     cameraAnimationRef.current = null; // force re-init in AnimatedCamera
     setIsAnimatingCamera(true);
+    setCameraAnimKey(prev => prev + 1); // Force AnimatedCamera to remount
   }, [results]);
 
   // Reset camera to default position
@@ -2038,6 +2051,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         />
 
         <AnimatedCamera
+          key={cameraAnimKey}
           cameraRef={cameraRef}
           controlsRef={controlsRef}
           animationRef={cameraAnimationRef}
