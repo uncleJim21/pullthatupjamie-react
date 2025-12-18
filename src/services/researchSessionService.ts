@@ -359,18 +359,25 @@ export async function fetchResearchSession(sessionId: string): Promise<ResearchS
  * Convert backend items to frontend format
  */
 export function backendItemsToFrontend(backendItems: ResearchSessionItemPayload[]): ResearchSessionItem[] {
-  return backendItems.map(item => ({
-    shareLink: item.pineconeId,
-    quote: item.metadata.quote,
-    summary: item.metadata.summary,
-    headline: item.metadata.headline,
-    episode: item.metadata.episode,
-    creator: item.metadata.creator,
-    episodeImage: item.metadata.episodeImage,
-    date: item.metadata.date,
-    hierarchyLevel: item.metadata.hierarchyLevel as 'feed' | 'episode' | 'chapter' | 'paragraph',
-    addedAt: new Date(), // We don't have the original timestamp, use current
-  }));
+  return backendItems
+    .filter(item => item && item.pineconeId) // Filter out null/invalid items
+    .map(item => {
+      // Handle cases where metadata might be null or missing fields
+      const metadata = item.metadata || {};
+      
+      return {
+        shareLink: item.pineconeId,
+        quote: metadata.quote,
+        summary: metadata.summary,
+        headline: metadata.headline,
+        episode: metadata.episode || 'Unknown Episode',
+        creator: metadata.creator || 'Unknown Creator',
+        episodeImage: metadata.episodeImage,
+        date: metadata.date || new Date().toISOString(),
+        hierarchyLevel: (metadata.hierarchyLevel as 'feed' | 'episode' | 'chapter' | 'paragraph') || 'paragraph',
+        addedAt: new Date(), // We don't have the original timestamp, use current
+      };
+    });
 }
 
 /**

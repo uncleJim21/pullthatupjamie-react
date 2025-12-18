@@ -41,6 +41,7 @@ interface UnifiedSidePanelProps {
   // Sessions panel props
   isSessionsOpen: boolean;
   onCloseSessions: () => void;
+  onOpenSession?: (sessionId: string, sessionTitle?: string) => void;
   
   // Width callback for layout
   onWidthChange?: (width: number) => void;
@@ -69,6 +70,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   sessionId: propSessionId,
   isSessionsOpen,
   onCloseSessions,
+  onOpenSession,
   onWidthChange
 }) => {
   // Determine which mode is active
@@ -497,8 +499,10 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                console.log('Open session:', session.id);
-                                // TODO: Implement open session functionality
+                                if (onOpenSession && session.id) {
+                                  const title = metadata?.title || metadata?.episode || 'Research Session';
+                                  onOpenSession(session.id, title);
+                                }
                               }}
                               className="px-3 py-1.5 bg-white text-black rounded text-xs font-medium hover:bg-gray-200 transition-colors flex-shrink-0"
                             >

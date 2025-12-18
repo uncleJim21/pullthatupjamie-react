@@ -36,7 +36,7 @@ import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import { ResearchSessionItem } from './ResearchSessionCollector.tsx';
-import { clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession } from '../services/researchSessionService.ts';
+import { clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend } from '../services/researchSessionService.ts';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
 
 
@@ -206,6 +206,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Analysis panel state
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
+  
+  // Sessions panel state
+  const [isSessionsPanelOpen, setIsSessionsPanelOpen] = useState(false);
   
   // Track warp speed deceleration completion
   const [isDecelerationComplete, setIsDecelerationComplete] = useState(true);
@@ -620,6 +623,25 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     setResearchSessionItems([]);
     clearLocalSession(); // Clear the stored session ID
     printLog(`[ResearchSession] Cleared all items and session ID`);
+  };
+  
+  // Handler for opening a session from the Sessions history tab
+  const handleOpenSessionFromHistory = async (sessionId: string, sessionTitle?: string) => {
+    printLog(`[SessionHistory] Opening session: ${sessionId}`);
+    
+    // Close the sessions panel
+    setIsSessionsPanelOpen(false);
+    
+    // If autoplay is enabled, switch to context tab
+    if (autoPlayContextOnOpen) {
+      setIsContextPanelOpen(true);
+    }
+    
+    // Load the session using the shared loading function
+    await loadResearchSessionWithWarpSpeed(
+      sessionId, 
+      sessionTitle || 'Research Session'
+    );
   };
 
   const toggleScopeSlideout = (e?: React.MouseEvent) => {
@@ -1276,32 +1298,113 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const sharedSessionId = searchParams.get('sharedSession');
   const researchSessionId = searchParams.get('researchSessionId');
   
+  // Reusable function to load a research session with warp speed animation
+  const loadResearchSessionWithWarpSpeed = async (sessionId: string, sessionTitle: string = 'Research Session') => {
+    try {
+      printLog(`[SessionLoad] Starting warp speed for session: ${sessionId}`);
+      
+      // Hide initial search UI and prepare for warp speed (do this first!)
+      setSearchHistory(prev => ({
+        ...prev,
+        'podcast-search': true
+      }));
+      setGridFadeOut(true);
+      resetContextPanelState();
+      setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
+      
+      // Start warp speed animation
+      setSearchState(prev => ({ ...prev, isLoading: true }));
+      setIsDecelerationComplete(false);
+      setResultViewStyle(SearchResultViewStyle.GALAXY); // Switch to galaxy view immediately
+      
+      // Fetch both 3D coordinates AND session items in parallel
+      const [research3DData, sessionData] = await Promise.all([
+        fetchResearchSessionWith3D(sessionId),
+        fetchResearchSession(sessionId)
+      ]);
+      
+      printLog(`[SessionLoad] Loaded ${research3DData.results?.length || 0} results with 3D coordinates`);
+      
+      // Debug: Log the session data structure
+      console.log('[SessionLoad] Session data:', sessionData);
+      console.log('[SessionLoad] Session items:', sessionData?.items);
+
+      // Set galaxy results from the 3D endpoint response
+      setGalaxyResults(research3DData.results || []);
+      
+      // Populate research session items from the session data
+      if (sessionData && sessionData.items && sessionData.items.length > 0) {
+        console.log('[SessionLoad] First item structure:', sessionData.items[0]);
+        
+        // The API returns items directly as metadata objects (not wrapped in pineconeId/metadata structure)
+        // So we need to convert them differently
+        const items: ResearchSessionItem[] = sessionData.items
+          .filter((item: any) => item) // Filter nulls
+          .map((item: any) => ({
+            shareLink: item.shareLink || item.id || '',
+            quote: item.quote,
+            summary: item.summary,
+            headline: item.headline,
+            episode: item.episode || 'Unknown Episode',
+            creator: item.creator || 'Unknown Creator',
+            episodeImage: item.episodeImage || item.episode_image,
+            date: item.date || item.published || new Date().toISOString(),
+            hierarchyLevel: (item.hierarchyLevel || 'paragraph') as 'feed' | 'episode' | 'chapter' | 'paragraph',
+            addedAt: new Date(),
+          }));
+        
+        setResearchSessionItems(items);
+        printLog(`[SessionLoad] Loaded ${items.length} items into research session collector`);
+      } else {
+        printLog(`[SessionLoad] No items found in session data`);
+        setResearchSessionItems([]);
+      }
+      
+      // Store axis labels if returned
+      if (research3DData.axisLabels) {
+        setAxisLabels(research3DData.axisLabels);
+        printLog(`[SessionLoad] Received axis labels: ${JSON.stringify(research3DData.axisLabels)}`);
+      }
+      
+      // Note: Intentionally NOT setting query state here to keep search bar empty
+      // for deeplinked sessions. The conversation item below will show the title.
+      
+      // Also update conversation for consistency
+      setConversation(prev => [...prev, {
+        id: nextConversationId.current++,
+        type: 'podcast-search' as const,
+        query: sessionTitle,
+        timestamp: new Date(),
+        isStreaming: false,
+        data: {
+          quotes: research3DData.results || []
+        }
+      }]);
+      
+      printLog('[SessionLoad] Loaded successfully with warp speed!');
+    } catch (error) {
+      console.error('Error loading research session:', error);
+      setSearchState(prev => ({
+        ...prev,
+        error: error as Error,
+        isLoading: false
+      }));
+    } finally {
+      // Stop warp speed (triggers deceleration)
+      setSearchState(prev => ({ ...prev, isLoading: false }));
+    }
+  };
+  
   useEffect(() => {
     const loadSharedSessionWithWarpSpeed = async () => {
       const sessionId = sharedSessionId || researchSessionId;
       if (sessionId) {
-        try {
-          printLog(`[SharedSession] Starting warp speed for session: ${sessionId}`);
-          
-          // Hide initial search UI and prepare for warp speed (do this first!)
-          setSearchHistory(prev => ({
-            ...prev,
-            'podcast-search': true
-          }));
-          setGridFadeOut(true);
-          resetContextPanelState();
-          setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
-          
-          // Start warp speed animation
-          setSearchState(prev => ({ ...prev, isLoading: true }));
-          setIsDecelerationComplete(false);
-          setResultViewStyle(SearchResultViewStyle.GALAXY); // Switch to galaxy view immediately
-          
-          let mongoDbId = sessionId;
-          let sessionTitle = 'Research Session';
-          
-          // If using sharedSession (short ID), fetch metadata first
-          if (sharedSessionId) {
+        let mongoDbId = sessionId;
+        let sessionTitle = 'Research Session';
+        
+        // If using sharedSession (short ID), fetch metadata first
+        if (sharedSessionId) {
+          try {
             const sharedSession = await fetchSharedResearchSession(sharedSessionId);
             
             if (!sharedSession || !sharedSession.researchSessionId) {
@@ -1311,49 +1414,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             printLog(`[SharedSession] Found research session ID: ${sharedSession.researchSessionId}`);
             mongoDbId = sharedSession.researchSessionId;
             sessionTitle = sharedSession.title || 'Shared Research Session';
+          } catch (error) {
+            console.error('Error fetching shared session metadata:', error);
+            setSearchState(prev => ({
+              ...prev,
+              error: error as Error,
+              isLoading: false
+            }));
+            return;
           }
-          
-          // Now fetch with 3D coordinates from the research endpoint
-          const research3DData = await fetchResearchSessionWith3D(mongoDbId);
-          
-          printLog(`[SharedSession] Loaded ${research3DData.results?.length || 0} results with 3D coordinates`);
-
-          // Set galaxy results from the 3D endpoint response
-          setGalaxyResults(research3DData.results || []);
-          
-          // Store axis labels if returned
-          if (research3DData.axisLabels) {
-            setAxisLabels(research3DData.axisLabels);
-            printLog(`[SharedSession] Received axis labels: ${JSON.stringify(research3DData.axisLabels)}`);
-          }
-          
-          // Note: Intentionally NOT setting query state here to keep search bar empty
-          // for deeplinked sessions. The conversation item below will show the title.
-          
-          // Also update conversation for consistency
-          setConversation(prev => [...prev, {
-            id: nextConversationId.current++,
-            type: 'podcast-search' as const,
-            query: sessionTitle,
-            timestamp: new Date(),
-            isStreaming: false,
-            data: {
-              quotes: research3DData.results || []
-            }
-          }]);
-          
-          printLog('[SharedSession] Loaded successfully with warp speed!');
-        } catch (error) {
-          console.error('Error loading shared research session:', error);
-          setSearchState(prev => ({
-            ...prev,
-            error: error as Error,
-            isLoading: false
-          }));
-        } finally {
-          // Stop warp speed (triggers deceleration)
-          setSearchState(prev => ({ ...prev, isLoading: false }));
         }
+        
+        // Load the session using the reusable function
+        await loadResearchSessionWithWarpSpeed(mongoDbId, sessionTitle);
       }
     };
 
@@ -3014,6 +3087,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           autoPlayOnOpen={autoPlayContextOnOpen}
           isAnalysisOpen={isAnalysisPanelOpen}
           onCloseAnalysis={() => setIsAnalysisPanelOpen(false)}
+          isSessionsOpen={isSessionsPanelOpen}
+          onCloseSessions={() => setIsSessionsPanelOpen(false)}
+          onOpenSession={handleOpenSessionFromHistory}
           onWidthChange={setContextPanelWidth}
           onTimestampClick={(timestamp) => {
             printLog(`Context panel timestamp clicked: ${timestamp}`);
