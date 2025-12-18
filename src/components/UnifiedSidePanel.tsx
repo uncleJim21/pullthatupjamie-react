@@ -4,6 +4,7 @@ import { analyzeResearchSession } from '../services/researchSessionAnalysisServi
 import { getCurrentSessionId, fetchAllResearchSessions, ResearchSession } from '../services/researchSessionService.ts';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
 import { AuthConfig } from '../constants/constants.ts';
+import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
 
 enum PanelMode {
   CONTEXT = 'context',
@@ -450,6 +451,9 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                         const itemCount = session.pineconeIdsCount || session.pineconeIds?.length || 0;
                         const createdDate = session.createdAt ? new Date(session.createdAt).toLocaleDateString() : '';
                         
+                        // Use helper to extract image with fallback chain
+                        const sessionImage = metadata ? extractImageFromAny(metadata) : undefined;
+                        
                         return (
                           <div
                             key={session.id}
@@ -457,10 +461,10 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                           >
                             {/* Episode Image */}
                             <div className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-gray-800">
-                              {metadata?.episodeImage ? (
+                              {sessionImage ? (
                                 <img
-                                  src={metadata.episodeImage}
-                                  alt={metadata.episode || 'Session'}
+                                  src={sessionImage}
+                                  alt={metadata?.episode || 'Session'}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;

@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS, printLog } from '../constants/constants.ts';
+import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
 import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Bookmark, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
@@ -1118,7 +1119,8 @@ const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
 
   // Derive tooltip display fields with sensible fallbacks so chapters and paragraphs
   // can share the same hover UI.
-  const tooltipImage = result.tooltipImage ?? result.episodeImage;
+  // Use the hierarchyImageUtils helper to consistently extract images
+  const tooltipImage = extractImageFromAny(result);
 
   // Prefer explicit tooltip title, then chapter headline, then episode title.
   const rawTitle =
@@ -1806,7 +1808,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
               <div className="text-xs text-gray-400 mb-2">Hierarchy Levels</div>
               <div className="flex flex-col gap-1">
                 {Object.entries(HIERARCHY_COLORS)
-                  .filter(([level]) => level !== 'ALL_PODS')
+                  .filter(([level]) => level !== 'ALL_PODS' && level !== 'FEED')
                   .map(([level, color]) => (
                   <div key={level} className="flex items-center gap-2">
                     <div

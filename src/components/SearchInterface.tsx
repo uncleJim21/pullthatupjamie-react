@@ -28,6 +28,7 @@ import WelcomeModal from './WelcomeModal.tsx';
 import AccountButton from './AccountButton.tsx';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 import AuthService from '../services/authService.ts';
+import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
 import ImageWithLoader from './ImageWithLoader.tsx';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
 import UnifiedSidePanel from './UnifiedSidePanel.tsx';
@@ -567,7 +568,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       headline: result.headline,
       episode: result.episode,
       creator: result.creator,
-      episodeImage: result.episodeImage,
+      episodeImage: result.episodeImage || extractImageFromAny(result),
       date: result.date,
       hierarchyLevel: result.hierarchyLevel,
       addedAt: new Date(),
