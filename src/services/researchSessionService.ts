@@ -52,6 +52,7 @@ export interface LastItemMetadata {
   start_time?: number | null;
   end_time?: number | null;
   summary?: string;
+  episodeImage?: string;
 }
 
 export interface ResearchSession {
@@ -186,6 +187,7 @@ function buildLastItemMetadata(items: ResearchSessionItem[]): LastItemMetadata |
     creator: lastItem.creator,
     publishedDate: lastItem.date,
     summary: lastItem.summary || lastItem.quote,
+    episodeImage: lastItem.episodeImage,
   };
 }
 
@@ -388,4 +390,35 @@ export async function loadCurrentSession(): Promise<ResearchSessionItem[]> {
   }
   
   return backendItemsToFrontend(session.items);
+}
+
+/**
+ * Fetch all research sessions for the current owner (user or clientId)
+ */
+export async function fetchAllResearchSessions(): Promise<ResearchSession[]> {
+  try {
+    const token = localStorage.getItem('auth_token');
+    const clientId = token ? undefined : getOrCreateClientId();
+    
+    // Build URL with clientId if not authenticated
+    let url = `${API_URL}/api/research-sessions`;
+    if (clientId) {
+      url += `?clientId=${encodeURIComponent(clientId)}`;
+    }
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.success && data.data ? data.data : [];
+  } catch (error) {
+    console.error('Fetch all research sessions error:', error);
+    return [];
+  }
 }

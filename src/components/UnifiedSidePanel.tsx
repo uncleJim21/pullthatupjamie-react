@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw } from 'lucide-react';
+import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History } from 'lucide-react';
 import { analyzeResearchSession } from '../services/researchSessionAnalysisService.ts';
-import { getCurrentSessionId } from '../services/researchSessionService.ts';
+import { getCurrentSessionId, fetchAllResearchSessions, ResearchSession } from '../services/researchSessionService.ts';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
 import { AuthConfig } from '../constants/constants.ts';
 
 enum PanelMode {
   CONTEXT = 'context',
-  ANALYSIS = 'analysis'
+  ANALYSIS = 'analysis',
+  SESSIONS = 'sessions'
 }
 
 interface UnifiedSidePanelProps {
@@ -36,6 +37,10 @@ interface UnifiedSidePanelProps {
   onCloseAnalysis: () => void;
   sessionId?: string;
   
+  // Sessions panel props
+  isSessionsOpen: boolean;
+  onCloseSessions: () => void;
+  
   // Width callback for layout
   onWidthChange?: (width: number) => void;
 }
@@ -61,11 +66,13 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   isAnalysisOpen,
   onCloseAnalysis,
   sessionId: propSessionId,
+  isSessionsOpen,
+  onCloseSessions,
   onWidthChange
 }) => {
   // Determine which mode is active
   const [activeMode, setActiveMode] = useState<PanelMode>(PanelMode.CONTEXT);
-  const isPanelOpen = isContextOpen || isAnalysisOpen;
+  const isPanelOpen = isContextOpen || isAnalysisOpen || isSessionsOpen;
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   // Analysis state
@@ -76,14 +83,21 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const sessionId = propSessionId || getCurrentSessionId();
   
+  // Sessions state
+  const [sessions, setSessions] = useState<ResearchSession[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+  
   // Update active mode based on which panel is being opened from parent
   useEffect(() => {
-    if (isContextOpen && !isAnalysisOpen) {
+    if (isContextOpen && !isAnalysisOpen && !isSessionsOpen) {
       setActiveMode(PanelMode.CONTEXT);
     } else if (isAnalysisOpen) {
       setActiveMode(PanelMode.ANALYSIS);
+    } else if (isSessionsOpen) {
+      setActiveMode(PanelMode.SESSIONS);
     }
-  }, [isContextOpen, isAnalysisOpen]);
+  }, [isContextOpen, isAnalysisOpen, isSessionsOpen]);
   
   // Handle tab clicks - just switch mode, don't close anything
   const handleModeSwitch = (mode: PanelMode) => {
@@ -133,6 +147,25 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
     }
   }, [activeMode, isPanelOpen]);
 
+  // Fetch sessions when sessions mode opens
+  useEffect(() => {
+    const loadSessions = async () => {
+      if (activeMode === PanelMode.SESSIONS && isPanelOpen && sessions.length === 0 && !isLoadingSessions) {
+        setIsLoadingSessions(true);
+        setSessionsError(null);
+        try {
+          const allSessions = await fetchAllResearchSessions();
+          setSessions(allSessions);
+        } catch (err) {
+          setSessionsError(err instanceof Error ? err.message : 'Failed to load sessions');
+        } finally {
+          setIsLoadingSessions(false);
+        }
+      }
+    };
+    void loadSessions();
+  }, [activeMode, isPanelOpen]);
+
   // Parse the analysis into title and content
   const lines = analysis.split('\n');
   const titleLine = lines.find(line => line.trim().startsWith('TITLE:'));
@@ -143,6 +176,8 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
     .trim();
 
   const isContextMode = activeMode === PanelMode.CONTEXT;
+  const isAnalysisMode = activeMode === PanelMode.ANALYSIS;
+  const isSessionsMode = activeMode === PanelMode.SESSIONS;
 
   // Calculate panel width including tabs
   const panelWidth = !isPanelOpen ? 0 : isCollapsed ? 32 : 600;
@@ -169,38 +204,50 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           <button
             onClick={() => handleModeSwitch(PanelMode.CONTEXT)}
             className={`
-              px-3 py-6 rounded-l-lg border-l border-t border-b transition-all
+              px-3 py-4 rounded-l-lg border-l border-t border-b transition-all
               ${isContextMode 
                 ? 'bg-black border-gray-700 text-white -mr-[1px] z-20' 
                 : 'bg-gray-900 border-gray-800 text-gray-500 hover:text-gray-300'
               }
             `}
-            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
             title="Context"
           >
-            <span className="text-xs font-medium">Context</span>
+            <BookText className="w-4 h-4" />
           </button>
           
           <button
             onClick={() => handleModeSwitch(PanelMode.ANALYSIS)}
             disabled={true}
             className={`
-              px-3 py-6 rounded-l-lg border-l border-t border-b transition-all
+              px-3 py-4 rounded-l-lg border-l border-t border-b transition-all
               disabled:opacity-50 disabled:cursor-not-allowed
-              ${!isContextMode 
+              ${isAnalysisMode 
                 ? 'bg-black border-gray-700 text-white -mr-[1px] z-20' 
                 : 'bg-gray-900 border-gray-800 text-gray-500 hover:text-gray-300'
               }
             `}
-            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
             title="AI Analysis (Coming Soon)"
           >
-            <span className="text-xs font-medium">AI Analysis</span>
+            <BrainCircuit className="w-4 h-4" />
+          </button>
+          
+          <button
+            onClick={() => handleModeSwitch(PanelMode.SESSIONS)}
+            className={`
+              px-3 py-4 rounded-l-lg border-l border-t border-b transition-all
+              ${isSessionsMode 
+                ? 'bg-black border-gray-700 text-white -mr-[1px] z-20' 
+                : 'bg-gray-900 border-gray-800 text-gray-500 hover:text-gray-300'
+              }
+            `}
+            title="Sessions"
+          >
+            <History className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Panel Content - Context or Analysis */}
+      {/* Panel Content - Context, Analysis, or Sessions */}
       {isContextMode ? (
         <PodcastContextPanel
           paragraphId={paragraphId}
@@ -222,7 +269,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           isCollapsed={isCollapsed}
           onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
         />
-      ) : (
+      ) : isAnalysisMode ? (
         // Analysis Panel - matching PodcastContextPanel structure exactly
         <div
           className={`sticky top-0 h-screen bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out ${panelWidthClass} overflow-hidden flex-shrink-0`}
@@ -324,6 +371,141 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* Right Side - Close/Collapse Controls */}
+              <div className="w-[40px] bg-[#0A0A0A] border-l border-gray-800 flex flex-col items-center py-3">
+                <button
+                  onClick={() => setIsCollapsed(true)}
+                  className="text-gray-400 hover:text-white transition-colors mb-2"
+                  aria-label="Collapse panel"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        // Sessions Panel - matching the same structure
+        <div
+          className={`sticky top-0 h-screen bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out ${panelWidthClass} overflow-hidden flex-shrink-0`}
+        >
+          {/* Collapsed State - Tab */}
+          {isCollapsed ? (
+            <button
+              onClick={() => setIsCollapsed(false)}
+              className="flex items-center justify-center h-full hover:bg-gray-900 transition-colors group"
+              aria-label="Expand panel"
+            >
+              <div className="flex flex-col items-center gap-2">
+                <History className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                <div
+                  style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+                  className="text-xs text-gray-400 group-hover:text-white transition-colors whitespace-nowrap"
+                >
+                  Sessions
+                </div>
+              </div>
+            </button>
+          ) : (
+            /* Expanded State - Full Panel */
+            <div className="flex-1 flex overflow-hidden">
+              {/* Left Side - Main Content */}
+              <div className="flex-1 flex flex-col border-r border-gray-800 min-w-0">
+                <div className="p-3 border-b border-gray-800 bg-[#0A0A0A]">
+                  <h3 className="text-sm font-medium text-gray-400">Research Sessions</h3>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4">
+                  {isLoadingSessions ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <Loader className="w-8 h-8 animate-spin mb-4" />
+                      <p className="text-sm">Loading sessions...</p>
+                    </div>
+                  ) : sessionsError ? (
+                    <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-300">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <div className="font-medium mb-1 text-sm">Error Loading Sessions</div>
+                          <div className="text-xs">{sessionsError}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : sessions.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                      <History className="w-12 h-12 mb-4 opacity-50" />
+                      <p className="text-sm text-center px-8">
+                        No research sessions yet
+                      </p>
+                      <p className="text-xs text-gray-600 text-center px-8 mt-2">
+                        Start adding items to create your first session
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {sessions.map((session) => {
+                        const metadata = session.lastItemMetadata;
+                        const itemCount = session.pineconeIdsCount || session.pineconeIds?.length || 0;
+                        const createdDate = session.createdAt ? new Date(session.createdAt).toLocaleDateString() : '';
+                        
+                        return (
+                          <div
+                            key={session.id}
+                            className="flex items-center gap-3 p-3 bg-gray-900/50 hover:bg-gray-800/50 border border-gray-800 rounded-lg transition-all cursor-pointer"
+                          >
+                            {/* Episode Image */}
+                            <div className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-gray-800">
+                              {metadata?.episodeImage ? (
+                                <img
+                                  src={metadata.episodeImage}
+                                  alt={metadata.episode || 'Session'}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <History className="w-6 h-6 text-gray-600" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Session Info */}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-white font-medium line-clamp-1">
+                                {metadata?.title || metadata?.episode || 'Research Session'}
+                              </p>
+                              <p className="text-xs text-gray-500 line-clamp-1">
+                                {metadata?.creator || 'Unknown creator'} • {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                              </p>
+                              {createdDate && (
+                                <p className="text-xs text-gray-600 mt-0.5">
+                                  {createdDate}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Open Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                console.log('Open session:', session.id);
+                                // TODO: Implement open session functionality
+                              }}
+                              className="px-3 py-1.5 bg-white text-black rounded text-xs font-medium hover:bg-gray-200 transition-colors flex-shrink-0"
+                            >
+                              Open
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Right Side - Close/Collapse Controls */}
