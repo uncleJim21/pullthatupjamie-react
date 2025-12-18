@@ -24,6 +24,7 @@ export interface ResearchSessionItem {
   date: string;
   hierarchyLevel: 'feed' | 'episode' | 'chapter' | 'paragraph';
   addedAt?: Date; // Optional since it's used by UI but not sent to API
+  coordinates3d?: { x: number; y: number; z: number }; // Optional 3D coordinates for galaxy layout
 }
 
 // Backend schema types
@@ -192,6 +193,23 @@ function buildLastItemMetadata(items: ResearchSessionItem[]): LastItemMetadata |
 }
 
 /**
+ * Build coordinatesById object from items with coordinates
+ */
+function buildCoordinatesById(items: ResearchSessionItem[]): Record<string, { x: number; y: number; z: number }> | undefined {
+  const coordinatesById: Record<string, { x: number; y: number; z: number }> = {};
+  let hasCoordinates = false;
+  
+  items.forEach(item => {
+    if (item.coordinates3d) {
+      coordinatesById[item.shareLink] = item.coordinates3d;
+      hasCoordinates = true;
+    }
+  });
+  
+  return hasCoordinates ? coordinatesById : undefined;
+}
+
+/**
  * Create a new research session (POST)
  */
 export async function createResearchSession(items: ResearchSessionItem[]): Promise<ResearchSessionResponse> {
@@ -206,12 +224,18 @@ export async function createResearchSession(items: ResearchSessionItem[]): Promi
     const pineconeIds = itemsToPineconeIds(items);
     const itemsPayload = itemsToPayload(items);
     const lastItemMetadata = buildLastItemMetadata(items);
+    const coordinatesById = buildCoordinatesById(items);
     
     const payload: Record<string, unknown> = {
       pineconeIds,
       items: itemsPayload,
       lastItemMetadata,
     };
+    
+    // Add coordinates if available
+    if (coordinatesById) {
+      payload.coordinatesById = coordinatesById;
+    }
     
     // Add clientId only if not authenticated
     if (clientId) {
@@ -261,12 +285,18 @@ export async function updateResearchSession(
     const pineconeIds = itemsToPineconeIds(items);
     const itemsPayload = itemsToPayload(items);
     const lastItemMetadata = buildLastItemMetadata(items);
+    const coordinatesById = buildCoordinatesById(items);
     
     const payload: Record<string, unknown> = {
       pineconeIds,
       items: itemsPayload,
       lastItemMetadata,
     };
+    
+    // Add coordinates if available
+    if (coordinatesById) {
+      payload.coordinatesById = coordinatesById;
+    }
     
     // Add clientId only if not authenticated
     if (clientId) {

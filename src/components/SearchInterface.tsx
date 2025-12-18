@@ -574,6 +574,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       episodeImage: result.episodeImage || extractImageFromAny(result),
       date: result.date,
       hierarchyLevel: result.hierarchyLevel,
+      coordinates3d: result.coordinates3d, // Capture 3D coordinates from galaxy
       addedAt: new Date(),
     };
 
@@ -1328,19 +1329,54 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       // Debug: Log the session data structure
       console.log('[SessionLoad] Session data:', sessionData);
       console.log('[SessionLoad] Session items:', sessionData?.items);
+      
+      // Debug: Log coordinates for each result
+      if (research3DData.results) {
+        research3DData.results.forEach((result: any, index: number) => {
+          console.log(`[SessionLoad] Galaxy result ${index} coordinates:`, {
+            shareLink: result.shareLink,
+            x: result.coordinates3d?.x,
+            y: result.coordinates3d?.y,
+            z: result.coordinates3d?.z,
+            hierarchyLevel: result.hierarchyLevel
+          });
+        });
+      }
 
       // Set galaxy results from the 3D endpoint response
       setGalaxyResults(research3DData.results || []);
       
       // Populate research session items from the session data
       if (sessionData && sessionData.items && sessionData.items.length > 0) {
+        console.log('[SessionLoad] Raw items from backend:', sessionData.items);
+        console.log('[SessionLoad] Number of raw items:', sessionData.items.length);
         console.log('[SessionLoad] First item structure:', sessionData.items[0]);
         
         // The API returns items directly as metadata objects (not wrapped in pineconeId/metadata structure)
         // So we need to convert them differently
-        const items: ResearchSessionItem[] = sessionData.items
-          .filter((item: any) => item) // Filter nulls
-          .map((item: any) => ({
+        const filteredItems = sessionData.items.filter((item: any) => item);
+        console.log('[SessionLoad] After null filter:', filteredItems.length);
+        
+        // Build a map of shareLink -> coordinates3d from the 3D results for quick lookup
+        const coordinatesMap = new Map<string, { x: number; y: number; z: number }>();
+        research3DData.results?.forEach((result: any) => {
+          if (result.shareLink && result.coordinates3d) {
+            coordinatesMap.set(result.shareLink, result.coordinates3d);
+          }
+        });
+        
+        const items: ResearchSessionItem[] = filteredItems.map((item: any, index: number) => {
+          console.log(`[SessionLoad] Processing item ${index}:`, {
+            shareLink: item.shareLink,
+            id: item.id,
+            episode: item.episode,
+            creator: item.creator
+          });
+          
+          // Merge coordinates from 3D results if available
+          const coordinates3d = coordinatesMap.get(item.shareLink || item.id);
+          
+          return {
             shareLink: item.shareLink || item.id || '',
             quote: item.quote,
             summary: item.summary,
@@ -1350,8 +1386,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             episodeImage: item.episodeImage || item.episode_image,
             date: item.date || item.published || new Date().toISOString(),
             hierarchyLevel: (item.hierarchyLevel || 'paragraph') as 'feed' | 'episode' | 'chapter' | 'paragraph',
+            coordinates3d: coordinates3d || item.coordinates3d, // Prefer from 3D results, fallback to stored
             addedAt: new Date(),
-          }));
+          };
+        });
+        
+        console.log('[SessionLoad] Final items array:', items);
+        console.log('[SessionLoad] Final items count:', items.length);
         
         setResearchSessionItems(items);
         printLog(`[SessionLoad] Loaded ${items.length} items into research session collector`);

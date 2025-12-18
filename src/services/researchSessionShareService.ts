@@ -170,7 +170,7 @@ export async function fetchResearchSessionWith3D(researchSessionId: string): Pro
       },
       body: JSON.stringify({
         researchSessionId,
-        fastMode: true,
+        fastMode: false, // Set to false to ensure proper 3D coordinate calculation
         extractAxisLabels: true
       })
     });
