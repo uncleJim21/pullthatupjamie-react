@@ -1327,8 +1327,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             printLog(`[SharedSession] Received axis labels: ${JSON.stringify(research3DData.axisLabels)}`);
           }
           
-          // Set query to session title
-          setQuery(sessionTitle);
+          // Note: Intentionally NOT setting query state here to keep search bar empty
+          // for deeplinked sessions. The conversation item below will show the title.
           
           // Also update conversation for consistency
           setConversation(prev => [...prev, {
