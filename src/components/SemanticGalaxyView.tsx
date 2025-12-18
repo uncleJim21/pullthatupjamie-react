@@ -1714,7 +1714,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full h-full bg-black" onMouseMove={handleMouseMove}>
+    <div ref={containerRef} className="relative w-full h-full bg-black select-none" onMouseMove={handleMouseMove}>
       {/* Warp Speed Loading Overlay - always on top when active */}
       <WarpSpeedLoadingOverlay 
         isLoading={isLoading}
@@ -2041,7 +2041,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         <OrbitControls
           ref={controlsRef}
           enabled={!isAnimatingCamera}
-          enableRotate={false}
+          enableRotate={true}
           enablePan={true}
           enableZoom={true}
           panSpeed={1}
