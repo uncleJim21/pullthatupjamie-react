@@ -293,7 +293,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
               alt="Logo" 
               style={{ height: '36px', width: '36px', marginRight: '10px' }} 
             />
-            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{logoText}</span>
+            {/* <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{logoText}</span> */}
           </div>
         </Link>
         
