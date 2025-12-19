@@ -456,6 +456,9 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                         // Use helper to extract image with fallback chain
                         const sessionImage = metadata ? extractImageFromAny(metadata) : undefined;
                         
+                        // Use title from API response, fallback to metadata fields
+                        const displayTitle = session.title || metadata?.title || metadata?.headline || metadata?.episode || 'Research Session';
+                        
                         return (
                           <div
                             key={session.id}
@@ -466,7 +469,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                               {sessionImage ? (
                                 <img
                                   src={sessionImage}
-                                  alt={metadata?.episode || 'Session'}
+                                  alt={displayTitle}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
@@ -483,7 +486,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                             {/* Session Info */}
                             <div className="flex-1 min-w-0">
                               <p className="text-sm text-white font-medium line-clamp-1">
-                                {metadata?.title || metadata?.episode || 'Research Session'}
+                                {displayTitle}
                               </p>
                               <p className="text-xs text-gray-500 line-clamp-1">
                                 {metadata?.creator || 'Unknown creator'} • {itemCount} {itemCount === 1 ? 'item' : 'items'}
@@ -500,8 +503,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (onOpenSession && session.id) {
-                                  const title = metadata?.title || metadata?.episode || 'Research Session';
-                                  onOpenSession(session.id, title);
+                                  onOpenSession(session.id, displayTitle);
                                 }
                               }}
                               className="px-3 py-1.5 bg-white text-black rounded text-xs font-medium hover:bg-gray-200 transition-colors flex-shrink-0"

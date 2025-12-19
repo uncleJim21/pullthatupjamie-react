@@ -53,6 +53,7 @@ export interface LastItemMetadata {
   start_time?: number | null;
   end_time?: number | null;
   summary?: string;
+  headline?: string;
   episodeImage?: string;
 }
 
@@ -64,6 +65,7 @@ export interface ResearchSession {
   pineconeIds: string[];
   items?: ResearchSessionItemPayload[];
   pineconeIdsCount?: number;
+  title?: string | null;
   lastItemMetadata?: LastItemMetadata;
   createdAt?: string;
   updatedAt?: string;
@@ -356,6 +358,14 @@ export function getCurrentClientId(): string | null {
  */
 export function getCurrentSessionId(): string | null {
   return getSessionId();
+}
+
+/**
+ * Set a session as the current active session
+ * (useful when restoring from history)
+ */
+export function setCurrentSessionId(sessionId: string): void {
+  setSessionId(sessionId);
 }
 
 /**

@@ -11,6 +11,7 @@ import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
 import { saveResearchSession, clearLocalSession, ResearchSessionItem, MAX_RESEARCH_ITEMS } from '../services/researchSessionService.ts';
 import { shareCurrentSession, copyToClipboard, ShareNode } from '../services/researchSessionShareService.ts';
 import ResearchAnalysisPanel from './ResearchAnalysisModal.tsx';
+import ShareSessionModal from './ShareSessionModal.tsx';
 
 // ============================================================================
 // RESEARCH SESSION CONFIGURATION
@@ -326,6 +327,7 @@ interface SemanticGalaxyViewProps {
   isContextPanelOpen?: boolean;
   onCloseContextPanel?: () => void;
   onOpenAnalysisPanel?: () => void;
+  sharedSessionTitle?: string | null;
 }
 
 // Transform color to compensate for additive blending brightening
@@ -882,11 +884,12 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSele
 };
 
 // Camera Reset Button
-const CameraResetButton: React.FC<{ onReset: () => void }> = ({ onReset }) => {
+const CameraResetButton: React.FC<{ onReset: () => void; hasTitle?: boolean }> = ({ onReset, hasTitle = false }) => {
   return (
     <button
       onClick={onReset}
-      className="absolute top-32 left-4 px-2.5 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm z-10 flex items-center gap-1"
+      className="absolute left-4 px-2.5 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm z-10 flex items-center gap-1 transition-all duration-300"
+      style={{ top: hasTitle ? '13rem' : '8rem' }}
     >
       <RotateCcw className="w-4 h-4" />
       <span className="hidden sm:inline">Reset</span>
@@ -900,11 +903,15 @@ const OptionsMenu: React.FC<{
   onToggleAxisLabels: () => void;
   autoPlayOnStarClick: boolean;
   onToggleAutoPlay: () => void;
-}> = ({ showAxisLabels, onToggleAxisLabels, autoPlayOnStarClick, onToggleAutoPlay }) => {
+  hasTitle?: boolean;
+}> = ({ showAxisLabels, onToggleAxisLabels, autoPlayOnStarClick, onToggleAutoPlay, hasTitle = false }) => {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="absolute top-44 left-4 z-10">
+    <div 
+      className="absolute left-4 z-10 transition-all duration-300"
+      style={{ top: hasTitle ? '16.5rem' : '11rem' }}
+    >
       <div className="relative">
         <button
           onClick={() => setOpen((prev) => !prev)}
@@ -950,7 +957,7 @@ const OptionsMenu: React.FC<{
 };
 
 // Minimap component
-const Minimap: React.FC<{ results: QuoteResult[]; selectedStarId: string | null }> = ({ results, selectedStarId }) => {
+const Minimap: React.FC<{ results: QuoteResult[]; selectedStarId: string | null; hasTitle?: boolean }> = ({ results, selectedStarId, hasTitle = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   React.useEffect(() => {
@@ -989,7 +996,10 @@ const Minimap: React.FC<{ results: QuoteResult[]; selectedStarId: string | null 
   }, [results, selectedStarId]);
 
   return (
-    <div className="absolute top-4 left-4 border border-gray-700 rounded-lg overflow-hidden z-10">
+    <div 
+      className="absolute left-4 border border-gray-700 rounded-lg overflow-hidden z-10 transition-all duration-300"
+      style={{ top: hasTitle ? '5.5rem' : '1rem' }}
+    >
       <canvas
         ref={canvasRef}
         width={105}
@@ -1482,6 +1492,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   isContextPanelOpen = false,
   onCloseContextPanel,
   onOpenAnalysisPanel,
+  sharedSessionTitle = null,
 }) => {
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -1518,7 +1529,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   });
   const shareToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isSharing, setIsSharing] = useState(false);
-  
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
   // Analysis modal state
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
   
@@ -1652,14 +1664,18 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
     }
   };
 
-  // Handle sharing the research session
-  const handleShareSession = async () => {
+  // Handle sharing the research session - opens modal
+  const handleShareSession = () => {
     if (isSharing) return;
     if (!researchSessionItems || researchSessionItems.length === 0) {
       showShareToast('error', 'No items to share');
       return;
     }
+    setIsShareModalOpen(true);
+  };
 
+  // Actually perform the share with optional custom title
+  const performShare = async (customTitle?: string) => {
     try {
       setIsSharing(true);
       showShareToast('loading', 'Creating share link...');
@@ -1686,12 +1702,16 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       if (nodes.length === 0) {
         showShareToast('error', 'No valid items to share');
         setIsSharing(false);
+        setIsShareModalOpen(false);
         return;
       }
 
-      // Create the share with an optional title from the last item
-      const lastItem = researchSessionItems[researchSessionItems.length - 1];
-      const title = lastItem.headline || lastItem.summary || undefined;
+      // Use custom title if provided, otherwise use suggested title from last item
+      let title = customTitle;
+      if (!title) {
+        const lastItem = researchSessionItems[researchSessionItems.length - 1];
+        title = lastItem.headline || lastItem.summary || undefined;
+      }
 
       const response = await shareCurrentSession(title, nodes);
 
@@ -1712,6 +1732,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       showShareToast('error', message);
     } finally {
       setIsSharing(false);
+      setIsShareModalOpen(false);
     }
   };
 
@@ -1723,8 +1744,19 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         onDecelerationComplete={onDecelerationComplete}
       />
       
+      {/* Shared Session Title Banner */}
+      {sharedSessionTitle && (
+        <div className="absolute top-4 left-4 z-20 pointer-events-none">
+          <div className="bg-black/90 backdrop-blur-sm border border-white/20 rounded-full px-6 py-3 shadow-xl">
+            <h2 className="text-white text-lg font-medium tracking-wide">
+              {sharedSessionTitle}
+            </h2>
+          </div>
+        </div>
+      )}
+      
       {/* Camera reset button */}
-      <CameraResetButton onReset={handleResetCamera} />
+      <CameraResetButton onReset={handleResetCamera} hasTitle={!!sharedSessionTitle} />
 
       {/* Options dropdown (Label Axes, Auto-Play, etc.) */}
       <OptionsMenu
@@ -1743,10 +1775,11 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
             console.error('Error saving autoPlayOnStarClick to userSettings:', e);
           }
         }}
+        hasTitle={!!sharedSessionTitle}
       />
 
       {/* Minimap */}
-      <Minimap results={results} selectedStarId={selectedStarId} />
+      <Minimap results={results} selectedStarId={selectedStarId} hasTitle={!!sharedSessionTitle} />
 
       {/* Hover preview for stars */}
       <HoverPreview 
@@ -2144,6 +2177,21 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Share Session Modal */}
+      <ShareSessionModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        onConfirm={performShare}
+        suggestedTitle={
+          researchSessionItems.length > 0
+            ? researchSessionItems[researchSessionItems.length - 1].headline ||
+              researchSessionItems[researchSessionItems.length - 1].summary ||
+              ''
+            : ''
+        }
+        isSharing={isSharing}
+      />
     </div>
   );
 };

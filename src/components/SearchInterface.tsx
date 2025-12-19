@@ -36,7 +36,7 @@ import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import { ResearchSessionItem } from './ResearchSessionCollector.tsx';
-import { clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend } from '../services/researchSessionService.ts';
+import { clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId } from '../services/researchSessionService.ts';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
 
 
@@ -209,7 +209,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Sessions panel state
   const [isSessionsPanelOpen, setIsSessionsPanelOpen] = useState(false);
-  
+
+  // Shared session title state (for displaying title banner)
+  const [sharedSessionTitle, setSharedSessionTitle] = useState<string | null>(null);
+
   // Track warp speed deceleration completion
   const [isDecelerationComplete, setIsDecelerationComplete] = useState(true);
   
@@ -623,6 +626,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const handleClearResearchSession = () => {
     setResearchSessionItems([]);
     clearLocalSession(); // Clear the stored session ID
+    setSharedSessionTitle(null); // Clear the session title when clearing research
     printLog(`[ResearchSession] Cleared all items and session ID`);
   };
   
@@ -632,6 +636,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     
     // Close the sessions panel
     setIsSessionsPanelOpen(false);
+    
+    // Set the session title for display (when opening from history, show the title)
+    setSharedSessionTitle(sessionTitle || null);
     
     // If autoplay is enabled, switch to context tab
     if (autoPlayContextOnOpen) {
@@ -1120,6 +1127,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         resetContextPanelState();
         setGridFadeOut(true);
         
+        // Clear shared session title when performing a new search
+        setSharedSessionTitle(null);
+        
         // Log the selected sources before search starts
         printLog(`Selected sources before search: ${JSON.stringify(Array.from(selectedSources))}`);
         
@@ -1422,6 +1432,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         }
       }]);
       
+      // Set this session as the current active session
+      // This allows sharing, saving updates, etc. to work properly
+      setCurrentSessionId(sessionId);
+      printLog(`[SessionLoad] Set session ${sessionId} as current active session`);
+      
       printLog('[SessionLoad] Loaded successfully with warp speed!');
     } catch (error) {
       console.error('Error loading research session:', error);
@@ -1447,14 +1462,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         if (sharedSessionId) {
           try {
             const sharedSession = await fetchSharedResearchSession(sharedSessionId);
-            
+
             if (!sharedSession || !sharedSession.researchSessionId) {
               throw new Error('Session not found or invalid - backend must return researchSessionId');
             }
-            
+
             printLog(`[SharedSession] Found research session ID: ${sharedSession.researchSessionId}`);
             mongoDbId = sharedSession.researchSessionId;
             sessionTitle = sharedSession.title || 'Shared Research Session';
+            
+            // Store the shared session title for display
+            setSharedSessionTitle(sessionTitle);
           } catch (error) {
             console.error('Error fetching shared session metadata:', error);
             setSearchState(prev => ({
@@ -2651,6 +2669,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 isContextPanelOpen={isContextPanelOpen}
                 onCloseContextPanel={() => setIsContextPanelOpen(false)}
                 onOpenAnalysisPanel={() => setIsAnalysisPanelOpen(true)}
+                sharedSessionTitle={sharedSessionTitle}
               />
             </div>
           ) : (
