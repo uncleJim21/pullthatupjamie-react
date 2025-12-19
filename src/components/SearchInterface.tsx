@@ -4,7 +4,7 @@ import { useSearchParams, useParams } from 'react-router-dom';
 import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, SearchViewStyle, SearchResultViewStyle, DISABLE_CLIPPING } from '../constants/constants.ts';
 import { handleQuoteSearch, handleQuoteSearch3D } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
-import React, { useState, useEffect, useRef} from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RegisterModal } from './RegisterModal.tsx';
 import {SignInModal} from './SignInModal.tsx'
 import LightningService from '../services/lightning.ts'
@@ -36,7 +36,7 @@ import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import { ResearchSessionItem } from './ResearchSessionCollector.tsx';
-import { clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId } from '../services/researchSessionService.ts';
+import { clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId, saveResearchSessionWithRetry } from '../services/researchSessionService.ts';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
 
 
@@ -212,7 +212,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   // Shared session title state (for displaying title banner)
   const [sharedSessionTitle, setSharedSessionTitle] = useState<string | null>(null);
-
+  
   // Track warp speed deceleration completion
   const [isDecelerationComplete, setIsDecelerationComplete] = useState(true);
   
@@ -230,6 +230,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [researchSessionItems, setResearchSessionItems] = useState<ResearchSessionItem[]>([]);
   const [showResearchToast, setShowResearchToast] = useState(false);
   const [showResearchLimitToast, setShowResearchLimitToast] = useState(false);
+  
+  // Debounced auto-save queue
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const SAVE_DEBOUNCE_MS = 2000; // Wait 2 seconds after last change
   const researchToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const researchLimitToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -546,6 +551,32 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }, 1500);
   };
 
+  // Debounced auto-save with queue to prevent race conditions
+  const debouncedQueuedSave = useCallback((items: ResearchSessionItem[]) => {
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Schedule new save after debounce delay
+    saveTimeoutRef.current = setTimeout(() => {
+      // Add to queue to serialize saves
+      saveQueueRef.current = saveQueueRef.current
+        .then(async () => {
+          try {
+            await saveResearchSessionWithRetry(items);
+            printLog(`[ResearchSession] Auto-saved session with ${items.length} items`);
+          } catch (error) {
+            console.error('[ResearchSession] Save failed after retries:', error);
+            // Could show a toast here for persistent failures
+          }
+        })
+        .catch(err => {
+          console.error('[ResearchSession] Queue error:', err);
+        });
+    }, SAVE_DEBOUNCE_MS);
+  }, []);
+
   // Research session handlers
   const handleAddToResearchSession = async (result: any) => {
     // Check if item already exists
@@ -585,13 +616,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     setResearchSessionItems(updatedItems);
     printLog(`[ResearchSession] Added item: ${result.shareLink}`);
 
-    // Auto-save session after adding item
-    try {
-      await saveResearchSession(updatedItems);
-      printLog(`[ResearchSession] Auto-saved session with ${updatedItems.length} items`);
-    } catch (error) {
-      console.error('Failed to auto-save research session:', error);
-    }
+    // Debounced auto-save (waits 2s after last change)
+    debouncedQueuedSave(updatedItems);
 
     // Show toast notification
     setShowResearchToast(true);
@@ -611,15 +637,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     // If no items left, clear the session
     if (updatedItems.length === 0) {
       clearLocalSession();
-      printLog(`[ResearchSession] Auto-cleared session ID - no items remaining`);
+      printLog(`[ResearchSession] No items left, cleared session`);
     } else {
-      // Auto-save the updated session
-      try {
-        await saveResearchSession(updatedItems);
-        printLog(`[ResearchSession] Auto-saved session after removal, ${updatedItems.length} items remaining`);
-      } catch (error) {
-        console.error('Failed to auto-save research session after removal:', error);
-      }
+      // Debounced auto-save after removal
+      debouncedQueuedSave(updatedItems);
     }
   };
 
@@ -1311,23 +1332,23 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Reusable function to load a research session with warp speed animation
   const loadResearchSessionWithWarpSpeed = async (sessionId: string, sessionTitle: string = 'Research Session') => {
-    try {
+        try {
       printLog(`[SessionLoad] Starting warp speed for session: ${sessionId}`);
-      
-      // Hide initial search UI and prepare for warp speed (do this first!)
-      setSearchHistory(prev => ({
-        ...prev,
-        'podcast-search': true
-      }));
-      setGridFadeOut(true);
-      resetContextPanelState();
-      setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
-      
-      // Start warp speed animation
-      setSearchState(prev => ({ ...prev, isLoading: true }));
-      setIsDecelerationComplete(false);
-      setResultViewStyle(SearchResultViewStyle.GALAXY); // Switch to galaxy view immediately
-      
+          
+          // Hide initial search UI and prepare for warp speed (do this first!)
+          setSearchHistory(prev => ({
+            ...prev,
+            'podcast-search': true
+          }));
+          setGridFadeOut(true);
+          resetContextPanelState();
+          setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
+          
+          // Start warp speed animation
+          setSearchState(prev => ({ ...prev, isLoading: true }));
+          setIsDecelerationComplete(false);
+          setResultViewStyle(SearchResultViewStyle.GALAXY); // Switch to galaxy view immediately
+          
       // Fetch both 3D coordinates AND session items in parallel
       const [research3DData, sessionData] = await Promise.all([
         fetchResearchSessionWith3D(sessionId),
@@ -1335,7 +1356,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       ]);
       
       printLog(`[SessionLoad] Loaded ${research3DData.results?.length || 0} results with 3D coordinates`);
-      
+          
       // Debug: Log the session data structure
       console.log('[SessionLoad] Session data:', sessionData);
       console.log('[SessionLoad] Session items:', sessionData?.items);
@@ -1410,45 +1431,45 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         printLog(`[SessionLoad] No items found in session data`);
         setResearchSessionItems([]);
       }
-      
-      // Store axis labels if returned
-      if (research3DData.axisLabels) {
-        setAxisLabels(research3DData.axisLabels);
+          
+          // Store axis labels if returned
+          if (research3DData.axisLabels) {
+            setAxisLabels(research3DData.axisLabels);
         printLog(`[SessionLoad] Received axis labels: ${JSON.stringify(research3DData.axisLabels)}`);
-      }
-      
+          }
+          
       // Note: Intentionally NOT setting query state here to keep search bar empty
       // for deeplinked sessions. The conversation item below will show the title.
-      
-      // Also update conversation for consistency
-      setConversation(prev => [...prev, {
-        id: nextConversationId.current++,
-        type: 'podcast-search' as const,
-        query: sessionTitle,
-        timestamp: new Date(),
-        isStreaming: false,
-        data: {
-          quotes: research3DData.results || []
-        }
-      }]);
-      
+          
+          // Also update conversation for consistency
+          setConversation(prev => [...prev, {
+            id: nextConversationId.current++,
+            type: 'podcast-search' as const,
+            query: sessionTitle,
+            timestamp: new Date(),
+            isStreaming: false,
+            data: {
+              quotes: research3DData.results || []
+            }
+          }]);
+          
       // Set this session as the current active session
       // This allows sharing, saving updates, etc. to work properly
       setCurrentSessionId(sessionId);
       printLog(`[SessionLoad] Set session ${sessionId} as current active session`);
       
       printLog('[SessionLoad] Loaded successfully with warp speed!');
-    } catch (error) {
+        } catch (error) {
       console.error('Error loading research session:', error);
-      setSearchState(prev => ({
-        ...prev,
-        error: error as Error,
-        isLoading: false
-      }));
-    } finally {
-      // Stop warp speed (triggers deceleration)
-      setSearchState(prev => ({ ...prev, isLoading: false }));
-    }
+          setSearchState(prev => ({
+            ...prev,
+            error: error as Error,
+            isLoading: false
+          }));
+        } finally {
+          // Stop warp speed (triggers deceleration)
+          setSearchState(prev => ({ ...prev, isLoading: false }));
+        }
   };
   
   useEffect(() => {

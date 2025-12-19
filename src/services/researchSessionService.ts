@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 const CLIENT_ID_KEY = 'research_client_id';
 const SESSION_ID_KEY = 'research_session_id';
 const SESSION_TIMESTAMP_KEY = 'research_session_timestamp';
+const SESSION_VERSION_KEY = 'research_session_version'; // For optimistic locking
 
 // Maximum items per research session
 export const MAX_RESEARCH_ITEMS = 50;
@@ -69,6 +70,7 @@ export interface ResearchSession {
   lastItemMetadata?: LastItemMetadata;
   createdAt?: string;
   updatedAt?: string;
+  __v?: number; // MongoDB version number for optimistic locking
 }
 
 export interface ResearchSessionResponse {
@@ -124,11 +126,27 @@ function setSessionId(sessionId: string): void {
 }
 
 /**
+ * Get the current session version
+ */
+function getSessionVersion(): number | null {
+  const version = localStorage.getItem(SESSION_VERSION_KEY);
+  return version ? parseInt(version, 10) : null;
+}
+
+/**
+ * Store the session version after successful save
+ */
+function setSessionVersion(version: number): void {
+  localStorage.setItem(SESSION_VERSION_KEY, version.toString());
+}
+
+/**
  * Clear the session ID (e.g., after clearing all items)
  */
 function clearSessionId(): void {
   localStorage.removeItem(SESSION_ID_KEY);
   localStorage.removeItem(SESSION_TIMESTAMP_KEY);
+  localStorage.removeItem(SESSION_VERSION_KEY);
 }
 
 /**
@@ -257,9 +275,12 @@ export async function createResearchSession(items: ResearchSessionItem[]): Promi
     
     const data = await response.json();
     
-    // Store the session ID for future updates
+    // Store the session ID and version for future updates
     if (data.success && data.data?.id) {
       setSessionId(data.data.id);
+      if (typeof data.data.__v === 'number') {
+        setSessionVersion(data.data.__v);
+      }
     }
     
     return data;
@@ -270,11 +291,12 @@ export async function createResearchSession(items: ResearchSessionItem[]): Promi
 }
 
 /**
- * Update an existing research session (PATCH)
+ * Update an existing research session (PATCH) with optimistic locking
  */
 export async function updateResearchSession(
   sessionId: string,
-  items: ResearchSessionItem[]
+  items: ResearchSessionItem[],
+  retryOnConflict = true
 ): Promise<ResearchSessionResponse> {
   try {
     // Enforce 50 item limit
@@ -288,12 +310,18 @@ export async function updateResearchSession(
     const itemsPayload = itemsToPayload(items);
     const lastItemMetadata = buildLastItemMetadata(items);
     const coordinatesById = buildCoordinatesById(items);
+    const currentVersion = getSessionVersion();
     
     const payload: Record<string, unknown> = {
       pineconeIds,
       items: itemsPayload,
       lastItemMetadata,
     };
+    
+    // Add expected version for optimistic locking
+    if (currentVersion !== null) {
+      payload.expectedVersion = currentVersion;
+    }
     
     // Add coordinates if available
     if (coordinatesById) {
@@ -311,12 +339,35 @@ export async function updateResearchSession(
       body: JSON.stringify(payload)
     });
     
+    // Handle version conflict (409)
+    if (response.status === 409 && retryOnConflict) {
+      console.warn('[ResearchSession] Version conflict detected, reloading session...');
+      
+      // Fetch latest version from server
+      const latestSession = await fetchResearchSession(sessionId);
+      if (latestSession) {
+        // Update our local version
+        if (typeof latestSession.__v === 'number') {
+          setSessionVersion(latestSession.__v);
+        }
+        
+        // Retry the update with new version (but don't retry again to avoid infinite loop)
+        return updateResearchSession(sessionId, items, false);
+      }
+    }
+    
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
     
     const data = await response.json();
+    
+    // Update stored version after successful save
+    if (data.success && typeof data.data?.__v === 'number') {
+      setSessionVersion(data.data.__v);
+    }
+    
     return data;
   } catch (error) {
     console.error('Update research session error:', error);
@@ -337,6 +388,39 @@ export async function saveResearchSession(items: ResearchSessionItem[]): Promise
     // Create new session
     return createResearchSession(items);
   }
+}
+
+/**
+ * Save research session with retry logic for network failures
+ */
+export async function saveResearchSessionWithRetry(
+  items: ResearchSessionItem[],
+  maxRetries = 3
+): Promise<ResearchSessionResponse> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await saveResearchSession(items);
+      if (attempt > 1) {
+        console.log(`[ResearchSession] Saved successfully on attempt ${attempt}`);
+      }
+      return result;
+    } catch (error) {
+      const isLastAttempt = attempt === maxRetries;
+      
+      if (isLastAttempt) {
+        console.error('[ResearchSession] Save failed after all retries');
+        throw error;
+      }
+      
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = Math.pow(2, attempt - 1) * 1000;
+      console.log(`[ResearchSession] Save failed, retrying in ${delay}ms... (attempt ${attempt}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  // TypeScript exhaustiveness check
+  throw new Error('Unexpected: retry loop completed without return');
 }
 
 /**
@@ -406,7 +490,7 @@ export function backendItemsToFrontend(backendItems: ResearchSessionItemPayload[
       const metadata = item.metadata || {};
       
       return {
-        shareLink: item.pineconeId,
+    shareLink: item.pineconeId,
         quote: metadata.quote,
         summary: metadata.summary,
         headline: metadata.headline,
@@ -415,7 +499,7 @@ export function backendItemsToFrontend(backendItems: ResearchSessionItemPayload[
         episodeImage: metadata.episodeImage,
         date: metadata.date || new Date().toISOString(),
         hierarchyLevel: (metadata.hierarchyLevel as 'feed' | 'episode' | 'chapter' | 'paragraph') || 'paragraph',
-        addedAt: new Date(), // We don't have the original timestamp, use current
+    addedAt: new Date(), // We don't have the original timestamp, use current
       };
     });
 }

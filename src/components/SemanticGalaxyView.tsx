@@ -1530,7 +1530,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   const shareToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-
+  
   // Analysis modal state
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
   
@@ -1709,7 +1709,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       // Use custom title if provided, otherwise use suggested title from last item
       let title = customTitle;
       if (!title) {
-        const lastItem = researchSessionItems[researchSessionItems.length - 1];
+      const lastItem = researchSessionItems[researchSessionItems.length - 1];
         title = lastItem.headline || lastItem.summary || undefined;
       }
 
