@@ -10,7 +10,7 @@ export const TFTC_FEED_URL = "https://feeds.fountain.fm/VV0f6IwusQoi5kOqvNCx"//W
 
 
 export { DEBUG_MODE, FRONTEND_URL, API_URL };
-export const DISABLE_CLIPPING = false; // Set to false to re-enable clipping features
+export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
 
 // Debug output to verify the configuration
 console.log('Constants loaded:', { 
