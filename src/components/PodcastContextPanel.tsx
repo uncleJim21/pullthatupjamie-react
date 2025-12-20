@@ -1063,7 +1063,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                 )}
 
                 {/* Keywords */}
-                {hierarchy.hierarchy.chapter && hierarchy.hierarchy.chapter.metadata.keywords.length > 0 && (
+                {hierarchy.hierarchy.chapter && hierarchy.hierarchy.chapter.metadata.keywords && hierarchy.hierarchy.chapter.metadata.keywords.length > 0 && (
                   <div className="pt-4 border-t border-gray-800">
                     <p className="text-xs text-gray-500 mb-2">KEYWORDS</p>
                     <div className="flex flex-wrap gap-1">
