@@ -117,7 +117,60 @@ nebulaDimOpacity={isEmbedMode ? 0.65 : undefined}
 
 This makes the nebula background darker (0.65 vs default 0.5) in embed mode for better star visibility against external site backgrounds.
 
-### 6. Future Enhancement: Mini Player
+### 6. Brand Customization (Embed Mode)
+
+**Brand Colors for Stars:**
+All stars use the first color from the `brandColors` array instead of hierarchy colors.
+
+**Location:** Lines 372-380, 703, 1472 in `SemanticGalaxyView.tsx`
+
+```typescript
+// Star component accepts override color
+interface StarProps {
+  // ... other props
+  overrideColor?: string;
+}
+
+// In Star component, use override if provided
+const baseColor = overrideColor || getHierarchyColor(result.hierarchyLevel);
+
+// Pass brand color to all stars
+overrideColor={brandColors && brandColors.length > 0 ? `#${brandColors[0]}` : undefined}
+```
+
+**Brand Logo Display:**
+When `brandImage` is provided, it's displayed in the top-left corner.
+
+**Location:** Lines 1773-1786 in `SemanticGalaxyView.tsx`
+
+```typescript
+{brandImage && (
+  <div className="absolute top-4 left-4 z-20 pointer-events-none">
+    <div className="bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-xl">
+      <img 
+        src={brandImage} 
+        alt="Brand Logo" 
+        className="h-12 w-auto object-contain"
+      />
+    </div>
+  </div>
+)}
+```
+
+**Data Source:**
+Brand data comes from the shared session API response:
+```json
+{
+  "brandImage": "https://example.com/logo.png",
+  "brandColors": ["d5bf90"]  // Array of hex colors (without #)
+}
+```
+
+**SearchInterface.tsx** (lines ~217-220, ~1498-1507):
+- Stores `brandImage` and `brandColors` from API response
+- Passes them to `SemanticGalaxyView` component
+
+### 7. Future Enhancement: Mini Player
 **Location:** Line ~3079 in `SearchInterface.tsx`
 
 Added a TODO comment for implementing a mini player specifically for embed mode:
@@ -155,10 +208,11 @@ https://yoursite.com/?sharedSession=ABC123&embed=true
 ## What Remains Visible in Embed Mode
 - ✅ Galaxy view (3D visualization) at full height
 - ✅ Galaxy controls (minimap, reset camera, options - bottom left)
-- ✅ Shared session title banner (top center)
+- ✅ Shared session title banner (top center) OR brand logo (top left)
 - ✅ All interactive features (star clicking, hover previews, camera controls)
 - ✅ Context menu (right-click on stars)
 - ✅ Darker nebula background (0.65 opacity vs 0.5 default)
+- ✅ Brand-colored stars (all stars use brand color instead of hierarchy colors)
 
 ## Future Work: Mini Player
 The mini player would provide:

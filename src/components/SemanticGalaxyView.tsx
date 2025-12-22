@@ -330,6 +330,8 @@ interface SemanticGalaxyViewProps {
   sharedSessionTitle?: string | null;
   hideStats?: boolean; // Hide the stats/legend panel
   nebulaDimOpacity?: number; // Configurable nebula dim opacity (defaults to NEBULA_CONFIG.DIM_OPACITY)
+  brandImage?: string; // Brand logo image URL for embed mode
+  brandColors?: string[]; // Brand colors for embed mode (stars will use first color)
 }
 
 // Transform color to compensate for additive blending brightening
@@ -375,6 +377,7 @@ interface StarProps {
   onClick: () => void;
   onRightClick: (event: any) => void;
   onHover: (result: QuoteResult | null) => void;
+  overrideColor?: string; // Override color for brand mode
 }
 
 // Component to draw lines connecting results from the same episode, chapter, or feed
@@ -697,7 +700,7 @@ const HierarchyConnections: React.FC<HierarchyConnectionsProps> = ({ results, hi
   );
 };
 
-const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSelection, onClick, onRightClick, onHover }) => {
+const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSelection, onClick, onRightClick, onHover, overrideColor }) => {
   const groupRef = useRef<THREE.Group>(null);
   const mainSpikeRefs = useRef<(THREE.Mesh | null)[]>([]);
   const [hovered, setHovered] = useState(false);
@@ -743,7 +746,8 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSele
     });
   });
 
-  const baseColor = getHierarchyColor(result.hierarchyLevel);
+  // Use override color if provided (for brand mode), otherwise use hierarchy color
+  const baseColor = overrideColor || getHierarchyColor(result.hierarchyLevel);
   
   // Apply transform to compensate for additive blending brightening
   // Use a moderate darkening factor (0.65) to compensate for both the intensity multiplier and layer stacking
@@ -882,133 +886,6 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSele
         );
       })}
     </group>
-  );
-};
-
-// Camera Reset Button
-const CameraResetButton: React.FC<{ onReset: () => void; hasTitle?: boolean }> = ({ onReset, hasTitle = false }) => {
-  return (
-    <button
-      onClick={onReset}
-      className="absolute left-4 px-2.5 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm z-10 flex items-center gap-1 transition-all duration-300"
-      style={{ top: hasTitle ? '13rem' : '8rem' }}
-    >
-      <RotateCcw className="w-4 h-4" />
-      <span className="hidden sm:inline">Reset</span>
-    </button>
-  );
-};
-
-// Options dropdown (Label Axes, Auto-Play, etc.)
-const OptionsMenu: React.FC<{
-  showAxisLabels: boolean;
-  onToggleAxisLabels: () => void;
-  autoPlayOnStarClick: boolean;
-  onToggleAutoPlay: () => void;
-  hasTitle?: boolean;
-}> = ({ showAxisLabels, onToggleAxisLabels, autoPlayOnStarClick, onToggleAutoPlay, hasTitle = false }) => {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div 
-      className="absolute left-4 z-10 transition-all duration-300"
-      style={{ top: hasTitle ? '16.5rem' : '11rem' }}
-    >
-      <div className="relative">
-        <button
-          onClick={() => setOpen((prev) => !prev)}
-          className="px-3 py-2 backdrop-blur-sm text-white rounded-lg border border-gray-700 bg-black/80 hover:bg-black/90 transition-colors text-sm flex items-center gap-2"
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-          <span>Options</span>
-        </button>
-
-        {open && (
-          <div className="mt-2 w-56 bg-black/95 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-            <button
-              onClick={onToggleAxisLabels}
-              className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-200 hover:bg-gray-800/80 transition-colors"
-            >
-              <div
-                className={`w-3 h-3 rounded border border-gray-400 flex items-center justify-center ${
-                  showAxisLabels ? 'bg-white' : 'bg-transparent'
-                }`}
-              >
-                {showAxisLabels && <Check className="w-2 h-2 text-black" />}
-              </div>
-              <span>Label Axes</span>
-            </button>
-            <button
-              onClick={onToggleAutoPlay}
-              className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-200 hover:bg-gray-800/80 transition-colors"
-            >
-              <div
-                className={`w-3 h-3 rounded border border-gray-400 flex items-center justify-center ${
-                  autoPlayOnStarClick ? 'bg-white' : 'bg-transparent'
-                }`}
-              >
-                {autoPlayOnStarClick && <Check className="w-2 h-2 text-black" />}
-              </div>
-              <span>Auto‑play on star click</span>
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Minimap component
-const Minimap: React.FC<{ results: QuoteResult[]; selectedStarId: string | null; hasTitle?: boolean }> = ({ results, selectedStarId, hasTitle = false }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  React.useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw points
-    results.forEach((result) => {
-      const x = ((result.coordinates3d.x + 1) / 2) * canvas.width;
-      const y = ((result.coordinates3d.z + 1) / 2) * canvas.height;
-
-      const isSelected = result.shareLink === selectedStarId;
-      const color = getHierarchyColor(result.hierarchyLevel);
-
-      ctx.beginPath();
-      ctx.arc(x, y, isSelected ? 4 : 2, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.fill();
-
-      if (isSelected) {
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-    });
-  }, [results, selectedStarId]);
-
-  return (
-    <div 
-      className="absolute left-4 border border-gray-700 rounded-lg overflow-hidden z-10 transition-all duration-300"
-      style={{ top: hasTitle ? '5.5rem' : '1rem' }}
-    >
-      <canvas
-        ref={canvasRef}
-        width={105}
-        height={105}
-        className="block"
-      />
-    </div>
   );
 };
 
@@ -1343,7 +1220,8 @@ const GalaxyScene: React.FC<{
   showAxisLabels: boolean;
   isAnimatingCamera: boolean;
   nebulaDimOpacity?: number;
-}> = ({ results, selectedStarId, onStarClick, onStarRightClick, onHover, axisLabels, showAxisLabels, isAnimatingCamera, nebulaDimOpacity }) => {
+  brandColors?: string[];
+}> = ({ results, selectedStarId, onStarClick, onStarRightClick, onHover, axisLabels, showAxisLabels, isAnimatingCamera, nebulaDimOpacity, brandColors }) => {
   // Calculate which stars are near the selected one
   const nearbyStars = useMemo(() => {
     if (!selectedStarId) return new Set<string>();
@@ -1471,6 +1349,7 @@ const GalaxyScene: React.FC<{
           onClick={() => onStarClick(result)}
           onRightClick={(e) => onStarRightClick(result, e)}
           onHover={onHover}
+          overrideColor={brandColors && brandColors.length > 0 ? `#${brandColors[0]}` : undefined}
         />
       ))}
     </>
@@ -1498,6 +1377,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   sharedSessionTitle = null,
   hideStats = false,
   nebulaDimOpacity,
+  brandImage,
+  brandColors,
 }) => {
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -1511,6 +1392,9 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   
   // Research session collapsed state
   const [isResearchCollapsed, setIsResearchCollapsed] = useState(true);
+  
+  // Options menu state
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   
   // Research item hover state with delay
   const [hoveredResearchItem, setHoveredResearchItem] = useState<any | null>(null);
@@ -1749,43 +1633,140 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         onDecelerationComplete={onDecelerationComplete}
       />
       
-      {/* Shared Session Title Banner */}
-      {sharedSessionTitle && (
-        <div className="absolute top-4 left-4 z-20 pointer-events-none">
-          <div className="bg-black/90 backdrop-blur-sm border border-white/20 rounded-full px-6 py-3 shadow-xl">
-            <h2 className="text-white text-lg font-medium tracking-wide">
-              {sharedSessionTitle}
-            </h2>
+      {/* Left Side Controls - Vertical Stack */}
+      <div className="absolute top-4 left-4 z-20 flex flex-col gap-3">
+        {/* Brand Image - Top Left Corner (embed mode) */}
+        {brandImage && (
+          <div className="pointer-events-none w-fit">
+            <img 
+              src={brandImage} 
+              alt="Brand Logo" 
+              className="h-12 w-auto object-contain rounded-md shadow-xl"
+              onError={(e) => {
+                // Hide image if it fails to load
+                e.currentTarget.style.display = 'none';
+              }}
+            />
           </div>
+        )}
+        
+        {/* Shared Session Title Banner */}
+        {sharedSessionTitle && (
+          <div className="pointer-events-none">
+            <div className="bg-black/90 backdrop-blur-sm border border-white/20 rounded-full px-6 py-3 shadow-xl">
+              <h2 className="text-white text-lg font-medium tracking-wide">
+                {sharedSessionTitle}
+              </h2>
+            </div>
+          </div>
+        )}
+        
+        {/* Minimap - Hidden in embed mode */}
+        {!hideStats && (
+          <div className="border border-gray-700 rounded-lg overflow-hidden">
+            <canvas
+              ref={(canvas) => {
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw background
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw points
+                results.forEach((result) => {
+                  const x = ((result.coordinates3d.x + 1) / 2) * canvas.width;
+                  const y = ((result.coordinates3d.z + 1) / 2) * canvas.height;
+
+                  const isSelected = result.shareLink === selectedStarId;
+                  const color = getHierarchyColor(result.hierarchyLevel);
+
+                  ctx.beginPath();
+                  ctx.arc(x, y, isSelected ? 4 : 2, 0, Math.PI * 2);
+                  ctx.fillStyle = color;
+                  ctx.fill();
+
+                  if (isSelected) {
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                  }
+                });
+              }}
+              width={105}
+              height={105}
+              className="block"
+            />
+          </div>
+        )}
+        
+        {/* Camera reset button */}
+        <button
+          onClick={handleResetCamera}
+          className="px-2.5 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm flex items-center gap-1 w-fit"
+        >
+          <RotateCcw className="w-4 h-4" />
+          <span className="hidden sm:inline">Reset</span>
+        </button>
+
+        {/* Options Menu */}
+        <div className="relative w-fit">
+          <button
+            onClick={() => setShowOptionsMenu((prev) => !prev)}
+            className="px-3 py-2 backdrop-blur-sm text-white rounded-lg border border-gray-700 bg-black/80 hover:bg-black/90 transition-colors text-sm flex items-center gap-2"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            <span>Options</span>
+          </button>
+
+          {showOptionsMenu && (
+            <div className="mt-2 w-56 bg-black/95 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+              <button
+                onClick={handleToggleAxisLabels}
+                className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-200 hover:bg-gray-800/80 transition-colors"
+              >
+                <div
+                  className={`w-3 h-3 rounded border border-gray-400 flex items-center justify-center ${
+                    showAxisLabels ? 'bg-white' : 'bg-transparent'
+                  }`}
+                >
+                  {showAxisLabels && <Check className="w-2 h-2 text-black" />}
+                </div>
+                <span>Label Axes</span>
+              </button>
+              <button
+                onClick={() => {
+                  const newValue = !autoPlayOnStarClick;
+                  setAutoPlayOnStarClick(newValue);
+                  try {
+                    const userSettings = localStorage.getItem('userSettings');
+                    const settings = userSettings ? JSON.parse(userSettings) : {};
+                    settings.autoPlayOnStarClick = newValue;
+                    localStorage.setItem('userSettings', JSON.stringify(settings));
+                  } catch (e) {
+                    console.error('Error saving autoPlayOnStarClick to userSettings:', e);
+                  }
+                }}
+                className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-200 hover:bg-gray-800/80 transition-colors"
+              >
+                <div
+                  className={`w-3 h-3 rounded border border-gray-400 flex items-center justify-center ${
+                    autoPlayOnStarClick ? 'bg-white' : 'bg-transparent'
+                  }`}
+                >
+                  {autoPlayOnStarClick && <Check className="w-2 h-2 text-black" />}
+                </div>
+                <span>Auto‑play on star click</span>
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
       
-      {/* Camera reset button */}
-      <CameraResetButton onReset={handleResetCamera} hasTitle={!!sharedSessionTitle} />
-
-      {/* Options dropdown (Label Axes, Auto-Play, etc.) */}
-      <OptionsMenu
-        showAxisLabels={showAxisLabels}
-        onToggleAxisLabels={handleToggleAxisLabels}
-        autoPlayOnStarClick={autoPlayOnStarClick}
-        onToggleAutoPlay={() => {
-          const newValue = !autoPlayOnStarClick;
-          setAutoPlayOnStarClick(newValue);
-          try {
-            const userSettings = localStorage.getItem('userSettings');
-            const settings = userSettings ? JSON.parse(userSettings) : {};
-            settings.autoPlayOnStarClick = newValue;
-            localStorage.setItem('userSettings', JSON.stringify(settings));
-          } catch (e) {
-            console.error('Error saving autoPlayOnStarClick to userSettings:', e);
-          }
-        }}
-        hasTitle={!!sharedSessionTitle}
-      />
-
-      {/* Minimap */}
-      <Minimap results={results} selectedStarId={selectedStarId} hasTitle={!!sharedSessionTitle} />
-
       {/* Hover preview for stars */}
       <HoverPreview 
         result={hoveredResult} 
@@ -2111,6 +2092,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           showAxisLabels={showAxisLabels}
           isAnimatingCamera={isAnimatingCamera}
           nebulaDimOpacity={nebulaDimOpacity}
+          brandColors={brandColors}
         />
       </Canvas>
       

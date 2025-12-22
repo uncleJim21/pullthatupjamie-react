@@ -213,6 +213,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Shared session title state (for displaying title banner)
   const [sharedSessionTitle, setSharedSessionTitle] = useState<string | null>(null);
   
+  // Brand data for embed mode
+  const [brandImage, setBrandImage] = useState<string | null>(null);
+  const [brandColors, setBrandColors] = useState<string[] | null>(null);
+
   // Track warp speed deceleration completion
   const [isDecelerationComplete, setIsDecelerationComplete] = useState(true);
   
@@ -1497,6 +1501,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             
             // Store the shared session title for display
             setSharedSessionTitle(sessionTitle);
+            
+            // Store brand data if present (for embed mode)
+            if (sharedSession.brandImage) {
+              setBrandImage(sharedSession.brandImage);
+              printLog(`[SharedSession] Brand image: ${sharedSession.brandImage}`);
+            }
+            if (sharedSession.brandColors && sharedSession.brandColors.length > 0) {
+              setBrandColors(sharedSession.brandColors);
+              printLog(`[SharedSession] Brand colors: ${JSON.stringify(sharedSession.brandColors)}`);
+            }
           } catch (error) {
             console.error('Error fetching shared session metadata:', error);
             setSearchState(prev => ({
@@ -2699,7 +2713,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 onOpenAnalysisPanel={() => setIsAnalysisPanelOpen(true)}
                 sharedSessionTitle={sharedSessionTitle}
                 hideStats={isEmbedMode}
-                nebulaDimOpacity={isEmbedMode ? 0.65 : undefined}
+                nebulaDimOpacity={isEmbedMode ? 0.78 : undefined}
+                brandImage={isEmbedMode ? (brandImage || undefined) : undefined}
+                brandColors={isEmbedMode ? (brandColors || undefined) : undefined}
               />
             </div>
           ) : (
