@@ -35,8 +35,8 @@ import UnifiedSidePanel from './UnifiedSidePanel.tsx';
 import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
-import { ResearchSessionItem } from './ResearchSessionCollector.tsx';
-import { clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId, saveResearchSessionWithRetry } from '../services/researchSessionService.ts';
+import EmbedMiniPlayer from './EmbedMiniPlayer.tsx';
+import { ResearchSessionItem, clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId, saveResearchSessionWithRetry } from '../services/researchSessionService.ts';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
 
 
@@ -228,6 +228,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // 3D search results state
   const [galaxyResults, setGalaxyResults] = useState<any[]>([]);
+  const [currentResultIndex, setCurrentResultIndex] = useState<number>(0);
   const [axisLabels, setAxisLabels] = useState<any>(null);
   
   // Research session state
@@ -1806,7 +1807,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             episodeImage: firstResult.episodeImage || '',
             creator: firstResult.creator,
             listenLink: firstResult.listenLink,
-            date: firstResult.date
+            date: firstResult.date,
+            quote: firstResult.quote,
+            summary: firstResult.summary,
+            headline: firstResult.headline,
+            hierarchyLevel: firstResult.hierarchyLevel,
+            shareLink: firstResult.shareLink,
           };
           printLog(`[AutoSelect] Setting audio context for first result: ${JSON.stringify(audioContext)}`);
           setSelectedAudioContext(audioContext);
@@ -1847,6 +1853,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       creator: string;
       listenLink?: string;
       date?: string;
+      quote?: string;
+      summary?: string;
+      headline?: string;
+      hierarchyLevel?: 'feed' | 'episode' | 'chapter' | 'paragraph';
+      shareLink?: string;
     }
   ) => {
     if (searchViewStyle === SearchViewStyle.SPLIT_SCREEN && searchMode === 'podcast-search') {
@@ -2049,6 +2060,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     creator: string;
     listenLink?: string;
     date?: string;
+    quote?: string;
+    summary?: string;
+    headline?: string;
+    hierarchyLevel?: 'feed' | 'episode' | 'chapter' | 'paragraph';
+    shareLink?: string;
   } | null>(null);
   const [autoPlayContextOnOpen, setAutoPlayContextOnOpen] = useState(false);
   // Track the effective width of the podcast context panel so we can center the floating search bar
@@ -2650,24 +2666,35 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   
                   setSelectedParagraphId(result.shareLink);
                   
+                  // Track the index of the clicked result for navigation
+                  const resultIndex = galaxyResults.findIndex(r => r.shareLink === result.shareLink);
+                  if (resultIndex !== -1) {
+                    setCurrentResultIndex(resultIndex);
+                    printLog(`[StarClick] Set current result index to: ${resultIndex}`);
+                  }
+                  
                   // Read auto-play preference from userSettings
                   let autoPlay = true; // Default to true for first-time users
-                  try {
-                    const settings = localStorage.getItem('userSettings');
-                    printLog(`[StarClick] Raw userSettings from localStorage: ${settings}`);
-                    if (settings) {
-                      const userSettings = JSON.parse(settings);
-                      printLog(`[StarClick] Parsed userSettings: ${JSON.stringify(userSettings)}`);
-                      // Use nullish coalescing to default to true when undefined
-                      autoPlay = userSettings.autoPlayOnStarClick ?? true;
-                      printLog(`[StarClick] autoPlayOnStarClick from settings: ${userSettings.autoPlayOnStarClick}, coerced to: ${autoPlay}`);
-                    }
-                  } catch (e) {
-                    console.error('Error reading autoPlayOnStarClick from userSettings:', e);
-                  }
-                  printLog(`[StarClick] Final AutoPlay setting: ${autoPlay}`);
                   
-                  // Store audio context so PodcastContextPanel can render a mini-player
+                  // In embed mode, always auto-play
+                  if (!isEmbedMode) {
+                    try {
+                      const settings = localStorage.getItem('userSettings');
+                      printLog(`[StarClick] Raw userSettings from localStorage: ${settings}`);
+                      if (settings) {
+                        const userSettings = JSON.parse(settings);
+                        printLog(`[StarClick] Parsed userSettings: ${JSON.stringify(userSettings)}`);
+                        // Use nullish coalescing to default to true when undefined
+                        autoPlay = userSettings.autoPlayOnStarClick ?? true;
+                        printLog(`[StarClick] autoPlayOnStarClick from settings: ${userSettings.autoPlayOnStarClick}, coerced to: ${autoPlay}`);
+                      }
+                    } catch (e) {
+                      console.error('Error reading autoPlayOnStarClick from userSettings:', e);
+                    }
+                  }
+                  printLog(`[StarClick] Final AutoPlay setting: ${autoPlay} (isEmbedMode: ${isEmbedMode})`);
+                  
+                  // Store audio context so PodcastContextPanel/EmbedMiniPlayer can render
                   const audioContext = {
                     audioUrl: result.audioUrl,
                     timeContext: {
@@ -2678,17 +2705,31 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     episodeImage: result.episodeImage || '',
                     creator: result.creator,
                     listenLink: result.listenLink,
-                    date: result.date
+                    date: result.date,
+                    quote: result.quote,
+                    summary: result.summary,
+                    headline: result.headline,
+                    hierarchyLevel: result.hierarchyLevel,
+                    shareLink: result.shareLink,
                   };
                   printLog(`[StarClick] Setting audio context: ${JSON.stringify(audioContext)}`);
                   setSelectedAudioContext(audioContext);
                   setAutoPlayContextOnOpen(autoPlay);
                   
-                  // Small delay to ensure state updates propagate before opening panel
-                  setTimeout(() => {
-                    setIsContextPanelOpen(true);
-                    printLog(`[StarClick] Panel opened after state updates`);
-                  }, 0);
+                  // In embed mode, trigger playback immediately via AudioController
+                  if (isEmbedMode && autoPlay && result.audioUrl) {
+                    printLog(`[StarClick] Embed mode - triggering immediate playback`);
+                    // Import playTrack from the audio controller will be handled via the mini player
+                    // The mini player will auto-play when selectedAudioContext changes
+                  }
+                  
+                  // Small delay to ensure state updates propagate before opening panel (non-embed mode)
+                  if (!isEmbedMode) {
+                    setTimeout(() => {
+                      setIsContextPanelOpen(true);
+                      printLog(`[StarClick] Panel opened after state updates`);
+                    }, 0);
+                  }
                 }}
                 selectedStarId={selectedParagraphId}
                 axisLabels={axisLabels}
@@ -3096,14 +3137,73 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         </div>
       )}
 
-      {/* TODO: Mini Player for Embed Mode
-          When isEmbedMode is true, add a mini player at the bottom showing:
-          - Podcast/Episode thumbnail
-          - Episode title
-          - Quote/clip info
-          - Basic playback controls
-          This will replace the floating search bar in embedded shared sessions
-      */}
+      {/* Embed Mode Mini Player */}
+      {isEmbedMode && selectedAudioContext && (
+        <EmbedMiniPlayer
+          audioUrl={selectedAudioContext.audioUrl}
+          episodeTitle={selectedAudioContext.episode}
+          episodeImage={selectedAudioContext.episodeImage}
+          creator={selectedAudioContext.creator}
+          timeContext={selectedAudioContext.timeContext}
+          quote={selectedAudioContext.quote}
+          summary={selectedAudioContext.summary}
+          headline={selectedAudioContext.headline}
+          hierarchyLevel={selectedAudioContext.hierarchyLevel}
+          trackId={selectedAudioContext.shareLink || 'embed-player'}
+          onPrevious={currentResultIndex > 0 ? () => {
+            const prevIndex = currentResultIndex - 1;
+            const prevResult = galaxyResults[prevIndex];
+            if (prevResult) {
+              printLog(`[Navigation] Moving to previous result at index ${prevIndex}`);
+              setCurrentResultIndex(prevIndex);
+              setSelectedParagraphId(prevResult.shareLink);
+              setSelectedAudioContext({
+                audioUrl: prevResult.audioUrl,
+                timeContext: {
+                  start_time: prevResult.timeContext?.start_time ?? 0,
+                  end_time: prevResult.timeContext?.end_time ?? 0,
+                },
+                episode: prevResult.episode,
+                episodeImage: prevResult.episodeImage || '',
+                creator: prevResult.creator,
+                listenLink: prevResult.listenLink,
+                date: prevResult.date,
+                quote: prevResult.quote,
+                summary: prevResult.summary,
+                headline: prevResult.headline,
+                hierarchyLevel: prevResult.hierarchyLevel,
+                shareLink: prevResult.shareLink,
+              });
+            }
+          } : undefined}
+          onNext={currentResultIndex < galaxyResults.length - 1 ? () => {
+            const nextIndex = currentResultIndex + 1;
+            const nextResult = galaxyResults[nextIndex];
+            if (nextResult) {
+              printLog(`[Navigation] Moving to next result at index ${nextIndex}`);
+              setCurrentResultIndex(nextIndex);
+              setSelectedParagraphId(nextResult.shareLink);
+              setSelectedAudioContext({
+                audioUrl: nextResult.audioUrl,
+                timeContext: {
+                  start_time: nextResult.timeContext?.start_time ?? 0,
+                  end_time: nextResult.timeContext?.end_time ?? 0,
+                },
+                episode: nextResult.episode,
+                episodeImage: nextResult.episodeImage || '',
+                creator: nextResult.creator,
+                listenLink: nextResult.listenLink,
+                date: nextResult.date,
+                quote: nextResult.quote,
+                summary: nextResult.summary,
+                headline: nextResult.headline,
+                hierarchyLevel: nextResult.hierarchyLevel,
+                shareLink: nextResult.shareLink,
+              });
+            }
+          } : undefined}
+        />
+      )}
 
       {searchMode === 'podcast-search' && !isAnyModalOpen() && (
         <div
@@ -3220,7 +3320,20 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             printLog(`Current resultViewStyle: ${resultViewStyle}, searchViewStyle: ${searchViewStyle}`);
             resetContextPanelState();
             setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
-            await handleSearch(keyword, feedId, episodeName, forceSearchAll);
+            
+            // Set the query and trigger search
+            setQuery(keyword);
+            
+            // Trigger search based on view style
+            setGridFadeOut(true);
+            setSearchState(prev => ({ ...prev, isLoading: true }));
+            setIsDecelerationComplete(false);
+            
+            if (resultViewStyle === SearchResultViewStyle.GALAXY) {
+              await performQuoteSearch3D();
+            } else {
+              await performQuoteSearch();
+            }
           }}
         />
       )}

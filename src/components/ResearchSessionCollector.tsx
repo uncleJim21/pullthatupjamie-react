@@ -1,19 +1,7 @@
 import React, { useState } from 'react';
 import { Bookmark, ChevronUp, ChevronDown, X, Download, Share2 } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
-
-interface ResearchSessionItem {
-  shareLink: string;
-  quote?: string;
-  summary?: string;
-  headline?: string;
-  episode: string;
-  creator: string;
-  episodeImage?: string;
-  date: string;
-  hierarchyLevel: 'feed' | 'episode' | 'chapter' | 'paragraph';
-  addedAt: Date;
-}
+import { ResearchSessionItem } from '../services/researchSessionService.ts';
 
 interface ResearchSessionCollectorProps {
   items: ResearchSessionItem[];
@@ -179,5 +167,3 @@ export const ResearchSessionCollector: React.FC<ResearchSessionCollectorProps> =
     </div>
   );
 };
-
-export type { ResearchSessionItem };

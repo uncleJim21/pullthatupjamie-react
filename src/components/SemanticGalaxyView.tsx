@@ -995,12 +995,59 @@ interface HoverPreviewProps {
 const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [adjustedPosition, setAdjustedPosition] = useState(position);
   
   // Reset image states when result changes
   useEffect(() => {
     setImageError(false);
     setImageLoaded(false);
   }, [result]);
+
+  // Adjust position to keep preview on screen
+  useEffect(() => {
+    if (!previewRef.current) return;
+
+    const preview = previewRef.current;
+    const rect = preview.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let newX = position.x + 20;
+    let newY = position.y + 20;
+
+    // Check if preview goes off right edge
+    if (newX + rect.width > viewportWidth) {
+      // Try positioning to the left of cursor
+      newX = position.x - rect.width - 20;
+      // If still off screen (left edge), clamp to right edge
+      if (newX < 0) {
+        newX = viewportWidth - rect.width - 10;
+      }
+    }
+
+    // Check if preview goes off bottom edge
+    if (newY + rect.height > viewportHeight) {
+      // Position above cursor
+      newY = position.y - rect.height - 20;
+      // If still off screen (top edge), clamp to bottom edge
+      if (newY < 0) {
+        newY = viewportHeight - rect.height - 10;
+      }
+    }
+
+    // Ensure we don't go off left edge
+    if (newX < 0) {
+      newX = 10;
+    }
+
+    // Ensure we don't go off top edge
+    if (newY < 0) {
+      newY = 10;
+    }
+
+    setAdjustedPosition({ x: newX, y: newY });
+  }, [position, result]);
 
   if (!result) return null;
 
@@ -1040,10 +1087,11 @@ const HoverPreview: React.FC<HoverPreviewProps> = ({ result, position }) => {
 
   return (
     <div
+      ref={previewRef}
       className="fixed pointer-events-none z-50"
       style={{
-        left: position.x + 20,
-        top: position.y + 20,
+        left: adjustedPosition.x,
+        top: adjustedPosition.y,
       }}
     >
       <div className="bg-black/95 backdrop-blur-sm border border-gray-700 rounded-lg p-3 max-w-xs shadow-xl">
@@ -1396,6 +1444,45 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   // Options menu state
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   
+  // Minimap canvas ref
+  const minimapCanvasRef = useRef<HTMLCanvasElement>(null);
+  
+  // Draw minimap when results or selection changes
+  useEffect(() => {
+    const canvas = minimapCanvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw points
+    results.forEach((result) => {
+      const x = ((result.coordinates3d.x + 1) / 2) * canvas.width;
+      const y = ((result.coordinates3d.z + 1) / 2) * canvas.height;
+
+      const isSelected = result.shareLink === selectedStarId;
+      const color = getHierarchyColor(result.hierarchyLevel);
+
+      ctx.beginPath();
+      ctx.arc(x, y, isSelected ? 4 : 2, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      if (isSelected) {
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    });
+  }, [results, selectedStarId]);
+  
   // Research item hover state with delay
   const [hoveredResearchItem, setHoveredResearchItem] = useState<any | null>(null);
   const [showResearchTooltip, setShowResearchTooltip] = useState(false);
@@ -1665,38 +1752,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         {!hideStats && (
           <div className="border border-gray-700 rounded-lg overflow-hidden">
             <canvas
-              ref={(canvas) => {
-                if (!canvas) return;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return;
-
-                // Clear canvas
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                // Draw background
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                // Draw points
-                results.forEach((result) => {
-                  const x = ((result.coordinates3d.x + 1) / 2) * canvas.width;
-                  const y = ((result.coordinates3d.z + 1) / 2) * canvas.height;
-
-                  const isSelected = result.shareLink === selectedStarId;
-                  const color = getHierarchyColor(result.hierarchyLevel);
-
-                  ctx.beginPath();
-                  ctx.arc(x, y, isSelected ? 4 : 2, 0, Math.PI * 2);
-                  ctx.fillStyle = color;
-                  ctx.fill();
-
-                  if (isSelected) {
-                    ctx.strokeStyle = 'white';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                  }
-                });
-              }}
+              ref={minimapCanvasRef}
               width={105}
               height={105}
               className="block"
@@ -1792,7 +1848,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
             timeContext: { start_time: null, end_time: null },
             similarity: { combined: 0, vector: 0 },
             coordinates3d: { x: 0, y: 0, z: 0 },
-          }}
+          } as QuoteResult}
           position={mousePosition}
         />
       )}
