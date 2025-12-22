@@ -1330,6 +1330,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const sharedSessionId = searchParams.get('sharedSession');
   const researchSessionId = searchParams.get('researchSessionId');
   
+  // Check if we're in embed mode (for embedded shared sessions)
+  const isEmbedMode = searchParams.get('embed') === 'true';
+  
   // Reusable function to load a research session with warp speed animation
   const loadResearchSessionWithWarpSpeed = async (sessionId: string, sessionTitle: string = 'Research Session') => {
         try {
@@ -2070,17 +2073,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           onClose={handleTutorialClose}
           defaultSection={getDefaultTutorialSection()}
         />
-        {/* Page Banner */}
-        <PageBanner 
-          logoText="Pull That Up Jamie!" 
-          onConnect={() => initializeLightning()}
-          onSignIn={() => setIsSignInModalOpen(true)}
-          onUpgrade={handleUpgrade}
-          onSignOut={handleSignOut}
-          onTutorialClick={handleTutorialClick}
-          isUserSignedIn={isUserSignedIn}
-          setIsUserSignedIn={setIsUserSignedIn}
-        />
+        {/* Page Banner - Hidden in embed mode */}
+        {!isEmbedMode && (
+          <PageBanner 
+            logoText="Pull That Up Jamie!" 
+            onConnect={() => initializeLightning()}
+            onSignIn={() => setIsSignInModalOpen(true)}
+            onUpgrade={handleUpgrade}
+            onSignOut={handleSignOut}
+            onTutorialClick={handleTutorialClick}
+            isUserSignedIn={isUserSignedIn}
+            setIsUserSignedIn={setIsUserSignedIn}
+          />
+        )}
 
         {/* Web Search Deprecation Banner */}
         {isWebSearchDeprecated && (
@@ -2581,8 +2586,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {/* Conversation History / Galaxy View */}
       {((conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && searchMode === 'podcast-search') && (
         <div>
-          {/* View Toggle - show during loading in galaxy mode OR when we have results */}
-          {(conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && (
+          {/* View Toggle - Hidden in embed mode - show during loading in galaxy mode OR when we have results */}
+          {!isEmbedMode && (conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && (
           <div className="flex justify-center mt-4 mb-3">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               <button
@@ -2619,7 +2624,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
           {/* Conditional rendering: List or Galaxy view */}
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (
-            <div className="relative w-full transition-all duration-300 ease-in-out" style={{ height: 'calc(100vh - 150px)' }}>
+            <div className="relative w-full transition-all duration-300 ease-in-out" style={{ 
+              height: isEmbedMode ? '100vh' : 'calc(100vh - 150px)' 
+            }}>
               <SemanticGalaxyView
                 results={galaxyResults}
                 onStarClick={(result) => {
@@ -2691,6 +2698,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 onCloseContextPanel={() => setIsContextPanelOpen(false)}
                 onOpenAnalysisPanel={() => setIsAnalysisPanelOpen(true)}
                 sharedSessionTitle={sharedSessionTitle}
+                hideStats={isEmbedMode}
+                nebulaDimOpacity={isEmbedMode ? 0.65 : undefined}
               />
             </div>
           ) : (
@@ -2893,8 +2902,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         )
       )}
 
-      {/* Floating Search Bar */}
-      {hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
+      {/* Floating Search Bar - Hidden in embed mode */}
+      {!isEmbedMode && hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
         <div className="fixed sm:bottom-4 bottom-1 z-40 flex justify-center px-4 sm:px-24" style={{
           left: '0',
           right: searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isContextPanelOpen
@@ -3071,6 +3080,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         </div>
       )}
 
+      {/* TODO: Mini Player for Embed Mode
+          When isEmbedMode is true, add a mini player at the bottom showing:
+          - Podcast/Episode thumbnail
+          - Episode title
+          - Quote/clip info
+          - Basic playback controls
+          This will replace the floating search bar in embedded shared sessions
+      */}
+
       {searchMode === 'podcast-search' && !isAnyModalOpen() && (
         <div
           className={`fixed w-full z-50 transition-all duration-300 ${
@@ -3150,8 +3168,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       />
       </div>
 
-      {/* Unified Side Panel (Context + Analysis) for Split-Screen Mode */}
-      {searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isDecelerationComplete && (
+      {/* Unified Side Panel (Context + Analysis) for Split-Screen Mode - Hidden in embed mode */}
+      {!isEmbedMode && searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isDecelerationComplete && (
         <UnifiedSidePanel
           paragraphId={selectedParagraphId}
           isContextOpen={isContextPanelOpen}

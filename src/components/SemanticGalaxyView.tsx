@@ -328,6 +328,8 @@ interface SemanticGalaxyViewProps {
   onCloseContextPanel?: () => void;
   onOpenAnalysisPanel?: () => void;
   sharedSessionTitle?: string | null;
+  hideStats?: boolean; // Hide the stats/legend panel
+  nebulaDimOpacity?: number; // Configurable nebula dim opacity (defaults to NEBULA_CONFIG.DIM_OPACITY)
 }
 
 // Transform color to compensate for additive blending brightening
@@ -396,7 +398,7 @@ interface AxisLabelsProps {
 }
 
 // Nebula background component rendered as a full-screen quad that follows the camera
-const NebulaBackground: React.FC = () => {
+const NebulaBackground: React.FC<{ dimOpacity?: number }> = ({ dimOpacity = NEBULA_CONFIG.DIM_OPACITY }) => {
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const groupRef = useRef<THREE.Group | null>(null);
   const { camera } = useThree();
@@ -459,13 +461,13 @@ const NebulaBackground: React.FC = () => {
       </mesh>
 
       {/* Configurable dimming overlay (translucent black) */}
-      {NEBULA_CONFIG.DIM_OPACITY > 0 && (
+      {dimOpacity > 0 && (
         <mesh position={[0, 0, 0.01]}>
           <planeGeometry args={[1, 1, 1, 1]} />
           <meshBasicMaterial
             color="black"
             transparent
-            opacity={NEBULA_CONFIG.DIM_OPACITY}
+            opacity={dimOpacity}
             depthWrite={false}
             depthTest={false}
           />
@@ -1340,7 +1342,8 @@ const GalaxyScene: React.FC<{
   } | null;
   showAxisLabels: boolean;
   isAnimatingCamera: boolean;
-}> = ({ results, selectedStarId, onStarClick, onStarRightClick, onHover, axisLabels, showAxisLabels, isAnimatingCamera }) => {
+  nebulaDimOpacity?: number;
+}> = ({ results, selectedStarId, onStarClick, onStarRightClick, onHover, axisLabels, showAxisLabels, isAnimatingCamera, nebulaDimOpacity }) => {
   // Calculate which stars are near the selected one
   const nearbyStars = useMemo(() => {
     if (!selectedStarId) return new Set<string>();
@@ -1402,7 +1405,7 @@ const GalaxyScene: React.FC<{
   return (
     <>
       {/* Nebula background */}
-      <NebulaBackground />
+      <NebulaBackground dimOpacity={nebulaDimOpacity} />
 
       {/* Ambient light */}
       <ambientLight intensity={0.3} />
@@ -1493,6 +1496,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   onCloseContextPanel,
   onOpenAnalysisPanel,
   sharedSessionTitle = null,
+  hideStats = false,
+  nebulaDimOpacity,
 }) => {
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -1811,7 +1816,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         />
       )}
 
-      {/* Stats overlay with Legend and Research Session */}
+      {/* Stats overlay with Legend and Research Session - Hidden when hideStats is true */}
+      {!hideStats && (
       <div className="absolute top-2 right-4 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 text-sm z-10 max-w-[200px] max-h-[calc(100vh-8rem)] flex flex-col">
         <div className="overflow-y-auto flex-1 px-3 py-2">
           <div className="flex flex-col gap-3">
@@ -2060,6 +2066,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           </div>
         </div>
       </div>
+      )}
 
       {/* 3D Canvas */}
       <Canvas
@@ -2103,6 +2110,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           axisLabels={axisLabels || null}
           showAxisLabels={showAxisLabels}
           isAnimatingCamera={isAnimatingCamera}
+          nebulaDimOpacity={nebulaDimOpacity}
         />
       </Canvas>
       
