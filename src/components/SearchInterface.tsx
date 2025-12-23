@@ -2084,25 +2084,23 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     <div className="min-h-screen bg-black text-white flex">
       {/* Main Content Area - Left Side */}
       <div className="flex-1 min-w-0 transition-all duration-300">
-        {/* Welcome Modal */}
-        <WelcomeModal
-          isOpen={isWelcomeOpen}
-          onQuickTour={handleWelcomeQuickTour}
-          onGetStarted={handleWelcomeGetStarted}
-        />
-        {/* Welcome Modal */}
-        <WelcomeModal
-          isOpen={isWelcomeOpen}
-          onQuickTour={handleWelcomeQuickTour}
-          onGetStarted={handleWelcomeGetStarted}
-        />
+        {/* Welcome Modal - Hidden in embed mode */}
+        {!isEmbedMode && (
+          <WelcomeModal
+            isOpen={isWelcomeOpen}
+            onQuickTour={handleWelcomeQuickTour}
+            onGetStarted={handleWelcomeGetStarted}
+          />
+        )}
 
-        {/* Tutorial Modal */}
-        <TutorialModal
-          isOpen={isTutorialOpen}
-          onClose={handleTutorialClose}
-          defaultSection={getDefaultTutorialSection()}
-        />
+        {/* Tutorial Modal - Hidden in embed mode */}
+        {!isEmbedMode && (
+          <TutorialModal
+            isOpen={isTutorialOpen}
+            onClose={handleTutorialClose}
+            defaultSection={getDefaultTutorialSection()}
+          />
+        )}
         {/* Page Banner - Hidden in embed mode */}
         {!isEmbedMode && (
           <PageBanner 
