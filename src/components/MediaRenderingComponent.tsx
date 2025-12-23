@@ -1567,7 +1567,21 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-white text-sm font-medium select-none">
-                            {clip.editRange.replace(/(\d+\.\d+)/g, (match) => parseFloat(match).toFixed(1))} ({clip.duration.toFixed(1)}s)
+                            {(() => {
+                              // Parse editRange (e.g., "1149s-1158s") and convert to MM:SS format
+                              const match = clip.editRange.match(/(\d+(?:\.\d+)?)s?-(\d+(?:\.\d+)?)s?/);
+                              if (match) {
+                                const startSeconds = Math.round(parseFloat(match[1]));
+                                const endSeconds = Math.round(parseFloat(match[2]));
+                                const formatTimeNoDecimal = (time: number) => {
+                                  const minutes = Math.floor(time / 60);
+                                  const seconds = time % 60;
+                                  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                                };
+                                return `${formatTimeNoDecimal(startSeconds)}-${formatTimeNoDecimal(endSeconds)}`;
+                              }
+                              return clip.editRange;
+                            })()} ({Math.round(clip.duration)}s)
                           </p>
                           <p className={`text-xs select-none ${
                             isProcessing ? 'text-blue-400' : 
