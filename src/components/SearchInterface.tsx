@@ -259,6 +259,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Add state for admin privileges and toggle
   const [adminFeedId, setAdminFeedId] = useState<string | null>(null);
+  const [adminFeedUrl, setAdminFeedUrl] = useState<string | null>(null);
   const [podcastSearchMode, setPodcastSearchMode] = useState<'global' | 'my-pod'>('global');
   const [showPodcastModeLabel, setShowPodcastModeLabel] = useState(false);
   const [podcastModeLabelText, setPodcastModeLabelText] = useState('');
@@ -380,14 +381,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     localStorage.removeItem('squareId');
     localStorage.removeItem('isSubscribed');
     
-    // Remove adminFeedId from localStorage and reset state
+    // Remove adminFeedId and adminFeedUrl from localStorage and reset state
     const settings = localStorage.getItem('userSettings');
     if (settings) {
       const userSettings = JSON.parse(settings);
       delete userSettings.adminFeedId;
+      delete userSettings.adminFeedUrl;
       localStorage.setItem('userSettings', JSON.stringify(userSettings));
     }
     setAdminFeedId(null);
+    setAdminFeedUrl(null);
     
     setRequestAuthMethod(RequestAuthMethod.FREE);
   };
@@ -933,17 +936,23 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       checkAndStoreAdminPrivileges();
     } else {
       setAdminFeedId(null);
+      setAdminFeedUrl(null);
     }
   }, [isUserSignedIn]);
 
-  // Add useEffect to load stored feedId on component mount
+  // Add useEffect to load stored feedId and feedUrl on component mount
   useEffect(() => {
     const storedFeedId = getStoredFeedId();
+    const storedFeedUrl = getStoredFeedUrl();
     if (storedFeedId) {
       setAdminFeedId(storedFeedId);
       printLog(`Loaded stored feedId: ${storedFeedId}`);
     }
-    printLog(`Initial adminFeedId state: ${storedFeedId}`);
+    if (storedFeedUrl) {
+      setAdminFeedUrl(storedFeedUrl);
+      printLog(`Loaded stored feedUrl: ${storedFeedUrl}`);
+    }
+    printLog(`Initial adminFeedId state: ${storedFeedId}, adminFeedUrl state: ${storedFeedUrl}`);
   }, []);
 
   // Debug adminFeedId changes
@@ -1357,19 +1366,20 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   };
 
   // Function to safely store feedId in userSettings
-  const storeFeedIdInUserSettings = (feedId: string) => {
+  const storeFeedIdInUserSettings = (feedId: string, feedUrl: string) => {
     try {
       const settings = localStorage.getItem('userSettings');
       const userSettings = settings ? JSON.parse(settings) : {};
       userSettings.adminFeedId = feedId;
+      userSettings.adminFeedUrl = feedUrl;
       localStorage.setItem('userSettings', JSON.stringify(userSettings));
-      printLog(`Stored feedId ${feedId} in userSettings`);
+      printLog(`Stored feedId ${feedId} and feedUrl ${feedUrl} in userSettings`);
     } catch (error) {
-      console.error('Error storing feedId in userSettings:', error);
+      console.error('Error storing feedId and feedUrl in userSettings:', error);
     }
   };
 
-  // Function to get stored feedId from userSettings
+  // Function to get stored feedId and feedUrl from userSettings
   const getStoredFeedId = (): string | null => {
     try {
       const settings = localStorage.getItem('userSettings');
@@ -1381,28 +1391,44 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
   };
 
-  // Function to check admin privileges and store feedId
+  const getStoredFeedUrl = (): string | null => {
+    try {
+      const settings = localStorage.getItem('userSettings');
+      const userSettings = settings ? JSON.parse(settings) : {};
+      return userSettings.adminFeedUrl || null;
+    } catch (error) {
+      console.error('Error getting feedUrl from userSettings:', error);
+      return null;
+    }
+  };
+
+  // Function to check admin privileges and store feedId and feedUrl
   const checkAndStoreAdminPrivileges = async () => {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
         setAdminFeedId(null);
+        setAdminFeedUrl(null);
         return;
       }
 
       const response = await AuthService.checkPrivs(token);
-      if (response?.privs?.privs?.feedId && response.privs.privs.access === 'admin') {
+      if (response?.privs?.privs?.feedId && response?.privs?.privs?.feedUrl && response.privs.privs.access === 'admin') {
         const feedId = response.privs.privs.feedId;
+        const feedUrl = response.privs.privs.feedUrl;
         setAdminFeedId(feedId);
-        storeFeedIdInUserSettings(feedId);
-        printLog(`Admin privileges confirmed for feedId: ${feedId}`);
+        setAdminFeedUrl(feedUrl);
+        storeFeedIdInUserSettings(feedId, feedUrl);
+        printLog(`Admin privileges confirmed for feedId: ${feedId}, feedUrl: ${feedUrl}`);
       } else {
         setAdminFeedId(null);
+        setAdminFeedUrl(null);
         printLog('No admin privileges found');
       }
     } catch (error) {
       console.error('Error checking admin privileges:', error);
       setAdminFeedId(null);
+      setAdminFeedUrl(null);
     }
   };
 

@@ -1,4 +1,4 @@
-import { printLog } from '../constants/constants.ts';
+import { DEBUG_MODE, DEBUG_TRANSCRIPTION, printLog } from '../constants/constants.ts';
 
 // Simple hash function for generating deterministic GUIDs
 export function generateHash(input: string): string {
@@ -113,7 +113,7 @@ export interface WordTimestamp {
 }
 
 class TranscriptionService {
-  private static readonly WHISPR_API_URL = 'https://whispr-v3-w-caching-ex8zk.ondigitalocean.app/WHSPR';
+  private static readonly WHISPR_API_URL = (DEBUG_TRANSCRIPTION && DEBUG_MODE) ? 'http://localhost:6969/WHSPR' : 'https://whispr-v3-w-caching-ex8zk.ondigitalocean.app/WHSPR';
 
   /**
    * Start transcription process
@@ -138,9 +138,8 @@ class TranscriptionService {
           console.log(`Generated GUID: ${guid} (length: ${guid.length})`);
           console.log(`Request payload:`, JSON.stringify(requestWithGuid, null, 2));
 
-      const backendUrl = 'https://whispr-v3-w-caching-ex8zk.ondigitalocean.app/WHSPR';
       
-      const response = await fetch(backendUrl, {
+      const response = await fetch(TranscriptionService.WHISPR_API_URL, {
         method: 'POST',
         headers: {
           'accept': 'application/json, text/plain, */*',
@@ -256,7 +255,7 @@ class TranscriptionService {
         throw new Error('No authentication token found. Please sign in again.');
       }
 
-      const backendUrl = `https://whispr-v3-w-caching-ex8zk.ondigitalocean.app/WHSPR/${guid}/get_result_by_guid`;
+      const backendUrl = `${TranscriptionService.WHISPR_API_URL}/${guid}/get_result_by_guid`;
       
       console.log(`Checking transcription status via backend: ${backendUrl}`);
 
