@@ -1,4 +1,4 @@
-export const DEBUG_MODE = true;
+export const DEBUG_MODE = false;
 export const DEBUG_TRANSCRIPTION = false;
 
 export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
