@@ -1210,7 +1210,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         style={{ minWidth: '200px' }}
                       >
                         <option value="uploads">📤 Your Uploads</option>
-                        <option value="rss-feed">📡 RSS Feed</option>
+                        <option value="rss-feed">📡 RSS Videos</option>
                       </select>
                       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white">
                         <ChevronDown className="w-4 h-4" />
