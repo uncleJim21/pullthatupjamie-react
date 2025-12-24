@@ -216,6 +216,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Brand data for embed mode
   const [brandImage, setBrandImage] = useState<string | null>(null);
   const [brandColors, setBrandColors] = useState<string[] | null>(null);
+  
+  // Embed mode hover state for auto-play control
+  const [isEmbedHovered, setIsEmbedHovered] = useState(false);
 
   // Track warp speed deceleration completion
   const [isDecelerationComplete, setIsDecelerationComplete] = useState(true);
@@ -2081,7 +2084,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   return (
     <AudioControllerProvider>
-    <div className="min-h-screen bg-black text-white flex">
+    <div 
+      className="min-h-screen bg-black text-white flex"
+      onMouseEnter={() => isEmbedMode && setIsEmbedHovered(true)}
+      onMouseLeave={() => isEmbedMode && setIsEmbedHovered(false)}
+    >
       {/* Main Content Area - Left Side */}
       <div className="flex-1 min-w-0 transition-all duration-300">
         {/* Welcome Modal - Hidden in embed mode */}
@@ -3136,19 +3143,21 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       )}
 
       {/* Embed Mode Mini Player */}
-      {isEmbedMode && selectedAudioContext && (
+      {isEmbedMode && (
         <EmbedMiniPlayer
-          audioUrl={selectedAudioContext.audioUrl}
-          episodeTitle={selectedAudioContext.episode}
-          episodeImage={selectedAudioContext.episodeImage}
-          creator={selectedAudioContext.creator}
-          timeContext={selectedAudioContext.timeContext}
-          quote={selectedAudioContext.quote}
-          summary={selectedAudioContext.summary}
-          headline={selectedAudioContext.headline}
-          hierarchyLevel={selectedAudioContext.hierarchyLevel}
-          trackId={selectedAudioContext.shareLink || 'embed-player'}
-          onPrevious={currentResultIndex > 0 ? () => {
+          isHovered={isEmbedHovered}
+          brandImage={brandImage || undefined}
+          audioUrl={selectedAudioContext?.audioUrl}
+          episodeTitle={selectedAudioContext?.episode}
+          episodeImage={selectedAudioContext?.episodeImage}
+          creator={selectedAudioContext?.creator}
+          timeContext={selectedAudioContext?.timeContext}
+          quote={selectedAudioContext?.quote}
+          summary={selectedAudioContext?.summary}
+          headline={selectedAudioContext?.headline}
+          hierarchyLevel={selectedAudioContext?.hierarchyLevel}
+          trackId={selectedAudioContext?.shareLink || 'embed-player'}
+          onPrevious={selectedAudioContext && currentResultIndex > 0 ? () => {
             const prevIndex = currentResultIndex - 1;
             const prevResult = galaxyResults[prevIndex];
             if (prevResult) {
@@ -3174,7 +3183,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               });
             }
           } : undefined}
-          onNext={currentResultIndex < galaxyResults.length - 1 ? () => {
+          onNext={selectedAudioContext && currentResultIndex < galaxyResults.length - 1 ? () => {
             const nextIndex = currentResultIndex + 1;
             const nextResult = galaxyResults[nextIndex];
             if (nextResult) {

@@ -4,6 +4,9 @@ import { useAudioController } from '../context/AudioControllerContext.tsx';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
 
 interface EmbedMiniPlayerProps {
+  // Hover state for embed mode
+  isHovered: boolean;
+  brandImage?: string;
   // Audio context
   audioUrl?: string;
   episodeTitle?: string;
@@ -26,6 +29,8 @@ interface EmbedMiniPlayerProps {
 }
 
 const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
+  isHovered,
+  brandImage,
   audioUrl,
   episodeTitle,
   episodeImage,
@@ -68,11 +73,17 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
     }
   }, [episodeImage]);
 
-  // Auto-play when track changes
+  // Auto-play when track changes AND user is hovering
   const autoPlayKeyRef = useRef<string | null>(null);
   
   useEffect(() => {
-    if (!audioUrl || !timeContext) return;
+    if (!audioUrl || !timeContext || !isHovered) {
+      // Pause if user leaves
+      if (!isHovered && isPlaying) {
+        pause();
+      }
+      return;
+    }
     
     const key = `${trackId}-${timeContext.start_time}-${timeContext.end_time}`;
     
@@ -88,7 +99,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
       startTime: timeContext.start_time,
       endTime: timeContext.end_time,
     });
-  }, [trackId, audioUrl, timeContext, playTrack]);
+  }, [trackId, audioUrl, timeContext, playTrack, isHovered, isPlaying, pause]);
 
   // Format time as MM:SS
   const formatTime = (seconds: number): string => {
@@ -135,7 +146,27 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-sm border-t border-gray-700 z-30">
       <div className="max-w-screen-xl mx-auto px-4 py-3">
-        <div className="flex items-center gap-4">
+        {!isHovered ? (
+          // Not hovering - show brand logo and "Hover to play" message
+          <div className="flex items-center justify-center gap-4 py-2">
+            {brandImage && (
+              <img
+                src={brandImage}
+                alt="Brand Logo"
+                className="h-12 w-auto object-contain rounded"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            )}
+            <div className="text-center">
+              <p className="text-lg font-medium text-white">Hover or tap to play</p>
+              <p className="text-xs text-gray-400">Explore podcast moments</p>
+            </div>
+          </div>
+        ) : (
+          // Hovering - show full player
+          <div className="flex items-center gap-4">
           {/* Episode Image - Simple responsive sizing focused on mobile */}
           <div className="flex-shrink-0">
             {episodeImage && !imageError ? (
@@ -253,6 +284,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
