@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { DEBUG_MODE, FRONTEND_URL, printLog, NavigationMode, TFTC_FEED_URL } from '../../constants/constants.ts';
+import { DEBUG_MODE, FRONTEND_URL, printLog, NavigationMode } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
@@ -125,6 +125,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
     const [qrModalOpen, setQrModalOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [adminFeedUrl, setAdminFeedUrl] = useState<string | null>(null);
     const [runHistory, setRunHistory] = useState<RunHistory[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [jamieProView, setJamieProView] = useState<JamieProView>('history');
@@ -378,14 +379,22 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 
   const fetchRssVideos = async () => {
     printLog('=== fetchRssVideos called ===');
+    
+    // Check if we have a feedUrl, if not return early with empty state
+    if (!adminFeedUrl) {
+      printLog('No admin feedUrl available, showing empty feed message');
+      setIsLoadingRssVideos(false);
+      setRssVideosError(null);
+      setRssVideos([]);
+      return;
+    }
+    
     try {
       setIsLoadingRssVideos(true);
       setRssVideosError(null);
     
-      printLog('Fetching RSS videos from TFTC feed...');
-      // TODO: Make feed URL dynamic based on user's podcast feed
-      // Currently hardcoded to TFTC feed: See TFTC_FEED_URL constant
-      const videos = await RssService.getVideoUrlsFromFeed();
+      printLog(`Fetching RSS videos from feed: ${adminFeedUrl}`);
+      const videos = await RssService.getVideoUrlsFromFeed(adminFeedUrl);
       
       console.log(`Received ${videos.length} videos from RSS service`);
       printLog(`Received ${videos.length} videos from RSS service`);
@@ -393,7 +402,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       // HACK: Fetch thumbnails directly here since RSS service isn't updating
       console.log('Fetching RSS feed directly to get thumbnails...');
       try {
-        const feedResponse = await fetch(TFTC_FEED_URL, {
+        const feedResponse = await fetch(adminFeedUrl, {
           cache: 'no-store'
         });
         const xmlText = await feedResponse.text();
@@ -709,6 +718,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       const token = localStorage.getItem("auth_token") as string;
       if(!token){
           setIsAdmin(false);
+          setAdminFeedUrl(null);
           return;
       }
       const response = await AuthService.checkPrivs(token);
@@ -716,12 +726,19 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       if (response && response.privs.privs && response.privs.privs.feedId === feedId) {
           printLog(`Admin privileges granted`);
           setIsAdmin(response.privs.privs.access === 'admin');
+          // Store the feedUrl if available
+          if (response.privs.privs.feedUrl) {
+            setAdminFeedUrl(response.privs.privs.feedUrl);
+            printLog(`Admin feedUrl set to: ${response.privs.privs.feedUrl}`);
+          }
       } else {
           setIsAdmin(false);
+          setAdminFeedUrl(null);
       }
     } catch (error) {
       console.error("Error checking privileges:", error);
       setIsAdmin(false);
+      setAdminFeedUrl(null);
     }
   };
 

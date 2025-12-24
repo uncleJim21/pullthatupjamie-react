@@ -1,4 +1,4 @@
-import { TFTC_FEED_URL } from '../constants/constants.ts';
+// TFTC_FEED_URL removed - now uses dynamic feedUrl passed as parameter
 
 // Interface for podcast feed item
 export interface PodcastFeed {
@@ -129,12 +129,15 @@ class RssService {
    * 
    * Deduplicates by episode title - only returns one video per unique title
    * 
-   * @param feedUrl URL of the RSS feed (defaults to TFTC feed)
+   * @param feedUrl URL of the RSS feed (required)
    * @returns Promise with array of video items (deduplicated by title)
-   * 
-   * TODO: Make feedUrl dynamic based on user's podcast feed
    */
-  async getVideoUrlsFromFeed(feedUrl: string = TFTC_FEED_URL): Promise<RssVideoItem[]> {
+  async getVideoUrlsFromFeed(feedUrl?: string): Promise<RssVideoItem[]> {
+    // Return empty array if no feedUrl provided
+    if (!feedUrl) {
+      console.log('[RSS Service] No feedUrl provided, returning empty array');
+      return [];
+    }
     try {
       // Fetch the RSS feed XML - cache: 'no-store' prevents caching without triggering CORS preflight
       const response = await fetch(feedUrl, {
