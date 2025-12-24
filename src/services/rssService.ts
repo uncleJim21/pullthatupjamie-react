@@ -77,6 +77,7 @@ export interface RssVideoItem {
   description?: string;
   episodeGuid?: string;
   thumbnailUrl?: string; // Episode thumbnail/cover art
+  link?: string; // Episode page URL (for sharing - use this instead of videoUrl)
 }
 
 // Helper function for logging (imported from constants if available)
@@ -169,6 +170,10 @@ class RssService {
         const guidEl = item.querySelector('guid');
         const episodeGuid = guidEl?.textContent || undefined;
         
+        // Get episode link (for sharing)
+        const linkEl = item.querySelector('link');
+        const link = linkEl?.textContent || undefined;
+        
         // Get published date
         const pubDateEl = item.querySelector('pubDate');
         const publishedDate = pubDateEl?.textContent || undefined;
@@ -222,7 +227,8 @@ class RssService {
                   publishedDate,
                   description,
                   episodeGuid,
-                  thumbnailUrl
+                  thumbnailUrl,
+                  link
                 });
               }
             });
