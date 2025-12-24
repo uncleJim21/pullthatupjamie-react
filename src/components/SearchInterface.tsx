@@ -219,6 +219,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Embed mode hover state for auto-play control
   const [isEmbedHovered, setIsEmbedHovered] = useState(false);
+  
+  // Track if user has unlocked audio (for embed mode)
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   // Track warp speed deceleration completion
   const [isDecelerationComplete, setIsDecelerationComplete] = useState(true);
@@ -2088,6 +2091,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       className="min-h-screen bg-black text-white flex"
       onMouseEnter={() => isEmbedMode && setIsEmbedHovered(true)}
       onMouseLeave={() => isEmbedMode && setIsEmbedHovered(false)}
+      onClick={() => {
+        if (isEmbedMode && !audioUnlocked) {
+          console.log('[SearchInterface] User clicked - unlocking audio');
+          setAudioUnlocked(true);
+        }
+      }}
     >
       {/* Main Content Area - Left Side */}
       <div className="flex-1 min-w-0 transition-all duration-300">
@@ -3146,6 +3155,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {isEmbedMode && (
         <EmbedMiniPlayer
           isHovered={isEmbedHovered}
+          audioUnlocked={audioUnlocked}
           brandImage={brandImage || undefined}
           audioUrl={selectedAudioContext?.audioUrl}
           episodeTitle={selectedAudioContext?.episode}

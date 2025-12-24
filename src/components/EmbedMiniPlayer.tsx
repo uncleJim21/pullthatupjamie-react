@@ -6,6 +6,8 @@ import { HIERARCHY_COLORS } from '../constants/constants.ts';
 interface EmbedMiniPlayerProps {
   // Hover state for embed mode
   isHovered: boolean;
+  // Audio unlock state (controlled from parent)
+  audioUnlocked: boolean;
   brandImage?: string;
   // Audio context
   audioUrl?: string;
@@ -30,6 +32,7 @@ interface EmbedMiniPlayerProps {
 
 const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   isHovered,
+  audioUnlocked,
   brandImage,
   audioUrl,
   episodeTitle,
@@ -73,11 +76,11 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
     }
   }, [episodeImage]);
 
-  // Auto-play when track changes AND user is hovering
+  // Auto-play when track changes AND user is hovering AND audio is unlocked
   const autoPlayKeyRef = useRef<string | null>(null);
   
   useEffect(() => {
-    if (!audioUrl || !timeContext || !isHovered) {
+    if (!audioUrl || !timeContext || !isHovered || !audioUnlocked) {
       // Pause if user leaves
       if (!isHovered && isPlaying) {
         pause();
@@ -99,7 +102,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
       startTime: timeContext.start_time,
       endTime: timeContext.end_time,
     });
-  }, [trackId, audioUrl, timeContext, playTrack, isHovered, isPlaying, pause]);
+  }, [trackId, audioUrl, timeContext, playTrack, isHovered, isPlaying, pause, audioUnlocked]);
 
   // Format time as MM:SS
   const formatTime = (seconds: number): string => {
@@ -144,11 +147,13 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   const displayText = headline || summary || quote || 'No description available';
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-sm border-t border-gray-700 z-30">
+    <div 
+      className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-sm border-t border-gray-700 z-30"
+    >
       <div className="max-w-screen-xl mx-auto px-4 py-3">
-        {!isHovered ? (
-          // Not hovering - show brand logo and "Hover to play" message
-          <div className="flex items-center justify-center gap-4 py-2">
+        {!isHovered || !audioUnlocked ? (
+          // Not hovering OR audio not unlocked - show brand logo and message
+          <div className="flex items-center justify-center gap-4 py-2 cursor-pointer hover:bg-white/5 transition-colors rounded-lg">
             {brandImage && (
               <img
                 src={brandImage}
@@ -160,8 +165,12 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
               />
             )}
             <div className="text-center">
-              <p className="text-lg font-medium text-white">Hover or tap to play</p>
-              <p className="text-xs text-gray-400">Explore podcast moments</p>
+              <p className="text-lg font-medium text-white">
+                {audioUnlocked ? 'Hover to play' : 'Click or tap to play'}
+              </p>
+              <p className="text-xs text-gray-400">
+                {audioUnlocked ? 'Explore podcast moments' : 'Unlock audio playback'}
+              </p>
             </div>
           </div>
         ) : (
