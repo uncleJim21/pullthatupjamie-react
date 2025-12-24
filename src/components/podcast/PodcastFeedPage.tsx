@@ -558,6 +558,12 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     } else if (feedData && initialView === 'uploads') {
       if (isAdmin) {
         setActiveTab('Uploads');
+        // Set the uploads view based on defaultTab prop
+        if (defaultTab === 'rss-feed') {
+          setUploadsView('rss-feed');
+        } else {
+          setUploadsView('uploads');
+        }
       } else {
         setActiveTab('Episodes');
         printLog('Non-admin user attempted to access Uploads tab, falling back to Episodes tab');
