@@ -46,12 +46,6 @@ export interface AuthConfig {
   };
 }
 
-export enum RequestAuthMethod {
-  LIGHTNING = 'lightning',
-  SQUARE = 'square',
-  FREE = 'free',
-  FREE_EXPENDED = 'free-expended'//means they're in limbo and have to choose
-}
 
 export enum NavigationMode {
   STANDARD = 'standard', // Current behavior - show Search Podcasts/Web in header
@@ -61,4 +55,23 @@ export enum NavigationMode {
 export enum AIClipsViewStyle {
   GRID = 'grid',
   LIST = 'list'
+}
+
+// Share modal context - defines the source/type of content being shared
+export enum ShareModalContext {
+  AUDIO_CLIP = 'audio_clip',              // Generated audio clip from podcast search
+  CDN_VIDEO_CLIP = 'cdn_video_clip',      // Clip from CDN-hosted video
+  CDN_VIDEO_FULL = 'cdn_video_full',      // Full CDN-hosted video
+  RSS_VIDEO_CLIP = 'rss_video_clip',      // Clip from RSS feed video
+  RSS_VIDEO_FULL = 'rss_video_full',      // Full RSS feed video
+  UPLOAD = 'upload',                       // User-uploaded content
+  OTHER = 'other'                          // Default/unknown context
+}
+
+export enum RequestAuthMethod {
+  LIGHTNING = 'lightning',
+  SQUARE = 'square',
+  FREE = 'free',
+  FREE_EXPENDED = 'free-expended',        // means they're in limbo and have to choose
+  ADMIN = 'admin'                          // Add admin auth method
 }

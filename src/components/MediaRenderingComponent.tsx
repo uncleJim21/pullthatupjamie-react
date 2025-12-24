@@ -3,7 +3,7 @@ import { Play, Pause, Volume2, VolumeX, Maximize, Scissors, Share, Filter } from
 import TranscriptionService, { generateHash } from '../services/transcriptionService.ts';
 import VideoEditService, { ChildEdit, SubtitleSegment } from '../services/videoEditService.ts';
 import { WordTimestamp } from '../services/transcriptionService.ts';
-import { printLog } from '../constants/constants.ts';
+import { printLog, ShareModalContext } from '../constants/constants.ts';
 import SocialShareModal, { SocialPlatform, SocialShareModalParentContext } from './SocialShareModal.tsx';
 import Hls from 'hls.js';
 
@@ -12,13 +12,15 @@ interface MediaRenderingComponentProps {
   fileName: string;
   fileType?: string;
   onClose: () => void;
+  episodeLink?: string; // Optional episode page URL for RSS videos (for sharing)
 }
 
 const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
   fileUrl,
   fileName,
   fileType,
-  onClose
+  onClose,
+  episodeLink
 }) => {
   // Debug logging for props
   useEffect(() => {
@@ -26,8 +28,43 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
     printLog('fileUrl: ' + fileUrl);
     printLog('fileName: ' + fileName);
     printLog('fileType: ' + fileType);
+    printLog('episodeLink: ' + (episodeLink || 'not provided'));
     printLog('=====================================');
-  }, [fileUrl, fileName, fileType]);
+  }, [fileUrl, fileName, fileType, episodeLink]);
+
+  // Helper function to determine if URL is from our CDN or external (RSS)
+  const isOwnCdnUrl = (url: string): boolean => {
+    const ownCdnDomains = [
+      'cascdr-chads-stay-winning.nyc3.digitaloceanspaces.com',
+      'nyc3.digitaloceanspaces.com'
+    ];
+    return ownCdnDomains.some(domain => url.includes(domain));
+  };
+
+  // Helper function to determine ShareModalContext
+  const getShareModalContext = (): ShareModalContext => {
+    const isClip = currentLookupHash !== null;
+    
+    // Check if ORIGINAL video is from our CDN or external (RSS)
+    // Use episodeLink to determine - if episodeLink exists, it's an RSS video
+    const isRssVideo = !!episodeLink;
+    
+    if (isClip) {
+      // It's a clip - determine if from CDN video or RSS video based on ORIGINAL source
+      if (isRssVideo) {
+        return ShareModalContext.RSS_VIDEO_CLIP;
+      } else {
+        return ShareModalContext.CDN_VIDEO_CLIP;
+      }
+    } else {
+      // It's a full video - determine if CDN or RSS based on ORIGINAL source
+      if (isRssVideo) {
+        return ShareModalContext.RSS_VIDEO_FULL;
+      } else {
+        return ShareModalContext.CDN_VIDEO_FULL;
+      }
+    }
+  };
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -1714,8 +1751,16 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           }}
           platform={SocialPlatform.Twitter}
           auth={localStorage.getItem('admin_privs') === 'true' ? { type: 'admin' } : undefined}
-          videoMetadata={currentParentUrl ? { customUrl: currentParentUrl } : undefined}
+          videoMetadata={
+            // Use episodeLink if provided (RSS videos), otherwise use currentParentUrl if available (clips)
+            episodeLink 
+              ? { customUrl: episodeLink }
+              : currentParentUrl 
+                ? { customUrl: currentParentUrl } 
+                : undefined
+          }
           parentContext={SocialShareModalParentContext.MediaRenderingComponent}
+          context={getShareModalContext()}
         />
       )}
     </div>

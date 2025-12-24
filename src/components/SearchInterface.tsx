@@ -1,7 +1,7 @@
 import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
-import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle } from '../constants/constants.ts';
+import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, ShareModalContext } from '../constants/constants.ts';
 import { handleQuoteSearch } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef} from 'react';
@@ -2340,6 +2340,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         nostrButtonLabel="Share on Nostr"
         lookupHash={shareModalData?.lookupHash || ''}
         auth={authConfig}
+        context={ShareModalContext.AUDIO_CLIP}
       />
       <SocialShareModal
         isOpen={isSocialShareModalOpen}

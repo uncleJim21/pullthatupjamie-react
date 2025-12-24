@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Clock, Twitter, Edit, Trash2, RefreshCw, AlertCircle, CheckCircle, XCircle, PenTool, X, Zap } from 'lucide-react';
-import { printLog } from '../constants/constants.ts';
+import { printLog, ShareModalContext } from '../constants/constants.ts';
 import DeleteConfirmationModal from './DeleteConfirmationModal.tsx';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 import ScheduledPostService from '../services/scheduledPostService.ts';
@@ -1189,6 +1189,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
             },
             onUpdate: handlePostUpdate
           }}
+          context={ShareModalContext.OTHER}
         />
       )}
 
@@ -1241,6 +1242,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({ className = '',
           }}
           showSignAllOverlay={isSigningAll}
           signAllProgress={signAllProgress}
+          context={ShareModalContext.OTHER}
         />
       )}
 

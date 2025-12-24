@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { DEBUG_MODE, FRONTEND_URL, printLog, NavigationMode } from '../../constants/constants.ts';
+import { DEBUG_MODE, FRONTEND_URL, printLog, NavigationMode, ShareModalContext } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
@@ -33,6 +33,7 @@ import ImageWithLoader from '../ImageWithLoader.tsx';
 import MediaRenderingComponent from '../MediaRenderingComponent.tsx';
 import MediaThumbnail from '../MediaThumbnail.tsx';
 import RssService, { RssVideoItem } from '../../services/rssService.ts';
+import { getFountainLink } from '../../services/fountainService.ts';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -164,7 +165,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isConfigureAutomationModalOpen, setIsConfigureAutomationModalOpen] = useState(false);
     const [shouldAutoSignAll, setShouldAutoSignAll] = useState(false);
     const [isMediaRenderingOpen, setIsMediaRenderingOpen] = useState(false);
-    const [currentMediaFile, setCurrentMediaFile] = useState<{url: string, name: string, type?: string} | null>(null);
+    const [currentMediaFile, setCurrentMediaFile] = useState<{url: string, name: string, type?: string, episodeLink?: string} | null>(null);
     const [rssVideos, setRssVideos] = useState<RssVideoItem[]>([]);
     const [isLoadingRssVideos, setIsLoadingRssVideos] = useState(false);
     const [rssVideosError, setRssVideosError] = useState<string | null>(null);
@@ -1307,11 +1308,16 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                                   <Share className="w-5 h-5" />
                                 </button>
                                 <button
-                                  onClick={() => {
+                                  onClick={async () => {
+                                    // Lookup Fountain link from GUID
+                                    const fountainLink = await getFountainLink(video.episodeGuid);
+                                    printLog(`Fountain link for "${video.title}": ${fountainLink || 'not found'}`);
+                                    
                                     setCurrentMediaFile({
                                       url: video.videoUrl,
                                       name: video.title,
-                                      type: 'm3u8'
+                                      type: 'm3u8',
+                                      episodeLink: fountainLink || video.link // Use Fountain link or fallback to RSS link
                                     });
                                     setIsMediaRenderingOpen(true);
                                   }}
@@ -1735,6 +1741,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           showTwitter={true}
           showNostr={true}
           onOpenChange={(open) => { if (!open) setIsShareModalOpen(false); }}
+          context={ShareModalContext.UPLOAD}
         />
       )}
 
@@ -1747,6 +1754,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           onComplete={() => setIsSocialShareModalOpen(false)}
           platform={SocialPlatform.Twitter}
           auth={localStorage.getItem('admin_privs') === 'true' ? { type: 'admin' } : undefined}
+          context={ShareModalContext.UPLOAD}
         />
       )}
 
@@ -1838,6 +1846,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           fileName={currentMediaFile.name}
           fileType={currentMediaFile.type}
           onClose={handleCloseMediaRendering}
+          episodeLink={currentMediaFile.episodeLink}
         />
       )}
     </div>

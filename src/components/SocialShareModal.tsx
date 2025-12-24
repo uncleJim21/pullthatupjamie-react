@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin, Clock, FileText, Link as LinkIcon } from 'lucide-react';
-import { printLog, API_URL } from '../constants/constants.ts';
+import { printLog, API_URL, ShareModalContext } from '../constants/constants.ts';
 import PlatformIntegrationService from '../services/platformIntegrationService.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
@@ -96,6 +96,8 @@ interface SocialShareModalProps {
   onVideoMetadataChange?: (metadata: { description?: string; customUrl?: string }) => void;
   // Parent context to determine when to show video details
   parentContext?: SocialShareModalParentContext;
+  // New: ShareModalContext for enhanced behavior control
+  context?: ShareModalContext;
 }
 
 // Simplified unified state interface
@@ -146,7 +148,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   signAllProgress = { current: 0, total: 0 },
   videoMetadata,
   onVideoMetadataChange,
-  parentContext = SocialShareModalParentContext.Other
+  parentContext = SocialShareModalParentContext.Other,
+  context = ShareModalContext.OTHER
 }) => {
   const [content, setContent] = useState<string>('');
   const [delayedDisabled, setDelayedDisabled] = useState<boolean>(true);
@@ -1875,7 +1878,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         prefs = `About this video: ${videoMetadata.description}\n\n${prefs}`;
       }
       
-      // Always include a URL - use custom URL if provided, otherwise use CDN URL
+      // Include URL in prefs - use custom URL (episode page) if provided, otherwise use file URL
       const shareUrl = videoMetadata?.customUrl || fileUrl;
       prefs = `${prefs}\n\nFull video available at: ${shareUrl}`;
       
@@ -1892,7 +1895,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         (generatedContent) => {
           // This callback updates the content as it streams in
           setContent(generatedContent);
-        }
+        },
+        context,
+        videoMetadata
       );
       
     } catch (error: any) {

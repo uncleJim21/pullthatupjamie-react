@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Check, Link, Twitter, X } from 'lucide-react';
-import { printLog, API_URL } from '../constants/constants.ts';
+import { printLog, API_URL, ShareModalContext } from '../constants/constants.ts';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 
 // Define type for Nostr window extension
@@ -36,6 +36,11 @@ interface ShareModalProps {
   lookupHash?: string;
   auth?: any;
   onSocialShareModalOpen?: (isOpen: boolean) => void;
+  context?: ShareModalContext;  // New: context for determining behavior
+  videoMetadata?: {             // New: additional metadata for videos
+    customUrl?: string;          // Custom URL for video (e.g., RSS source URL)
+    description?: string;        // Video description
+  };
 }
 
 const ShareModal: React.FC<ShareModalProps> = ({
@@ -56,7 +61,9 @@ const ShareModal: React.FC<ShareModalProps> = ({
   nostrButtonLabel,
   lookupHash,
   auth,
-  onSocialShareModalOpen
+  onSocialShareModalOpen,
+  context = ShareModalContext.OTHER,
+  videoMetadata
 }) => {
   const [copied, setCopied] = useState(false);
   const [activePlatform, setActivePlatform] = useState<SocialPlatform | null>(null);
@@ -221,6 +228,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
           renderUrl={getRenderUrl()}
           lookupHash={getValidLookupHash()}
           auth={auth}
+          context={context}
+          videoMetadata={videoMetadata}
         />
       )}
       

@@ -6,7 +6,7 @@ import { ClipProgress } from '../../types/clips.ts';
 import EditTimestampsModal from "./EditTimestampsModal.tsx";
 import SocialShareModal, { SocialPlatform } from "../SocialShareModal.tsx";
 import ShareModal from "../ShareModal.tsx";
-import { AuthConfig, AIClipsViewStyle } from "../../constants/constants.ts";
+import { AuthConfig, AIClipsViewStyle, ShareModalContext } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
 
@@ -641,6 +641,7 @@ export const PodcastSearchResultItem = ({
             platform={SocialPlatform.Twitter}
             lookupHash={shareClipLookupHash}
             auth={authConfig}
+            context={ShareModalContext.AUDIO_CLIP}
           />
         )}
 
@@ -1019,6 +1020,7 @@ export const PodcastSearchResultItem = ({
           platform={SocialPlatform.Twitter}
           lookupHash={shareClipLookupHash}
           auth={authConfig}
+          context={ShareModalContext.AUDIO_CLIP}
         />
       )}
     </div>
