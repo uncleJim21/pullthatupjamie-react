@@ -1749,7 +1749,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         )}
         
         {/* Minimap - Hidden in embed mode */}
-        {!hideStats && (
+        {/* {!hideStats && (
           <div className="border border-gray-700 rounded-lg overflow-hidden">
             <canvas
               ref={minimapCanvasRef}
@@ -1758,7 +1758,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
               className="block"
             />
           </div>
-        )}
+        )} */}
         
         {/* Camera reset button */}
         <button
