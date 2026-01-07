@@ -17,6 +17,7 @@ import QuickTopicGrid from './QuickTopicGrid.tsx';
 import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
+import { getFountainLink } from '../services/fountainService.ts';
 import PodcastFeedService from '../services/podcastFeedService.ts';
 import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown } from 'lucide-react';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
@@ -321,7 +322,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [shareModalData, setShareModalData] = useState<{
     fileUrl: string;
     lookupHash: string;
+    customUrl?: string;
   } | null>(null);
+
+  // Clip-batch pages know the episode GUID; use it to provide a Fountain listen link to Jamie Assist
+  const [clipBatchEpisodeGuid, setClipBatchEpisodeGuid] = useState<string | null>(null);
+  const [clipBatchFountainLink, setClipBatchFountainLink] = useState<string | null>(null);
 
   // Update the isAnyModalOpen function to include share modals
   const isAnyModalOpen = (): boolean => {
@@ -1180,6 +1186,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               throw new Error('No data returned');
             }
 
+            // Store episode GUID for this batch so we can resolve Fountain link for share/Jamie Assist.
+            const episodeGuid = response.data.filter_scope?.episode_guid || null;
+            setClipBatchEpisodeGuid(episodeGuid);
+            
+            // Resolve Fountain link up-front so the per-item Share button can use it (via PodcastSearchResultItem.listenLink).
+            let fountainLink: string | null = null;
+            if (episodeGuid) {
+              fountainLink = await getFountainLink(episodeGuid);
+            }
+            setClipBatchFountainLink(fountainLink);
+
             setConversation([{
               id: nextConversationId.current++,
               type: 'podcast-search' as const,
@@ -1204,6 +1221,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     episode: rec.title,
                     creator: `${rec.feed_title} - ${rec.episode_title}`,
                     audioUrl: rec.audio_url,
+                    listenLink: fountainLink || undefined,
                     date: response.data?.run_date || '',
                     timeContext: {
                       start_time: rec.start_time,
@@ -1358,11 +1376,25 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   // Add handler for ClipTrackerModal share clicks
   const handleClipShare = (lookupHash: string, cdnLink: string) => {
+    // Prefer Fountain link for clip-batch/audio contexts so Jamie Assist prompts use a listen page, not the raw CDN mp4.
+    const initialCustomUrl = clipBatchFountainLink || undefined;
     setShareModalData({
       fileUrl: cdnLink,
-      lookupHash: lookupHash
+      lookupHash: lookupHash,
+      customUrl: initialCustomUrl
     });
     setIsShareModalOpen(true);
+
+    // If we don't have it yet but we do know the episode GUID, resolve it in the background and update the modal.
+    if (!initialCustomUrl && clipBatchEpisodeGuid) {
+      getFountainLink(clipBatchEpisodeGuid)
+        .then((link) => {
+          if (!link) return;
+          setClipBatchFountainLink(link);
+          setShareModalData((prev) => prev ? { ...prev, customUrl: link } : prev);
+        })
+        .catch((e) => console.error('Error fetching Fountain link on share:', e));
+    }
   };
 
   // Function to safely store feedId in userSettings
@@ -1511,8 +1543,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             if (token) {
               // Explicitly fetch the clip batch data with the new token
               PodcastFeedService.getClipBatchByRunId(feedId, runId, token)
-                .then(response => {
+                .then(async response => {
                   if (response.success && response.data) {
+                    const episodeGuid = response.data.filter_scope?.episode_guid || null;
+                    setClipBatchEpisodeGuid(episodeGuid);
+
+                    let fountainLink: string | null = null;
+                    if (episodeGuid) {
+                      fountainLink = await getFountainLink(episodeGuid);
+                    }
+                    setClipBatchFountainLink(fountainLink);
+
                     setConversation([{
                       id: nextConversationId.current++,
                       type: 'podcast-search' as const,
@@ -1530,6 +1571,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                             episode: rec.title,
                             creator: `${rec.feed_title} - ${rec.episode_title}`,
                             audioUrl: rec.audio_url,
+                            listenLink: fountainLink || undefined,
                             date: response.data?.run_date || '',
                             timeContext: {
                               start_time: rec.start_time,
@@ -1566,8 +1608,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             if (token) {
               // Explicitly fetch the clip batch data with the new token
               PodcastFeedService.getClipBatchByRunId(feedId, runId, token)
-                .then(response => {
+                .then(async response => {
                   if (response.success && response.data) {
+                    const episodeGuid = response.data.filter_scope?.episode_guid || null;
+                    setClipBatchEpisodeGuid(episodeGuid);
+
+                    let fountainLink: string | null = null;
+                    if (episodeGuid) {
+                      fountainLink = await getFountainLink(episodeGuid);
+                    }
+                    setClipBatchFountainLink(fountainLink);
+
                     setConversation([{
                       id: nextConversationId.current++,
                       type: 'podcast-search' as const,
@@ -1585,6 +1636,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                             episode: rec.title,
                             creator: `${rec.feed_title} - ${rec.episode_title}`,
                             audioUrl: rec.audio_url,
+                            listenLink: fountainLink || undefined,
                             date: response.data?.run_date || '',
                             timeContext: {
                               start_time: rec.start_time,
@@ -2341,6 +2393,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         lookupHash={shareModalData?.lookupHash || ''}
         auth={authConfig}
         context={ShareModalContext.AUDIO_CLIP}
+        videoMetadata={shareModalData?.customUrl ? { customUrl: shareModalData.customUrl } : undefined}
       />
       <SocialShareModal
         isOpen={isSocialShareModalOpen}

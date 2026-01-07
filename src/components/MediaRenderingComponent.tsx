@@ -1737,6 +1737,33 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
 
       {/* Social Share Modal */}
       {isSocialShareModalOpen && currentShareUrl && (
+        (() => {
+          const shareContext = getShareModalContext();
+          // Decide which URL to hand to Jamie Assist as the "listen/watch" link based on ShareModalContext.
+          //
+          // - AUDIO_CLIP (handled elsewhere): Fountain
+          // - *_VIDEO_CLIP: use the underlying parent video page URL (not the CDN clip URL)
+          // - RSS_VIDEO_FULL: use the RSS episode/video page URL (not Fountain, not the m3u8)
+          // - CDN_VIDEO_FULL: use the CDN URL (fileUrl) directly
+          const urlOverride = (() => {
+            switch (shareContext) {
+              case ShareModalContext.RSS_VIDEO_CLIP:
+                // Prefer episodeLink (Fountain if available), fall back to parent URL.
+                return episodeLink || currentParentUrl || undefined;
+              case ShareModalContext.CDN_VIDEO_CLIP:
+                // For CDN clips, prefer the underlying parent URL (page), not the clip asset URL.
+                return currentParentUrl || undefined;
+              case ShareModalContext.RSS_VIDEO_FULL:
+                // Prefer episodeLink (Fountain if available).
+                return episodeLink || undefined;
+              case ShareModalContext.CDN_VIDEO_FULL:
+                return undefined; // fall back to fileUrl
+              default:
+                return currentParentUrl || episodeLink || undefined;
+            }
+          })();
+
+          return (
         <SocialShareModal
           isOpen={isSocialShareModalOpen}
           onClose={handleCloseSocialShareModal}
@@ -1751,17 +1778,12 @@ const MediaRenderingComponent: React.FC<MediaRenderingComponentProps> = ({
           }}
           platform={SocialPlatform.Twitter}
           auth={localStorage.getItem('admin_privs') === 'true' ? { type: 'admin' } : undefined}
-          videoMetadata={
-            // Use episodeLink if provided (RSS videos), otherwise use currentParentUrl if available (clips)
-            episodeLink 
-              ? { customUrl: episodeLink }
-              : currentParentUrl 
-                ? { customUrl: currentParentUrl } 
-                : undefined
-          }
+          videoMetadata={urlOverride ? { customUrl: urlOverride } : undefined}
           parentContext={SocialShareModalParentContext.MediaRenderingComponent}
-          context={getShareModalContext()}
+          context={shareContext}
         />
+          );
+        })()
       )}
     </div>
   );

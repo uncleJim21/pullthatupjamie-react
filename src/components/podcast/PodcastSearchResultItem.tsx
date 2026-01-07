@@ -616,6 +616,8 @@ export const PodcastSearchResultItem = ({
             lookupHash={shareClipLookupHash}
             auth={authConfig}
             onSocialShareModalOpen={onSocialShareModalOpen}
+            context={ShareModalContext.AUDIO_CLIP}
+            videoMetadata={listenLink ? { customUrl: listenLink } : undefined}
           />
         )}
 
@@ -995,6 +997,8 @@ export const PodcastSearchResultItem = ({
           lookupHash={shareClipLookupHash}
           auth={authConfig}
           onSocialShareModalOpen={onSocialShareModalOpen}
+          context={ShareModalContext.AUDIO_CLIP}
+          videoMetadata={listenLink ? { customUrl: listenLink } : undefined}
         />
       )}
 

@@ -1090,7 +1090,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   }}
                   similarity={{ combined: 1, vector: 1 }}
                   episodeImage={feedData?.logoUrl || ''}
-                  listenLink={featuredEpisode.audioUrl}
+                  listenLink={featuredEpisode.listenLink || featuredEpisode.audioUrl}
                   isPlaying={currentlyPlayingId === featuredEpisode.id}
                   onPlayPause={handlePlayPause}
                   onEnded={handleEnded}
@@ -1117,7 +1117,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                     }}
                     similarity={{ combined: 1, vector: 1 }}
                     episodeImage={feedData?.logoUrl || ''}
-                    listenLink={episode.audioUrl}
+                      listenLink={episode.listenLink || episode.audioUrl}
                     isPlaying={currentlyPlayingId === episode.id}
                     onPlayPause={handlePlayPause}
                     onEnded={handleEnded}
@@ -1148,7 +1148,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       }}
                       similarity={{ combined: 1, vector: 1 }}
                       episodeImage={feedData?.logoUrl || ''}
-                      listenLink={featuredEpisode.audioUrl}
+                      listenLink={featuredEpisode.listenLink || featuredEpisode.audioUrl}
                       isPlaying={currentlyPlayingId === featuredEpisode.id}
                       onPlayPause={handlePlayPause}
                       onEnded={handleEnded}
@@ -1175,7 +1175,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         }}
                         similarity={{ combined: 1, vector: 1 }}
                         episodeImage={feedData?.logoUrl || ''}
-                        listenLink={episode.audioUrl}
+                      listenLink={episode.listenLink || episode.audioUrl}
                         isPlaying={currentlyPlayingId === episode.id}
                         onPlayPause={handlePlayPause}
                         onEnded={handleEnded}
@@ -1309,15 +1309,15 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                                 </button>
                                 <button
                                   onClick={async () => {
-                                    // Lookup Fountain link from GUID
+                                    // Prefer Fountain episode page when available; fall back to RSS episode link.
                                     const fountainLink = await getFountainLink(video.episodeGuid);
                                     printLog(`Fountain link for "${video.title}": ${fountainLink || 'not found'}`);
-                                    
+
                                     setCurrentMediaFile({
                                       url: video.videoUrl,
                                       name: video.title,
                                       type: 'm3u8',
-                                      episodeLink: fountainLink || video.link // Use Fountain link or fallback to RSS link
+                                      episodeLink: fountainLink || video.link
                                     });
                                     setIsMediaRenderingOpen(true);
                                   }}
