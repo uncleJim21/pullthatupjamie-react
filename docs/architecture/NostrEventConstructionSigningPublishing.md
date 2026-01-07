@@ -147,7 +147,7 @@ const nostrCreatedAt = signedEvent.created_at;
 ```
 
 ### 4) Publish to relays (current behavior for direct publish)
-For direct publish (not scheduling), the app opens WebSocket connections to relays and sends `["EVENT", signedEvent]`. In this path, the event has no `r` tag and contains the media URL in `content` (non-standard).
+For direct publish (not scheduling), the app opens WebSocket connections to relays and sends `["EVENT", signedEvent]`. In this path, the event includes a **small set of `["r", "<relay_url>"]` relay-hint tags** (2–5) to improve cross-client resolution. These are **hints, not receipts** of where the event was actually published. The media URL is still embedded in `content` (non-standard).
 
 ```ts
 const relays = [
