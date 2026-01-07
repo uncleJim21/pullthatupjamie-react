@@ -1,14 +1,6 @@
 // Import shared URL configuration
 import { FRONTEND_URL, API_URL, DEBUG_MODE } from '../config/urls.js';
 export const DEBUG_TRANSCRIPTION = false;
-// export const TFTC_FEED_URL = "https://feeds.fountain.fm/ZwwaDULvAj0yZvJ5kdB9"//TFTC
-export const TFTC_FEED_URL = "https://feeds.fountain.fm/VV0f6IwusQoi5kOqvNCx"//Walker
-// export const TFTC_FEED_URL = "https://feeds.fountain.fm/u59Boi42aXChVy0qnxqY"//Green Candle 
-// export const TFTC_FEED_URL = "https://feeds.fountain.fm/JOopP2CpndCzDzbAeAy9"//Jake Woodhouse
-// export const TFTC_FEED_URL = "https://fountain.fm/show/kHBRZl0Mb0MGWMELtjw4"//The Bitcoin Boomers
-// export const TFTC_FEED_URL = "https://feeds.fountain.fm/vq7iTHPmrNkiwXCiQfZm"//Freedom Tech Weekend
-
-
 export { DEBUG_MODE, FRONTEND_URL, API_URL };
 export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
 

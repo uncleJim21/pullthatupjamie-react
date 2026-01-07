@@ -47,6 +47,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   onNext,
   trackId,
 }) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const {
     currentTrack,
     isPlaying: controllerIsPlaying,
@@ -66,12 +67,14 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   
   // Track image errors per episode to prevent hiding on subsequent selections
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const lastEpisodeImageRef = useRef<string | undefined>(undefined);
   
   // Reset image error state when episode image changes
   useEffect(() => {
     if (episodeImage !== lastEpisodeImageRef.current) {
       setImageError(false);
+      setImageLoaded(false);
       lastEpisodeImageRef.current = episodeImage;
     }
   }, [episodeImage]);
@@ -146,8 +149,36 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   // Determine what text to display
   const displayText = headline || summary || quote || 'No description available';
 
+  // Expose the rendered player height as a CSS variable so other overlays (e.g. attribution pill)
+  // can position themselves above it without overlapping.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const setHeightVar = (height: number) => {
+      // Clamp to a sane minimum to avoid 0 during initial layout.
+      const safeHeight = Math.max(64, Math.round(height));
+      document.documentElement.style.setProperty('--embed-mini-player-height', `${safeHeight}px`);
+    };
+
+    // Initial measurement
+    setHeightVar(el.getBoundingClientRect().height);
+
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      const height = entry?.contentRect?.height ?? el.getBoundingClientRect().height;
+      setHeightVar(height);
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div 
+      ref={containerRef}
       className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-sm border-t border-gray-700 z-30"
     >
       <div className="max-w-screen-xl mx-auto px-4 py-3">
@@ -179,15 +210,22 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
           {/* Episode Image - Simple responsive sizing focused on mobile */}
           <div className="flex-shrink-0">
             {episodeImage && !imageError ? (
-              <img
-                src={episodeImage}
-                alt={episodeTitle || 'Episode'}
-                className="w-16 h-16 md:w-20 md:h-20 rounded object-cover"
-                onError={() => {
-                  console.log('[EmbedMiniPlayer] Image failed to load:', episodeImage);
-                  setImageError(true);
-                }}
-              />
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded overflow-hidden relative bg-gray-800">
+                {!imageLoaded && (
+                  <div className="absolute inset-0 bg-gray-800 animate-pulse" />
+                )}
+                <img
+                  src={episodeImage}
+                  alt={episodeTitle || 'Episode'}
+                  className={`w-full h-full object-cover ${imageLoaded ? 'block' : 'hidden'}`}
+                  decoding="async"
+                  onLoad={() => setImageLoaded(true)}
+                  onError={() => {
+                    console.log('[EmbedMiniPlayer] Image failed to load:', episodeImage);
+                    setImageError(true);
+                  }}
+                />
+              </div>
             ) : (
               <div className="w-16 h-16 md:w-20 md:h-20 rounded bg-gray-800 flex items-center justify-center">
                 <Podcast className="w-6 h-6 md:w-8 md:h-8 text-gray-600" />

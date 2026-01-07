@@ -36,6 +36,7 @@ import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from './EmbedMiniPlayer.tsx';
+import PoweredByJamiePill from './PoweredByJamiePill.tsx';
 import { ResearchSessionItem, clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId, saveResearchSessionWithRetry } from '../services/researchSessionService.ts';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
 
@@ -3220,6 +3221,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             }
           } : undefined}
         />
+      )}
+
+      {/* Embed Mode Attribution (bottom-right) */}
+      {isEmbedMode && (
+        <div
+          className="fixed right-4 z-40"
+          style={{ bottom: 'calc(var(--embed-mini-player-height, 92px) + 12px)' }}
+        >
+          <PoweredByJamiePill sharedSessionId={sharedSessionId} />
+        </div>
       )}
 
       {searchMode === 'podcast-search' && !isAnyModalOpen() && (
