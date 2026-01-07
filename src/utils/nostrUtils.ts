@@ -104,9 +104,45 @@ export const generatePrimalUrl = (eventId: string): string => {
 
 /**
  * Standard relay pool for Nostr events
+ *
+ * Note: We keep this centralized so direct-publish and scheduled-posting use the same defaults.
  */
-export const relayPool = [
+const normalizeRelayUrl = (url: string): string | null => {
+  const trimmed = (url || '').trim();
+  if (!trimmed) return null;
+  // Only allow ws/wss relay URLs
+  if (!(trimmed.startsWith('wss://') || trimmed.startsWith('ws://'))) return null;
+  // Normalize: remove trailing slash
+  return trimmed.replace(/\/+$/, '');
+};
+
+// Expanded relay defaults for broader publishing reach (normalized, deduped)
+const DEFAULT_RELAYS_RAW = [
   "wss://relay.primal.net",
-  "wss://relay.damus.io", 
-  "wss://nos.lol"
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+
+  // Expanded defaults
+  "wss://eden.nostr.land",
+  "wss://atlas.nostr.land",
+  "wss://cyberspace.nostr1.com",
+  "wss://nostr.lopp.social",
+  "wss://nostr.czas.plus",
+  "wss://premium.primal.net",
+  "wss://relay.artio.inf.unibe.ch",
+  "wss://relay-rpi.edufeed.org",
+  "wss://relay.nosto.re",
+  "wss://nostr.oxtr.dev",
+  "wss://njump.me",
+  "wss://espelho.girino.org",
+
+  // Legacy/common relays
+  "wss://relay.mostr.pub",
+  "wss://nostr.land",
+  "wss://purplerelay.com",
+  "wss://relay.snort.social",
 ];
+
+export const relayPool = Array.from(
+  new Set(DEFAULT_RELAYS_RAW.map(normalizeRelayUrl).filter(Boolean) as string[])
+);
