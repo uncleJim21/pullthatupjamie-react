@@ -1034,7 +1034,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         : 'text-white opacity-80 hover:text-gray-300'
                     }`}
                   >
-                    {tab}
+                    {tab === 'Uploads' ? 'My Media' : tab}
                     {activeTab === tab && (
                       <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"></div>
                     )}
