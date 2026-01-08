@@ -1,4 +1,5 @@
 import { API_URL, printLog } from '../constants/constants.ts';
+import { normalizeChapterLike, normalizeTimingFields } from '../utils/normalizeTimings.ts';
 
 export interface ChapterMetadata {
   headline: string;
@@ -111,12 +112,21 @@ class ChapterService {
     // Check cache first
     const cached = this.getCachedData(episodeGuid);
     if (cached) {
-      return {
+      const cachedResponse: EpisodeWithChaptersResponse = {
         success: true,
         guid: episodeGuid,
         episode: cached.episode,
         chapters: cached.chapters,
         chapterCount: cached.chapterCount
+      };
+      // Normalize cached data too (older cache entries may be snake_case).
+      return {
+        ...cachedResponse,
+        episode: {
+          ...cachedResponse.episode,
+          metadata: normalizeTimingFields(cachedResponse.episode.metadata as any),
+        },
+        chapters: cachedResponse.chapters.map(ch => normalizeChapterLike(ch as any)),
       };
     }
 
@@ -132,10 +142,19 @@ class ChapterService {
       const data: EpisodeWithChaptersResponse = await response.json();
       printLog(`ChapterService: Fetched ${data.chapterCount} chapters for ${episodeGuid}`);
 
-      // Cache the result
-      this.setCachedData(episodeGuid, data);
+      // Normalize timing fields so consumers can rely on startTime/endTime regardless of casing.
+      const normalized: EpisodeWithChaptersResponse = {
+        ...data,
+        episode: data.episode
+          ? { ...data.episode, metadata: normalizeTimingFields((data.episode as any).metadata) }
+          : data.episode,
+        chapters: Array.isArray(data.chapters) ? data.chapters.map(ch => normalizeChapterLike(ch as any)) : data.chapters,
+      };
 
-      return data;
+      // Cache the normalized result
+      this.setCachedData(episodeGuid, normalized);
+
+      return normalized;
     } catch (error) {
       printLog(`ChapterService: Error fetching episode chapters for ${episodeGuid}: ${error}`);
       throw error;

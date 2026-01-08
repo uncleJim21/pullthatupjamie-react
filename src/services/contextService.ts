@@ -1,4 +1,5 @@
 import { API_URL, printLog } from '../constants/constants.ts';
+import { normalizeTimingFields } from '../utils/normalizeTimings.ts';
 
 export interface AdjacentParagraph {
   id: string;
@@ -181,6 +182,10 @@ class ContextService {
       }
 
       const data = await response.json();
+      // Normalize chapter timing fields so UI can safely consume either snake_case or camelCase.
+      if (data?.hierarchy?.chapter?.metadata) {
+        data.hierarchy.chapter.metadata = normalizeTimingFields(data.hierarchy.chapter.metadata as any) as any;
+      }
       console.log(`[ContextService] Fetched hierarchy (paragraph):`, data.path);
       printLog(`Fetched hierarchy (paragraph): ${data.path}`);
       return data;
@@ -218,6 +223,10 @@ class ContextService {
       }
 
       const data = await response.json();
+      // Normalize chapter timing fields so UI can safely consume either snake_case or camelCase.
+      if (data?.hierarchy?.chapter?.metadata) {
+        data.hierarchy.chapter.metadata = normalizeTimingFields(data.hierarchy.chapter.metadata as any) as any;
+      }
       console.log(`[ContextService] Fetched hierarchy (chapter):`, data.path);
       printLog(`Fetched hierarchy (chapter): ${data.path}`);
       return data;
