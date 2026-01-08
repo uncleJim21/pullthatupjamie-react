@@ -294,18 +294,24 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Backwards-compat: older saved filters used `episodeName`; we now use `episodeGuid`.
+        return {
+          episodeGuid: parsed.episodeGuid || '',
+          minDate: parsed.minDate || '',
+          maxDate: parsed.maxDate || '',
+        };
       } catch (e) {
         console.error('Error parsing saved filters:', e);
-        return { episodeName: '', minDate: '', maxDate: '' };
+        return { episodeGuid: '', minDate: '', maxDate: '' };
       }
     }
-    return { episodeName: '', minDate: '', maxDate: '' };
+    return { episodeGuid: '', minDate: '', maxDate: '' };
   });
 
   // Helper to check if any filters are active
   const hasActiveFilters = () => {
-    return searchFilters.episodeName !== '' || searchFilters.minDate !== '' || searchFilters.maxDate !== '';
+    return searchFilters.episodeGuid !== '' || searchFilters.minDate !== '' || searchFilters.maxDate !== '';
   };
 
   // Podcast stats - these will be updated from API later
@@ -1014,7 +1020,27 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
   };
 
-  const performQuoteSearch = async () => {  
+  type KeywordSearchScope = 'episode' | 'feed' | 'all';
+  type KeywordSearchOverride = {
+    scope: KeywordSearchScope;
+    feedId?: string | number;
+    guid?: string;
+  };
+
+  // Normalize feed identifiers that may come through as "feed_1143651" or similar.
+  const normalizeFeedId = (value: string | number | null | undefined): string | undefined => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'number') return Number.isFinite(value) ? String(value) : undefined;
+    const raw = value.trim();
+    if (!raw) return undefined;
+    // Strip common prefixes like "feed_"
+    const stripped = raw.startsWith('feed_') ? raw.slice('feed_'.length) : raw;
+    // If still not purely numeric, try taking trailing digits.
+    const match = stripped.match(/(\d+)$/);
+    return match ? match[1] : stripped;
+  };
+
+  const performQuoteSearch = async (queryOverride?: string, override?: KeywordSearchOverride) => {  
     setSearchHistory(prev => ({...prev, [searchMode]: true}));
     
     printLog("Starting quote search...");
@@ -1046,20 +1072,53 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
     printLog(`Request auth method:${requestAuthMethod}`)
     
+    const queryToUse = (queryOverride ?? query).trim();
+    if (!queryToUse) {
+      setSearchState(prev => ({
+        ...prev,
+        error: new Error('Missing query'),
+        isLoading: false
+      }));
+      return;
+    }
+
+    // Apply filter override rules for keyword-driven searches.
+    const scope = override?.scope;
+    const overrideGuid = override?.guid?.trim();
+    const overrideFeedId = normalizeFeedId(override?.feedId);
+
+    const effectiveGuid =
+      scope === 'episode'
+        ? overrideGuid
+        : (searchFilters.episodeGuid || '').trim() || undefined;
+
+    const effectiveFeedIds =
+      scope === 'feed'
+        ? (overrideFeedId ? [overrideFeedId] : [])
+        : scope === 'episode'
+          ? [] // Per requirements: episode search uses ONLY guid
+          : scope === 'all'
+            ? [] // Per requirements: all feeds uses NO filters
+            : feedIdsToUse;
+
+    const effectiveMinDate = scope ? undefined : (searchFilters.minDate || undefined);
+    const effectiveMaxDate = scope ? undefined : (searchFilters.maxDate || undefined);
+
     try {
       const quoteResults = await handleQuoteSearch(
-        query, 
+        queryToUse, 
         auth, 
-        feedIdsToUse,
-        searchFilters.minDate || undefined,
-        searchFilters.maxDate || undefined,
-        searchFilters.episodeName || undefined,
-        ['chapter', 'paragraph'] // Include both chapters and paragraphs
+        effectiveFeedIds,
+        effectiveMinDate,
+        effectiveMaxDate,
+        undefined, // episodeName (deprecated in favor of guid)
+        ['chapter', 'paragraph'], // Include both chapters and paragraphs
+        effectiveGuid
       );
       setConversation(prev => [...prev, {
         id: searchState.activeConversationId as number,
         type: 'podcast-search' as const,
-        query: query,
+        query: queryToUse,
         timestamp: new Date(),
         isStreaming: false,
         data: {
@@ -1082,7 +1141,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
   }
 
-  const performQuoteSearch3D = async () => {
+  const performQuoteSearch3D = async (queryOverride?: string, override?: KeywordSearchOverride) => {
     setSearchHistory(prev => ({...prev, [searchMode]: true}));
     
     printLog("Starting 3D quote search...");
@@ -1109,19 +1168,52 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
     printLog(`Request auth method:${requestAuthMethod}`)
     
+    const queryToUse = (queryOverride ?? query).trim();
+    if (!queryToUse) {
+      setSearchState(prev => ({
+        ...prev,
+        error: new Error('Missing query'),
+        isLoading: false
+      }));
+      return;
+    }
+
+    // Apply filter override rules for keyword-driven searches.
+    const scope = override?.scope;
+    const overrideGuid = override?.guid?.trim();
+    const overrideFeedId = normalizeFeedId(override?.feedId);
+
+    const effectiveGuid =
+      scope === 'episode'
+        ? overrideGuid
+        : (searchFilters.episodeGuid || '').trim() || undefined;
+
+    const effectiveFeedIds =
+      scope === 'feed'
+        ? (overrideFeedId ? [overrideFeedId] : [])
+        : scope === 'episode'
+          ? [] // Per requirements: episode search uses ONLY guid
+          : scope === 'all'
+            ? [] // Per requirements: all feeds uses NO filters
+            : feedIdsToUse;
+
+    const effectiveMinDate = scope ? undefined : (searchFilters.minDate || undefined);
+    const effectiveMaxDate = scope ? undefined : (searchFilters.maxDate || undefined);
+
     try {
       const shouldExtractAxisLabels = getShowAxisLabels();
       printLog(`Extracting axis labels: ${shouldExtractAxisLabels}`);
       
       const quoteResults3D = await handleQuoteSearch3D(
-        query, 
+        queryToUse, 
         auth, 
-        feedIdsToUse,
-        searchFilters.minDate || undefined,
-        searchFilters.maxDate || undefined,
-        searchFilters.episodeName || undefined,
+        effectiveFeedIds,
+        effectiveMinDate,
+        effectiveMaxDate,
+        undefined, // episodeName (deprecated in favor of guid)
         undefined, // hierarchyLevels - not currently used
-        shouldExtractAxisLabels // Request axis labels if enabled in settings
+        shouldExtractAxisLabels, // Request axis labels if enabled in settings
+        effectiveGuid
       );
       
       printLog(`[3D Search] Received ${quoteResults3D.results?.length || 0} results from API`);
@@ -1139,7 +1231,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       setConversation(prev => [...prev, {
         id: searchState.activeConversationId as number,
         type: 'podcast-search' as const,
-        query: query,
+        query: queryToUse,
         timestamp: new Date(),
         isStreaming: false,
         data: {
@@ -1622,7 +1714,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 feedIdsToUse,
                 searchFilters.minDate || undefined,
                 searchFilters.maxDate || undefined,
-                searchFilters.episodeName || undefined
+                undefined,
+                undefined,
+                (searchFilters.episodeGuid || '').trim() || undefined
               );
               
               setConversation(prev => [...prev, {
@@ -1928,7 +2022,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     e.stopPropagation();
     
     const emptyFilters = {
-      episodeName: '',
+      episodeGuid: '',
       minDate: '',
       maxDate: ''
     };
@@ -3423,8 +3517,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               } 
             }));
           }}
-          onKeywordSearch={async (keyword, feedId, episodeName, forceSearchAll = false) => {
-            printLog(`Keyword search triggered: keyword="${keyword}", feedId="${feedId}", episodeName="${episodeName}", forceSearchAll="${forceSearchAll}"`);
+          onKeywordSearch={async (keyword, feedId, guid, forceSearchAll = false) => {
+            printLog(`Keyword search triggered: keyword="${keyword}", feedId="${feedId}", guid="${guid}", forceSearchAll="${forceSearchAll}"`);
             printLog(`Current resultViewStyle: ${resultViewStyle}, searchViewStyle: ${searchViewStyle}`);
             resetContextPanelState();
             setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
@@ -3436,11 +3530,23 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             setGridFadeOut(true);
             setSearchState(prev => ({ ...prev, isLoading: true }));
             setIsDecelerationComplete(false);
+
+            // Override rules:
+            // - Search this episode: guid only (ignore all other filters)
+            // - Search this feed: feedId only (ignore all other filters)
+            // - Search all feeds: no filters at all (ignore all other filters)
+            const override: KeywordSearchOverride | undefined = forceSearchAll
+              ? { scope: 'all' }
+              : guid
+                ? { scope: 'episode', guid }
+                : feedId
+                  ? { scope: 'feed', feedId }
+                  : undefined;
             
             if (resultViewStyle === SearchResultViewStyle.GALAXY) {
-              await performQuoteSearch3D();
+              await performQuoteSearch3D(keyword, override);
             } else {
-              await performQuoteSearch();
+              await performQuoteSearch(keyword, override);
             }
           }}
         />

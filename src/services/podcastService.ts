@@ -4,6 +4,7 @@ export interface PodcastSearchParams {
   query: string;
   limit?: number;
   feedIds?: string[];
+  guid?: string;
   minDate?: string;
   maxDate?: string;
   episodeName?: string;
@@ -17,7 +18,8 @@ export const handleQuoteSearch = async (
   minDate?: string,
   maxDate?: string,
   episodeName?: string,
-  hierarchyLevels?: string[]
+  hierarchyLevels?: string[],
+  guid?: string
 ) => {
   try{
     const headers: Record<string, string> = {
@@ -41,6 +43,9 @@ export const handleQuoteSearch = async (
     };
 
     // Add optional filters if provided
+    if (guid && guid.trim() !== '') {
+      body.guid = guid.trim();
+    }
     if (minDate) {
       body.minDate = minDate;
     }
@@ -82,7 +87,8 @@ export const handleQuoteSearch3D = async (
   maxDate?: string,
   episodeName?: string,
   hierarchyLevels?: string[],
-  extractAxisLabels?: boolean
+  extractAxisLabels?: boolean,
+  guid?: string
 ) => {
   try {
     const headers: Record<string, string> = {
@@ -106,6 +112,9 @@ export const handleQuoteSearch3D = async (
     };
 
     // Add optional filters if provided
+    if (guid && guid.trim() !== '') {
+      body.guid = guid.trim();
+    }
     if (minDate) {
       body.minDate = minDate;
     }

@@ -831,7 +831,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                                     icon: <ScanSearch className="w-3.5 h-3.5" />,
                                     color: HIERARCHY_COLORS.FEED,
                                     onClick: () => {
-                                      const feedId = hierarchy?.hierarchy.feed?.id;
+                                      // Prefer numeric/string feedId from metadata (API filter expects the raw feed id, not "feed_####")
+                                      const feedId = hierarchy?.hierarchy.feed?.metadata.feedId || hierarchy?.hierarchy.feed?.id;
                                       printLog(`Searching this feed (${feedId}) for keyword: ${keyword}`);
                                       onKeywordSearch?.(keyword, feedId);
                                     }
@@ -841,9 +842,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                                     icon: <ScanSearch className="w-3.5 h-3.5" />,
                                     color: HIERARCHY_COLORS.EPISODE,
                                     onClick: () => {
-                                      const episodeName = hierarchy?.hierarchy.episode?.metadata.title;
-                                      printLog(`Searching this episode (${episodeName}) for keyword: ${keyword}`);
-                                      onKeywordSearch?.(keyword, undefined, episodeName);
+                                      const episodeGuid = hierarchy?.hierarchy.episode?.metadata.guid;
+                                      printLog(`Searching this episode (${episodeGuid}) for keyword: ${keyword}`);
+                                      onKeywordSearch?.(keyword, undefined, episodeGuid);
                                     }
                                   }
                                 ]}
@@ -1088,7 +1089,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                               icon: <ScanSearch className="w-3.5 h-3.5" />,
                               color: HIERARCHY_COLORS.FEED,
                               onClick: () => {
-                                const feedId = hierarchy.hierarchy.feed?.id;
+                                // Prefer numeric/string feedId from metadata (API filter expects the raw feed id, not "feed_####")
+                                const feedId = hierarchy.hierarchy.feed?.metadata.feedId || hierarchy.hierarchy.feed?.id;
                                 printLog(`Searching this feed (${feedId}) for keyword: ${keyword}`);
                                 onKeywordSearch?.(keyword, feedId);
                               }
@@ -1098,9 +1100,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                               icon: <ScanSearch className="w-3.5 h-3.5" />,
                               color: HIERARCHY_COLORS.EPISODE,
                               onClick: () => {
-                                const episodeName = hierarchy.hierarchy.episode?.metadata.title;
-                                printLog(`Searching this episode (${episodeName}) for keyword: ${keyword}`);
-                                onKeywordSearch?.(keyword, undefined, episodeName);
+                                const episodeGuid = hierarchy.hierarchy.episode?.metadata.guid;
+                                printLog(`Searching this episode (${episodeGuid}) for keyword: ${keyword}`);
+                                onKeywordSearch?.(keyword, undefined, episodeGuid);
                               }
                             }
                           ]}
