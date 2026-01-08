@@ -1,4 +1,4 @@
-import { API_URL, AuthConfig, RequestAuthMethod, printLog } from "../constants/constants.ts";
+import { API_URL, AuthConfig, RequestAuthMethod, printLog, ShareModalContext } from "../constants/constants.ts";
 
 // Custom error class to include HTTP status
 export class JamieAssistError extends Error {
@@ -15,7 +15,12 @@ export const generateAssistContent = async (
   lookupHash: string,
   additionalPrefs: string = "",
   auth: AuthConfig,
-  onContentUpdate: (content: string) => void
+  onContentUpdate: (content: string) => void,
+  context: ShareModalContext = ShareModalContext.OTHER,
+  videoMetadata?: {
+    description?: string;
+    customUrl?: string;
+  }
 ): Promise<string> => {
   try {
     // Validate lookupHash
@@ -52,7 +57,11 @@ export const generateAssistContent = async (
     const response = await fetch(`${API_URL}/api/jamie-assist/${lookupHash}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ additionalPrefs })
+      body: JSON.stringify({ 
+        additionalPrefs,
+        context,
+        videoMetadata 
+      })
     });
 
     if (!response.ok) {

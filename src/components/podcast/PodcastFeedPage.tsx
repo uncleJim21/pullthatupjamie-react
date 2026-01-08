@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { DEBUG_MODE, FRONTEND_URL, printLog, NavigationMode } from '../../constants/constants.ts';
+import { DEBUG_MODE, FRONTEND_URL, printLog, NavigationMode, ShareModalContext } from '../../constants/constants.ts';
 import { PodcastSearchResultItem, PresentationContext } from './PodcastSearchResultItem.tsx';
 import SubscribeSection from './SubscribeSection.tsx'
 import { SubscribeLinks } from './SubscribeSection.tsx';
@@ -33,6 +33,8 @@ import ImageWithLoader from '../ImageWithLoader.tsx';
 import MediaRenderingComponent from '../MediaRenderingComponent.tsx';
 import MediaThumbnail from '../MediaThumbnail.tsx';
 import { AudioControllerProvider } from '../../context/AudioControllerContext.tsx';
+import RssService, { RssVideoItem } from '../../services/rssService.ts';
+import { getFountainLink } from '../../services/fountainService.ts';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -111,6 +113,7 @@ const ConfigureAutomationModal = ({ isOpen, onClose, onConfigure }: ConfigureAut
 
 type TabType = 'Home' | 'Episodes' | 'Top Clips' | 'Subscribe' | 'Jamie Pro' | 'Uploads';
 type JamieProView = 'chat' | 'history' | 'settings' | 'scheduled-posts';
+type UploadsView = 'uploads' | 'rss-feed';
 
 const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> = ({ initialView, defaultTab }) => {
     const { feedId, episodeId } = useParams<{ feedId: string; episodeId?: string }>();
@@ -123,10 +126,12 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [copied,setCopied] = useState(false);
     const [qrModalOpen, setQrModalOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [adminFeedUrl, setAdminFeedUrl] = useState<string | null>(null);
     const [runHistory, setRunHistory] = useState<RunHistory[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [jamieProView, setJamieProView] = useState<JamieProView>('history');
     const [isCollapsibleTabsOpen, setIsCollapsibleTabsOpen] = useState(false);
+    const [uploadsView, setUploadsView] = useState<UploadsView>('uploads');
     
     // Initialize jamieProView from URL parameter
     useEffect(() => {
@@ -160,7 +165,10 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [isConfigureAutomationModalOpen, setIsConfigureAutomationModalOpen] = useState(false);
     const [shouldAutoSignAll, setShouldAutoSignAll] = useState(false);
     const [isMediaRenderingOpen, setIsMediaRenderingOpen] = useState(false);
-    const [currentMediaFile, setCurrentMediaFile] = useState<{url: string, name: string, type?: string} | null>(null);
+    const [currentMediaFile, setCurrentMediaFile] = useState<{url: string, name: string, type?: string, episodeLink?: string} | null>(null);
+    const [rssVideos, setRssVideos] = useState<RssVideoItem[]>([]);
+    const [isLoadingRssVideos, setIsLoadingRssVideos] = useState(false);
+    const [rssVideosError, setRssVideosError] = useState<string | null>(null);
     
 
     // Use the new userSettings hook with cloud sync for admin users
@@ -357,6 +365,129 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     }
   };
 
+  const fetchRssVideos = async () => {
+    printLog('=== fetchRssVideos called ===');
+    
+    // Check if we have a feedUrl, if not return early with empty state
+    if (!adminFeedUrl) {
+      printLog('No admin feedUrl available, showing empty feed message');
+      setIsLoadingRssVideos(false);
+      setRssVideosError(null);
+      setRssVideos([]);
+      return;
+    }
+    
+    try {
+      setIsLoadingRssVideos(true);
+      setRssVideosError(null);
+    
+      printLog(`Fetching RSS videos from feed: ${adminFeedUrl}`);
+      const videos = await RssService.getVideoUrlsFromFeed(adminFeedUrl);
+      
+      console.log(`Received ${videos.length} videos from RSS service`);
+      printLog(`Received ${videos.length} videos from RSS service`);
+      
+      // HACK: Fetch thumbnails directly here since RSS service isn't updating
+      console.log('Fetching RSS feed directly to get thumbnails...');
+      try {
+        const feedResponse = await fetch(adminFeedUrl, {
+          cache: 'no-store'
+        });
+        const xmlText = await feedResponse.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+        
+        // Create a map of title -> thumbnail URL
+        const thumbnailMap = new Map<string, string>();
+        const items = xmlDoc.querySelectorAll('channel > item');
+        
+        items.forEach((item) => {
+          const titleEl = item.querySelector('title');
+          const title = titleEl?.textContent || '';
+          
+          // Try to find itunes:image
+          const images = item.getElementsByTagName('itunes:image');
+          if (images.length > 0) {
+            const thumbnailUrl = images[0].getAttribute('href');
+            if (thumbnailUrl) {
+              thumbnailMap.set(title, thumbnailUrl);
+              console.log(`Found thumbnail for "${title.substring(0, 30)}...": ${thumbnailUrl}`);
+            }
+          }
+        });
+        
+        console.log(`Extracted ${thumbnailMap.size} thumbnails from RSS feed`);
+        
+        // Add thumbnails to videos
+        videos.forEach((video) => {
+          const thumbnail = thumbnailMap.get(video.title);
+          if (thumbnail) {
+            video.thumbnailUrl = thumbnail;
+          }
+        });
+      } catch (err) {
+        console.error('Failed to fetch thumbnails:', err);
+      }
+      
+      console.log(`Received ${videos.length} videos from RSS service`);
+      printLog(`Received ${videos.length} videos from RSS service`);
+      
+      // DEDUPLICATE HERE - compare first 20 characters of title
+      const seen = new Set<string>();
+      const uniqueVideos = videos.filter((video) => {
+        const key = video.title.substring(0, 20);
+        if (seen.has(key)) {
+          console.log(`REMOVING DUPLICATE: "${video.title}"`);
+          printLog(`REMOVING DUPLICATE: "${video.title}"`);
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
+      
+      console.log(`After deduplication: ${uniqueVideos.length} unique videos (removed ${videos.length - uniqueVideos.length} duplicates)`);
+      printLog(`After deduplication: ${uniqueVideos.length} unique videos (removed ${videos.length - uniqueVideos.length} duplicates)`);
+      
+      // Log thumbnail info
+      console.log('===== CHECKING THUMBNAILS =====');
+      uniqueVideos.forEach((video, i) => {
+        console.log(`Video ${i + 1}: "${video.title.substring(0, 40)}..." - Thumbnail: ${video.thumbnailUrl || 'NONE'}`);
+      });
+      console.log('===== END THUMBNAILS =====');
+      
+      // Upsert logic: merge new entries with existing ones
+      setRssVideos(prevVideos => {
+        // Create a map of existing videos by their unique key (episodeGuid or videoUrl)
+        const existingMap = new Map<string, RssVideoItem>();
+        prevVideos.forEach(video => {
+          const key = video.episodeGuid || video.videoUrl;
+          existingMap.set(key, video);
+        });
+        
+        // Update or add new videos
+        uniqueVideos.forEach(video => {
+          const key = video.episodeGuid || video.videoUrl;
+          existingMap.set(key, video); // This will update existing or add new
+        });
+        
+        // Convert back to array
+        const mergedVideos = Array.from(existingMap.values());
+        console.log(`Upserted RSS videos: ${prevVideos.length} existing + ${uniqueVideos.length} fetched = ${mergedVideos.length} total`);
+        printLog(`Upserted RSS videos: ${prevVideos.length} existing + ${uniqueVideos.length} fetched = ${mergedVideos.length} total`);
+        
+        return mergedVideos;
+      });
+      printLog('RSS videos upserted to state');
+    } catch (error) {
+      console.error('Error fetching RSS videos:', error);
+      printLog('ERROR fetching RSS videos: ' + (error instanceof Error ? error.message : String(error)));
+      setRssVideosError('Failed to load RSS video feed. Please try again.');
+    } finally {
+      setIsLoadingRssVideos(false);
+      printLog('=== fetchRssVideos completed ===');
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'Jamie Pro') {
       fetchRunHistory();
@@ -364,10 +495,15 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     
     if (activeTab === 'Uploads') {
       // Reset to first page when tab changes to Uploads
-      setCurrentPage(1);
-      fetchUploads();
+      if (uploadsView === 'uploads') {
+        setCurrentPage(1);
+        fetchUploads();
+      } else if (uploadsView === 'rss-feed') {
+        // Fetch and merge fresh RSS data with existing entries
+        fetchRssVideos();
+      }
     }
-  }, [activeTab]);
+  }, [activeTab, uploadsView]);
 
   // This useEffect is removed - using the one below that properly checks isUserSignedIn dependency 
 
@@ -410,6 +546,12 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     } else if (feedData && initialView === 'uploads') {
       if (isAdmin) {
         setActiveTab('Uploads');
+        // Set the uploads view based on defaultTab prop
+        if (defaultTab === 'rss-feed') {
+          setUploadsView('rss-feed');
+        } else {
+          setUploadsView('uploads');
+        }
       } else {
         setActiveTab('Episodes');
         printLog('Non-admin user attempted to access Uploads tab, falling back to Episodes tab');
@@ -570,6 +712,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       const token = localStorage.getItem("auth_token") as string;
       if(!token){
           setIsAdmin(false);
+          setAdminFeedUrl(null);
           return;
       }
       const response = await AuthService.checkPrivs(token);
@@ -577,12 +720,19 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
       if (response && response.privs.privs && response.privs.privs.feedId === feedId) {
           printLog(`Admin privileges granted`);
           setIsAdmin(response.privs.privs.access === 'admin');
+          // Store the feedUrl if available
+          if (response.privs.privs.feedUrl) {
+            setAdminFeedUrl(response.privs.privs.feedUrl);
+            printLog(`Admin feedUrl set to: ${response.privs.privs.feedUrl}`);
+          }
       } else {
           setIsAdmin(false);
+          setAdminFeedUrl(null);
       }
     } catch (error) {
       console.error("Error checking privileges:", error);
       setIsAdmin(false);
+      setAdminFeedUrl(null);
     }
   };
 
@@ -685,23 +835,35 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   };
 
   const handleOpenMediaFile = (upload: UploadItem) => {
+    printLog('=== handleOpenMediaFile called ===');
+    printLog('upload.fileName: ' + upload.fileName);
+    printLog('upload.publicUrl: ' + upload.publicUrl);
+    
     const fileExtension = upload.fileName.split('.').pop()?.toLowerCase();
+    printLog('fileExtension: ' + fileExtension);
     
     // Check if it's an image file
     const isImage = fileExtension && ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
+    printLog('isImage: ' + isImage);
     
     if (isImage) {
       // Open image in new tab
+      printLog('Opening image in new tab');
       window.open(upload.publicUrl, '_blank');
     } else {
       // Open audio/video in MediaRenderingComponent
-      setCurrentMediaFile({
+      printLog('Setting currentMediaFile and opening MediaRenderingComponent');
+      const mediaFile = {
         url: upload.publicUrl,
         name: upload.fileName,
         type: upload.fileName.split('.').pop()?.toLowerCase()
-      });
+      };
+      printLog('mediaFile: ' + JSON.stringify(mediaFile));
+      setCurrentMediaFile(mediaFile);
       setIsMediaRenderingOpen(true);
+      printLog('isMediaRenderingOpen set to true');
     }
+    printLog('==================================');
   };
 
   const handleCloseMediaRendering = () => {
@@ -860,7 +1022,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         : 'text-white opacity-80 hover:text-gray-300'
                     }`}
                   >
-                    {tab}
+                    {tab === 'Uploads' ? 'My Media' : tab}
                     {activeTab === tab && (
                       <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"></div>
                     )}
@@ -916,7 +1078,10 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   }}
                   similarity={{ combined: 1, vector: 1 }}
                   episodeImage={feedData?.logoUrl || ''}
-                  listenLink={featuredEpisode.audioUrl}
+                  listenLink={featuredEpisode.listenLink || featuredEpisode.audioUrl}
+                  isPlaying={currentlyPlayingId === featuredEpisode.id}
+                  onPlayPause={handlePlayPause}
+                  onEnded={handleEnded}
                   shareUrl={createFeedShareUrl(feedId || '')}
                   shareLink=""
                 />
@@ -940,7 +1105,10 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                     }}
                     similarity={{ combined: 1, vector: 1 }}
                     episodeImage={feedData?.logoUrl || ''}
-                    listenLink={episode.audioUrl}
+                      listenLink={episode.audioUrl || episode.listenLink}
+                    isPlaying={currentlyPlayingId === episode.id}
+                    onPlayPause={handlePlayPause}
+                    onEnded={handleEnded}
                     shareUrl={createFeedShareUrl(feedId || '')}
                     shareLink=""
                   />
@@ -968,7 +1136,10 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       }}
                       similarity={{ combined: 1, vector: 1 }}
                       episodeImage={feedData?.logoUrl || ''}
-                      listenLink={featuredEpisode.audioUrl}
+                      listenLink={featuredEpisode.listenLink || featuredEpisode.audioUrl}
+                      isPlaying={currentlyPlayingId === featuredEpisode.id}
+                      onPlayPause={handlePlayPause}
+                      onEnded={handleEnded}
                       shareUrl={createFeedShareUrl(feedId || '')}
                       shareLink=""
                     />
@@ -992,7 +1163,10 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         }}
                         similarity={{ combined: 1, vector: 1 }}
                         episodeImage={feedData?.logoUrl || ''}
-                        listenLink={episode.audioUrl}
+                      listenLink={episode.audioUrl || episode.listenLink}
+                        isPlaying={currentlyPlayingId === episode.id}
+                        onPlayPause={handlePlayPause}
+                        onEnded={handleEnded}
                         shareUrl={createFeedShareUrl(feedId || '')}
                         shareLink=""
                       />
@@ -1016,28 +1190,144 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
               <div className="py-8">
                 <div className="flex justify-between items-center mb-4">
                   <div className="space-y-2">
-                    <h2 className="text-xl font-bold">Your Uploads</h2>
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
-                      <input
-                        type="checkbox"
-                        id="globalAutoShare"
-                        checked={autoShare}
-                        onChange={handleAutoShareChange}
-                        className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white"
-                      />
-                      <label htmlFor="globalAutoShare">Start Auto Share after Upload</label>
+                    {/* Dropdown Menu for Uploads View Selection */}
+                    <div className="relative inline-block">
+                      <select
+                        value={uploadsView}
+                        onChange={(e) => setUploadsView(e.target.value as UploadsView)}
+                        className="text-xl font-bold bg-[#111111] text-white border border-gray-700 rounded-md px-3 py-2 pr-8 appearance-none cursor-pointer hover:border-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
+                        style={{ minWidth: '200px' }}
+                      >
+                        <option value="uploads">📤 Your Uploads</option>
+                        <option value="rss-feed">📡 RSS Videos</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white">
+                        <ChevronDown className="w-4 h-4" />
+                      </div>
                     </div>
+                    {uploadsView === 'uploads' && (
+                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <input
+                          type="checkbox"
+                          id="globalAutoShare"
+                          checked={autoShare}
+                          onChange={handleAutoShareChange}
+                          className="rounded border-gray-600 bg-gray-800 text-white focus:ring-white"
+                        />
+                        <label htmlFor="globalAutoShare">Start Auto Share after Upload</label>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={openUploadModal}
-                    className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors flex items-center font-medium"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload
-                  </button>
+                  {uploadsView === 'uploads' && (
+                    <button
+                      onClick={openUploadModal}
+                      className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition-colors flex items-center font-medium"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload
+                    </button>
+                  )}
                 </div>
                 
-                {isLoadingUploads ? (
+                {uploadsView === 'rss-feed' ? (
+                  // RSS Feed Videos View
+                  <div>
+                    {isLoadingRssVideos ? (
+                      <div className="flex justify-center items-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+                      </div>
+                    ) : rssVideosError ? (
+                      <div className="p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-400">
+                        {rssVideosError}
+                      </div>
+                    ) : rssVideos.length === 0 ? (
+                      <div className="p-8 bg-[#111111] border border-gray-800 rounded-lg text-center">
+                        <p className="text-gray-400">No video streams found in RSS feed.</p>
+                      </div>
+                    ) : (
+                      <div>
+                        {(() => { printLog(`Rendering ${rssVideos.length} RSS videos in UI`); return null; })()}
+                        <div className="space-y-3 mb-4">
+                          {rssVideos.map((video, index) => {
+                            printLog(`Rendering video ${index + 1}: "${video.title}"`);
+                            return (
+                            <div 
+                              key={`${video.episodeGuid || index}-${video.videoUrl}`}
+                              className="bg-[#111111] border border-gray-800 rounded-lg p-4 flex items-center gap-4 hover:border-gray-700 transition-colors"
+                            >
+                              {/* Thumbnail Preview */}
+                              <MediaThumbnail
+                                fileUrl={video.thumbnailUrl || video.videoUrl}
+                                fileName={video.thumbnailUrl ? 'thumbnail.jpg' : video.title}
+                                width={60}
+                                height={60}
+                                className="flex-shrink-0"
+                              />
+                              
+                              {/* Video Info */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white font-medium" title={video.title}>
+                                  {truncateMiddle(video.title, 50)}
+                                </p>
+                                <div className="flex flex-wrap text-gray-400 text-sm mt-1 gap-4">
+                                  {video.publishedDate && (
+                                    <p>{formatDate(video.publishedDate)}</p>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Action Buttons */}
+                              <div className="flex space-x-3 flex-shrink-0">
+                                <button
+                                  onClick={() => handleCopyFileUrl(video.videoUrl, `rss-${index}`)}
+                                  className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
+                                  title="Copy link"
+                                >
+                                  {copiedLinkId === `rss-${index}` ? 
+                                    <Check className="w-5 h-5 text-green-500" /> : 
+                                    <Link className="w-5 h-5" />
+                                  }
+                                </button>
+                                <button
+                                  onClick={() => openShareModal(video.videoUrl)}
+                                  className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
+                                  title="Share file"
+                                >
+                                  <Share className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    // Prefer Fountain episode page when available; fall back to RSS episode link.
+                                    const fountainLink = await getFountainLink(video.episodeGuid);
+                                    printLog(`Fountain link for "${video.title}": ${fountainLink || 'not found'}`);
+
+                                    setCurrentMediaFile({
+                                      url: video.videoUrl,
+                                      name: video.title,
+                                      type: 'm3u8',
+                                      episodeLink: fountainLink || video.link
+                                    });
+                                    setIsMediaRenderingOpen(true);
+                                  }}
+                                  className="flex items-center justify-center h-9 w-9 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition-colors"
+                                  title="Open video"
+                                >
+                                  <ExternalLink className="w-5 h-5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                          })}
+                        </div>
+                        
+                        {/* Video count */}
+                        <div className="text-center text-gray-500 text-sm mt-4">
+                          Showing {rssVideos.length} video{rssVideos.length !== 1 ? 's' : ''} from RSS feed
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : isLoadingUploads ? (
                   <div className="flex justify-center items-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
                   </div>
@@ -1436,6 +1726,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           showTwitter={true}
           showNostr={true}
           onOpenChange={(open) => { if (!open) setIsShareModalOpen(false); }}
+          context={ShareModalContext.UPLOAD}
         />
       )}
 
@@ -1448,6 +1739,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           onComplete={() => setIsSocialShareModalOpen(false)}
           platform={SocialPlatform.Twitter}
           auth={localStorage.getItem('admin_privs') === 'true' ? { type: 'admin' } : undefined}
+          context={ShareModalContext.UPLOAD}
         />
       )}
 
@@ -1539,6 +1831,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
           fileName={currentMediaFile.name}
           fileType={currentMediaFile.type}
           onClose={handleCloseMediaRendering}
+          episodeLink={currentMediaFile.episodeLink}
         />
       )}
     </div>

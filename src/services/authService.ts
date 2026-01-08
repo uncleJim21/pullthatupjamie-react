@@ -1,5 +1,5 @@
 // services/authService.ts
-import { API_URL, printLog } from "../constants/constants.ts";
+import { API_URL,DEBUG_AUTH, printLog } from "../constants/constants.ts";
 interface SignInResponse {
     token: string;
     subscriptionValid: boolean;
@@ -8,6 +8,7 @@ interface SignInResponse {
 
 interface Privileges {
     feedId: string;
+    feedUrl: string;
     access: 'admin' | 'user' | 'viewer'; // Adjust as needed
 }
 
@@ -21,7 +22,7 @@ interface TwitterStatusResponse {
 }
 
 class AuthService {
-    private static readonly AUTH_SERVER_URL = 'https://cascdr-auth-backend-cw4nk.ondigitalocean.app';
+    private static readonly AUTH_SERVER_URL = DEBUG_AUTH ? 'http://localhost:4020' : 'https://cascdr-auth-backend-cw4nk.ondigitalocean.app';
     private static readonly ADMIN_PRIVS_KEY = 'admin_privs';
 
     static async signIn(email: string, password: string): Promise<SignInResponse> {

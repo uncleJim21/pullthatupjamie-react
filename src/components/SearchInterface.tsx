@@ -1,7 +1,7 @@
 import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
-import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, SearchViewStyle, SearchResultViewStyle, DISABLE_CLIPPING } from '../constants/constants.ts';
+import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, SearchViewStyle, SearchResultViewStyle, DISABLE_CLIPPING,ShareModalContext } from '../constants/constants.ts';
 import { handleQuoteSearch, handleQuoteSearch3D } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -17,6 +17,7 @@ import QuickTopicGrid from './QuickTopicGrid.tsx';
 import AvailableSourcesSection from './AvailableSourcesSection.tsx';
 import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
+import { getFountainLink } from '../services/fountainService.ts';
 import PodcastFeedService from '../services/podcastFeedService.ts';
 import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles, CheckCircle, AlertCircle} from 'lucide-react';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
@@ -357,6 +358,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Add state for admin privileges and toggle
   const [adminFeedId, setAdminFeedId] = useState<string | null>(null);
+  const [adminFeedUrl, setAdminFeedUrl] = useState<string | null>(null);
   const [podcastSearchMode, setPodcastSearchMode] = useState<'global' | 'my-pod'>('global');
   const [showPodcastModeLabel, setShowPodcastModeLabel] = useState(false);
   const [podcastModeLabelText, setPodcastModeLabelText] = useState('');
@@ -418,7 +420,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [shareModalData, setShareModalData] = useState<{
     fileUrl: string;
     lookupHash: string;
+    customUrl?: string;
   } | null>(null);
+
+  // Clip-batch pages know the episode GUID; use it to provide a Fountain listen link to Jamie Assist
+  const [clipBatchEpisodeGuid, setClipBatchEpisodeGuid] = useState<string | null>(null);
+  const [clipBatchFountainLink, setClipBatchFountainLink] = useState<string | null>(null);
 
   // Update the isAnyModalOpen function to include share modals
   const isAnyModalOpen = (): boolean => {
@@ -479,14 +486,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     localStorage.removeItem('squareId');
     localStorage.removeItem('isSubscribed');
     
-    // Remove adminFeedId from localStorage and reset state
+    // Remove adminFeedId and adminFeedUrl from localStorage and reset state
     const settings = localStorage.getItem('userSettings');
     if (settings) {
       const userSettings = JSON.parse(settings);
       delete userSettings.adminFeedId;
+      delete userSettings.adminFeedUrl;
       localStorage.setItem('userSettings', JSON.stringify(userSettings));
     }
     setAdminFeedId(null);
+    setAdminFeedUrl(null);
     
     setRequestAuthMethod(RequestAuthMethod.FREE);
   };
@@ -1245,17 +1254,23 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       checkAndStoreAdminPrivileges();
     } else {
       setAdminFeedId(null);
+      setAdminFeedUrl(null);
     }
   }, [isUserSignedIn]);
 
-  // Add useEffect to load stored feedId on component mount
+  // Add useEffect to load stored feedId and feedUrl on component mount
   useEffect(() => {
     const storedFeedId = getStoredFeedId();
+    const storedFeedUrl = getStoredFeedUrl();
     if (storedFeedId) {
       setAdminFeedId(storedFeedId);
       printLog(`Loaded stored feedId: ${storedFeedId}`);
     }
-    printLog(`Initial adminFeedId state: ${storedFeedId}`);
+    if (storedFeedUrl) {
+      setAdminFeedUrl(storedFeedUrl);
+      printLog(`Loaded stored feedUrl: ${storedFeedUrl}`);
+    }
+    printLog(`Initial adminFeedId state: ${storedFeedId}, adminFeedUrl state: ${storedFeedUrl}`);
   }, []);
 
   // Debug adminFeedId changes
@@ -1686,6 +1701,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               throw new Error('No data returned');
             }
 
+            // Store episode GUID for this batch so we can resolve Fountain link for share/Jamie Assist.
+            const episodeGuid = response.data.filter_scope?.episode_guid || null;
+            setClipBatchEpisodeGuid(episodeGuid);
+            
+            // Resolve Fountain link up-front so the per-item Share button can use it (via PodcastSearchResultItem.listenLink).
+            let fountainLink: string | null = null;
+            if (episodeGuid) {
+              fountainLink = await getFountainLink(episodeGuid);
+            }
+            setClipBatchFountainLink(fountainLink);
+
             setConversation([{
               id: nextConversationId.current++,
               type: 'podcast-search' as const,
@@ -1710,6 +1736,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     episode: rec.title,
                     creator: `${rec.feed_title} - ${rec.episode_title}`,
                     audioUrl: rec.audio_url,
+                    listenLink: fountainLink || undefined,
                     date: response.data?.run_date || '',
                     timeContext: {
                       start_time: rec.start_time,
@@ -1998,27 +2025,42 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   // Add handler for ClipTrackerModal share clicks
   const handleClipShare = (lookupHash: string, cdnLink: string) => {
+    // Prefer Fountain link for clip-batch/audio contexts so Jamie Assist prompts use a listen page, not the raw CDN mp4.
+    const initialCustomUrl = clipBatchFountainLink || undefined;
     setShareModalData({
       fileUrl: cdnLink,
-      lookupHash: lookupHash
+      lookupHash: lookupHash,
+      customUrl: initialCustomUrl
     });
     setIsShareModalOpen(true);
+
+    // If we don't have it yet but we do know the episode GUID, resolve it in the background and update the modal.
+    if (!initialCustomUrl && clipBatchEpisodeGuid) {
+      getFountainLink(clipBatchEpisodeGuid)
+        .then((link) => {
+          if (!link) return;
+          setClipBatchFountainLink(link);
+          setShareModalData((prev) => prev ? { ...prev, customUrl: link } : prev);
+        })
+        .catch((e) => console.error('Error fetching Fountain link on share:', e));
+    }
   };
 
   // Function to safely store feedId in userSettings
-  const storeFeedIdInUserSettings = (feedId: string) => {
+  const storeFeedIdInUserSettings = (feedId: string, feedUrl: string) => {
     try {
       const settings = localStorage.getItem('userSettings');
       const userSettings = settings ? JSON.parse(settings) : {};
       userSettings.adminFeedId = feedId;
+      userSettings.adminFeedUrl = feedUrl;
       localStorage.setItem('userSettings', JSON.stringify(userSettings));
-      printLog(`Stored feedId ${feedId} in userSettings`);
+      printLog(`Stored feedId ${feedId} and feedUrl ${feedUrl} in userSettings`);
     } catch (error) {
-      console.error('Error storing feedId in userSettings:', error);
+      console.error('Error storing feedId and feedUrl in userSettings:', error);
     }
   };
 
-  // Function to get stored feedId from userSettings
+  // Function to get stored feedId and feedUrl from userSettings
   const getStoredFeedId = (): string | null => {
     try {
       const settings = localStorage.getItem('userSettings');
@@ -2030,28 +2072,44 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
   };
 
-  // Function to check admin privileges and store feedId
+  const getStoredFeedUrl = (): string | null => {
+    try {
+      const settings = localStorage.getItem('userSettings');
+      const userSettings = settings ? JSON.parse(settings) : {};
+      return userSettings.adminFeedUrl || null;
+    } catch (error) {
+      console.error('Error getting feedUrl from userSettings:', error);
+      return null;
+    }
+  };
+
+  // Function to check admin privileges and store feedId and feedUrl
   const checkAndStoreAdminPrivileges = async () => {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
         setAdminFeedId(null);
+        setAdminFeedUrl(null);
         return;
       }
 
       const response = await AuthService.checkPrivs(token);
-      if (response?.privs?.privs?.feedId && response.privs.privs.access === 'admin') {
+      if (response?.privs?.privs?.feedId && response?.privs?.privs?.feedUrl && response.privs.privs.access === 'admin') {
         const feedId = response.privs.privs.feedId;
+        const feedUrl = response.privs.privs.feedUrl;
         setAdminFeedId(feedId);
-        storeFeedIdInUserSettings(feedId);
-        printLog(`Admin privileges confirmed for feedId: ${feedId}`);
+        setAdminFeedUrl(feedUrl);
+        storeFeedIdInUserSettings(feedId, feedUrl);
+        printLog(`Admin privileges confirmed for feedId: ${feedId}, feedUrl: ${feedUrl}`);
       } else {
         setAdminFeedId(null);
+        setAdminFeedUrl(null);
         printLog('No admin privileges found');
       }
     } catch (error) {
       console.error('Error checking admin privileges:', error);
       setAdminFeedId(null);
+      setAdminFeedUrl(null);
     }
   };
 
@@ -2184,8 +2242,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             if (token) {
               // Explicitly fetch the clip batch data with the new token
               PodcastFeedService.getClipBatchByRunId(feedId, runId, token)
-                .then(response => {
+                .then(async response => {
                   if (response.success && response.data) {
+                    const episodeGuid = response.data.filter_scope?.episode_guid || null;
+                    setClipBatchEpisodeGuid(episodeGuid);
+
+                    let fountainLink: string | null = null;
+                    if (episodeGuid) {
+                      fountainLink = await getFountainLink(episodeGuid);
+                    }
+                    setClipBatchFountainLink(fountainLink);
+
                     setConversation([{
                       id: nextConversationId.current++,
                       type: 'podcast-search' as const,
@@ -2203,6 +2270,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                             episode: rec.title,
                             creator: `${rec.feed_title} - ${rec.episode_title}`,
                             audioUrl: rec.audio_url,
+                            listenLink: fountainLink || undefined,
                             date: response.data?.run_date || '',
                             timeContext: {
                               start_time: rec.start_time,
@@ -2239,8 +2307,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             if (token) {
               // Explicitly fetch the clip batch data with the new token
               PodcastFeedService.getClipBatchByRunId(feedId, runId, token)
-                .then(response => {
+                .then(async response => {
                   if (response.success && response.data) {
+                    const episodeGuid = response.data.filter_scope?.episode_guid || null;
+                    setClipBatchEpisodeGuid(episodeGuid);
+
+                    let fountainLink: string | null = null;
+                    if (episodeGuid) {
+                      fountainLink = await getFountainLink(episodeGuid);
+                    }
+                    setClipBatchFountainLink(fountainLink);
+
                     setConversation([{
                       id: nextConversationId.current++,
                       type: 'podcast-search' as const,
@@ -2258,6 +2335,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                             episode: rec.title,
                             creator: `${rec.feed_title} - ${rec.episode_title}`,
                             audioUrl: rec.audio_url,
+                            listenLink: fountainLink || undefined,
                             date: response.data?.run_date || '',
                             timeContext: {
                               start_time: rec.start_time,
@@ -3301,6 +3379,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         nostrButtonLabel="Share on Nostr"
         lookupHash={shareModalData?.lookupHash || ''}
         auth={authConfig}
+        context={ShareModalContext.AUDIO_CLIP}
+        videoMetadata={shareModalData?.customUrl ? { customUrl: shareModalData.customUrl } : undefined}
       />
       <SocialShareModal
         isOpen={isSocialShareModalOpen}

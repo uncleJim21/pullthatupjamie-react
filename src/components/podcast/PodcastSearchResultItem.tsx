@@ -6,7 +6,7 @@ import { ClipProgress } from '../../types/clips.ts';
 import EditTimestampsModal from "./EditTimestampsModal.tsx";
 import SocialShareModal, { SocialPlatform } from "../SocialShareModal.tsx";
 import ShareModal from "../ShareModal.tsx";
-import { AuthConfig, AIClipsViewStyle, DISABLE_CLIPPING } from "../../constants/constants.ts";
+import { AuthConfig, AIClipsViewStyle, DISABLE_CLIPPING,ShareModalContext } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
 import { useAudioController } from '../../context/AudioControllerContext.tsx';
@@ -648,6 +648,8 @@ export const PodcastSearchResultItem = ({
             lookupHash={shareClipLookupHash}
             auth={authConfig}
             onSocialShareModalOpen={onSocialShareModalOpen}
+            context={ShareModalContext.AUDIO_CLIP}
+            videoMetadata={listenLink ? { customUrl: listenLink } : undefined}
           />
         )}
 
@@ -673,6 +675,7 @@ export const PodcastSearchResultItem = ({
             platform={SocialPlatform.Twitter}
             lookupHash={shareClipLookupHash}
             auth={authConfig}
+            context={ShareModalContext.AUDIO_CLIP}
           />
         )}
 
@@ -1035,6 +1038,8 @@ export const PodcastSearchResultItem = ({
           lookupHash={shareClipLookupHash}
           auth={authConfig}
           onSocialShareModalOpen={onSocialShareModalOpen}
+          context={ShareModalContext.AUDIO_CLIP}
+          videoMetadata={listenLink ? { customUrl: listenLink } : undefined}
         />
       )}
 
@@ -1060,6 +1065,7 @@ export const PodcastSearchResultItem = ({
           platform={SocialPlatform.Twitter}
           lookupHash={shareClipLookupHash}
           auth={authConfig}
+          context={ShareModalContext.AUDIO_CLIP}
         />
       )}
     </div>

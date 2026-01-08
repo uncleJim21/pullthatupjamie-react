@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin, Clock, FileText, Link as LinkIcon } from 'lucide-react';
-import { printLog, API_URL } from '../constants/constants.ts';
+import { printLog, API_URL, ShareModalContext } from '../constants/constants.ts';
 import PlatformIntegrationService from '../services/platformIntegrationService.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
@@ -19,18 +19,7 @@ import { formatScheduledDate } from '../utils/time.ts';
 import ScheduledPostSlots from './ScheduledPostSlots.tsx';
 import { mentionService } from '../services/mentionService.ts';
 import { useUserSettings } from '../hooks/useUserSettings.ts';
-import { generatePrimalUrl } from '../utils/nostrUtils.ts';
-
-// Define relay pool for Nostr
-export const relayPool = [
-  "wss://relay.primal.net",
-  "wss://relay.damus.io",
-  "wss://nos.lol",
-  "wss://relay.mostr.pub",
-  "wss://nostr.land",
-  "wss://purplerelay.com",
-  "wss://relay.snort.social"
-];
+import { generatePrimalUrl, relayPool } from '../utils/nostrUtils.ts';
 
 // Define type for Nostr window extension
 declare global {
@@ -96,6 +85,8 @@ interface SocialShareModalProps {
   onVideoMetadataChange?: (metadata: { description?: string; customUrl?: string }) => void;
   // Parent context to determine when to show video details
   parentContext?: SocialShareModalParentContext;
+  // New: ShareModalContext for enhanced behavior control
+  context?: ShareModalContext;
 }
 
 // Simplified unified state interface
@@ -146,7 +137,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   signAllProgress = { current: 0, total: 0 },
   videoMetadata,
   onVideoMetadataChange,
-  parentContext = SocialShareModalParentContext.Other
+  parentContext = SocialShareModalParentContext.Other,
+  context = ShareModalContext.OTHER
 }) => {
   const [content, setContent] = useState<string>('');
   const [delayedDisabled, setDelayedDisabled] = useState<boolean>(true);
@@ -1325,20 +1317,39 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   }, [showMentionsLookup]);
 
   // Nostr-specific functions
-  const connectToRelay = (relay: string): Promise<WebSocket> => {
+  const connectToRelay = (relay: string, timeoutMs: number = 10000): Promise<WebSocket> => {
     return new Promise((resolve, reject) => {
       try {
         setPublishStatus(prev => ({ ...prev, [relay]: 'connecting' }));
         
         const socket = new WebSocket(relay);
+        let settled = false;
+
+        const timeoutId = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          try {
+            socket.close();
+          } catch {
+            // ignore
+          }
+          setPublishStatus(prev => ({ ...prev, [relay]: 'timeout' }));
+          reject(new Error(`Connection timeout to relay ${relay}`));
+        }, timeoutMs);
         
         socket.onopen = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
           setPublishStatus(prev => ({ ...prev, [relay]: 'connected' }));
           setRelayConnections(prev => ({ ...prev, [relay]: socket }));
           resolve(socket);
         };
         
         socket.onerror = (error) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
           console.error(`Error connecting to relay ${relay}:`, error);
           setPublishStatus(prev => ({ ...prev, [relay]: 'failed' }));
           reject(error);
@@ -1346,65 +1357,112 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         
         socket.onclose = () => {
           setRelayConnections(prev => ({ ...prev, [relay]: null }));
+          if (!settled) {
+            settled = true;
+            clearTimeout(timeoutId);
+            setPublishStatus(prev => ({ ...prev, [relay]: 'failed' }));
+            reject(new Error(`Relay closed connection before opening: ${relay}`));
+          }
         };
         
-        return socket;
+        return;
       } catch (error) {
         setPublishStatus(prev => ({ ...prev, [relay]: 'failed' }));
         reject(error);
-        return null;
+        return;
       }
     });
   };
 
-  const publishEventToRelay = (relay: string, event: any): Promise<boolean> => {
+  const publishEventToRelay = (relay: string, event: any, timeoutMs: number = 10000): Promise<boolean> => {
     return new Promise(async (resolve) => {
-      try {
-        let socket = relayConnections[relay];
-        
-        if (!socket || socket.readyState !== WebSocket.OPEN) {
-          try {
-            socket = await connectToRelay(relay);
-          } catch (error) {
-            console.error(`Failed to connect to relay ${relay}:`, error);
-            setPublishStatus(prev => ({ ...prev, [relay]: 'failed' }));
-            resolve(false);
-            return;
-          }
+      let socket: WebSocket | null = null;
+      let settled = false;
+      let timeoutId: any = null;
+
+      const cleanup = () => {
+        try {
+          if (timeoutId) clearTimeout(timeoutId);
+        } catch {
+          // ignore
         }
-        
+        try {
+          if (socket) {
+            socket.removeEventListener('message', handleMessage as any);
+            socket.removeEventListener('error', handleError as any);
+            socket.removeEventListener('close', handleClose as any);
+          }
+        } catch {
+          // ignore
+        }
+        try {
+          if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.close();
+          }
+        } catch {
+          // ignore
+        }
+      };
+
+      const handleMessage = (msg: MessageEvent) => {
+        if (settled) return;
+        try {
+          const data = JSON.parse(msg.data);
+          // Expect: ["OK", "<event.id>", true|false, "<message>"]
+          if (Array.isArray(data) && data[0] === "OK" && data[1] === event.id) {
+            settled = true;
+            cleanup();
+            const ok = data[2] === true;
+            setPublishStatus(prev => ({ ...prev, [relay]: ok ? 'published' : 'rejected' }));
+            resolve(ok);
+          }
+        } catch (error) {
+          console.error(`Error parsing relay response from ${relay}:`, error);
+        }
+      };
+
+      const handleError = (error: any) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        console.error(`Error publishing to relay ${relay}:`, error);
+        setPublishStatus(prev => ({ ...prev, [relay]: 'failed' }));
+        resolve(false);
+      };
+
+      const handleClose = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        setPublishStatus(prev => ({ ...prev, [relay]: 'failed' }));
+        resolve(false);
+      };
+
+      try {
+        socket = await connectToRelay(relay, timeoutMs);
+
         setPublishStatus(prev => ({ ...prev, [relay]: 'publishing' }));
-        
-        // Create a publish message in the Nostr protocol format
-        const publishMessage = JSON.stringify(["EVENT", event]);
-        
+
         // Set up a timeout to handle unresponsive relays
-        const timeoutId = setTimeout(() => {
+        timeoutId = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          cleanup();
           setPublishStatus(prev => ({ ...prev, [relay]: 'timeout' }));
           resolve(false);
-        }, 10000); // 10 seconds timeout
-        
-        // One-time message handler for the relay response
-        const handleMessage = (msg: MessageEvent) => {
-          try {
-            const data = JSON.parse(msg.data);
-            if (Array.isArray(data) && data[0] === "OK" && data[1] === event.id) {
-              clearTimeout(timeoutId);
-              setPublishStatus(prev => ({ ...prev, [relay]: 'published' }));
-              socket.removeEventListener('message', handleMessage);
-              resolve(true);
-            }
-          } catch (error) {
-            console.error(`Error parsing relay response from ${relay}:`, error);
-          }
-        };
-        
+        }, timeoutMs);
+
         socket.addEventListener('message', handleMessage);
-        
+        socket.addEventListener('error', handleError as any);
+        socket.addEventListener('close', handleClose as any);
+
         // Send the event to the relay
+        const publishMessage = JSON.stringify(["EVENT", event]);
         socket.send(publishMessage);
-        
       } catch (error) {
+        if (settled) return;
+        settled = true;
+        cleanup();
         console.error(`Error publishing to relay ${relay}:`, error);
         setPublishStatus(prev => ({ ...prev, [relay]: 'failed' }));
         resolve(false);
@@ -1451,12 +1509,19 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   };
 
   // Unified helper to build a Nostr event: NO r-tag, media URL goes in content (original behavior)
-  const createNostrEventUnified = (text: string, media?: string) => {
+  const buildRelayHintTags = (relays: string[], limit: number = 5): string[][] => {
+    // Relay URLs in tags are *hints*, not receipts. Keep small (2–5).
+    return (relays || []).slice(0, Math.max(0, limit)).map((r) => ["r", r]);
+  };
+
+  // Unified helper to build a Nostr event
+  // Note: tags must be finalized BEFORE signing (sig covers tags array).
+  const createNostrEventUnified = (text: string, tags: string[][] = []) => {
     const evt: any = {
       kind: 1,
       created_at: Math.floor(Date.now() / 1000),
       content: text, // text already includes media URL via buildFinalContent
-      tags: [], // no r-tag
+      tags,
     };
     return evt;
   };
@@ -1483,31 +1548,43 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       
       const mediaUrl = fileUrl || renderUrl || '';
       const finalContent = buildFinalContent(content, mediaUrl, 'nostr');
-      const eventToSign = createNostrEventUnified(finalContent, mediaUrl || undefined);
+      // Direct publish: include a small set of relay-hint tags to aid cross-client resolution.
+      const eventToSign = createNostrEventUnified(finalContent, buildRelayHintTags(relayPool, 5));
       const signedEvent = await window.nostr.signEvent(eventToSign);
       printLog(`Successfully signed Nostr event: ${JSON.stringify(signedEvent)}`);
-      
-      const publishPromises = relayPool.map(relay => 
-        publishEventToRelay(relay, signedEvent)
-      );
-      
-      const results = await Promise.allSettled(publishPromises);
-      
-      const successCount = results.filter(
-        result => result.status === 'fulfilled' && result.value === true
-      ).length;
-      
-      printLog(`Published to ${successCount}/${relayPool.length} relays`);
-      
-      const success = successCount > 0;
-      if (success) {
-        // Create Primal.net URL using shared utility
-        const primalUrl = generatePrimalUrl(signedEvent.id);
-        setSuccessUrls(prev => ({ ...prev, nostr: primalUrl }));
-      }
-      
-      setNostrState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success }));
-      return success;
+
+      const MIN_RELAY_SUCCESSES = 3;
+      let successCount = 0;
+      let resolved = false;
+
+      const thresholdPromise = new Promise<boolean>((resolve) => {
+        const tasks = relayPool.map((relay) =>
+          publishEventToRelay(relay, signedEvent).then((ok) => {
+            if (ok) {
+              successCount += 1;
+              if (!resolved && successCount >= MIN_RELAY_SUCCESSES) {
+                resolved = true;
+                // Create Primal.net URL using shared utility
+                const primalUrl = generatePrimalUrl(signedEvent.id);
+                setSuccessUrls(prev => ({ ...prev, nostr: primalUrl }));
+                setNostrState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: true, error: null }));
+                resolve(true);
+              }
+            }
+            return ok;
+          })
+        );
+
+        Promise.allSettled(tasks).then(() => {
+          if (resolved) return;
+          resolved = true;
+          printLog(`Published to ${successCount}/${relayPool.length} relays`);
+          setNostrState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: false, error: `Only ${successCount}/${MIN_RELAY_SUCCESSES} relays accepted the event.` }));
+          resolve(false);
+        });
+      });
+
+      return await thresholdPromise;
     } catch (error) {
       console.error("Error publishing to Nostr:", error);
       setNostrState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: false, error: error instanceof Error ? error.message : 'Failed to publish' }));
@@ -1616,7 +1693,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           }
 
           // Re-sign the event with the user's exact content (no automatic additions)
-          const eventToSign = createNostrEventUnified(finalContent, mediaUrl || undefined);
+          // Scheduling/update flow: keep tags empty unless backend reconstructs identical tags for verification.
+          const eventToSign = createNostrEventUnified(finalContent, []);
           const signedEvent = await window.nostr.signEvent(eventToSign);
 
           // Generate new Primal URL from new event ID using shared utility
@@ -1670,7 +1748,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             const fullContentWithMedia = buildFinalContent(content, mediaUrl || '', 'nostr');
             
             // Sign that EXACT content
-            const eventToSign = createNostrEventUnified(fullContentWithMedia, mediaUrl || undefined);
+            // Scheduling flow: keep tags empty unless backend reconstructs identical tags for verification.
+            const eventToSign = createNostrEventUnified(fullContentWithMedia, []);
             const signedEvent = await window.nostr.signEvent(eventToSign);
             
           // Generate Primal URL from event ID using shared utility
@@ -1875,7 +1954,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         prefs = `About this video: ${videoMetadata.description}\n\n${prefs}`;
       }
       
-      // Always include a URL - use custom URL if provided, otherwise use CDN URL
+      // Include URL in prefs - use custom URL (episode page) if provided, otherwise use file URL
       const shareUrl = videoMetadata?.customUrl || fileUrl;
       prefs = `${prefs}\n\nFull video available at: ${shareUrl}`;
       
@@ -1892,7 +1971,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         (generatedContent) => {
           // This callback updates the content as it streams in
           setContent(generatedContent);
-        }
+        },
+        context,
+        videoMetadata
       );
       
     } catch (error: any) {
@@ -3577,7 +3658,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             </div>
             {nostrState.enabled && nostrState.available && (
               <div className="text-xs text-gray-400">
-                Nostr relays: {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length}
+                Nostr relays: {Object.values(publishStatus).filter(s => s === 'published').length}/{relayPool.length} (need 3)
               </div>
             )}
           </div>
