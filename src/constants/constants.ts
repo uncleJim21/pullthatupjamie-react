@@ -3,24 +3,8 @@ import { FRONTEND_URL, API_URL, DEBUG_MODE } from '../config/urls.js';
 export const DEBUG_TRANSCRIPTION = false;
 export { DEBUG_MODE, FRONTEND_URL, API_URL };
 export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
-
-export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
 export const DEBUG_AUTH = false;
 
-// More explicit approach to determine FRONTEND_URL
-export const FRONTEND_URL = (() => {
-  // Force localhost in development mode regardless of actual origin
-  if (DEBUG_MODE) {
-    return 'http://localhost:3000';
-  }
-  
-  // In production, use the actual origin or default to the production URL
-  const result = typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-    ? 'https://pullthatupjamie.ai' 
-    : 'http://localhost:3000';
-  
-  return result;
-})();
 
 // Debug output to verify the configuration
 console.log('Constants loaded:', { 
