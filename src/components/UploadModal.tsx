@@ -202,7 +202,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onShareRequest }) =>
         {error && (
           <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-md flex items-start text-left">
             <AlertCircle className="w-5 h-5 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
-            <p className="text-red-400 text-sm">{error}</p>
+            <p className="text-red-400 text-sm whitespace-pre-line">{error}</p>
           </div>
         )}
 

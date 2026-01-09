@@ -69,6 +69,44 @@ interface PresignedUrlResponse {
   cacheControl?: boolean | string;
 }
 
+type PresignedUrlErrorResponse = {
+  error?: string;
+  code?: string;
+  message?: string;
+  hint?: string;
+};
+
+const buildPresignedUrlErrorMessage = (
+  status: number,
+  statusText: string,
+  payload?: PresignedUrlErrorResponse,
+  fallbackBodyText?: string
+) => {
+  const message = payload?.message?.trim();
+  const hint = payload?.hint?.trim();
+  const code = payload?.code?.trim();
+  const error = payload?.error?.trim();
+
+  // Prefer API-provided message/hint (e.g. invalid_filename)
+  if (message) {
+    return hint ? `${message}\n${hint}` : message;
+  }
+
+  // Next best: known error identifiers
+  if (error || code) {
+    const parts = [error, code].filter(Boolean).join(' / ');
+    return `Upload request failed (${status}${statusText ? ` ${statusText}` : ''}): ${parts}`;
+  }
+
+  // Fallback: raw body or HTTP status
+  const body = fallbackBodyText?.trim();
+  if (body) {
+    return `Upload request failed (${status}${statusText ? ` ${statusText}` : ''}): ${body}`;
+  }
+
+  return `Upload request failed (${status}${statusText ? ` ${statusText}` : ''}).`;
+};
+
 /**
  * Fetch list of uploaded files
  */
@@ -119,8 +157,35 @@ export const getPresignedUrl = async (
   });
   
   if (!response.ok) {
-    console.error('Failed to get presigned URL:', await response.text());
-    throw new Error('Failed to get presigned URL');
+    // Try to parse the API's structured error payload first (common for 400s).
+    let errorPayload: PresignedUrlErrorResponse | undefined;
+    let fallbackText: string | undefined;
+
+    try {
+      errorPayload = (await response.clone().json()) as PresignedUrlErrorResponse;
+    } catch {
+      try {
+        fallbackText = await response.text();
+      } catch {
+        // ignore
+      }
+    }
+
+    const errorMessage = buildPresignedUrlErrorMessage(
+      response.status,
+      response.statusText,
+      errorPayload,
+      fallbackText
+    );
+
+    console.error('Failed to get presigned URL:', {
+      status: response.status,
+      statusText: response.statusText,
+      errorPayload,
+      fallbackText
+    });
+
+    throw new Error(errorMessage);
   }
 
   const data = await response.json();
