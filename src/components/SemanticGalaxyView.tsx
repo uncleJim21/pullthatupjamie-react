@@ -329,6 +329,7 @@ interface SemanticGalaxyViewProps {
   onOpenAnalysisPanel?: () => void;
   sharedSessionTitle?: string | null;
   hideStats?: boolean; // Hide the stats/legend panel
+  hideOptions?: boolean; // Hide the left-side Options menu (used for embed mode)
   nebulaDimOpacity?: number; // Configurable nebula dim opacity (defaults to NEBULA_CONFIG.DIM_OPACITY)
   brandImage?: string; // Brand logo image URL for embed mode
   brandColors?: string[]; // Brand colors for embed mode (stars will use first color)
@@ -1424,6 +1425,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   onOpenAnalysisPanel,
   sharedSessionTitle = null,
   hideStats = false,
+  hideOptions = false,
   nebulaDimOpacity,
   brandImage,
   brandColors,
@@ -1443,6 +1445,13 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   
   // Options menu state
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  
+  // Ensure we don't keep an "open" options menu in embed mode if this flag flips
+  useEffect(() => {
+    if (hideOptions) {
+      setShowOptionsMenu(false);
+    }
+  }, [hideOptions]);
   
   // Minimap canvas ref
   const minimapCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1770,57 +1779,59 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         </button>
 
         {/* Options Menu */}
-        <div className="relative w-fit">
-          <button
-            onClick={() => setShowOptionsMenu((prev) => !prev)}
-            className="px-3 py-2 backdrop-blur-sm text-white rounded-lg border border-gray-700 bg-black/80 hover:bg-black/90 transition-colors text-sm flex items-center gap-2"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            <span>Options</span>
-          </button>
+        {!hideOptions && (
+          <div className="relative w-fit">
+            <button
+              onClick={() => setShowOptionsMenu((prev) => !prev)}
+              className="px-3 py-2 backdrop-blur-sm text-white rounded-lg border border-gray-700 bg-black/80 hover:bg-black/90 transition-colors text-sm flex items-center gap-2"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              <span>Options</span>
+            </button>
 
-          {showOptionsMenu && (
-            <div className="mt-2 w-56 bg-black/95 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-              <button
-                onClick={handleToggleAxisLabels}
-                className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-200 hover:bg-gray-800/80 transition-colors"
-              >
-                <div
-                  className={`w-3 h-3 rounded border border-gray-400 flex items-center justify-center ${
-                    showAxisLabels ? 'bg-white' : 'bg-transparent'
-                  }`}
+            {showOptionsMenu && (
+              <div className="mt-2 w-56 bg-black/95 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                <button
+                  onClick={handleToggleAxisLabels}
+                  className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-200 hover:bg-gray-800/80 transition-colors"
                 >
-                  {showAxisLabels && <Check className="w-2 h-2 text-black" />}
-                </div>
-                <span>Label Axes</span>
-              </button>
-              <button
-                onClick={() => {
-                  const newValue = !autoPlayOnStarClick;
-                  setAutoPlayOnStarClick(newValue);
-                  try {
-                    const userSettings = localStorage.getItem('userSettings');
-                    const settings = userSettings ? JSON.parse(userSettings) : {};
-                    settings.autoPlayOnStarClick = newValue;
-                    localStorage.setItem('userSettings', JSON.stringify(settings));
-                  } catch (e) {
-                    console.error('Error saving autoPlayOnStarClick to userSettings:', e);
-                  }
-                }}
-                className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-200 hover:bg-gray-800/80 transition-colors"
-              >
-                <div
-                  className={`w-3 h-3 rounded border border-gray-400 flex items-center justify-center ${
-                    autoPlayOnStarClick ? 'bg-white' : 'bg-transparent'
-                  }`}
+                  <div
+                    className={`w-3 h-3 rounded border border-gray-400 flex items-center justify-center ${
+                      showAxisLabels ? 'bg-white' : 'bg-transparent'
+                    }`}
+                  >
+                    {showAxisLabels && <Check className="w-2 h-2 text-black" />}
+                  </div>
+                  <span>Label Axes</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const newValue = !autoPlayOnStarClick;
+                    setAutoPlayOnStarClick(newValue);
+                    try {
+                      const userSettings = localStorage.getItem('userSettings');
+                      const settings = userSettings ? JSON.parse(userSettings) : {};
+                      settings.autoPlayOnStarClick = newValue;
+                      localStorage.setItem('userSettings', JSON.stringify(settings));
+                    } catch (e) {
+                      console.error('Error saving autoPlayOnStarClick to userSettings:', e);
+                    }
+                  }}
+                  className="w-full px-3 py-2 flex items-center gap-2 text-xs text-gray-200 hover:bg-gray-800/80 transition-colors"
                 >
-                  {autoPlayOnStarClick && <Check className="w-2 h-2 text-black" />}
-                </div>
-                <span>Auto‑play on star click</span>
-              </button>
-            </div>
-          )}
-        </div>
+                  <div
+                    className={`w-3 h-3 rounded border border-gray-400 flex items-center justify-center ${
+                      autoPlayOnStarClick ? 'bg-white' : 'bg-transparent'
+                    }`}
+                  >
+                    {autoPlayOnStarClick && <Check className="w-2 h-2 text-black" />}
+                  </div>
+                  <span>Auto‑play on star click</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       
       {/* Hover preview for stars */}

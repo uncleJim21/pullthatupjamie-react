@@ -2941,6 +2941,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 onOpenAnalysisPanel={() => setIsAnalysisPanelOpen(true)}
                 sharedSessionTitle={sharedSessionTitle}
                 hideStats={isEmbedMode}
+                hideOptions={isEmbedMode}
                 nebulaDimOpacity={isEmbedMode ? 0.78 : undefined}
                 brandImage={isEmbedMode ? (brandImage || undefined) : undefined}
                 brandColors={isEmbedMode ? (brandColors || undefined) : undefined}
