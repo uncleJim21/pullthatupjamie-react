@@ -708,10 +708,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
       printLog(`[AI Analysis] analysisCardClick received: pineconeId=${pineconeId}`);
 
-      // Make this behave like a "star click" (show context + start playback).
-      // Close analysis so UnifiedSidePanel switches to context mode.
-      setIsAnalysisPanelOpen(false);
-
       // First try to find the item in current galaxy results.
       const match = galaxyResults.find(r => r?.shareLink === pineconeId);
       if (match) {
@@ -755,10 +751,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           shareLink: match.shareLink,
         });
 
-        setAutoPlayContextOnOpen(autoPlay);
-
-        if (!embedFlag) {
-          setTimeout(() => setIsContextPanelOpen(true), 0);
+        // Start playback immediately (even if the UI is currently on the Analysis tab)
+        if (match.audioUrl) {
+          window.dispatchEvent(
+            new CustomEvent('playAudioTrack', {
+              detail: {
+                id: match.shareLink,
+                audioUrl: match.audioUrl,
+                startTime: match.timeContext?.start_time ?? 0,
+                endTime: match.timeContext?.end_time,
+              },
+            }),
+          );
         }
         return;
       }
@@ -775,11 +779,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
         const meta = para.metadata;
         setSelectedParagraphId(pineconeId);
+        const startTime = meta.start_time ?? para.start_time ?? 0;
+        const endTime = meta.end_time ?? para.end_time ?? 0;
         setSelectedAudioContext({
           audioUrl: meta.audioUrl,
           timeContext: {
-            start_time: meta.start_time ?? para.start_time ?? 0,
-            end_time: meta.end_time ?? para.end_time ?? 0,
+            start_time: startTime,
+            end_time: endTime,
           },
           episode: meta.episode || para.episode,
           episodeImage: meta.episodeImage || '',
@@ -793,21 +799,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           shareLink: pineconeId,
         });
 
-        let autoPlay = true;
-        if (!embedFlag) {
-          try {
-            const settings = localStorage.getItem('userSettings');
-            if (settings) {
-              const userSettings = JSON.parse(settings);
-              autoPlay = userSettings.autoPlayOnStarClick ?? true;
-            }
-          } catch {
-            // ignore
-          }
-        }
-        setAutoPlayContextOnOpen(autoPlay);
-        if (!embedFlag) {
-          setTimeout(() => setIsContextPanelOpen(true), 0);
+        // Start playback immediately (even if the UI is currently on the Analysis tab)
+        if (meta.audioUrl) {
+          window.dispatchEvent(
+            new CustomEvent('playAudioTrack', {
+              detail: {
+                id: pineconeId,
+                audioUrl: meta.audioUrl,
+                startTime,
+                endTime,
+              },
+            }),
+          );
         }
       } catch (err) {
         printLog(`[AI Analysis] Failed to fetch paragraph metadata for pineconeId=${pineconeId}`);
@@ -3043,6 +3046,20 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   printLog(`[StarClick] Setting audio context: ${JSON.stringify(audioContext)}`);
                   setSelectedAudioContext(audioContext);
                   setAutoPlayContextOnOpen(autoPlay);
+
+                  // If Analysis tab is open, the Context panel may not be mounted, so trigger playback directly.
+                  if (isAnalysisPanelOpen && autoPlay && result.audioUrl) {
+                    window.dispatchEvent(
+                      new CustomEvent('playAudioTrack', {
+                        detail: {
+                          id: result.shareLink,
+                          audioUrl: result.audioUrl,
+                          startTime: result.timeContext?.start_time ?? 0,
+                          endTime: result.timeContext?.end_time,
+                        },
+                      }),
+                    );
+                  }
                   
                   // In embed mode, trigger playback immediately via AudioController
                   if (isEmbedMode && autoPlay && result.audioUrl) {

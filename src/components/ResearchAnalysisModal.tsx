@@ -10,7 +10,7 @@ interface ResearchAnalysisPanelProps {
   onWidthChange?: (width: number) => void;
 }
 
-const DEFAULT_INSTRUCTIONS = "Analyze this research session and summarize the main themes, key insights, and 3-5 follow-up questions.";
+const DEFAULT_INSTRUCTIONS = "Analyze this research session and summarize the main themes, key insights, and definitive conclusion. Keep it succinct and to the point. Don't explicitly mention the word research session.";
 
 export const ResearchAnalysisPanel: React.FC<ResearchAnalysisPanelProps> = ({
   isOpen,

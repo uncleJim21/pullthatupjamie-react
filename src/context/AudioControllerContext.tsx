@@ -160,6 +160,22 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
     return () => window.removeEventListener('stopAllAudio', handler);
   }, [stop]);
 
+  // Listen for global "playAudioTrack" events (so non-player UI can trigger playback)
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<AudioTrack>).detail;
+      if (!detail?.id || !detail?.audioUrl) return;
+      void playTrack({
+        id: detail.id,
+        audioUrl: detail.audioUrl,
+        startTime: detail.startTime,
+        endTime: detail.endTime,
+      });
+    };
+    window.addEventListener('playAudioTrack', handler);
+    return () => window.removeEventListener('playAudioTrack', handler);
+  }, [playTrack]);
+
   const handleLoadedMetadata = () => {
     const audio = audioRef.current;
     if (!audio) return;
