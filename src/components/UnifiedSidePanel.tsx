@@ -12,8 +12,13 @@ type AnalysisCardJson = {
   title?: string;
 };
 
-function parseCardJsonMentions(input: string): Array<{ kind: 'text'; text: string } | { kind: 'card'; card: AnalysisCardJson }> {
-  const parts: Array<{ kind: 'text'; text: string } | { kind: 'card'; card: AnalysisCardJson }> = [];
+type ParsedAnalysisPart =
+  | { kind: 'text'; text: string }
+  | { kind: 'card'; card: AnalysisCardJson }
+  | { kind: 'card_loading' };
+
+function parseCardJsonMentions(input: string): ParsedAnalysisPart[] {
+  const parts: ParsedAnalysisPart[] = [];
 
   let i = 0;
   while (i < input.length) {
@@ -31,10 +36,9 @@ function parseCardJsonMentions(input: string): Array<{ kind: 'text'; text: strin
     // find JSON object after marker
     const braceStart = input.indexOf('{', markerIdx);
     if (braceStart === -1) {
-      // no JSON found; keep literal marker and continue
-      parts.push({ kind: 'text', text: input.slice(markerIdx, markerIdx + 'CARD_JSON:'.length) });
-      i = markerIdx + 'CARD_JSON:'.length;
-      continue;
+      // We have the marker but not the JSON yet (streaming). Show a loading placeholder.
+      parts.push({ kind: 'card_loading' });
+      break;
     }
 
     let depth = 0;
@@ -51,6 +55,12 @@ function parseCardJsonMentions(input: string): Array<{ kind: 'text'; text: strin
       }
     }
 
+    // If we hit end of input without closing braces, we're mid-stream; show loading.
+    if (depth !== 0) {
+      parts.push({ kind: 'card_loading' });
+      break;
+    }
+
     const jsonText = input.slice(braceStart, j);
     try {
       const parsed = JSON.parse(jsonText) as AnalysisCardJson;
@@ -60,7 +70,9 @@ function parseCardJsonMentions(input: string): Array<{ kind: 'text'; text: strin
         parts.push({ kind: 'text', text: `CARD_JSON: ${jsonText}` });
       }
     } catch {
-      parts.push({ kind: 'text', text: `CARD_JSON: ${jsonText}` });
+      // If JSON is malformed (rare, but could happen mid-stream), render loading.
+      parts.push({ kind: 'card_loading' });
+      break;
     }
 
     i = j;
@@ -68,6 +80,20 @@ function parseCardJsonMentions(input: string): Array<{ kind: 'text'; text: strin
 
   return parts;
 }
+
+const InlineCardMentionLoading: React.FC = () => {
+  return (
+    <span
+      className="inline-flex items-center gap-2 px-2 py-1 rounded-md border border-gray-800 bg-gray-900/30 align-middle select-none max-w-[220px]"
+      aria-label="Loading source card"
+    >
+      <span className="w-[14px] h-[14px] rounded-sm bg-gray-800 flex items-center justify-center flex-shrink-0">
+        <Loader className="w-3 h-3 text-gray-500 animate-spin" />
+      </span>
+      <span className="text-xs text-gray-400 truncate">Loading…</span>
+    </span>
+  );
+};
 
 const InlineCardMention: React.FC<{
   card: AnalysisCardJson;
@@ -445,6 +471,15 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                       <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
                         {parseCardJsonMentions(content).map((part, idx) => {
                           if (part.kind === 'text') return <React.Fragment key={`t-${idx}`}>{part.text}</React.Fragment>;
+                          if (part.kind === 'card_loading') {
+                            return (
+                              <React.Fragment key={`l-${idx}`}>
+                                {' '}
+                                <InlineCardMentionLoading />
+                                {' '}
+                              </React.Fragment>
+                            );
+                          }
                           return (
                             <React.Fragment key={`c-${idx}`}>
                               {' '}
