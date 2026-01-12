@@ -1,10 +1,112 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot } from 'lucide-react';
+import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon } from 'lucide-react';
 import { analyzeResearchSession } from '../services/researchSessionAnalysisService.ts';
 import { getCurrentSessionId, fetchAllResearchSessions, ResearchSession } from '../services/researchSessionService.ts';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
 import { AuthConfig, printLog } from '../constants/constants.ts';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
+
+type AnalysisCardJson = {
+  pineconeId: string;
+  episodeImage?: string;
+  title?: string;
+};
+
+function parseCardJsonMentions(input: string): Array<{ kind: 'text'; text: string } | { kind: 'card'; card: AnalysisCardJson }> {
+  const parts: Array<{ kind: 'text'; text: string } | { kind: 'card'; card: AnalysisCardJson }> = [];
+
+  let i = 0;
+  while (i < input.length) {
+    const markerIdx = input.indexOf('CARD_JSON:', i);
+    if (markerIdx === -1) {
+      parts.push({ kind: 'text', text: input.slice(i) });
+      break;
+    }
+
+    // push text before marker
+    if (markerIdx > i) {
+      parts.push({ kind: 'text', text: input.slice(i, markerIdx) });
+    }
+
+    // find JSON object after marker
+    const braceStart = input.indexOf('{', markerIdx);
+    if (braceStart === -1) {
+      // no JSON found; keep literal marker and continue
+      parts.push({ kind: 'text', text: input.slice(markerIdx, markerIdx + 'CARD_JSON:'.length) });
+      i = markerIdx + 'CARD_JSON:'.length;
+      continue;
+    }
+
+    let depth = 0;
+    let j = braceStart;
+    for (; j < input.length; j++) {
+      const ch = input[j];
+      if (ch === '{') depth++;
+      if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          j++; // include closing brace
+          break;
+        }
+      }
+    }
+
+    const jsonText = input.slice(braceStart, j);
+    try {
+      const parsed = JSON.parse(jsonText) as AnalysisCardJson;
+      if (parsed && typeof parsed.pineconeId === 'string') {
+        parts.push({ kind: 'card', card: parsed });
+      } else {
+        parts.push({ kind: 'text', text: `CARD_JSON: ${jsonText}` });
+      }
+    } catch {
+      parts.push({ kind: 'text', text: `CARD_JSON: ${jsonText}` });
+    }
+
+    i = j;
+  }
+
+  return parts;
+}
+
+const InlineCardMention: React.FC<{
+  card: AnalysisCardJson;
+  onClick?: (pineconeId: string) => void;
+}> = ({ card, onClick }) => {
+  const title = card.title || 'Open source';
+  const imageUrl = card.episodeImage;
+
+  return (
+    <span
+      className="inline-flex items-center gap-2 px-2 py-1 rounded-md border border-gray-800 bg-gray-900/40 align-middle cursor-pointer hover:bg-gray-900/70 transition-colors max-w-[420px]"
+      role="button"
+      tabIndex={0}
+      onClick={() => onClick?.(card.pineconeId)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.(card.pineconeId);
+        }
+      }}
+      title={title}
+      aria-label={`Open source: ${title}`}
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="w-[14px] h-[14px] rounded-sm object-cover flex-shrink-0 opacity-90"
+          loading="lazy"
+        />
+      ) : (
+        <span className="w-[14px] h-[14px] rounded-sm bg-gray-800 flex items-center justify-center flex-shrink-0">
+          <LinkIcon className="w-3 h-3 text-gray-500" />
+        </span>
+      )}
+      <span className="text-xs text-gray-200 truncate">{title}</span>
+    </span>
+  );
+};
 
 enum PanelMode {
   CONTEXT = 'context',
@@ -341,7 +443,22 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                         </div>
                       )}
                       <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
-                        {content}
+                        {parseCardJsonMentions(content).map((part, idx) => {
+                          if (part.kind === 'text') return <React.Fragment key={`t-${idx}`}>{part.text}</React.Fragment>;
+                          return (
+                            <React.Fragment key={`c-${idx}`}>
+                              {' '}
+                              <InlineCardMention
+                                card={part.card}
+                                onClick={(pineconeId) => {
+                                  // Unimplemented: wire this up to a real navigation action later.
+                                  printLog(`[AI Analysis] Card click (unimplemented): pineconeId=${pineconeId}`);
+                                }}
+                              />
+                              {' '}
+                            </React.Fragment>
+                          );
+                        })}
                       </div>
                       {isAnalyzing && (
                         <div className="flex items-center gap-2 text-blue-400 text-sm pt-4">
