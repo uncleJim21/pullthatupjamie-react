@@ -486,8 +486,13 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                               <InlineCardMention
                                 card={part.card}
                                 onClick={(pineconeId) => {
-                                  // Unimplemented: wire this up to a real navigation action later.
-                                  printLog(`[AI Analysis] Card click (unimplemented): pineconeId=${pineconeId}`);
+                                  printLog(`[AI Analysis] Card click: pineconeId=${pineconeId}`);
+                                  // Let SearchInterface handle this and trigger playback/navigation
+                                  if (typeof window !== 'undefined') {
+                                    window.dispatchEvent(
+                                      new CustomEvent('analysisCardClick', { detail: { pineconeId } }),
+                                    );
+                                  }
                                 }}
                               />
                               {' '}

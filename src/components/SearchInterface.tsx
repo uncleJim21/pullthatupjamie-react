@@ -34,6 +34,7 @@ import ImageWithLoader from './ImageWithLoader.tsx';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
 import UnifiedSidePanel from './UnifiedSidePanel.tsx';
 import SemanticGalaxyView from './SemanticGalaxyView.tsx';
+import ContextService from '../services/contextService.ts';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from './EmbedMiniPlayer.tsx';
@@ -695,6 +696,128 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       `[AI Analysis] Panel ${isAnalysisPanelOpen ? 'opened' : 'closed'}: sessionId=${sessionId || 'null'} items=${researchSessionItems.length}`,
     );
   }, [isAnalysisPanelOpen]);
+
+  // Handle clicks from AI Analysis inline cards (CARD_JSON mentions)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const embedFlag = searchParams.get('embed') === 'true';
+
+    const onAnalysisCardClick = async (e: Event) => {
+      const pineconeId = (e as CustomEvent<{ pineconeId?: string }>).detail?.pineconeId;
+      if (!pineconeId) return;
+
+      printLog(`[AI Analysis] analysisCardClick received: pineconeId=${pineconeId}`);
+
+      // Make this behave like a "star click" (show context + start playback).
+      // Close analysis so UnifiedSidePanel switches to context mode.
+      setIsAnalysisPanelOpen(false);
+
+      // First try to find the item in current galaxy results.
+      const match = galaxyResults.find(r => r?.shareLink === pineconeId);
+      if (match) {
+        printLog(`[AI Analysis] Found pineconeId in galaxyResults; triggering star-click behavior`);
+
+        setSelectedParagraphId(match.shareLink);
+
+        const resultIndex = galaxyResults.findIndex(r => r?.shareLink === match.shareLink);
+        if (resultIndex !== -1) {
+          setCurrentResultIndex(resultIndex);
+        }
+
+        let autoPlay = true;
+        if (!embedFlag) {
+          try {
+            const settings = localStorage.getItem('userSettings');
+            if (settings) {
+              const userSettings = JSON.parse(settings);
+              autoPlay = userSettings.autoPlayOnStarClick ?? true;
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        setSelectedAudioContext({
+          audioUrl: match.audioUrl,
+          timeContext: {
+            start_time: match.timeContext?.start_time ?? 0,
+            end_time: match.timeContext?.end_time ?? 0,
+          },
+          episode: match.episode,
+          episodeImage: match.episodeImage || '',
+          creator: match.creator,
+          listenLink: match.listenLink,
+          date: match.date,
+          quote: match.quote,
+          summary: match.summary,
+          headline: match.headline,
+          hierarchyLevel: match.hierarchyLevel,
+          shareLink: match.shareLink,
+        });
+
+        setAutoPlayContextOnOpen(autoPlay);
+
+        if (!embedFlag) {
+          setTimeout(() => setIsContextPanelOpen(true), 0);
+        }
+        return;
+      }
+
+      // Fallback: fetch the paragraph metadata so we can play it even if galaxyResults doesn't contain it.
+      try {
+        printLog(`[AI Analysis] pineconeId not in galaxyResults; fetching paragraph metadata for playback`);
+        const adjacent = await ContextService.fetchAdjacentParagraphs(pineconeId, 0);
+        const para = adjacent.paragraphs.find(p => p.id === pineconeId) || adjacent.paragraphs[0];
+        if (!para) {
+          printLog(`[AI Analysis] No paragraph metadata found for pineconeId=${pineconeId}`);
+          return;
+        }
+
+        const meta = para.metadata;
+        setSelectedParagraphId(pineconeId);
+        setSelectedAudioContext({
+          audioUrl: meta.audioUrl,
+          timeContext: {
+            start_time: meta.start_time ?? para.start_time ?? 0,
+            end_time: meta.end_time ?? para.end_time ?? 0,
+          },
+          episode: meta.episode || para.episode,
+          episodeImage: meta.episodeImage || '',
+          creator: meta.creator || para.creator,
+          listenLink: meta.listenLink,
+          date: new Date().toISOString(),
+          quote: meta.text || para.text,
+          summary: undefined,
+          headline: undefined,
+          hierarchyLevel: 'paragraph',
+          shareLink: pineconeId,
+        });
+
+        let autoPlay = true;
+        if (!embedFlag) {
+          try {
+            const settings = localStorage.getItem('userSettings');
+            if (settings) {
+              const userSettings = JSON.parse(settings);
+              autoPlay = userSettings.autoPlayOnStarClick ?? true;
+            }
+          } catch {
+            // ignore
+          }
+        }
+        setAutoPlayContextOnOpen(autoPlay);
+        if (!embedFlag) {
+          setTimeout(() => setIsContextPanelOpen(true), 0);
+        }
+      } catch (err) {
+        printLog(`[AI Analysis] Failed to fetch paragraph metadata for pineconeId=${pineconeId}`);
+        console.error('[AI Analysis] analysisCardClick error:', err);
+      }
+    };
+
+    window.addEventListener('analysisCardClick', onAnalysisCardClick);
+    return () => window.removeEventListener('analysisCardClick', onAnalysisCardClick);
+  }, [galaxyResults, searchParams]);
   
   // Handler for opening a session from the Sessions history tab
   const handleOpenSessionFromHistory = async (sessionId: string, sessionTitle?: string) => {
