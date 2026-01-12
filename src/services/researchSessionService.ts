@@ -1,4 +1,4 @@
-import { API_URL } from "../constants/constants.ts";
+import { API_URL, printLog } from "../constants/constants.ts";
 import { v4 as uuidv4 } from 'uuid';
 
 // Storage key for client ID
@@ -101,6 +101,9 @@ function getSessionId(): string | null {
   const timestamp = localStorage.getItem(SESSION_TIMESTAMP_KEY);
   
   if (!sessionId || !timestamp) {
+    printLog(
+      `[ResearchSession] getSessionId(): missing ${!sessionId ? 'sessionId' : ''}${!sessionId && !timestamp ? ' + ' : ''}${!timestamp ? 'timestamp' : ''}`,
+    );
     return null;
   }
   
@@ -109,7 +112,7 @@ function getSessionId(): string | null {
   const sessionTime = parseInt(timestamp, 10);
   
   if (now - sessionTime > SESSION_EXPIRY_MS) {
-    console.log('Research session expired (24h), will create new session');
+    printLog('[ResearchSession] Research session expired (24h), will clear local session');
     clearSessionId();
     return null;
   }
@@ -123,6 +126,7 @@ function getSessionId(): string | null {
 function setSessionId(sessionId: string): void {
   localStorage.setItem(SESSION_ID_KEY, sessionId);
   localStorage.setItem(SESSION_TIMESTAMP_KEY, Date.now().toString());
+  printLog(`[ResearchSession] setSessionId(): ${sessionId}`);
 }
 
 /**
@@ -144,9 +148,11 @@ function setSessionVersion(version: number): void {
  * Clear the session ID (e.g., after clearing all items)
  */
 function clearSessionId(): void {
+  const prevSessionId = localStorage.getItem(SESSION_ID_KEY);
   localStorage.removeItem(SESSION_ID_KEY);
   localStorage.removeItem(SESSION_TIMESTAMP_KEY);
   localStorage.removeItem(SESSION_VERSION_KEY);
+  printLog(`[ResearchSession] clearSessionId(): prev=${prevSessionId || 'null'}`);
 }
 
 /**
@@ -277,6 +283,7 @@ export async function createResearchSession(items: ResearchSessionItem[]): Promi
     
     // Store the session ID and version for future updates
     if (data.success && data.data?.id) {
+      printLog(`[ResearchSession] createResearchSession(): received id=${data.data.id}`);
       setSessionId(data.data.id);
       if (typeof data.data.__v === 'number') {
         setSessionVersion(data.data.__v);

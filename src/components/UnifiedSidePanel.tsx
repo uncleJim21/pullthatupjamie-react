@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History } from 'lucide-react';
+import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot } from 'lucide-react';
 import { analyzeResearchSession } from '../services/researchSessionAnalysisService.ts';
 import { getCurrentSessionId, fetchAllResearchSessions, ResearchSession } from '../services/researchSessionService.ts';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
-import { AuthConfig } from '../constants/constants.ts';
+import { AuthConfig, printLog } from '../constants/constants.ts';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
 
 enum PanelMode {
@@ -121,6 +121,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
       return;
     }
 
+    printLog(`[AI Analysis] AnalyzeNow clicked: sessionId=${sessionId} instructionsLen=${instructions.length}`);
     setIsAnalyzing(true);
     setError(null);
     setAnalysis('');
@@ -143,12 +144,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
     }
   };
 
-  // Auto-analyze when analysis mode opens
-  useEffect(() => {
-    if (activeMode === PanelMode.ANALYSIS && isPanelOpen && !analysis && !isAnalyzing && !error && sessionId) {
-      handleAnalyze();
-    }
-  }, [activeMode, isPanelOpen]);
+  // No auto-analyze on open; user triggers analysis explicitly from UI.
 
   // Fetch sessions when sessions mode opens
   useEffect(() => {
@@ -181,6 +177,13 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   const isContextMode = activeMode === PanelMode.CONTEXT;
   const isAnalysisMode = activeMode === PanelMode.ANALYSIS;
   const isSessionsMode = activeMode === PanelMode.SESSIONS;
+
+  // Debug: log whenever we enter analysis mode (and what sessionId is)
+  useEffect(() => {
+    if (activeMode === PanelMode.ANALYSIS && isPanelOpen) {
+      printLog(`[AI Analysis] Tab active: sessionId=${sessionId || 'null'} analysisLen=${analysis.length}`);
+    }
+  }, [activeMode, isPanelOpen, sessionId, analysis.length]);
 
   // Calculate panel width including tabs
   const panelWidth = !isPanelOpen ? 0 : isCollapsed ? 32 : 600;
@@ -220,7 +223,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           
           <button
             onClick={() => handleModeSwitch(PanelMode.ANALYSIS)}
-            disabled={true}
+            disabled={false}
             className={`
               px-3 py-4 rounded-l-lg border-l border-t border-b transition-all
               disabled:opacity-50 disabled:cursor-not-allowed
@@ -348,15 +351,46 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                       )}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                      <BrainCircuit className="w-12 h-12 mb-4" />
-                      <p className="text-sm mb-4">No analysis available</p>
-                      <button
-                        onClick={handleAnalyze}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
-                      >
-                        Analyze Session
-                      </button>
+                    <div className="flex flex-col h-full text-gray-200">
+                      <div className="max-w-xl w-full pt-6">
+                        <div className="mb-2 text-lg font-semibold text-white">AI Analysis</div>
+                        <div className="text-sm text-gray-400 mb-6">
+                          Turn your saved podcast clips into key themes, takeaways, and next questions.
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            onClick={handleAnalyze}
+                            disabled={!sessionId || isAnalyzing}
+                            className="p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                          >
+                            <div className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
+                              <BrainCircuit className="w-4 h-4 text-blue-400" />
+                              <span>Analyze Now</span>
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              Use an LLM to summarize and expand on your compiled research
+                            </div>
+                          </button>
+
+                          <button
+                            disabled={true}
+                            className="p-4 rounded-lg border border-gray-800 bg-gray-950/40 opacity-60 cursor-not-allowed text-left"
+                          >
+                            <div className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
+                              <Bot className="w-4 h-4 text-gray-400" />
+                              <span>Agent Mode (Soon™)</span>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Use an Agent to perform searches, sift through content and explain high signal content related to your research intent
+                            </div>
+                          </button>
+                        </div>
+
+                        <div className="mt-6 text-xs text-gray-600">
+                          Session ID: <span className="text-gray-500">{sessionId || 'none'}</span>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

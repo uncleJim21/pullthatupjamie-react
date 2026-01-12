@@ -1,4 +1,4 @@
-import { API_URL } from "../constants/constants.ts";
+import { API_URL, printLog } from "../constants/constants.ts";
 
 export interface AnalysisRequest {
   instructions: string;
@@ -56,6 +56,8 @@ export async function analyzeResearchSession(
     if (clientId) {
       url += `?clientId=${encodeURIComponent(clientId)}`;
     }
+
+    printLog(`[AI Analysis] Request: sessionId=${sessionId} url=${url} instructionsLen=${instructions.length} authed=${Boolean(token)}`);
     
     const response = await fetch(url, {
       method: 'POST',

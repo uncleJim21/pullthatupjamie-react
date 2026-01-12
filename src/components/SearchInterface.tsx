@@ -38,7 +38,7 @@ import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from './EmbedMiniPlayer.tsx';
 import PoweredByJamiePill from './PoweredByJamiePill.tsx';
-import { ResearchSessionItem, clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId, saveResearchSessionWithRetry } from '../services/researchSessionService.ts';
+import { ResearchSessionItem, clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId, saveResearchSessionWithRetry, getCurrentSessionId } from '../services/researchSessionService.ts';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
 
 
@@ -677,6 +677,24 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     setSharedSessionTitle(null); // Clear the session title when clearing research
     printLog(`[ResearchSession] Cleared all items and session ID`);
   };
+
+  // Debug: log research items + sessionId whenever research changes
+  useEffect(() => {
+    const sessionId = getCurrentSessionId();
+    const first = researchSessionItems[0]?.shareLink;
+    const last = researchSessionItems[researchSessionItems.length - 1]?.shareLink;
+    printLog(
+      `[ResearchSession] Items changed: count=${researchSessionItems.length} sessionId=${sessionId || 'null'} first=${first || 'null'} last=${last || 'null'}`,
+    );
+  }, [researchSessionItems]);
+
+  // Debug: log when analysis panel opens/closes (and what sessionId we think is active)
+  useEffect(() => {
+    const sessionId = getCurrentSessionId();
+    printLog(
+      `[AI Analysis] Panel ${isAnalysisPanelOpen ? 'opened' : 'closed'}: sessionId=${sessionId || 'null'} items=${researchSessionItems.length}`,
+    );
+  }, [isAnalysisPanelOpen]);
   
   // Handler for opening a session from the Sessions history tab
   const handleOpenSessionFromHistory = async (sessionId: string, sessionTitle?: string) => {
@@ -2938,7 +2956,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 showResearchToast={showResearchToast}
                 isContextPanelOpen={isContextPanelOpen}
                 onCloseContextPanel={() => setIsContextPanelOpen(false)}
-                onOpenAnalysisPanel={() => setIsAnalysisPanelOpen(true)}
+                onOpenAnalysisPanel={() => {
+                  const sessionId = getCurrentSessionId();
+                  printLog(`[AI Analysis] Open requested from Galaxy: sessionId=${sessionId || 'null'} items=${researchSessionItems.length}`);
+                  setIsAnalysisPanelOpen(true);
+                }}
                 sharedSessionTitle={sharedSessionTitle}
                 hideStats={isEmbedMode}
                 hideOptions={isEmbedMode}
