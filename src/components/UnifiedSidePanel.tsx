@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { analyzeAdHocResearch, analyzeResearchSession } from '../services/researchSessionAnalysisService.ts';
 import { getCurrentSessionId, fetchAllResearchSessions, ResearchSession } from '../services/researchSessionService.ts';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
@@ -79,6 +82,120 @@ function parseCardJsonMentions(input: string): ParsedAnalysisPart[] {
   }
 
   return parts;
+}
+
+function buildMarkdownWithCardPlaceholders(input: string): {
+  markdown: string;
+  cardsByIndex: Record<number, AnalysisCardJson>;
+} {
+  const parts = parseCardJsonMentions(input);
+  const cardsByIndex: Record<number, AnalysisCardJson> = {};
+  let cardIdx = 0;
+
+  const chunks: string[] = [];
+  for (const p of parts) {
+    if (p.kind === 'text') {
+      chunks.push(p.text);
+      continue;
+    }
+
+    // Keep citations inline: if the model put the CARD_JSON on its own line, trim that whitespace.
+    if (chunks.length > 0) {
+      const last = chunks[chunks.length - 1];
+      if (typeof last === 'string') {
+        chunks[chunks.length - 1] = last.replace(/\s+$/, ' ');
+      }
+    }
+
+    if (p.kind === 'card_loading') {
+      chunks.push(`[[CARD_LOADING:${cardIdx++}]]`);
+      continue;
+    }
+
+    const idx = cardIdx++;
+    cardsByIndex[idx] = p.card;
+    chunks.push(`[[CARD:${idx}]]`);
+  }
+
+  return { markdown: chunks.join(''), cardsByIndex };
+}
+
+function injectInlineTokens(
+  node: React.ReactNode,
+  cardsByIndex: Record<number, AnalysisCardJson>,
+  onCardClick: (pineconeId: string) => void
+): React.ReactNode {
+  const tokenRe = /\[\[(CARD|CARD_LOADING):(\d+)\]\]/g;
+
+  if (typeof node === 'string') {
+    const out: React.ReactNode[] = [];
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = tokenRe.exec(node)) !== null) {
+      const [full, kind, idxStr] = m;
+      const idx = Number(idxStr);
+      const start = m.index;
+      if (start > last) out.push(node.slice(last, start));
+      if (kind === 'CARD_LOADING') {
+        out.push(<InlineCardMentionLoading key={`l-${idx}-${start}`} />);
+      } else {
+        const card = cardsByIndex[idx];
+        if (card) {
+          out.push(
+            <InlineCardMention
+              key={`c-${idx}-${start}`}
+              card={card}
+              onClick={onCardClick}
+            />
+          );
+        } else {
+          out.push(full);
+        }
+      }
+      last = start + full.length;
+    }
+    if (last < node.length) out.push(node.slice(last));
+    return out.length === 1 ? out[0] : out;
+  }
+
+  if (Array.isArray(node)) {
+    return node.map((child, i) =>
+      injectInlineTokens(child, cardsByIndex, onCardClick) as any
+    );
+  }
+
+  if (React.isValidElement(node)) {
+    const children = (node.props as any)?.children;
+    if (!children) return node;
+    return React.cloneElement(node as any, {
+      ...(node.props as any),
+      children: injectInlineTokens(children, cardsByIndex, onCardClick),
+    });
+  }
+
+  return node;
+}
+
+function isCardOnlyParagraphContent(node: React.ReactNode): boolean {
+  // After injection, a "card-only" paragraph tends to look like:
+  // [" ", <InlineCardMention ... />, " "] (possibly with newlines/spaces)
+  const isWhitespace = (x: unknown) => typeof x === 'string' && x.trim() === '';
+
+  if (React.isValidElement(node)) {
+    const t = (node.type as any);
+    return t === InlineCardMention || t === InlineCardMentionLoading;
+  }
+
+  if (Array.isArray(node)) {
+    const filtered = node.filter((n) => !isWhitespace(n));
+    return (
+      filtered.length === 1 &&
+      React.isValidElement(filtered[0]) &&
+      (((filtered[0] as any).type === InlineCardMention) || ((filtered[0] as any).type === InlineCardMentionLoading))
+    );
+  }
+
+  return false;
 }
 
 const InlineCardMentionLoading: React.FC = () => {
@@ -549,37 +666,51 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                           <h3 className="text-lg font-bold text-white leading-tight">{title}</h3>
                         </div>
                       )}
-                      <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
-                        {parseCardJsonMentions(content).map((part, idx) => {
-                          if (part.kind === 'text') return <React.Fragment key={`t-${idx}`}>{part.text}</React.Fragment>;
-                          if (part.kind === 'card_loading') {
-                            return (
-                              <React.Fragment key={`l-${idx}`}>
-                                {' '}
-                                <InlineCardMentionLoading />
-                                {' '}
-                              </React.Fragment>
-                            );
-                          }
+                      <div className="text-sm text-gray-300 leading-relaxed">
+                        {(() => {
+                          const { markdown, cardsByIndex } = buildMarkdownWithCardPlaceholders(content);
+                          const onCardClick = (pineconeId: string) => {
+                            printLog(`[AI Analysis] Card click: pineconeId=${pineconeId}`);
+                            if (typeof window !== 'undefined') {
+                              window.dispatchEvent(
+                                new CustomEvent('analysisCardClick', { detail: { pineconeId } }),
+                              );
+                            }
+                          };
+
                           return (
-                            <React.Fragment key={`c-${idx}`}>
-                              {' '}
-                              <InlineCardMention
-                                card={part.card}
-                                onClick={(pineconeId) => {
-                                  printLog(`[AI Analysis] Card click: pineconeId=${pineconeId}`);
-                                  // Let SearchInterface handle this and trigger playback/navigation
-                                  if (typeof window !== 'undefined') {
-                                    window.dispatchEvent(
-                                      new CustomEvent('analysisCardClick', { detail: { pineconeId } }),
-                                    );
-                                  }
-                                }}
-                              />
-                              {' '}
-                            </React.Fragment>
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm, remarkBreaks]}
+                              components={{
+                                // Inject our inline chips anywhere placeholders appear, without breaking markdown structure.
+                                p: ({ children }) => {
+                                  const injected = injectInlineTokens(children, cardsByIndex, onCardClick);
+                                  const isCardOnly = isCardOnlyParagraphContent(injected);
+                                  // Keep markdown spacing tight; especially for citation-only paragraphs.
+                                  return (
+                                    <p className={isCardOnly ? 'my-1' : 'my-2'}>
+                                      {injected}
+                                    </p>
+                                  );
+                                },
+                                ul: ({ children }) => <ul className="my-2 pl-5 list-disc space-y-1">{children}</ul>,
+                                ol: ({ children }) => <ol className="my-2 pl-5 list-decimal space-y-1">{children}</ol>,
+                                li: ({ children }) => (
+                                  <li className="my-1">
+                                    {injectInlineTokens(children, cardsByIndex, onCardClick)}
+                                  </li>
+                                ),
+                                strong: ({ children }) => <strong>{injectInlineTokens(children, cardsByIndex, onCardClick)}</strong>,
+                                em: ({ children }) => <em>{injectInlineTokens(children, cardsByIndex, onCardClick)}</em>,
+                                h1: ({ children }) => <h1 className="text-2xl font-bold text-white my-2">{children}</h1>,
+                                h2: ({ children }) => <h2 className="text-xl font-bold text-white my-2">{children}</h2>,
+                                h3: ({ children }) => <h3 className="text-lg font-semibold text-white my-2">{children}</h3>,
+                              }}
+                            >
+                              {markdown}
+                            </ReactMarkdown>
                           );
-                        })}
+                        })()}
                       </div>
                       {isAnalyzing && (
                         <div className="flex items-center gap-2 text-blue-400 text-sm pt-4">
