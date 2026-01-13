@@ -597,15 +597,14 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           {isCollapsed ? (
             <button
               onClick={() => setIsCollapsed(false)}
-              className="flex items-center justify-center h-full hover:bg-gray-900 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center h-full hover:bg-gray-900 transition-colors group"
               aria-label="Expand panel"
-              disabled={true}
             >
               <div className="flex flex-col items-center gap-2">
                 <BrainCircuit className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
                 <div
                   style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
-                  className="text-xs text-gray-800 group-hover:text-white transition-colors whitespace-nowrap"
+                  className="text-xs text-gray-400 group-hover:text-white transition-colors whitespace-nowrap"
                 >
                   AI Analysis
                 </div>
