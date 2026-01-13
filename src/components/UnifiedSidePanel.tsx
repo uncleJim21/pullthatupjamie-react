@@ -624,7 +624,11 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                     )}
                   </div>
                   <button
-                    onClick={() => setShowAnalysisSourceChooser(true)}
+                    onClick={() => {
+                      // Always allow reopening the analysis source chooser.
+                      setShowAnalysisModeChooser(false);
+                      setShowAnalysisSourceChooser(true);
+                    }}
                     className="text-gray-500 hover:text-white transition-colors p-1 rounded hover:bg-gray-900"
                     aria-label="Choose what to analyze"
                     title="Choose what to analyze"
@@ -634,7 +638,51 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                 </div>
 
                 <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
-                  {effectiveAnalysisSource === 'compiled_session' && !sessionId ? (
+                  {showAnalysisSourceChooser ? (
+                    <div className="max-w-xl w-full pt-6 text-gray-200">
+                      <div className="space-y-4">
+                        <div className="text-lg font-semibold text-white">Choose What to Analyze</div>
+
+                        <button
+                          onClick={() => {
+                            persistAnalysisSource('current_search');
+                            setShowAnalysisSourceChooser(false);
+                            // Move directly into the analysis phase
+                            void handleAnalyze('current_search');
+                          }}
+                          disabled={isAnalyzing}
+                          className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                            <TextSearch className="w-4 h-4 text-blue-400" />
+                            <span>Current Search (Recommended)</span>
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            Analyze the items currently on screen
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            persistAnalysisSource('compiled_session');
+                            setShowAnalysisSourceChooser(false);
+                            // Move directly into the analysis phase
+                            void handleAnalyze('compiled_session');
+                          }}
+                          disabled={isAnalyzing}
+                          className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                            <Layers className="w-4 h-4 text-gray-300" />
+                            <span>Compiled Session</span>
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            Analyze the items you compiled into your current session
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  ) : effectiveAnalysisSource === 'compiled_session' && !sessionId ? (
                     <div className="flex flex-col items-center justify-center h-full text-gray-500">
                       <BrainCircuit className="w-12 h-12 mb-4 opacity-50" />
                       <p className="text-sm text-center px-8">
