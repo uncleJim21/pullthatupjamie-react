@@ -293,6 +293,11 @@ interface UnifiedSidePanelProps {
 
   // AI Analysis: current on-screen results (used for "Current Search" analysis mode)
   currentSearchResults?: any[];
+
+  // Research session controls (for Context panel "add to research" toggle)
+  researchSessionShareLinks?: string[];
+  onAddToResearch?: (result: any) => void;
+  onRemoveFromResearch?: (shareLink: string) => void;
 }
 
 const DEFAULT_INSTRUCTIONS = "Analyze this research session and summarize the main themes, key insights, and definitive conclusion. Keep it succinct and to the point no more than a few sentences when focus is on a single episode. You can take a bit more liberty when talking about common themes or disagreements. Don't explicitly mention the word research session.";
@@ -320,7 +325,10 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   onCloseSessions,
   onOpenSession,
   onWidthChange,
-  currentSearchResults
+  currentSearchResults,
+  researchSessionShareLinks,
+  onAddToResearch,
+  onRemoveFromResearch
 }) => {
   // Determine which mode is active
   const [activeMode, setActiveMode] = useState<PanelMode>(PanelMode.CONTEXT);
@@ -587,6 +595,9 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           onWidthChange={() => {}} // We handle width reporting at the wrapper level
           isCollapsed={isCollapsed}
           onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+          researchSessionShareLinks={researchSessionShareLinks}
+          onAddToResearch={onAddToResearch}
+          onRemoveFromResearch={onRemoveFromResearch}
         />
       ) : isAnalysisMode ? (
         // Analysis Panel - matching PodcastContextPanel structure exactly

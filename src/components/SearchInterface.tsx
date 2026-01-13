@@ -3720,6 +3720,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   .reverse()
                   .find(item => item.type === 'podcast-search')?.data?.quotes || [])
           }
+          // Used by Context panel: add/remove the current paragraph to research
+          researchSessionShareLinks={researchSessionItems.map(item => item.shareLink)}
+          onAddToResearch={handleAddToResearchSession}
+          onRemoveFromResearch={handleRemoveFromResearchSession}
         />
       )}
     </div>

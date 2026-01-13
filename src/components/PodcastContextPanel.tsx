@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronLeft, Podcast, ChevronDown, ChevronUp, Play, ScanSearch, RotateCcw, RotateCw } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Podcast, ChevronDown, ChevronUp, Play, ScanSearch, RotateCcw, RotateCw, Layers, Plus, Minus } from 'lucide-react';
 import ContextService, { AdjacentParagraph, HierarchyResponse } from '../services/contextService.ts';
 import ChapterService, { Chapter } from '../services/chapterService.ts';
 import { printLog, HIERARCHY_COLORS } from '../constants/constants.ts';
@@ -44,6 +44,11 @@ interface PodcastContextPanelProps {
   // External collapse control (when part of UnifiedSidePanel)
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+
+  // Research session controls (optional)
+  researchSessionShareLinks?: string[];
+  onAddToResearch?: (result: any) => void;
+  onRemoveFromResearch?: (shareLink: string) => void;
 }
 
 const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
@@ -64,7 +69,10 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   autoPlayOnOpen,
   onWidthChange,
   isCollapsed: externalIsCollapsed,
-  onToggleCollapse
+  onToggleCollapse,
+  researchSessionShareLinks = [],
+  onAddToResearch,
+  onRemoveFromResearch
 }) => {
   const [paragraphs, setParagraphs] = useState<AdjacentParagraph[]>([]);
   const [hierarchy, setHierarchy] = useState<HierarchyResponse | null>(null);
@@ -104,6 +112,36 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const isParagraphId = !!paragraphId && paragraphIdPattern.test(paragraphId);
   const effectiveParagraphId = isParagraphId ? paragraphId : null;
   const effectiveChapterId = !isParagraphId ? paragraphId : null;
+
+  const isInResearchSession = Boolean(
+    effectiveParagraphId && researchSessionShareLinks.includes(effectiveParagraphId),
+  );
+
+  const handleToggleResearch = () => {
+    if (!effectiveParagraphId) return;
+    if (isInResearchSession) {
+      onRemoveFromResearch?.(effectiveParagraphId);
+      return;
+    }
+
+    // Build a minimal "result-like" shape compatible with SearchInterface's handleAddToResearchSession
+    const paragraph = paragraphs.find(p => p.id === effectiveParagraphId);
+    const quoteText = paragraph?.text || '';
+    const episodeMeta = hierarchy?.hierarchy.episode?.metadata;
+
+    onAddToResearch?.({
+      shareLink: effectiveParagraphId,
+      quote: quoteText,
+      summary: undefined,
+      headline: undefined,
+      episode: episodeMeta?.title || paragraph?.episode || 'Unknown Episode',
+      creator: episodeMeta?.creator || paragraph?.creator || 'Unknown Creator',
+      episodeImage: episodeMeta?.imageUrl || undefined,
+      date: episodeMeta?.publishedDate || new Date().toISOString(),
+      hierarchyLevel: 'paragraph',
+      coordinates3d: undefined,
+    });
+  };
 
   // Navigation functions for view history
   const pushView = (mode: ViewMode, chapter?: Chapter | null) => {
@@ -545,10 +583,33 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
             />
           </div>
 
-          {/* Time Display */}
-          <span className="text-xs text-gray-400 min-w-[48px] text-right font-mono mb-4">
-            {formatTime(current)}
-          </span>
+          {/* Time Display + Research toggle */}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs text-gray-400 min-w-[48px] text-right font-mono">
+              {formatTime(current)}
+            </span>
+
+            {/* Research toggle (near time) */}
+            {isParagraphId && effectiveParagraphId && (
+              <button
+                onClick={handleToggleResearch}
+                title={isInResearchSession ? 'Remove from current research items' : 'Add to current research items'}
+                aria-label={isInResearchSession ? 'Remove from current research items' : 'Add to current research items'}
+                className={`h-7 px-2 rounded-md border transition-colors flex items-center gap-1.5 ${
+                  isInResearchSession
+                    ? 'bg-white text-black border-white'
+                    : 'bg-black text-white border-gray-700 hover:bg-white hover:text-black hover:border-white'
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                {isInResearchSession ? (
+                  <Minus className="w-4 h-4" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -665,13 +726,15 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               )}
               <h3 className="text-sm font-medium text-gray-400">Details</h3>
             </div>
-            <button
-              onClick={() => setIsCollapsed(true)}
-              className="text-gray-400 hover:text-white transition-colors"
-              aria-label="Collapse panel"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsCollapsed(true)}
+                className="text-gray-400 hover:text-white transition-colors"
+                aria-label="Collapse panel"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4">
