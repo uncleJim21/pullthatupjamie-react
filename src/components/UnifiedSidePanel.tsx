@@ -178,7 +178,7 @@ interface UnifiedSidePanelProps {
   currentSearchResults?: any[];
 }
 
-const DEFAULT_INSTRUCTIONS = "Analyze this research session and summarize the main themes, key insights, and definitive conclusion. Keep it succinct and to the point no more than a few sentences when focuses on a single episode. You can take a bit more liberty when talking about common themes or disagreements. Don't explicitly mention the word research session.";
+const DEFAULT_INSTRUCTIONS = "Analyze this research session and summarize the main themes, key insights, and definitive conclusion. Keep it succinct and to the point no more than a few sentences when focus is on a single episode. You can take a bit more liberty when talking about common themes or disagreements. Don't explicitly mention the word research session.";
 
 export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   paragraphId,
