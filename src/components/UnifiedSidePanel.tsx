@@ -553,7 +553,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                 : 'bg-gray-900 border-gray-800 text-gray-500 hover:text-gray-300'
               }
             `}
-            title="AI Analysis (Coming Soon)"
+            title="AI Analysis (Beta)"
           >
             <BrainCircuit className="w-4 h-4" />
           </button>
@@ -611,13 +611,13 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
               className="flex items-center justify-center h-full hover:bg-gray-900 transition-colors group"
               aria-label="Expand panel"
             >
-              <div className="flex flex-col items-center gap-2">
+                <div className="flex flex-col items-center gap-2">
                 <BrainCircuit className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
                 <div
                   style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
                   className="text-xs text-gray-400 group-hover:text-white transition-colors whitespace-nowrap"
                 >
-                  AI Analysis
+                  AI Analysis (Beta)
                 </div>
               </div>
             </button>
@@ -628,7 +628,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
               <div className="flex-1 flex flex-col border-r border-gray-800 min-w-0">
                 <div className="p-3 border-b border-gray-800 bg-[#0A0A0A] flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-400">AI Analysis</h3>
+                    <h3 className="text-sm font-medium text-gray-400">AI Analysis (Beta)</h3>
                     {effectiveSourceLabel && (
                       <span className="text-[11px] text-gray-600 truncate">• {effectiveSourceLabel}</span>
                     )}

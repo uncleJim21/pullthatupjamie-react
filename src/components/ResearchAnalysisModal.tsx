@@ -109,7 +109,7 @@ export const ResearchAnalysisPanel: React.FC<ResearchAnalysisPanelProps> = ({
           <div className="flex flex-col items-center gap-2">
             <BrainCircuit className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
             <div className="writing-mode-vertical text-xs text-gray-400 group-hover:text-white transition-colors whitespace-nowrap">
-              AI Analysis
+              AI Analysis (Beta)
             </div>
           </div>
         </button>
@@ -122,7 +122,7 @@ export const ResearchAnalysisPanel: React.FC<ResearchAnalysisPanelProps> = ({
           <div className="p-3 border-b border-gray-800 flex items-center gap-2 justify-between bg-[#0A0A0A]">
             <div className="flex items-center gap-2">
               <BrainCircuit className="w-4 h-4 text-blue-400" />
-              <h3 className="text-sm font-medium text-gray-400">AI Analysis</h3>
+              <h3 className="text-sm font-medium text-gray-400">AI Analysis (Beta)</h3>
             </div>
             <button
               onClick={() => setIsCollapsed(true)}

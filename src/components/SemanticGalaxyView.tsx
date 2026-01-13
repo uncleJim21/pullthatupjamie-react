@@ -2087,12 +2087,12 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
                       }, 0);
                     }}
                     className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
-                    title="AI Analysis"
-                    aria-label="AI Analysis"
+                    title="AI Analysis (Beta)"
+                    aria-label="AI Analysis (Beta)"
                   >
                     <BrainCircuit className="w-3.5 h-3.5 mx-auto" />
                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      AI Analysis
+                      AI Analysis (Beta)
                     </span>
                   </button>
                   
