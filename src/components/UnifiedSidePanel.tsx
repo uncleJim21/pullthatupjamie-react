@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon } from 'lucide-react';
-import { analyzeResearchSession } from '../services/researchSessionAnalysisService.ts';
+import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers } from 'lucide-react';
+import { analyzeAdHocResearch, analyzeResearchSession } from '../services/researchSessionAnalysisService.ts';
 import { getCurrentSessionId, fetchAllResearchSessions, ResearchSession } from '../services/researchSessionService.ts';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
 import { AuthConfig, printLog } from '../constants/constants.ts';
@@ -173,9 +173,12 @@ interface UnifiedSidePanelProps {
   
   // Width callback for layout
   onWidthChange?: (width: number) => void;
+
+  // AI Analysis: current on-screen results (used for "Current Search" analysis mode)
+  currentSearchResults?: any[];
 }
 
-const DEFAULT_INSTRUCTIONS = "Analyze this research session and summarize the main themes, key insights, and definitive conclusion. Keep it succinct and to the point. Don't explicitly mention the word research session.";
+const DEFAULT_INSTRUCTIONS = "Analyze this research session and summarize the main themes, key insights, and definitive conclusion. Keep it succinct and to the point no more than a few sentences when focuses on a single episode. You can take a bit more liberty when talking about common themes or disagreements. Don't explicitly mention the word research session.";
 
 export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   paragraphId,
@@ -199,7 +202,8 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   isSessionsOpen,
   onCloseSessions,
   onOpenSession,
-  onWidthChange
+  onWidthChange,
+  currentSearchResults
 }) => {
   // Determine which mode is active
   const [activeMode, setActiveMode] = useState<PanelMode>(PanelMode.CONTEXT);
@@ -213,6 +217,34 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   const [instructions] = useState(DEFAULT_INSTRUCTIONS);
   const contentRef = useRef<HTMLDivElement>(null);
   const sessionId = propSessionId || getCurrentSessionId();
+
+  type AnalysisSource = 'current_search' | 'compiled_session';
+  const [analysisSource, setAnalysisSource] = useState<AnalysisSource | null>(() => {
+    try {
+      const raw = localStorage.getItem('userSettings');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const v = parsed?.aiAnalysisSource;
+      return v === 'current_search' || v === 'compiled_session' ? v : null;
+    } catch {
+      return null;
+    }
+  });
+  const [showAnalysisSourceChooser, setShowAnalysisSourceChooser] = useState(false);
+  const [showAnalysisModeChooser, setShowAnalysisModeChooser] = useState(true);
+
+  const persistAnalysisSource = (source: AnalysisSource) => {
+    try {
+      const raw = localStorage.getItem('userSettings');
+      const parsed = raw ? JSON.parse(raw) : {};
+      parsed.aiAnalysisSource = source;
+      localStorage.setItem('userSettings', JSON.stringify(parsed));
+    } catch (e) {
+      // If localStorage/userSettings is corrupted, overwrite with a minimal object
+      localStorage.setItem('userSettings', JSON.stringify({ aiAnalysisSource: source }));
+    }
+    setAnalysisSource(source);
+  };
   
   // Sessions state
   const [sessions, setSessions] = useState<ResearchSession[]>([]);
@@ -240,30 +272,58 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
     if (!isPanelOpen) {
       setAnalysis('');
       setError(null);
+      setShowAnalysisSourceChooser(false);
+      setShowAnalysisModeChooser(true);
     }
   }, [isPanelOpen]);
 
-  const handleAnalyze = async () => {
-    if (!sessionId) {
-      setError('No research session found. Please save your session first.');
+  const handleAnalyze = async (overrideSource?: AnalysisSource) => {
+    const effectiveSource = overrideSource || analysisSource;
+    if (!effectiveSource) {
+      setShowAnalysisSourceChooser(true);
       return;
     }
 
-    printLog(`[AI Analysis] AnalyzeNow clicked: sessionId=${sessionId} instructionsLen=${instructions.length}`);
+    const uniqueIds: string[] = [];
+    const seen = new Set<string>();
+    if (effectiveSource === 'current_search') {
+      for (const r of currentSearchResults || []) {
+        const id = (r as any)?.shareLink || (r as any)?.id;
+        if (typeof id === 'string' && id && !seen.has(id)) {
+          uniqueIds.push(id);
+          seen.add(id);
+          if (uniqueIds.length >= 50) break;
+        }
+      }
+      if (uniqueIds.length === 0) {
+        setError('No current search results to analyze.');
+        return;
+      }
+    } else {
+      if (!sessionId) {
+        setError('No research session found. Please save your session first.');
+        return;
+      }
+    }
+
+    const compiledSessionId = sessionId || undefined;
+    printLog(
+      `[AI Analysis] AnalyzeNow clicked: source=${effectiveSource} sessionId=${sessionId || 'null'} ids=${uniqueIds.length} instructionsLen=${instructions.length}`,
+    );
     setIsAnalyzing(true);
     setError(null);
     setAnalysis('');
 
-    const result = await analyzeResearchSession(
-      sessionId,
-      instructions,
-      (chunk) => {
-        setAnalysis(prev => prev + chunk);
-        if (contentRef.current) {
-          contentRef.current.scrollTop = contentRef.current.scrollHeight;
-        }
+    const onChunk = (chunk: string) => {
+      setAnalysis(prev => prev + chunk);
+      if (contentRef.current) {
+        contentRef.current.scrollTop = contentRef.current.scrollHeight;
       }
-    );
+    };
+
+    const result = effectiveSource === 'current_search'
+      ? await analyzeAdHocResearch(uniqueIds, instructions, onChunk)
+      : await analyzeResearchSession(compiledSessionId as string, instructions, onChunk);
 
     setIsAnalyzing(false);
 
@@ -312,6 +372,14 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
       printLog(`[AI Analysis] Tab active: sessionId=${sessionId || 'null'} analysisLen=${analysis.length}`);
     }
   }, [activeMode, isPanelOpen, sessionId, analysis.length]);
+
+  const effectiveAnalysisSource = analysisSource;
+  const effectiveSourceLabel =
+    effectiveAnalysisSource === 'current_search'
+      ? 'Current Search'
+      : effectiveAnalysisSource === 'compiled_session'
+        ? 'Compiled Session'
+        : null;
 
   // Calculate panel width including tabs
   const panelWidth = !isPanelOpen ? 0 : isCollapsed ? 32 : 600;
@@ -431,12 +499,25 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
             <div className="flex-1 flex overflow-hidden">
               {/* Left Side - Main Content */}
               <div className="flex-1 flex flex-col border-r border-gray-800 min-w-0">
-                <div className="p-3 border-b border-gray-800 bg-[#0A0A0A]">
-                  <h3 className="text-sm font-medium text-gray-400">AI Analysis</h3>
+                <div className="p-3 border-b border-gray-800 bg-[#0A0A0A] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h3 className="text-sm font-medium text-gray-400">AI Analysis</h3>
+                    {effectiveSourceLabel && (
+                      <span className="text-[11px] text-gray-600 truncate">• {effectiveSourceLabel}</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowAnalysisSourceChooser(true)}
+                    className="text-gray-500 hover:text-white transition-colors p-1 rounded hover:bg-gray-900"
+                    aria-label="Choose what to analyze"
+                    title="Choose what to analyze"
+                  >
+                    <Settings2 className="w-4 h-4" />
+                  </button>
                 </div>
 
                 <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
-                  {!sessionId ? (
+                  {effectiveAnalysisSource === 'compiled_session' && !sessionId ? (
                     <div className="flex flex-col items-center justify-center h-full text-gray-500">
                       <BrainCircuit className="w-12 h-12 mb-4 opacity-50" />
                       <p className="text-sm text-center px-8">
@@ -510,15 +591,107 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                   ) : (
                     <div className="flex flex-col h-full text-gray-200">
                       <div className="max-w-xl w-full pt-6">
-                        <div className="mb-2 text-lg font-semibold text-white">AI Analysis</div>
-                        <div className="text-sm text-gray-400 mb-6">
-                          Turn your saved podcast clips into key themes, takeaways, and next questions.
-                        </div>
+                        {showAnalysisModeChooser ? (
+                          <>
+                            <div className="mb-2 text-lg font-semibold text-white">AI Analysis</div>
+                            <div className="text-sm text-gray-400 mb-6">
+                              Turn your saved podcast clips into key themes, takeaways, and next questions.
+                            </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <button
+                                onClick={() => {
+                                  setShowAnalysisModeChooser(false);
+                                  // Step 3: choose source (or run immediately if already chosen)
+                                  if (!analysisSource) {
+                                    setShowAnalysisSourceChooser(true);
+                                    return;
+                                  }
+                                  void handleAnalyze();
+                                }}
+                                disabled={isAnalyzing}
+                                className="p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                              >
+                                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
+                                  <BrainCircuit className="w-4 h-4 text-blue-400" />
+                                  <span>Analyze</span>
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  Use an LLM to summarize and expand on your selected source
+                                </div>
+                              </button>
+
+                              <button
+                                disabled={true}
+                                className="p-4 rounded-lg border border-gray-800 bg-gray-950/40 opacity-60 cursor-not-allowed text-left"
+                              >
+                                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
+                                  <Bot className="w-4 h-4 text-gray-400" />
+                                  <span>Agent Mode (Soon™)</span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  Use an Agent to perform searches, sift through content and explain high signal content related to your research intent
+                                </div>
+                              </button>
+                            </div>
+                          </>
+                        ) : (!effectiveAnalysisSource || showAnalysisSourceChooser) ? (
+                          <div className="space-y-4">
+                            <div className="text-lg font-semibold text-white">Choose What to Analyze</div>
+
+                            <button
+                              onClick={() => {
+                                persistAnalysisSource('current_search');
+                                setShowAnalysisSourceChooser(false);
+                                void handleAnalyze('current_search');
+                              }}
+                              disabled={isAnalyzing}
+                              className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                                <TextSearch className="w-4 h-4 text-blue-400" />
+                                <span>Current Search (Recommended)</span>
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">
+                                Analyze the items currently on screen
+                              </div>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                persistAnalysisSource('compiled_session');
+                                setShowAnalysisSourceChooser(false);
+                                void handleAnalyze('compiled_session');
+                              }}
+                              disabled={isAnalyzing}
+                              className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                                <Layers className="w-4 h-4 text-gray-300" />
+                                <span>Compiled Session</span>
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">
+                                Analyze the items you compiled into your current session
+                              </div>
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="mb-2 text-lg font-semibold text-white">AI Analysis (Beta)</div>
+                            <div className="text-sm text-gray-400 mb-1">
+                              Turn your saved podcast clips into key themes, takeaways, and next questions.
+                            </div>
+                            <div className="text-xs text-gray-600 mb-6">
+                              (ChatGPT 4o-mini)
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
                           <button
-                            onClick={handleAnalyze}
-                            disabled={!sessionId || isAnalyzing}
+                            onClick={() => void handleAnalyze()}
+                            disabled={
+                              isAnalyzing ||
+                              (effectiveAnalysisSource === 'compiled_session' ? !sessionId : false)
+                            }
                             className="p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
                           >
                             <div className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
@@ -526,7 +699,9 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                               <span>Analyze Now</span>
                             </div>
                             <div className="text-xs text-gray-400">
-                              Use an LLM to summarize and expand on your compiled research
+                              {effectiveAnalysisSource === 'current_search'
+                                ? 'Use an LLM to summarize and expand on the items currently on screen'
+                                : 'Use an LLM to summarize and expand on your compiled research'}
                             </div>
                           </button>
 
@@ -547,6 +722,8 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                         <div className="mt-6 text-xs text-gray-600">
                           Session ID: <span className="text-gray-500">{sessionId || 'none'}</span>
                         </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
@@ -556,7 +733,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                 {!isAnalyzing && analysis && (
                   <div className="border-t border-gray-800 p-3 bg-[#0A0A0A]">
                     <button
-                      onClick={handleAnalyze}
+                      onClick={() => void handleAnalyze()}
                       disabled={!sessionId}
                       className="w-full px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-900 disabled:cursor-not-allowed text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >

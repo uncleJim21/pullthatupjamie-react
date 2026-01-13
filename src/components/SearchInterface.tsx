@@ -3712,6 +3712,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               await performQuoteSearch(keyword, override);
             }
           }}
+          // Used by AI Analysis: "Current Search" mode (what's on screen right now)
+          currentSearchResults={
+            resultViewStyle === SearchResultViewStyle.GALAXY
+              ? galaxyResults
+              : ([...conversation]
+                  .reverse()
+                  .find(item => item.type === 'podcast-search')?.data?.quotes || [])
+          }
         />
       )}
     </div>

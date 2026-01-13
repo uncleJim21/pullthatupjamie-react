@@ -298,6 +298,60 @@ export async function createResearchSession(items: ResearchSessionItem[]): Promi
 }
 
 /**
+ * Create a new research session without persisting it as the "current" session in localStorage.
+ * Useful for one-off analysis of transient sets (e.g. "current search results").
+ */
+export async function createEphemeralResearchSession(items: ResearchSessionItem[]): Promise<ResearchSessionResponse> {
+  try {
+    // Enforce 50 item limit
+    if (items.length > MAX_RESEARCH_ITEMS) {
+      throw new Error(`Maximum ${MAX_RESEARCH_ITEMS} items allowed per session`);
+    }
+
+    const token = localStorage.getItem('auth_token');
+    const clientId = token ? undefined : getOrCreateClientId();
+    const pineconeIds = itemsToPineconeIds(items);
+    const itemsPayload = itemsToPayload(items);
+    const lastItemMetadata = buildLastItemMetadata(items);
+    const coordinatesById = buildCoordinatesById(items);
+
+    const payload: Record<string, unknown> = {
+      pineconeIds,
+      items: itemsPayload,
+      lastItemMetadata,
+    };
+
+    if (coordinatesById) {
+      payload.coordinatesById = coordinatesById;
+    }
+
+    if (clientId) {
+      payload.clientId = clientId;
+    }
+
+    const response = await fetch(`${API_URL}/api/research-sessions`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.success && data.data?.id) {
+      printLog(`[ResearchSession] createEphemeralResearchSession(): received id=${data.data.id}`);
+    }
+    return data;
+  } catch (error) {
+    console.error('Create ephemeral research session error:', error);
+    throw error;
+  }
+}
+
+/**
  * Update an existing research session (PATCH) with optimistic locking
  */
 export async function updateResearchSession(

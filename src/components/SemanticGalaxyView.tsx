@@ -4,7 +4,7 @@ import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS, printLog } from '../constants/constants.ts';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
-import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Bookmark, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Layers, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
@@ -1920,7 +1920,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
                 className="w-full flex items-center justify-between mb-2 hover:text-gray-300 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <Bookmark className="w-3.5 h-3.5" />
+                  <Layers className="w-3.5 h-3.5" />
                   <span className="text-[0.65rem] font-medium">Research</span>
                   {researchSessionItems.length > 0 && (
                     <span className="text-[0.6rem] text-gray-400">
@@ -2171,7 +2171,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
               label: researchSessionShareLinks.includes(contextMenu.result.shareLink)
                 ? 'Already in Research'
                 : 'Add to Research',
-              icon: <Bookmark className="w-4 h-4" />,
+              icon: <Layers className="w-4 h-4" />,
               onClick: () => onAddToResearch(contextMenu.result),
               disabled: researchSessionShareLinks.includes(contextMenu.result.shareLink),
             },
