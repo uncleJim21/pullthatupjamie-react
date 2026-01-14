@@ -3413,7 +3413,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               : null),
           }}
         >
-          <div className="w-full max-w-[40rem] flex flex-col">
+          <div className={`w-full flex flex-col ${isNarrowLayout ? 'max-w-[22rem]' : 'max-w-[40rem]'}`}>
             {!DISABLE_CLIPPING && searchMode === 'podcast-search' && !isAnyModalOpen() && (
               <div className="flex gap-3">
                 <div className="flex-1">
@@ -3465,7 +3465,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               <div className="flex flex-col gap-2 relative">
                 {/* Floating scope switch and arrow - above the grid, centered on filter button */}
                 {!!adminFeedId && searchMode === 'podcast-search' && (
-                  <div className="absolute bottom-full mb-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-50">
+                  <div
+                    className={`absolute bottom-full mb-0 flex flex-col gap-1 z-50 ${
+                      // On narrow, right-align to keep the segmented control from clipping off-screen.
+                      isNarrowLayout ? 'right-0 items-end' : 'left-1/2 -translate-x-1/2 items-center'
+                    }`}
+                  >
                     {/* Scope switch with slide animation */}
                     <div className={`transition-all duration-300 ${
                       showScopeSlideout 
