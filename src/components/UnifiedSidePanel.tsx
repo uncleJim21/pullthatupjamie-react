@@ -299,6 +299,9 @@ interface UnifiedSidePanelProps {
   researchSessionShareLinks?: string[];
   onAddToResearch?: (result: any) => void;
   onRemoveFromResearch?: (shareLink: string) => void;
+  // Track navigation for the Details mini player
+  onPreviousTrack?: () => void;
+  onNextTrack?: () => void;
 
   // Bottom layout: allow parent to treat the panel as "expanded only" and collapse back
   // to a mini player UI. When provided, the bottom-sheet will render a single down-chevron
@@ -337,6 +340,8 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   researchSessionShareLinks,
   onAddToResearch,
   onRemoveFromResearch,
+  onPreviousTrack,
+  onNextTrack,
   onRequestCollapseToMiniPlayer,
   defaultSheetMode = 'peek',
 }) => {
@@ -704,6 +709,8 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                   researchSessionShareLinks={researchSessionShareLinks}
                   onAddToResearch={onAddToResearch}
                   onRemoveFromResearch={onRemoveFromResearch}
+                  onPreviousTrack={onPreviousTrack}
+                  onNextTrack={onNextTrack}
                 />
               </div>
             ) : isAnalysisMode ? (
@@ -1164,6 +1171,8 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           researchSessionShareLinks={researchSessionShareLinks}
           onAddToResearch={onAddToResearch}
           onRemoveFromResearch={onRemoveFromResearch}
+          onPreviousTrack={onPreviousTrack}
+          onNextTrack={onNextTrack}
         />
       ) : isAnalysisMode ? (
         // Analysis Panel - matching PodcastContextPanel structure exactly

@@ -3879,6 +3879,87 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           researchSessionShareLinks={researchSessionItems.map(item => item.shareLink)}
           onAddToResearch={handleAddToResearchSession}
           onRemoveFromResearch={handleRemoveFromResearchSession}
+          onPreviousTrack={
+            selectedAudioContext && currentResultIndex > 0 ? () => {
+              const prevIndex = currentResultIndex - 1;
+              const prevResult = galaxyResults[prevIndex];
+              if (!prevResult) return;
+              printLog(`[Navigation] Moving to previous result at index ${prevIndex}`);
+              setCurrentResultIndex(prevIndex);
+              setSelectedParagraphId(prevResult.shareLink);
+              setSelectedAudioContext({
+                audioUrl: prevResult.audioUrl,
+                timeContext: {
+                  start_time: prevResult.timeContext?.start_time ?? 0,
+                  end_time: prevResult.timeContext?.end_time ?? 0,
+                },
+                episode: prevResult.episode,
+                episodeImage: prevResult.episodeImage || '',
+                creator: prevResult.creator,
+                listenLink: prevResult.listenLink,
+                date: prevResult.date,
+                quote: prevResult.quote,
+                summary: prevResult.summary,
+                headline: prevResult.headline,
+                hierarchyLevel: prevResult.hierarchyLevel,
+                shareLink: prevResult.shareLink,
+              });
+
+              // Always auto-play when user explicitly navigates tracks from the player UI.
+              if (prevResult.audioUrl) {
+                window.dispatchEvent(
+                  new CustomEvent('playAudioTrack', {
+                    detail: {
+                      id: prevResult.shareLink,
+                      audioUrl: prevResult.audioUrl,
+                      startTime: prevResult.timeContext?.start_time ?? 0,
+                      endTime: prevResult.timeContext?.end_time,
+                    },
+                  }),
+                );
+              }
+            } : undefined
+          }
+          onNextTrack={
+            selectedAudioContext && currentResultIndex < galaxyResults.length - 1 ? () => {
+              const nextIndex = currentResultIndex + 1;
+              const nextResult = galaxyResults[nextIndex];
+              if (!nextResult) return;
+              printLog(`[Navigation] Moving to next result at index ${nextIndex}`);
+              setCurrentResultIndex(nextIndex);
+              setSelectedParagraphId(nextResult.shareLink);
+              setSelectedAudioContext({
+                audioUrl: nextResult.audioUrl,
+                timeContext: {
+                  start_time: nextResult.timeContext?.start_time ?? 0,
+                  end_time: nextResult.timeContext?.end_time ?? 0,
+                },
+                episode: nextResult.episode,
+                episodeImage: nextResult.episodeImage || '',
+                creator: nextResult.creator,
+                listenLink: nextResult.listenLink,
+                date: nextResult.date,
+                quote: nextResult.quote,
+                summary: nextResult.summary,
+                headline: nextResult.headline,
+                hierarchyLevel: nextResult.hierarchyLevel,
+                shareLink: nextResult.shareLink,
+              });
+
+              if (nextResult.audioUrl) {
+                window.dispatchEvent(
+                  new CustomEvent('playAudioTrack', {
+                    detail: {
+                      id: nextResult.shareLink,
+                      audioUrl: nextResult.audioUrl,
+                      startTime: nextResult.timeContext?.start_time ?? 0,
+                      endTime: nextResult.timeContext?.end_time,
+                    },
+                  }),
+                );
+              }
+            } : undefined
+          }
         />
       )}
     </div>

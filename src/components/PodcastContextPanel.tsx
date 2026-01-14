@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BookText, ChevronRight, ChevronLeft, Info, Podcast, ChevronDown, ChevronUp, Play, ScanSearch, RotateCcw, RotateCw, Layers, Plus, Minus } from 'lucide-react';
+import { BookText, ChevronRight, ChevronLeft, Info, Podcast, ChevronDown, ChevronUp, Play, ScanSearch, RotateCcw, RotateCw, Layers, Plus, Minus, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import ContextService, { AdjacentParagraph, HierarchyResponse } from '../services/contextService.ts';
 import ChapterService, { Chapter } from '../services/chapterService.ts';
 import { printLog, HIERARCHY_COLORS } from '../constants/constants.ts';
@@ -50,6 +50,10 @@ interface PodcastContextPanelProps {
   researchSessionShareLinks?: string[];
   onAddToResearch?: (result: any) => void;
   onRemoveFromResearch?: (shareLink: string) => void;
+
+  // Track navigation (optional): jump to previous/next clip in the current results list.
+  onPreviousTrack?: () => void;
+  onNextTrack?: () => void;
 }
 
 const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
@@ -74,7 +78,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   onToggleCollapse,
   researchSessionShareLinks = [],
   onAddToResearch,
-  onRemoveFromResearch
+  onRemoveFromResearch,
+  onPreviousTrack,
+  onNextTrack,
 }) => {
   const [paragraphs, setParagraphs] = useState<AdjacentParagraph[]>([]);
   const [hierarchy, setHierarchy] = useState<HierarchyResponse | null>(null);
@@ -575,6 +581,30 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                 <RotateCw size={10} />
               </button>
             </div>
+
+            {/* Row 3: Track navigation (prev/next) */}
+            {(onPreviousTrack || onNextTrack) && (
+              <div className="flex gap-1">
+                <button
+                  onClick={onPreviousTrack}
+                  disabled={!onPreviousTrack}
+                  className="p-1 rounded-full text-white transition-colors hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Previous clip"
+                  aria-label="Previous clip"
+                >
+                  <ChevronsLeft size={10} />
+                </button>
+                <button
+                  onClick={onNextTrack}
+                  disabled={!onNextTrack}
+                  className="p-1 rounded-full text-white transition-colors hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Next clip"
+                  aria-label="Next clip"
+                >
+                  <ChevronsRight size={10} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Progress Bar */}
@@ -654,12 +684,16 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         <div className={`flex-1 min-h-0 overflow-hidden ${isBottomLayout ? 'flex flex-col' : 'flex'}`}>
         {/* Left Side - Adjacent Paragraphs (Hidden in Chapter Mode) */}
         {viewMode !== ViewMode.CHAPTER && (!isBottomLayout || mobileView === 'context') && (
-          <div className={`flex-1 flex flex-col min-w-0 ${isBottomLayout ? '' : 'border-r border-gray-800'}`}>
+          <div className={`flex-1 flex flex-col min-w-0 min-h-0 ${isBottomLayout ? '' : 'border-r border-gray-800'}`}>
           <div className="p-3 border-b border-gray-800 bg-[#0A0A0A]">
             <h3 className="text-sm font-medium text-gray-400">Context</h3>
           </div>
           
-          <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
+          <div
+            ref={contentRef}
+            className="flex-1 overflow-y-auto p-4"
+            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+          >
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
@@ -755,7 +789,10 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
             </div>
           </div>
           
-          <div className="flex-1 min-h-0 overflow-y-auto p-4">
+          <div
+            className="flex-1 min-h-0 overflow-y-auto p-4"
+            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+          >
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />

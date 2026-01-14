@@ -225,7 +225,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
           {/* Episode Image - Simple responsive sizing focused on mobile */}
           <div className="flex-shrink-0">
             {episodeImage && !imageError ? (
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded overflow-hidden relative bg-gray-800">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded overflow-hidden relative bg-gray-800">
                 {!imageLoaded && (
                   <div className="absolute inset-0 bg-gray-800 animate-pulse" />
                 )}
@@ -242,7 +242,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
                 />
               </div>
             ) : (
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded bg-gray-800 flex items-center justify-center">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded bg-gray-800 flex items-center justify-center">
                 <Podcast className="w-6 h-6 md:w-8 md:h-8 text-gray-600" />
               </div>
             )}
@@ -286,7 +286,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
               <div className="flex justify-end">
                 <button
                   onClick={() => onExpandChange(!isExpanded)}
-                  className="h-8 w-11 md:h-10 md:w-14 flex items-center justify-center rounded-md border border-gray-700 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                  className="h-8 w-14 md:h-10 md:w-[68px] flex items-center justify-center rounded-md border border-gray-700 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
                   aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
                   title={isExpanded ? 'Collapse' : 'Expand'}
                 >
