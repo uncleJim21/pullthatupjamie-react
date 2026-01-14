@@ -517,6 +517,34 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     }
   };
 
+  // When a user selects a chapter (especially from "All Chapters"), we expect it to jump and play.
+  // This mirrors the existing paragraph click behavior (seek + ensure playback).
+  const playSelectedChapter = (chapter: Chapter) => {
+    if (!effectiveAudioUrl) return;
+    const startTime = chapter.startTime;
+    const endTime = chapter.endTime;
+
+    // Notify external listeners (e.g., list view) just like paragraph clicks
+    if (onTimestampClick) {
+      onTimestampClick(startTime);
+    }
+
+    if (!isContextTrackActive) {
+      void playTrack({
+        id: contextTrackId,
+        audioUrl: effectiveAudioUrl,
+        startTime,
+        endTime,
+      });
+      return;
+    }
+
+    seekTo(startTime);
+    if (!contextIsPlaying) {
+      void togglePlay();
+    }
+  };
+
   const renderEpisodeMiniPlayer = () => {
     if (!effectiveAudioUrl) return null;
     const current = effectiveCurrentTime;
@@ -691,8 +719,12 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
           
           <div
             ref={contentRef}
-            className="flex-1 overflow-y-auto p-4"
-            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+            className={`flex-1 overflow-y-auto p-4 ${isBottomLayout ? 'pb-24' : ''}`}
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
+              overscrollBehavior: 'contain',
+            }}
           >
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -790,8 +822,12 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
           </div>
           
           <div
-            className="flex-1 min-h-0 overflow-y-auto p-4"
-            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+            className={`flex-1 min-h-0 overflow-y-auto p-4 ${isBottomLayout ? 'pb-24' : ''}`}
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
+              overscrollBehavior: 'contain',
+            }}
           >
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -1016,12 +1052,13 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                 {/* All Chapters List */}
                 <div className="pt-4 border-t border-gray-800">
                   <p className="text-xs text-gray-500 mb-3">ALL CHAPTERS ({episodeChapters.length})</p>
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                  <div className={`space-y-2 ${isBottomLayout ? '' : 'max-h-[400px] overflow-y-auto pr-2'}`}>
                     {episodeChapters.map((chapter) => (
                       <div
                         key={chapter.id}
                         onClick={() => {
                           setSelectedChapter(chapter);
+                          playSelectedChapter(chapter);
                         }}
                         className={`p-2 rounded cursor-pointer transition-colors ${
                           selectedChapter.id === chapter.id
@@ -1138,6 +1175,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                         if (currentChapter) {
                           setSelectedChapter(currentChapter);
                           pushView(ViewMode.CHAPTER, currentChapter);
+                          playSelectedChapter(currentChapter);
                         }
                       }}
                     >
