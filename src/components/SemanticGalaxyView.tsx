@@ -1477,6 +1477,22 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   const [cameraAnimKey, setCameraAnimKey] = useState(0); // Force remount on results change
   const cameraAnimationRef = useRef<CameraAnimationState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasDomRef = useRef<HTMLCanvasElement | null>(null);
+  const pinchRef = useRef<{
+    active: boolean;
+    pointers: Map<number, { x: number; y: number }>;
+    startDistancePx: number;
+    startCamDistance: number;
+    startDir: THREE.Vector3;
+    target: THREE.Vector3;
+  }>({
+    active: false,
+    pointers: new Map(),
+    startDistancePx: 0,
+    startCamDistance: 0,
+    startDir: new THREE.Vector3(0, 0, 1),
+    target: new THREE.Vector3(0, 0, 0),
+  });
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ result: QuoteResult; position: { x: number; y: number } } | null>(null);
@@ -1610,7 +1626,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   }, []);
 
   // Hard-disable the problematic touch gestures in OrbitControls on touch-like pointers.
-  // Keep 1-finger rotate; disable pinch-zoom + two-finger pan/dolly (these are the crashing paths).
+  // Keep 1-finger rotate; disable OrbitControls pinch-zoom + two-finger pan/dolly (these are the crashing paths).
+  // We'll implement our own pinch-to-zoom on the canvas element (below) to re-enable zoom safely.
   useEffect(() => {
     const c = controlsRef.current;
     if (!c) return;
@@ -1626,6 +1643,125 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       c.enablePan = true;
       // Leave default touches mapping when not touch-like.
     }
+  }, [isTouchLikePointer]);
+
+  // Safe pinch-to-zoom (mobile): adjust camera distance along the OrbitControls target vector.
+  // We attach native pointer listeners in capture phase so OrbitControls never sees 2-finger gestures.
+  useEffect(() => {
+    const el = canvasDomRef.current;
+    if (!el) return;
+
+    const getTwo = () => {
+      const pts = Array.from(pinchRef.current.pointers.values());
+      if (pts.length < 2) return null;
+      return [pts[0], pts[1]] as const;
+    };
+
+    const distancePx = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      Math.hypot(a.x - b.x, a.y - b.y);
+
+    const beginPinchIfReady = () => {
+      if (!isTouchLikePointer) return;
+      if (pinchRef.current.active) return;
+      if (pinchRef.current.pointers.size < 2) return;
+
+      const cam = cameraRef.current;
+      const controls = controlsRef.current;
+      if (!cam || !controls) return;
+
+      const two = getTwo();
+      if (!two) return;
+      const d = distancePx(two[0], two[1]);
+      if (!Number.isFinite(d) || d <= 0) return;
+
+      const target = (controls.target?.clone?.() as THREE.Vector3) ?? new THREE.Vector3(0, 0, 0);
+      const offset = cam.position.clone().sub(target);
+      const startCamDistance = offset.length();
+      if (!Number.isFinite(startCamDistance) || startCamDistance <= 0) return;
+
+      pinchRef.current.active = true;
+      pinchRef.current.startDistancePx = d;
+      pinchRef.current.startCamDistance = startCamDistance;
+      pinchRef.current.startDir = offset.normalize();
+      pinchRef.current.target = target;
+    };
+
+    const updatePinch = () => {
+      if (!pinchRef.current.active) return;
+      if (pinchRef.current.pointers.size < 2) return;
+      const cam = cameraRef.current;
+      const controls = controlsRef.current;
+      if (!cam || !controls) return;
+
+      const two = getTwo();
+      if (!two) return;
+      const d = distancePx(two[0], two[1]);
+      if (!Number.isFinite(d) || d <= 0) return;
+
+      const scale = pinchRef.current.startDistancePx / d; // spread fingers => d bigger => scale < 1 (zoom in)
+      const rawDistance = pinchRef.current.startCamDistance * scale;
+
+      const minD = typeof controls.minDistance === 'number' ? controls.minDistance : 5;
+      const maxD = typeof controls.maxDistance === 'number' ? controls.maxDistance : 50;
+      const clamped = Math.max(minD, Math.min(maxD, rawDistance));
+
+      cam.position
+        .copy(pinchRef.current.target)
+        .add(pinchRef.current.startDir.clone().multiplyScalar(clamped));
+      controls.update?.();
+    };
+
+    const endPinchIfNeeded = () => {
+      if (pinchRef.current.pointers.size < 2) {
+        pinchRef.current.active = false;
+      }
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      pinchRef.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // Once we have 2 touches, we "own" the gesture (stop OrbitControls from seeing it).
+      if (pinchRef.current.pointers.size >= 2) {
+        beginPinchIfReady();
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      if (!pinchRef.current.pointers.has(e.pointerId)) return;
+      pinchRef.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (pinchRef.current.pointers.size >= 2) {
+        // Capture 2-finger gestures so OrbitControls never runs its dolly handler (crash-prone).
+        e.preventDefault();
+        e.stopPropagation();
+        beginPinchIfReady();
+        updatePinch();
+      }
+    };
+
+    const onPointerUpOrCancel = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      pinchRef.current.pointers.delete(e.pointerId);
+      endPinchIfNeeded();
+    };
+
+    el.addEventListener('pointerdown', onPointerDown, { capture: true });
+    el.addEventListener('pointermove', onPointerMove, { capture: true });
+    el.addEventListener('pointerup', onPointerUpOrCancel, { capture: true });
+    el.addEventListener('pointercancel', onPointerUpOrCancel, { capture: true });
+    el.addEventListener('pointerleave', onPointerUpOrCancel, { capture: true });
+
+    return () => {
+      el.removeEventListener('pointerdown', onPointerDown, { capture: true } as any);
+      el.removeEventListener('pointermove', onPointerMove, { capture: true } as any);
+      el.removeEventListener('pointerup', onPointerUpOrCancel, { capture: true } as any);
+      el.removeEventListener('pointercancel', onPointerUpOrCancel, { capture: true } as any);
+      el.removeEventListener('pointerleave', onPointerUpOrCancel, { capture: true } as any);
+    };
   }, [isTouchLikePointer]);
 
   // Track mouse position for hover preview
@@ -2220,6 +2356,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           // Belt + suspenders: ensure the actual canvas element disables default touch actions.
           try {
             (gl.domElement as any).style.touchAction = 'none';
+            canvasDomRef.current = gl.domElement as any;
           } catch {
             // ignore
           }

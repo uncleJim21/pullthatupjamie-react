@@ -286,7 +286,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
               <div className="flex justify-end">
                 <button
                   onClick={() => onExpandChange(!isExpanded)}
-                  className="h-8 w-14 md:h-10 md:w-[68px] flex items-center justify-center rounded-md border border-gray-700 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                  className="h-8 w-14 md:h-10 md:w-[68px] mb-1 flex items-center justify-center rounded-md border border-gray-700 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
                   aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
                   title={isExpanded ? 'Collapse' : 'Expand'}
                 >
