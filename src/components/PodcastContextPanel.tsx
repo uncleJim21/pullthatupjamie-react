@@ -19,6 +19,7 @@ interface ViewHistoryItem {
 }
 
 interface PodcastContextPanelProps {
+  layoutMode?: 'side' | 'bottom';
   paragraphId: string | null;
   isOpen: boolean;
   onClose: () => void;
@@ -52,6 +53,7 @@ interface PodcastContextPanelProps {
 }
 
 const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
+  layoutMode = 'side',
   paragraphId,
   isOpen,
   onClose,
@@ -91,6 +93,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const [internalIsCollapsed, setInternalIsCollapsed] = useState(false);
   const isCollapsed = externalIsCollapsed !== undefined ? externalIsCollapsed : internalIsCollapsed;
   const setIsCollapsed = onToggleCollapse || setInternalIsCollapsed;
+  const isBottomLayout = layoutMode === 'bottom';
+  const allowCollapse = !isBottomLayout;
+  const [mobileView, setMobileView] = useState<'details' | 'context'>('details');
   const contentRef = useRef<HTMLDivElement>(null);
   const {
     currentTrack,
@@ -616,31 +621,68 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   };
 
   const panelWidthClass = !isOpen
-    ? 'w-0 border-l-0'
-    : isCollapsed
-      ? 'w-[32px]'
-      : 'w-[600px]';
+    ? (isBottomLayout ? 'w-full' : 'w-0 border-l-0')
+    : isBottomLayout
+      ? 'w-full'
+      : isCollapsed
+        ? 'w-[32px]'
+        : 'w-[600px]';
 
   // Report current width to parent whenever open/collapsed state changes
   useEffect(() => {
     if (!onWidthChange) return;
+    if (isBottomLayout) {
+      onWidthChange(0);
+      return;
+    }
     if (!isOpen) {
       onWidthChange(0);
       return;
     }
     onWidthChange(isCollapsed ? 32 : 600);
-  }, [isOpen, isCollapsed, onWidthChange]);
+  }, [isBottomLayout, isOpen, isCollapsed, onWidthChange]);
 
   return (
     <div
-      className={`sticky top-0 h-screen bg-black border-l border-gray-800 flex flex-col transition-all duration-300 ease-in-out ${panelWidthClass} overflow-hidden flex-shrink-0`}
+      className={`bg-black flex flex-col transition-all duration-300 ease-in-out ${panelWidthClass} overflow-hidden flex-shrink-0 ${
+        isBottomLayout ? 'h-full' : 'sticky top-0 h-screen border-l border-gray-800'
+      }`}
     >
       {/* Split Content Area */}
-      {!isCollapsed ? (
-      <div className="flex-1 flex overflow-hidden">
+      {(!allowCollapse || !isCollapsed) ? (
+      <div className={`flex-1 overflow-hidden ${isBottomLayout ? 'flex flex-col' : 'flex'}`}>
+        {/* Bottom layout: toggle between Details / Context instead of side-by-side */}
+        {isBottomLayout && viewMode !== ViewMode.CHAPTER && (
+          <div className="border-b border-gray-800 bg-[#0A0A0A] p-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setMobileView('details')}
+                className={`px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
+                  mobileView === 'details'
+                    ? 'bg-black text-white border-gray-700'
+                    : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
+                }`}
+              >
+                Details
+              </button>
+              <button
+                onClick={() => setMobileView('context')}
+                className={`px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
+                  mobileView === 'context'
+                    ? 'bg-black text-white border-gray-700'
+                    : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
+                }`}
+              >
+                Context
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className={`flex-1 overflow-hidden ${isBottomLayout ? 'flex flex-col' : 'flex'}`}>
         {/* Left Side - Adjacent Paragraphs (Hidden in Chapter Mode) */}
-        {viewMode !== ViewMode.CHAPTER && (
-          <div className="flex-1 flex flex-col border-r border-gray-800 min-w-0">
+        {viewMode !== ViewMode.CHAPTER && (!isBottomLayout || mobileView === 'context') && (
+          <div className={`flex-1 flex flex-col min-w-0 ${isBottomLayout ? '' : 'border-r border-gray-800'}`}>
           <div className="p-3 border-b border-gray-800 bg-[#0A0A0A]">
             <h3 className="text-sm font-medium text-gray-400">Context</h3>
           </div>
@@ -712,7 +754,10 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         )}
 
         {/* Right Side - Hierarchy Details */}
-        <div className={`flex flex-col bg-[#0A0A0A] ${viewMode === ViewMode.CHAPTER ? 'flex-1' : 'w-[320px]'}`}>
+        {(!isBottomLayout || mobileView === 'details' || viewMode === ViewMode.CHAPTER) && (
+        <div className={`flex flex-col bg-[#0A0A0A] ${
+          isBottomLayout ? 'flex-1 w-full' : (viewMode === ViewMode.CHAPTER ? 'flex-1' : 'w-[320px]')
+        }`}>
           <div className="p-3 border-b border-gray-800 flex items-center gap-2 justify-between">
             <div className="flex items-center gap-2">
               {canGoBack && (
@@ -727,13 +772,15 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               <h3 className="text-sm font-medium text-gray-400">Details</h3>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsCollapsed(true)}
-                className="text-gray-400 hover:text-white transition-colors"
-                aria-label="Collapse panel"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
+              {allowCollapse && (
+                <button
+                  onClick={() => setIsCollapsed(true)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  aria-label="Collapse panel"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </div>
           
@@ -1198,6 +1245,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               </div>
             )}
           </div>
+        </div>
+        )}
         </div>
       </div>
       ) : (

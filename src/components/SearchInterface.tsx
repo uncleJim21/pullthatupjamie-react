@@ -2372,6 +2372,78 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [autoPlayContextOnOpen, setAutoPlayContextOnOpen] = useState(false);
   // Track the effective width of the podcast context panel so we can center the floating search bar
   const [contextPanelWidth, setContextPanelWidth] = useState(0);
+  // Keep a ref so the narrow-layout ResizeObserver can incorporate the latest panel width
+  // without needing to re-register the observer on every width change.
+  const contextPanelWidthRef = useRef(0);
+  useEffect(() => {
+    contextPanelWidthRef.current = contextPanelWidth;
+  }, [contextPanelWidth]);
+
+  // Responsive layout: treat "narrow" the same way PageBanner collapses nav items.
+  // We base this on the measured main content width (not window width) so it also triggers
+  // when the side panel squeezes the content area.
+  const mainContentRef = useRef<HTMLDivElement | null>(null);
+  // For galaxy mode, the most important thing is the actual space the galaxy has.
+  // Using the galaxy viewport as the measurement target makes the breakpoint feel much more intuitive.
+  const galaxyViewportRef = useRef<HTMLDivElement | null>(null);
+  const [isNarrowLayout, setIsNarrowLayout] = useState(false);
+
+  useEffect(() => {
+    const el = mainContentRef.current;
+    if (!el) return;
+
+    // Keep aligned with PageBanner's MOBILE_BREAKPOINT (900px), but:
+    // - Avoid feedback loops: opening the side panel reduces `el` width, which can cause
+    //   bottom↔side oscillation if we key off `el` alone.
+    // - Use a *wide* hysteresis band so the mode doesn't flap while resizing.
+    //
+    // We approximate the "true available width" as:
+    //   effectiveWidth = mainContentWidth + contextPanelWidth
+    // This removes the panel-open feedback because (main shrinks) + (panel grows) ≈ constant.
+    //
+    // Thresholds (tuned per observed behavior in split-screen):
+    // - Collapse sooner (user preference): enter narrow around ~65% of a typical wide layout.
+    // - Expand later: allow it to take close to full width to return to side layout.
+    //
+    // NOTE: These are absolute px values because we don't have a reliable "percent of full"
+    // baseline across different layouts; but we measure the galaxy viewport (when present),
+    // which makes these thresholds feel consistent.
+    const NARROW_ENTER = 1150;
+    const NARROW_EXIT = 1750;
+
+    const updateFromWidth = (mainWidth: number) => {
+      const effectiveWidth = mainWidth + (contextPanelWidthRef.current || 0);
+      setIsNarrowLayout((prev) => {
+        if (prev) {
+          // Currently narrow: only exit once we're clearly above the threshold.
+          return effectiveWidth < NARROW_EXIT;
+        }
+        // Currently wide: only enter once we're clearly below the threshold.
+        return effectiveWidth <= NARROW_ENTER;
+      });
+    };
+
+    // Prefer the galaxy viewport when it's mounted; fallback to the full main content area.
+    // This avoids using header/other chrome as the primary signal.
+    const measureEl = galaxyViewportRef.current ?? el;
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver((entries) => {
+        if (!entries.length) return;
+        const entry = entries[0];
+        const width = entry.contentRect?.width ?? measureEl.getBoundingClientRect().width;
+        updateFromWidth(width);
+      });
+      observer.observe(measureEl);
+      updateFromWidth(measureEl.getBoundingClientRect().width);
+      return () => observer.disconnect();
+    }
+
+    const onResize = () => updateFromWidth(measureEl.getBoundingClientRect().width);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const resetContextPanelState = () => {
     setIsContextPanelOpen(false);
@@ -2396,7 +2468,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       }}
     >
       {/* Main Content Area - Left Side */}
-      <div className="flex-1 min-w-0 transition-all duration-300">
+      <div ref={mainContentRef} className="flex-1 min-w-0 transition-all duration-300">
         {/* Welcome Modal - Hidden in embed mode */}
         {!isEmbedMode && (
           <WelcomeModal
@@ -2985,9 +3057,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
           {/* Conditional rendering: List or Galaxy view */}
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (
-            <div className="relative w-full transition-all duration-300 ease-in-out" style={{ 
+            <div
+              ref={galaxyViewportRef}
+              className="relative w-full transition-all duration-300 ease-in-out"
+              style={{
               height: isEmbedMode ? '100vh' : 'calc(100vh - 150px)' 
-            }}>
+              }}
+            >
               <SemanticGalaxyView
                 results={galaxyResults}
                 onStarClick={(result) => {
@@ -3313,7 +3389,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {!isEmbedMode && hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
         <div className="fixed sm:bottom-4 bottom-1 z-40 flex justify-center px-4 sm:px-24" style={{
           left: '0',
-          right: searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isContextPanelOpen
+          right: !isNarrowLayout && searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isContextPanelOpen
             ? `${contextPanelWidth}px`
             : '0'
         }}>
@@ -3652,6 +3728,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {/* Unified Side Panel (Context + Analysis) for Split-Screen Mode - Hidden in embed mode */}
       {!isEmbedMode && searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isDecelerationComplete && (
         <UnifiedSidePanel
+          layoutMode={isNarrowLayout ? 'bottom' : 'side'}
           paragraphId={selectedParagraphId}
           isContextOpen={isContextPanelOpen}
           onCloseContext={() => setIsContextPanelOpen(false)}
@@ -3670,7 +3747,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           isSessionsOpen={isSessionsPanelOpen}
           onCloseSessions={() => setIsSessionsPanelOpen(false)}
           onOpenSession={handleOpenSessionFromHistory}
-          onWidthChange={setContextPanelWidth}
+          onWidthChange={isNarrowLayout ? () => setContextPanelWidth(0) : setContextPanelWidth}
           onTimestampClick={(timestamp) => {
             printLog(`Context panel timestamp clicked: ${timestamp}`);
             window.dispatchEvent(new CustomEvent('seekToTimestamp', { 

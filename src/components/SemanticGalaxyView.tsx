@@ -705,6 +705,8 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSele
   const groupRef = useRef<THREE.Group>(null);
   const mainSpikeRefs = useRef<(THREE.Mesh | null)[]>([]);
   const [hovered, setHovered] = useState(false);
+  const longPressTimeoutRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
   
   // Generate unique tiny ray properties for this star
   const tinyRayProps = useMemo(
@@ -779,22 +781,58 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSele
       <mesh
         onClick={(e) => {
           e.stopPropagation();
+          if (longPressTriggeredRef.current) {
+            // Long-press already handled the interaction (open context menu).
+            longPressTriggeredRef.current = false;
+            return;
+          }
           onClick();
         }}
         onContextMenu={(e) => {
           e.stopPropagation();
           onRightClick(e as any);
         }}
+        onPointerDown={(e) => {
+          // Touch devices don't have a right-click; emulate with long-press.
+          // R3F passes through PointerEvent semantics on the nativeEvent.
+          const native = e.nativeEvent as PointerEvent;
+          if (native?.pointerType !== 'touch') return;
+
+          e.stopPropagation();
+          longPressTriggeredRef.current = false;
+
+          if (longPressTimeoutRef.current) {
+            window.clearTimeout(longPressTimeoutRef.current);
+          }
+
+          const clientX = (native as any).clientX ?? 0;
+          const clientY = (native as any).clientY ?? 0;
+
+          longPressTimeoutRef.current = window.setTimeout(() => {
+            longPressTriggeredRef.current = true;
+            onRightClick({ clientX, clientY, nativeEvent: native } as any);
+          }, 520);
+        }}
+        onPointerUp={() => {
+          if (longPressTimeoutRef.current) {
+            window.clearTimeout(longPressTimeoutRef.current);
+            longPressTimeoutRef.current = null;
+          }
+        }}
+        onPointerOut={() => {
+          if (longPressTimeoutRef.current) {
+            window.clearTimeout(longPressTimeoutRef.current);
+            longPressTimeoutRef.current = null;
+          }
+          setHovered(false);
+          onHover(null);
+          document.body.style.cursor = 'auto';
+        }}
         onPointerOver={(e) => {
           e.stopPropagation();
           setHovered(true);
           onHover(result);
           document.body.style.cursor = 'pointer';
-        }}
-        onPointerOut={() => {
-          setHovered(false);
-          onHover(null);
-          document.body.style.cursor = 'auto';
         }}
       >
         <sphereGeometry

@@ -258,6 +258,7 @@ enum PanelMode {
 }
 
 interface UnifiedSidePanelProps {
+  layoutMode?: 'side' | 'bottom';
   // Context panel props
   paragraphId: string | null;
   isContextOpen: boolean;
@@ -303,6 +304,7 @@ interface UnifiedSidePanelProps {
 const DEFAULT_INSTRUCTIONS = "Analyze this research session and summarize the main themes, key insights, and definitive conclusion. Keep it succinct and to the point no more than a few sentences when focus is on a single episode. You can take a bit more liberty when talking about common themes or disagreements. Don't explicitly mention the word research session.";
 
 export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
+  layoutMode = 'side',
   paragraphId,
   isContextOpen,
   onCloseContext,
@@ -523,6 +525,534 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
       : 'w-[600px]';
 
   // Render single unified container with tabs always visible
+  const isBottomLayout = layoutMode === 'bottom';
+
+  // Bottom-sheet state (mobile / narrow layout): shown by default when a panel is open.
+  type SheetMode = 'peek' | 'full' | 'hidden';
+  const [sheetMode, setSheetMode] = useState<SheetMode>('peek');
+
+  // If the app opens the panel (e.g. auto-select on search), ensure the sheet is visible.
+  useEffect(() => {
+    if (!isBottomLayout) return;
+    if (isPanelOpen && sheetMode === 'hidden') {
+      setSheetMode('peek');
+    }
+  }, [isBottomLayout, isPanelOpen, sheetMode]);
+
+  // In bottom layout, width is irrelevant; never push/offset the main content.
+  useEffect(() => {
+    if (!isBottomLayout) return;
+    onWidthChange?.(0);
+  }, [isBottomLayout, onWidthChange]);
+
+  const closeAllPanels = () => {
+    onCloseContext();
+    onCloseAnalysis();
+    onCloseSessions();
+  };
+
+  if (isBottomLayout) {
+    // If nothing is open, hide the sheet entirely (consistent with existing open/close state).
+    if (!isPanelOpen || sheetMode === 'hidden') {
+      return null;
+    }
+
+    const sheetHeight = sheetMode === 'full' ? '92vh' : '46vh';
+
+    return (
+      <div className="fixed left-0 right-0 bottom-0 z-[70]">
+        <div
+          className="bg-black border-t border-gray-800 rounded-t-xl shadow-2xl overflow-hidden"
+          style={{
+            height: sheetHeight,
+            transition: 'height 240ms ease',
+          }}
+        >
+          {/* Sheet header: handle + tabs + controls */}
+          <div className="border-b border-gray-800 bg-[#0A0A0A]">
+            <div className="flex items-center justify-between px-3 pt-2 pb-2 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="h-1 w-10 rounded-full bg-gray-700/70" aria-hidden="true" />
+                <span className="text-xs text-gray-500 truncate">
+                  {activeMode === PanelMode.CONTEXT
+                    ? 'Context'
+                    : activeMode === PanelMode.ANALYSIS
+                      ? 'AI Analysis (Beta)'
+                      : 'Sessions'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSheetMode((prev) => (prev === 'full' ? 'peek' : 'full'))}
+                  className="px-2 py-1 text-xs text-gray-300 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
+                  aria-label={sheetMode === 'full' ? 'Shrink panel' : 'Expand panel'}
+                  title={sheetMode === 'full' ? 'Shrink' : 'Expand'}
+                >
+                  {sheetMode === 'full' ? 'Shrink' : 'Expand'}
+                </button>
+                <button
+                  onClick={() => {
+                    closeAllPanels();
+                    setSheetMode('hidden');
+                  }}
+                  className="px-2 py-1 text-xs text-gray-300 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
+                  aria-label="Hide panel"
+                  title="Hide"
+                >
+                  Hide
+                </button>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 px-3 pb-2">
+              <button
+                onClick={() => handleModeSwitch(PanelMode.CONTEXT)}
+                className={`flex-1 px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
+                  isContextMode
+                    ? 'bg-black text-white border-gray-700'
+                    : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
+                }`}
+              >
+                Context
+              </button>
+              <button
+                onClick={() => handleModeSwitch(PanelMode.ANALYSIS)}
+                className={`flex-1 px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
+                  isAnalysisMode
+                    ? 'bg-black text-white border-gray-700'
+                    : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
+                }`}
+              >
+                AI
+              </button>
+              <button
+                onClick={() => handleModeSwitch(PanelMode.SESSIONS)}
+                className={`flex-1 px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
+                  isSessionsMode
+                    ? 'bg-black text-white border-gray-700'
+                    : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
+                }`}
+              >
+                Sessions
+              </button>
+            </div>
+          </div>
+
+          {/* Content area */}
+          <div className="h-full overflow-hidden">
+            {isContextMode ? (
+              <div className="h-full">
+                <PodcastContextPanel
+                  layoutMode="bottom"
+                  paragraphId={paragraphId}
+                  isOpen={true}
+                  onClose={() => {
+                    onCloseContext();
+                    setSheetMode('hidden');
+                  }}
+                  smartInterpolation={smartInterpolation}
+                  onTimestampClick={onTimestampClick}
+                  onKeywordSearch={onKeywordSearch}
+                  auth={auth}
+                  audioUrl={audioUrl}
+                  episodeTitle={episodeTitle}
+                  episodeImage={episodeImage}
+                  creator={creator}
+                  listenLink={listenLink}
+                  timeContext={timeContext}
+                  date={date}
+                  autoPlayOnOpen={autoPlayOnOpen}
+                  onWidthChange={() => {}}
+                  researchSessionShareLinks={researchSessionShareLinks}
+                  onAddToResearch={onAddToResearch}
+                  onRemoveFromResearch={onRemoveFromResearch}
+                />
+              </div>
+            ) : isAnalysisMode ? (
+              <div className="h-full bg-black flex flex-col overflow-hidden">
+                {/* Header (bottom-sheet variant) */}
+                <div className="p-3 border-b border-gray-800 bg-[#0A0A0A] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h3 className="text-sm font-medium text-gray-400">AI Analysis (Beta)</h3>
+                    {effectiveSourceLabel && (
+                      <span className="text-[11px] text-gray-600 truncate">• {effectiveSourceLabel}</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowAnalysisModeChooser(false);
+                      setShowAnalysisSourceChooser(true);
+                    }}
+                    className="text-gray-500 hover:text-white transition-colors p-1 rounded hover:bg-gray-900"
+                    aria-label="Choose what to analyze"
+                    title="Choose what to analyze"
+                  >
+                    <Settings2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
+                  {showAnalysisSourceChooser ? (
+                    <div className="max-w-xl w-full pt-6 text-gray-200">
+                      <div className="space-y-4">
+                        <div className="text-lg font-semibold text-white">Choose What to Analyze</div>
+
+                        <button
+                          onClick={() => {
+                            persistAnalysisSource('current_search');
+                            setShowAnalysisSourceChooser(false);
+                            void handleAnalyze('current_search');
+                          }}
+                          disabled={isAnalyzing}
+                          className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                            <TextSearch className="w-4 h-4 text-blue-400" />
+                            <span>Current Search (Recommended)</span>
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">Analyze the items currently on screen</div>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            persistAnalysisSource('compiled_session');
+                            setShowAnalysisSourceChooser(false);
+                            void handleAnalyze('compiled_session');
+                          }}
+                          disabled={isAnalyzing}
+                          className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                            <Layers className="w-4 h-4 text-gray-300" />
+                            <span>Compiled Session</span>
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">Analyze the items you compiled into your current session</div>
+                        </button>
+                      </div>
+                    </div>
+                  ) : effectiveAnalysisSource === 'compiled_session' && !sessionId ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                      <BrainCircuit className="w-12 h-12 mb-4 opacity-50" />
+                      <p className="text-sm text-center px-8">
+                        Add items to your research session to perform AI analysis
+                      </p>
+                      <p className="text-xs text-gray-600 text-center px-8 mt-2">
+                        Long-press stars in the galaxy and select "Add to Research"
+                      </p>
+                    </div>
+                  ) : error ? (
+                    <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-300">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <div className="font-medium mb-1 text-sm">Analysis Error</div>
+                          <div className="text-xs">{error}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : isAnalyzing && !analysis ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <Loader className="w-8 h-8 animate-spin mb-4" />
+                      <p className="text-sm">Analyzing research session...</p>
+                    </div>
+                  ) : analysis ? (
+                    <div className="space-y-4">
+                      {title && (
+                        <div className="pb-4 border-b border-gray-800">
+                          <h3 className="text-lg font-bold text-white leading-tight">{title}</h3>
+                        </div>
+                      )}
+                      <div className="text-sm text-gray-300 leading-relaxed">
+                        {(() => {
+                          const { markdown, cardsByIndex } = buildMarkdownWithCardPlaceholders(content);
+                          const onCardClick = (pineconeId: string) => {
+                            printLog(`[AI Analysis] Card click: pineconeId=${pineconeId}`);
+                            if (typeof window !== 'undefined') {
+                              window.dispatchEvent(
+                                new CustomEvent('analysisCardClick', { detail: { pineconeId } }),
+                              );
+                            }
+                          };
+
+                          return (
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm, remarkBreaks]}
+                              components={{
+                                p: ({ children }) => {
+                                  const injected = injectInlineTokens(children, cardsByIndex, onCardClick);
+                                  const isCardOnly = isCardOnlyParagraphContent(injected);
+                                  return <p className={isCardOnly ? 'my-1' : 'my-2'}>{injected}</p>;
+                                },
+                                ul: ({ children }) => <ul className="my-2 pl-5 list-disc space-y-1">{children}</ul>,
+                                ol: ({ children }) => <ol className="my-2 pl-5 list-decimal space-y-1">{children}</ol>,
+                                li: ({ children }) => (
+                                  <li className="my-1">{injectInlineTokens(children, cardsByIndex, onCardClick)}</li>
+                                ),
+                                strong: ({ children }) => <strong>{injectInlineTokens(children, cardsByIndex, onCardClick)}</strong>,
+                                em: ({ children }) => <em>{injectInlineTokens(children, cardsByIndex, onCardClick)}</em>,
+                                h1: ({ children }) => <h1 className="text-2xl font-bold text-white my-2">{children}</h1>,
+                                h2: ({ children }) => <h2 className="text-xl font-bold text-white my-2">{children}</h2>,
+                                h3: ({ children }) => <h3 className="text-lg font-semibold text-white my-2">{children}</h3>,
+                              }}
+                            >
+                              {markdown}
+                            </ReactMarkdown>
+                          );
+                        })()}
+                      </div>
+                      {isAnalyzing && (
+                        <div className="flex items-center gap-2 text-blue-400 text-sm pt-4">
+                          <Loader className="w-4 h-4 animate-spin" />
+                          <span>Generating...</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col h-full text-gray-200">
+                      <div className="max-w-xl w-full pt-6">
+                        {showAnalysisModeChooser ? (
+                          <>
+                            <div className="mb-2 text-lg font-semibold text-white">AI Analysis</div>
+                            <div className="text-sm text-gray-400 mb-6">
+                              Turn your saved podcast clips into key themes, takeaways, and next questions.
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <button
+                                onClick={() => {
+                                  setShowAnalysisModeChooser(false);
+                                  if (!analysisSource) {
+                                    setShowAnalysisSourceChooser(true);
+                                    return;
+                                  }
+                                  void handleAnalyze();
+                                }}
+                                disabled={isAnalyzing}
+                                className="p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                              >
+                                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
+                                  <BrainCircuit className="w-4 h-4 text-blue-400" />
+                                  <span>Analyze</span>
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  Use an LLM to summarize and expand on your selected source
+                                </div>
+                              </button>
+
+                              <button
+                                disabled={true}
+                                className="p-4 rounded-lg border border-gray-800 bg-gray-950/40 opacity-60 cursor-not-allowed text-left"
+                              >
+                                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
+                                  <Bot className="w-4 h-4 text-gray-400" />
+                                  <span>Agent Mode (Soon™)</span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  Use an Agent to perform searches, sift through content and explain high signal content related to your research intent
+                                </div>
+                              </button>
+                            </div>
+                          </>
+                        ) : (!effectiveAnalysisSource || showAnalysisSourceChooser) ? (
+                          <div className="space-y-4">
+                            <div className="text-lg font-semibold text-white">Choose What to Analyze</div>
+
+                            <button
+                              onClick={() => {
+                                persistAnalysisSource('current_search');
+                                setShowAnalysisSourceChooser(false);
+                                void handleAnalyze('current_search');
+                              }}
+                              disabled={isAnalyzing}
+                              className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                                <TextSearch className="w-4 h-4 text-blue-400" />
+                                <span>Current Search (Recommended)</span>
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">Analyze the items currently on screen</div>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                persistAnalysisSource('compiled_session');
+                                setShowAnalysisSourceChooser(false);
+                                void handleAnalyze('compiled_session');
+                              }}
+                              disabled={isAnalyzing}
+                              className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                                <Layers className="w-4 h-4 text-gray-300" />
+                                <span>Compiled Session</span>
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">Analyze the items you compiled into your current session</div>
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="mb-2 text-lg font-semibold text-white">AI Analysis (Beta)</div>
+                            <div className="text-sm text-gray-400 mb-1">
+                              Turn your saved podcast clips into key themes, takeaways, and next questions.
+                            </div>
+                            <div className="text-xs text-gray-600 mb-6">(ChatGPT 4o-mini)</div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <button
+                                onClick={() => void handleAnalyze()}
+                                disabled={
+                                  isAnalyzing ||
+                                  (effectiveAnalysisSource === 'compiled_session' ? !sessionId : false)
+                                }
+                                className="p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                              >
+                                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
+                                  <BrainCircuit className="w-4 h-4 text-blue-400" />
+                                  <span>Analyze Now</span>
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  {effectiveAnalysisSource === 'current_search'
+                                    ? 'Use an LLM to summarize and expand on the items currently on screen'
+                                    : 'Use an LLM to summarize and expand on your compiled research'}
+                                </div>
+                              </button>
+
+                              <button
+                                disabled={true}
+                                className="p-4 rounded-lg border border-gray-800 bg-gray-950/40 opacity-60 cursor-not-allowed text-left"
+                              >
+                                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
+                                  <Bot className="w-4 h-4 text-gray-400" />
+                                  <span>Agent Mode (Soon™)</span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  Use an Agent to perform searches, sift through content and explain high signal content related to your research intent
+                                </div>
+                              </button>
+                            </div>
+
+                            <div className="mt-6 text-xs text-gray-600">
+                              Session ID: <span className="text-gray-500">{sessionId || 'none'}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {!isAnalyzing && analysis && (
+                  <div className="border-t border-gray-800 p-3 bg-[#0A0A0A]">
+                    <button
+                      onClick={() => void handleAnalyze()}
+                      disabled={!sessionId && effectiveAnalysisSource === 'compiled_session'}
+                      className="w-full px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-900 disabled:cursor-not-allowed text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Re-analyze
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-full">
+                {/* Sessions tab content is already self-contained; keep behavior consistent */}
+                <div className="h-full bg-black flex flex-col overflow-hidden">
+                  <div className="flex-1 overflow-y-auto p-4">
+                    {isLoadingSessions ? (
+                      <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                        <Loader className="w-8 h-8 animate-spin mb-4" />
+                        <p className="text-sm">Loading sessions...</p>
+                      </div>
+                    ) : sessionsError ? (
+                      <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-300">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <div className="font-medium mb-1 text-sm">Error Loading Sessions</div>
+                            <div className="text-xs">{sessionsError}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : sessions.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                        <History className="w-12 h-12 mb-4 opacity-50" />
+                        <p className="text-sm text-center px-8">No research sessions yet</p>
+                        <p className="text-xs text-gray-600 text-center px-8 mt-2">
+                          Start adding items to create your first session
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {sessions.map((session) => {
+                          const metadata = session.lastItemMetadata;
+                          const itemCount = session.pineconeIdsCount || session.pineconeIds?.length || 0;
+                          const createdDate = session.createdAt ? new Date(session.createdAt).toLocaleDateString() : '';
+                          const sessionImage = metadata ? extractImageFromAny(metadata) : undefined;
+                          const displayTitle =
+                            session.title || metadata?.title || metadata?.headline || metadata?.episode || 'Research Session';
+
+                          return (
+                            <div
+                              key={session.id}
+                              className="flex items-center gap-3 p-3 bg-gray-900/50 hover:bg-gray-800/50 border border-gray-800 rounded-lg transition-all cursor-pointer"
+                            >
+                              <div className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-gray-800">
+                                {sessionImage ? (
+                                  <img
+                                    src={sessionImage}
+                                    alt={displayTitle}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <History className="w-6 h-6 text-gray-600" />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-white font-medium line-clamp-1">{displayTitle}</p>
+                                <p className="text-xs text-gray-500 line-clamp-1">
+                                  {metadata?.creator || 'Unknown creator'} • {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                                </p>
+                                {createdDate && (
+                                  <p className="text-xs text-gray-600 mt-0.5">{createdDate}</p>
+                                )}
+                              </div>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onOpenSession && session.id) {
+                                    onOpenSession(session.id, displayTitle);
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-white text-black rounded text-xs font-medium hover:bg-gray-200 transition-colors flex-shrink-0"
+                              >
+                                Open
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen">
       {/* Folder-style tabs - ALWAYS visible when panel is open and not collapsed */}
