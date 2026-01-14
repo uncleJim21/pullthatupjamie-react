@@ -1,9 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Podcast, RotateCcw, RotateCw, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, Play, Podcast, RotateCcw, RotateCw, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useAudioController } from '../context/AudioControllerContext.tsx';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
 
 interface EmbedMiniPlayerProps {
+  // Rendering mode:
+  // - embed: existing behavior (hover-gated, audio unlock prompt)
+  // - app: narrow-screen player (always visible controls; optional expand/collapse)
+  mode?: 'embed' | 'app';
   // Hover state for embed mode
   isHovered: boolean;
   // Audio unlock state (controlled from parent)
@@ -28,9 +32,14 @@ interface EmbedMiniPlayerProps {
   onNext?: () => void;
   // Unique track ID
   trackId: string;
+
+  // Optional expand/collapse affordance (app mode)
+  isExpanded?: boolean;
+  onExpandChange?: (expanded: boolean) => void;
 }
 
 const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
+  mode = 'embed',
   isHovered,
   audioUnlocked,
   brandImage,
@@ -46,6 +55,8 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   onPrevious,
   onNext,
   trackId,
+  isExpanded,
+  onExpandChange,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -79,10 +90,11 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
     }
   }, [episodeImage]);
 
-  // Auto-play when track changes AND user is hovering AND audio is unlocked
+  // Auto-play when track changes AND user is hovering AND audio is unlocked (embed mode only)
   const autoPlayKeyRef = useRef<string | null>(null);
   
   useEffect(() => {
+    if (mode !== 'embed') return;
     if (!audioUrl || !timeContext || !isHovered || !audioUnlocked) {
       // Pause if user leaves
       if (!isHovered && isPlaying) {
@@ -105,7 +117,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
       startTime: timeContext.start_time,
       endTime: timeContext.end_time,
     });
-  }, [trackId, audioUrl, timeContext, playTrack, isHovered, isPlaying, pause, audioUnlocked]);
+  }, [mode, trackId, audioUrl, timeContext, playTrack, isHovered, isPlaying, pause, audioUnlocked]);
 
   // Format time as MM:SS
   const formatTime = (seconds: number): string => {
@@ -158,7 +170,10 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
     const setHeightVar = (height: number) => {
       // Clamp to a sane minimum to avoid 0 during initial layout.
       const safeHeight = Math.max(64, Math.round(height));
+      // Legacy: embed attribution and other overlays depend on this.
       document.documentElement.style.setProperty('--embed-mini-player-height', `${safeHeight}px`);
+      // General: used by the main app on narrow screens too.
+      document.documentElement.style.setProperty('--mini-player-height', `${safeHeight}px`);
     };
 
     // Initial measurement
@@ -182,7 +197,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
       className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-sm border-t border-gray-700 z-30"
     >
       <div className="max-w-screen-xl mx-auto px-4 py-3">
-        {!isHovered || !audioUnlocked ? (
+        {mode === 'embed' && (!isHovered || !audioUnlocked) ? (
           // Not hovering OR audio not unlocked - show brand logo and message
           <div className="flex items-center justify-center gap-4 py-2 cursor-pointer hover:bg-white/5 transition-colors rounded-lg">
             {brandImage && (
@@ -266,6 +281,23 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
 
           {/* Playback Controls - Responsive sizing */}
           <div className="flex flex-col gap-1.5 flex-shrink-0">
+            {/* Expand/collapse (app mode) */}
+            {mode === 'app' && typeof onExpandChange === 'function' && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() => onExpandChange(!isExpanded)}
+                  className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center rounded-md border border-gray-700 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                  aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                  title={isExpanded ? 'Collapse' : 'Expand'}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronUp className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            )}
             {/* Row 1: Play and Time */}
             <div className="flex gap-2 md:gap-3 items-center">
               <button

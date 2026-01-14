@@ -299,6 +299,12 @@ interface UnifiedSidePanelProps {
   researchSessionShareLinks?: string[];
   onAddToResearch?: (result: any) => void;
   onRemoveFromResearch?: (shareLink: string) => void;
+
+  // Bottom layout: allow parent to treat the panel as "expanded only" and collapse back
+  // to a mini player UI. When provided, the bottom-sheet will render a single down-chevron
+  // control to invoke this callback.
+  onRequestCollapseToMiniPlayer?: () => void;
+  defaultSheetMode?: 'peek' | 'full' | 'dock';
 }
 
 const DEFAULT_INSTRUCTIONS = "Analyze this research session and summarize the main themes, key insights, and definitive conclusion. Keep it succinct and to the point no more than a few sentences when focus is on a single episode. You can take a bit more liberty when talking about common themes or disagreements. Don't explicitly mention the word research session.";
@@ -330,7 +336,9 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   currentSearchResults,
   researchSessionShareLinks,
   onAddToResearch,
-  onRemoveFromResearch
+  onRemoveFromResearch,
+  onRequestCollapseToMiniPlayer,
+  defaultSheetMode = 'peek',
 }) => {
   // Determine which mode is active
   const [activeMode, setActiveMode] = useState<PanelMode>(PanelMode.CONTEXT);
@@ -529,7 +537,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
 
   // Bottom-sheet state (mobile / narrow layout): shown by default when a panel is open.
   type SheetMode = 'peek' | 'full' | 'dock';
-  const [sheetMode, setSheetMode] = useState<SheetMode>('peek');
+  const [sheetMode, setSheetMode] = useState<SheetMode>(defaultSheetMode);
 
   // If the app opens the panel (e.g. auto-select on search), ensure the sheet is visible.
   useEffect(() => {
@@ -625,31 +633,44 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
 
               {/* Controls (right side) */}
               <div className="flex items-center gap-1 flex-shrink-0">
-                <button
-                  onClick={() => setSheetMode((prev) => (prev === 'full' ? 'peek' : 'full'))}
-                  className="p-1.5 text-gray-400 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
-                  aria-label={sheetMode === 'full' ? 'Shrink panel' : 'Expand panel'}
-                  title={sheetMode === 'full' ? 'Shrink' : 'Expand'}
-                >
-                  {sheetMode === 'full' ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronUp className="w-4 h-4" />
-                  )}
-                </button>
-                {sheetMode !== 'full' && (
+                {typeof onRequestCollapseToMiniPlayer === 'function' ? (
                   <button
-                    onClick={() => setSheetMode((prev) => (prev === 'dock' ? 'peek' : 'dock'))}
+                    onClick={() => onRequestCollapseToMiniPlayer()}
                     className="p-1.5 text-gray-400 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
-                    aria-label={sheetMode === 'dock' ? 'Undock panel' : 'Dock panel down'}
-                    title={sheetMode === 'dock' ? 'Undock' : 'Dock'}
+                    aria-label="Collapse"
+                    title="Collapse"
                   >
-                    {sheetMode === 'dock' ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
+                    <ChevronDown className="w-4 h-4" />
                   </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setSheetMode((prev) => (prev === 'full' ? 'peek' : 'full'))}
+                      className="p-1.5 text-gray-400 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
+                      aria-label={sheetMode === 'full' ? 'Shrink panel' : 'Expand panel'}
+                      title={sheetMode === 'full' ? 'Shrink' : 'Expand'}
+                    >
+                      {sheetMode === 'full' ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronUp className="w-4 h-4" />
+                      )}
+                    </button>
+                    {sheetMode !== 'full' && (
+                      <button
+                        onClick={() => setSheetMode((prev) => (prev === 'dock' ? 'peek' : 'dock'))}
+                        className="p-1.5 text-gray-400 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
+                        aria-label={sheetMode === 'dock' ? 'Undock panel' : 'Dock panel down'}
+                        title={sheetMode === 'dock' ? 'Undock' : 'Dock'}
+                      >
+                        {sheetMode === 'dock' ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>

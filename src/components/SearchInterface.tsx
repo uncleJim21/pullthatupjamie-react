@@ -2387,6 +2387,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Using the galaxy viewport as the measurement target makes the breakpoint feel much more intuitive.
   const galaxyViewportRef = useRef<HTMLDivElement | null>(null);
   const [isNarrowLayout, setIsNarrowLayout] = useState(false);
+  // Narrow layout: show a compact mini player by default; user can expand to see UnifiedSidePanel.
+  const [isNarrowInfoExpanded, setIsNarrowInfoExpanded] = useState(false);
 
   useEffect(() => {
     const el = mainContentRef.current;
@@ -2450,6 +2452,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     setSelectedParagraphId(null);
     setSelectedAudioContext(null);
     setAutoPlayContextOnOpen(false);
+    setIsNarrowInfoExpanded(false);
     // Also stop any in-flight audio playback via the shared controller
     window.dispatchEvent(new Event('stopAllAudio'));
   };
@@ -3387,13 +3390,29 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       )}
 
       {/* Floating Search Bar - Hidden in embed mode */}
-      {!isEmbedMode && hasSearchedInMode(searchMode) && (searchMode === 'web-search' || searchMode === 'podcast-search') && !isAnyModalOpen() && (
-        <div className="fixed sm:bottom-4 bottom-1 z-40 flex justify-center px-4 sm:px-24" style={{
-          left: '0',
-          right: !isNarrowLayout && searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isContextPanelOpen
-            ? `${contextPanelWidth}px`
-            : '0'
-        }}>
+      {!isEmbedMode &&
+        // Hide search when narrow "info" is expanded (UnifiedSidePanel full mode).
+        !(isNarrowLayout && isNarrowInfoExpanded) &&
+        hasSearchedInMode(searchMode) &&
+        (searchMode === 'web-search' || searchMode === 'podcast-search') &&
+        !isAnyModalOpen() && (
+        <div
+          className="fixed sm:bottom-4 bottom-1 z-40 flex justify-center px-4 sm:px-24"
+          style={{
+            left: '0',
+            right:
+              !isNarrowLayout &&
+              searchMode === 'podcast-search' &&
+              searchViewStyle === SearchViewStyle.SPLIT_SCREEN &&
+              isContextPanelOpen
+                ? `${contextPanelWidth}px`
+                : '0',
+            // When the mini player is visible (narrow + not expanded), lift the search bar above it.
+            ...(isNarrowLayout && !isNarrowInfoExpanded && selectedAudioContext
+              ? { bottom: 'calc(var(--mini-player-height, 92px) + 8px)' }
+              : null),
+          }}
+        >
           <div className="w-full max-w-[40rem] flex flex-col">
             {!DISABLE_CLIPPING && searchMode === 'podcast-search' && !isAnyModalOpen() && (
               <div className="flex gap-3">
@@ -3410,21 +3429,37 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               </div>
             )}
             <form onSubmit={handleSearch}>
-            <div className="flex items-start gap-3">
-              {/* Textarea - grows to fill available space */}
-              <textarea
-                ref={searchInputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `Search the web privately with LLM summary`}
-                className="flex-1 bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSearch(e);
-                  }
-                }}
-              />
+            <div className={`flex gap-3 ${isNarrowLayout ? 'items-end' : 'items-start'}`}>
+              {/* Input (narrow) / Textarea (wide) */}
+              {isNarrowLayout ? (
+                <input
+                  ref={searchInputRef as any}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `Search the web privately with LLM summary`}
+                  className="flex-1 bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg min-h-[36px]"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSearch(e as any);
+                    }
+                  }}
+                />
+              ) : (
+                <textarea
+                  ref={searchInputRef}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `Search the web privately with LLM summary`}
+                  className="flex-1 bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSearch(e);
+                    }
+                  }}
+                />
+              )}
 
               {/* Button column - fixed width */}
               <div className="flex flex-col gap-2 relative">
@@ -3491,13 +3526,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     <button
                       type="button"
                       onClick={toggleScopeSlideout}
-                      className="w-8 h-6 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                      className={`${isNarrowLayout ? 'w-6 h-5' : 'w-8 h-6'} flex items-center justify-center text-gray-400 hover:text-white transition-colors`}
                       aria-label={showScopeSlideout ? 'Collapse scope selector' : 'Expand scope selector'}
                     >
                       {showScopeSlideout ? (
-                        <ChevronDown className="w-4 h-4" />
+                        <ChevronDown className={isNarrowLayout ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
                       ) : (
-                        <ChevronUp className="w-4 h-4" />
+                        <ChevronUp className={isNarrowLayout ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
                       )}
                     </button>
                   </div>
@@ -3509,15 +3544,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     type="button"
                     onClick={podcastSearchMode === 'my-pod' ? undefined : handleFilterClick}
                     disabled={podcastSearchMode === 'my-pod'}
-                    className={`w-10 h-10 rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
+                    className={`rounded-full transition-colors duration-200 flex items-center justify-center border shadow-lg ${
                       podcastSearchMode === 'my-pod'
                         ? 'bg-black/30 border-gray-800 text-gray-600 cursor-not-allowed'
                         : 'bg-black/50 backdrop-blur-sm hover:bg-black/70 border-gray-700 text-white'
-                    }`}
+                    } ${isNarrowLayout ? 'w-7 h-7' : 'w-10 h-10'}`}
                     aria-label="Filter"
                     aria-disabled={podcastSearchMode === 'my-pod'}
                   >
-                    <Filter className="w-4 h-4" />
+                    <Filter className={isNarrowLayout ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
                   </button>
                   
                   {/* Reset filters badge */}
@@ -3536,14 +3571,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 {/* Search button */}
                 <button
                   type="submit"
-                  className="w-10 h-10 bg-white rounded-full hover:bg-gray-100 transition-colors flex items-center justify-center"
+                  className={`${isNarrowLayout ? 'w-7 h-7' : 'w-10 h-10'} bg-white rounded-full hover:bg-gray-100 transition-colors flex items-center justify-center`}
                   disabled={searchState.isLoading}
                 >
                   {searchState.isLoading ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
+                    <div className={`animate-spin rounded-full border-b-2 border-black ${isNarrowLayout ? 'h-3.5 w-3.5' : 'h-5 w-5'}`} />
                   ) : (
                     <svg
-                      className="w-4 h-4 text-black"
+                      className={`${isNarrowLayout ? 'w-3 h-3' : 'w-4 h-4'} text-black`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -3564,12 +3599,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         </div>
       )}
 
-      {/* Embed Mode Mini Player */}
-      {isEmbedMode && (
+      {/* Mini Player */}
+      {(isEmbedMode || (isNarrowLayout && !isEmbedMode && selectedAudioContext)) && (
         <EmbedMiniPlayer
-          isHovered={isEmbedHovered}
-          audioUnlocked={audioUnlocked}
-          brandImage={brandImage || undefined}
+          mode={isEmbedMode ? 'embed' : 'app'}
+          isHovered={isEmbedMode ? isEmbedHovered : true}
+          audioUnlocked={isEmbedMode ? audioUnlocked : true}
+          brandImage={isEmbedMode ? (brandImage || undefined) : undefined}
           audioUrl={selectedAudioContext?.audioUrl}
           episodeTitle={selectedAudioContext?.episode}
           episodeImage={selectedAudioContext?.episodeImage}
@@ -3580,6 +3616,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           headline={selectedAudioContext?.headline}
           hierarchyLevel={selectedAudioContext?.hierarchyLevel}
           trackId={selectedAudioContext?.shareLink || 'embed-player'}
+          isExpanded={isNarrowInfoExpanded}
+          onExpandChange={(expanded) => setIsNarrowInfoExpanded(expanded)}
           onPrevious={selectedAudioContext && currentResultIndex > 0 ? () => {
             const prevIndex = currentResultIndex - 1;
             const prevResult = galaxyResults[prevIndex];
@@ -3726,10 +3764,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       />
       </div>
 
-      {/* Unified Side Panel (Context + Analysis) for Split-Screen Mode - Hidden in embed mode */}
-      {!isEmbedMode && searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isDecelerationComplete && (
+      {/* Unified Side Panel (Context + Analysis) for Split-Screen Mode - Hidden in embed mode.
+          On narrow screens, we only mount this when the user expands from the mini player. */}
+      {!isEmbedMode && searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isDecelerationComplete && (!isNarrowLayout || isNarrowInfoExpanded) && (
         <UnifiedSidePanel
           layoutMode={isNarrowLayout ? 'bottom' : 'side'}
+          defaultSheetMode={isNarrowLayout ? 'full' : 'peek'}
+          onRequestCollapseToMiniPlayer={
+            isNarrowLayout ? () => setIsNarrowInfoExpanded(false) : undefined
+          }
           paragraphId={selectedParagraphId}
           isContextOpen={isContextPanelOpen}
           onCloseContext={() => setIsContextPanelOpen(false)}
