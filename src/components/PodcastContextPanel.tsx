@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronLeft, Podcast, ChevronDown, ChevronUp, Play, ScanSearch, RotateCcw, RotateCw, Layers, Plus, Minus } from 'lucide-react';
+import { BookText, ChevronRight, ChevronLeft, Info, Podcast, ChevronDown, ChevronUp, Play, ScanSearch, RotateCcw, RotateCw, Layers, Plus, Minus } from 'lucide-react';
 import ContextService, { AdjacentParagraph, HierarchyResponse } from '../services/contextService.ts';
 import ChapterService, { Chapter } from '../services/chapterService.ts';
 import { printLog, HIERARCHY_COLORS } from '../constants/constants.ts';
@@ -644,42 +644,14 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
   return (
     <div
-      className={`bg-black flex flex-col transition-all duration-300 ease-in-out ${panelWidthClass} overflow-hidden flex-shrink-0 ${
+      className={`bg-black flex flex-col transition-all duration-300 ease-in-out ${panelWidthClass} overflow-hidden flex-shrink-0 min-h-0 ${
         isBottomLayout ? 'h-full' : 'sticky top-0 h-screen border-l border-gray-800'
       }`}
     >
       {/* Split Content Area */}
       {(!allowCollapse || !isCollapsed) ? (
-      <div className={`flex-1 overflow-hidden ${isBottomLayout ? 'flex flex-col' : 'flex'}`}>
-        {/* Bottom layout: toggle between Details / Context instead of side-by-side */}
-        {isBottomLayout && viewMode !== ViewMode.CHAPTER && (
-          <div className="border-b border-gray-800 bg-[#0A0A0A] p-2">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setMobileView('details')}
-                className={`px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
-                  mobileView === 'details'
-                    ? 'bg-black text-white border-gray-700'
-                    : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
-                }`}
-              >
-                Details
-              </button>
-              <button
-                onClick={() => setMobileView('context')}
-                className={`px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
-                  mobileView === 'context'
-                    ? 'bg-black text-white border-gray-700'
-                    : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
-                }`}
-              >
-                Context
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className={`flex-1 overflow-hidden ${isBottomLayout ? 'flex flex-col' : 'flex'}`}>
+      <div className={`flex-1 min-h-0 overflow-hidden ${isBottomLayout ? 'flex' : 'flex'}`}>
+        <div className={`flex-1 min-h-0 overflow-hidden ${isBottomLayout ? 'flex flex-col' : 'flex'}`}>
         {/* Left Side - Adjacent Paragraphs (Hidden in Chapter Mode) */}
         {viewMode !== ViewMode.CHAPTER && (!isBottomLayout || mobileView === 'context') && (
           <div className={`flex-1 flex flex-col min-w-0 ${isBottomLayout ? '' : 'border-r border-gray-800'}`}>
@@ -769,7 +741,6 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                   ←
                 </button>
               )}
-              <h3 className="text-sm font-medium text-gray-400">Details</h3>
             </div>
             <div className="flex items-center gap-2">
               {allowCollapse && (
@@ -1248,6 +1219,36 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
         </div>
         )}
         </div>
+
+        {/* Bottom layout: Details/Context toggle lives on the right as vertical tabs (saves vertical space) */}
+        {isBottomLayout && viewMode !== ViewMode.CHAPTER && (
+          <div className="w-12 flex-shrink-0 border-l border-gray-800 bg-[#0A0A0A] flex flex-col items-center py-2 gap-2">
+            <button
+              onClick={() => setMobileView('details')}
+              className={`w-9 h-9 rounded-md border transition-colors flex items-center justify-center ${
+                mobileView === 'details'
+                  ? 'bg-black text-white border-gray-700'
+                  : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
+              }`}
+              aria-label="Details"
+              title="Details"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setMobileView('context')}
+              className={`w-9 h-9 rounded-md border transition-colors flex items-center justify-center ${
+                mobileView === 'context'
+                  ? 'bg-black text-white border-gray-700'
+                  : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
+              }`}
+              aria-label="Context"
+              title="Context"
+            >
+              <BookText className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
       ) : (
         // Collapsed tray: narrow vertical tab the user can click to re-expand

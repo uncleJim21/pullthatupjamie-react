@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronUp, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -528,13 +528,13 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   const isBottomLayout = layoutMode === 'bottom';
 
   // Bottom-sheet state (mobile / narrow layout): shown by default when a panel is open.
-  type SheetMode = 'peek' | 'full' | 'hidden';
+  type SheetMode = 'peek' | 'full' | 'dock';
   const [sheetMode, setSheetMode] = useState<SheetMode>('peek');
 
   // If the app opens the panel (e.g. auto-select on search), ensure the sheet is visible.
   useEffect(() => {
     if (!isBottomLayout) return;
-    if (isPanelOpen && sheetMode === 'hidden') {
+    if (isPanelOpen && sheetMode === 'dock') {
       setSheetMode('peek');
     }
   }, [isBottomLayout, isPanelOpen, sheetMode]);
@@ -553,11 +553,11 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
 
   if (isBottomLayout) {
     // If nothing is open, hide the sheet entirely (consistent with existing open/close state).
-    if (!isPanelOpen || sheetMode === 'hidden') {
+    if (!isPanelOpen) {
       return null;
     }
 
-    const sheetHeight = sheetMode === 'full' ? '92vh' : '46vh';
+    const sheetHeight = sheetMode === 'full' ? '92vh' : sheetMode === 'peek' ? '60vh' : '44px';
 
     return (
       <div className="fixed left-0 right-0 bottom-0 z-[70]">
@@ -570,87 +570,97 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
         >
           {/* Sheet header: handle + tabs + controls */}
           <div className="border-b border-gray-800 bg-[#0A0A0A]">
-            <div className="flex items-center justify-between px-3 pt-2 pb-2 gap-2">
+            <div className="flex items-center justify-between px-3 pt-2 pb-1 gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="h-1 w-10 rounded-full bg-gray-700/70" aria-hidden="true" />
-                <span className="text-xs text-gray-500 truncate">
-                  {activeMode === PanelMode.CONTEXT
-                    ? 'Context'
-                    : activeMode === PanelMode.ANALYSIS
-                      ? 'AI Analysis (Beta)'
-                      : 'Sessions'}
-                </span>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Right-side controls are aligned with the tabs row below */}
+              <div className="w-8" />
+            </div>
+
+            {/* Tabs + controls row */}
+            <div className="flex items-end justify-between px-3 pb-2 gap-2">
+              <div className="flex items-end gap-1 overflow-x-auto max-w-[75%] min-w-0">
+                <button
+                  onClick={() => handleModeSwitch(PanelMode.CONTEXT)}
+                  className={`flex-shrink-0 px-3 py-2 rounded-t-md text-xs font-medium border transition-colors ${
+                    isContextMode
+                      ? 'bg-black text-white border-gray-700'
+                      : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
+                  }`}
+                  aria-label="Context"
+                  title="Context"
+                >
+                  <BookText className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleModeSwitch(PanelMode.ANALYSIS)}
+                  className={`flex-shrink-0 px-3 py-2 rounded-t-md text-xs font-medium border transition-colors ${
+                    isAnalysisMode
+                      ? 'bg-black text-white border-gray-700'
+                      : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
+                  }`}
+                  aria-label="AI Analysis"
+                  title="AI Analysis"
+                >
+                  <BrainCircuit className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleModeSwitch(PanelMode.SESSIONS)}
+                  className={`flex-shrink-0 px-3 py-2 rounded-t-md text-xs font-medium border transition-colors ${
+                    isSessionsMode
+                      ? 'bg-black text-white border-gray-700'
+                      : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
+                  }`}
+                  aria-label="Sessions"
+                  title="Sessions"
+                >
+                  <History className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Controls (right side) */}
+              <div className="flex items-center gap-1 flex-shrink-0">
                 <button
                   onClick={() => setSheetMode((prev) => (prev === 'full' ? 'peek' : 'full'))}
-                  className="px-2 py-1 text-xs text-gray-300 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
+                  className="p-1.5 text-gray-400 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
                   aria-label={sheetMode === 'full' ? 'Shrink panel' : 'Expand panel'}
                   title={sheetMode === 'full' ? 'Shrink' : 'Expand'}
                 >
-                  {sheetMode === 'full' ? 'Shrink' : 'Expand'}
+                  {sheetMode === 'full' ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronUp className="w-4 h-4" />
+                  )}
                 </button>
                 <button
-                  onClick={() => {
-                    closeAllPanels();
-                    setSheetMode('hidden');
-                  }}
-                  className="px-2 py-1 text-xs text-gray-300 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
-                  aria-label="Hide panel"
-                  title="Hide"
+                  onClick={() => setSheetMode((prev) => (prev === 'dock' ? 'peek' : 'dock'))}
+                  className="p-1.5 text-gray-400 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
+                  aria-label={sheetMode === 'dock' ? 'Undock panel' : 'Dock panel down'}
+                  title={sheetMode === 'dock' ? 'Undock' : 'Dock'}
                 >
-                  Hide
+                  {sheetMode === 'dock' ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
                 </button>
               </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex gap-1 px-3 pb-2">
-              <button
-                onClick={() => handleModeSwitch(PanelMode.CONTEXT)}
-                className={`flex-1 px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
-                  isContextMode
-                    ? 'bg-black text-white border-gray-700'
-                    : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
-                }`}
-              >
-                Context
-              </button>
-              <button
-                onClick={() => handleModeSwitch(PanelMode.ANALYSIS)}
-                className={`flex-1 px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
-                  isAnalysisMode
-                    ? 'bg-black text-white border-gray-700'
-                    : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
-                }`}
-              >
-                AI
-              </button>
-              <button
-                onClick={() => handleModeSwitch(PanelMode.SESSIONS)}
-                className={`flex-1 px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
-                  isSessionsMode
-                    ? 'bg-black text-white border-gray-700'
-                    : 'bg-gray-900/40 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-900/70'
-                }`}
-              >
-                Sessions
-              </button>
             </div>
           </div>
 
           {/* Content area */}
-          <div className="h-full overflow-hidden">
+          <div className="h-full min-h-0 overflow-hidden flex flex-col">
             {isContextMode ? (
-              <div className="h-full">
+              <div className="h-full min-h-0">
                 <PodcastContextPanel
                   layoutMode="bottom"
                   paragraphId={paragraphId}
                   isOpen={true}
                   onClose={() => {
                     onCloseContext();
-                    setSheetMode('hidden');
+                    setSheetMode('dock');
                   }}
                   smartInterpolation={smartInterpolation}
                   onTimestampClick={onTimestampClick}
