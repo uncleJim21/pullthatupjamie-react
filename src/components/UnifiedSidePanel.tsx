@@ -557,7 +557,10 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
       return null;
     }
 
-    const sheetHeight = sheetMode === 'full' ? '92vh' : sheetMode === 'peek' ? '60vh' : '44px';
+    // Peek is the default "stacked" height on narrow/mobile. Now that the inner panes scroll,
+    // we can keep this shorter to leave more galaxy visible.
+    // Reduced by ~30% from 60vh → 42vh.
+    const sheetHeight = sheetMode === 'full' ? '92vh' : sheetMode === 'peek' ? '42vh' : '44px';
 
     return (
       <div className="fixed left-0 right-0 bottom-0 z-[70]">
@@ -634,18 +637,20 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                     <ChevronUp className="w-4 h-4" />
                   )}
                 </button>
-                <button
-                  onClick={() => setSheetMode((prev) => (prev === 'dock' ? 'peek' : 'dock'))}
-                  className="p-1.5 text-gray-400 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
-                  aria-label={sheetMode === 'dock' ? 'Undock panel' : 'Dock panel down'}
-                  title={sheetMode === 'dock' ? 'Undock' : 'Dock'}
-                >
-                  {sheetMode === 'dock' ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
-                </button>
+                {sheetMode !== 'full' && (
+                  <button
+                    onClick={() => setSheetMode((prev) => (prev === 'dock' ? 'peek' : 'dock'))}
+                    className="p-1.5 text-gray-400 hover:text-white border border-gray-800 rounded-md hover:bg-gray-900 transition-colors"
+                    aria-label={sheetMode === 'dock' ? 'Undock panel' : 'Dock panel down'}
+                    title={sheetMode === 'dock' ? 'Undock' : 'Dock'}
+                  >
+                    {sheetMode === 'dock' ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>

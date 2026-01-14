@@ -727,7 +727,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
         {/* Right Side - Hierarchy Details */}
         {(!isBottomLayout || mobileView === 'details' || viewMode === ViewMode.CHAPTER) && (
-        <div className={`flex flex-col bg-[#0A0A0A] ${
+        <div className={`flex flex-col bg-[#0A0A0A] min-h-0 ${
           isBottomLayout ? 'flex-1 w-full' : (viewMode === ViewMode.CHAPTER ? 'flex-1' : 'w-[320px]')
         }`}>
           <div className="p-3 border-b border-gray-800 flex items-center gap-2 justify-between">
@@ -755,7 +755,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
