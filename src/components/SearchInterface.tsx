@@ -3647,6 +3647,21 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 hierarchyLevel: prevResult.hierarchyLevel,
                 shareLink: prevResult.shareLink,
               });
+
+              // Match embed-mode UX: immediately play the next/previous clip when user navigates.
+              // (Non-embed narrow mode does not have hover-autoplay.)
+              if (!isEmbedMode && isNarrowLayout && prevResult.audioUrl) {
+                window.dispatchEvent(
+                  new CustomEvent('playAudioTrack', {
+                    detail: {
+                      id: prevResult.shareLink,
+                      audioUrl: prevResult.audioUrl,
+                      startTime: prevResult.timeContext?.start_time ?? 0,
+                      endTime: prevResult.timeContext?.end_time,
+                    },
+                  }),
+                );
+              }
             }
           } : undefined}
           onNext={selectedAudioContext && currentResultIndex < galaxyResults.length - 1 ? () => {
@@ -3673,6 +3688,20 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 hierarchyLevel: nextResult.hierarchyLevel,
                 shareLink: nextResult.shareLink,
               });
+
+              // Match embed-mode UX: immediately play the next/previous clip when user navigates.
+              if (!isEmbedMode && isNarrowLayout && nextResult.audioUrl) {
+                window.dispatchEvent(
+                  new CustomEvent('playAudioTrack', {
+                    detail: {
+                      id: nextResult.shareLink,
+                      audioUrl: nextResult.audioUrl,
+                      startTime: nextResult.timeContext?.start_time ?? 0,
+                      endTime: nextResult.timeContext?.end_time,
+                    },
+                  }),
+                );
+              }
             }
           } : undefined}
         />

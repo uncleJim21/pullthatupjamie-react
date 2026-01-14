@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Play, Podcast, RotateCcw, RotateCw, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, Play, Podcast, RotateCcw, RotateCw, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useAudioController } from '../context/AudioControllerContext.tsx';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
 
@@ -286,14 +286,17 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
               <div className="flex justify-end">
                 <button
                   onClick={() => onExpandChange(!isExpanded)}
-                  className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center rounded-md border border-gray-700 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                  className="h-8 w-11 md:h-10 md:w-14 flex items-center justify-center rounded-md border border-gray-700 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
                   aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
                   title={isExpanded ? 'Collapse' : 'Expand'}
                 >
                   {isExpanded ? (
                     <ChevronDown className="w-4 h-4" />
                   ) : (
-                    <ChevronUp className="w-4 h-4" />
+                    <span className="inline-flex items-center gap-1">
+                      <Info className="w-4 h-4" />
+                      <ChevronUp className="w-4 h-4" />
+                    </span>
                   )}
                 </button>
               </div>
