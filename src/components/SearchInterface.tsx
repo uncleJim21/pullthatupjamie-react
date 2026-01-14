@@ -3179,6 +3179,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 }}
                 sharedSessionTitle={sharedSessionTitle}
                 hideStats={isEmbedMode}
+                compactStats={isNarrowLayout}
                 hideOptions={isEmbedMode}
                 nebulaDimOpacity={isEmbedMode ? 0.78 : undefined}
                 brandImage={isEmbedMode ? (brandImage || undefined) : undefined}

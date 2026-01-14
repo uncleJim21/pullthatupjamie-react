@@ -329,6 +329,7 @@ interface SemanticGalaxyViewProps {
   onOpenAnalysisPanel?: () => void;
   sharedSessionTitle?: string | null;
   hideStats?: boolean; // Hide the stats/legend panel
+  compactStats?: boolean; // When true, top-right overlay shows only a minimal search summary
   hideOptions?: boolean; // Hide the left-side Options menu (used for embed mode)
   nebulaDimOpacity?: number; // Configurable nebula dim opacity (defaults to NEBULA_CONFIG.DIM_OPACITY)
   brandImage?: string; // Brand logo image URL for embed mode
@@ -1463,11 +1464,13 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   onOpenAnalysisPanel,
   sharedSessionTitle = null,
   hideStats = false,
+  compactStats = false,
   hideOptions = false,
   nebulaDimOpacity,
   brandImage,
   brandColors,
 }) => {
+  const [isTouchLikePointer, setIsTouchLikePointer] = useState(false);
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isAnimatingCamera, setIsAnimatingCamera] = useState(false);
@@ -1586,6 +1589,44 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   
   const cameraRef = useRef<THREE.PerspectiveCamera>(null);
   const controlsRef = useRef<any>(null);
+
+  // Detect "touch-like" environments (mobile/tablet, or desktop with coarse pointer).
+  // We use this to avoid OrbitControls' 2-finger dolly/pan codepath which can crash
+  // when the pointer/touch stream is interrupted (common when the page can scroll).
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+
+    const mq = window.matchMedia('(pointer: coarse)');
+    const update = () => setIsTouchLikePointer(Boolean(mq.matches));
+    update();
+
+    // Older Safari uses addListener/removeListener
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', update);
+      return () => mq.removeEventListener('change', update);
+    }
+    mq.addListener(update);
+    return () => mq.removeListener(update);
+  }, []);
+
+  // Hard-disable the problematic touch gestures in OrbitControls on touch-like pointers.
+  // Keep 1-finger rotate; disable pinch-zoom + two-finger pan/dolly (these are the crashing paths).
+  useEffect(() => {
+    const c = controlsRef.current;
+    if (!c) return;
+
+    if (isTouchLikePointer) {
+      c.enableZoom = false;
+      c.enablePan = false;
+      // Force two-finger gesture to rotate (0) instead of dolly/pan (3).
+      // OrbitControls expects these numeric enums internally.
+      c.touches = { ONE: 0, TWO: 0 };
+    } else {
+      c.enableZoom = true;
+      c.enablePan = true;
+      // Leave default touches mapping when not touch-like.
+    }
+  }, [isTouchLikePointer]);
 
   // Track mouse position for hover preview
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -1904,260 +1945,285 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
 
       {/* Stats overlay with Legend and Research Session - Hidden when hideStats is true */}
       {!hideStats && (
-      <div className="absolute top-2 right-4 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 text-sm z-10 max-w-[200px] max-h-[calc(100vh-8rem)] flex flex-col">
-        <div className="overflow-y-auto flex-1 px-3 py-2">
-          <div className="flex flex-col gap-3">
-            {/* Query Display */}
-            {query && (
-              <>
-                <div className="flex items-start gap-2 min-w-0 group relative">
-                  <Search className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400" />
-                  <div 
-                    className="text-xs text-gray-200 line-clamp-2 break-words overflow-hidden flex-1 cursor-help"
-                    title={query}
-                  >
-                    {query}
-                  </div>
-                </div>
-                <div className="border-t border-gray-700" />
-              </>
-            )}
-            
-            {/* Stats */}
-            <div className="flex flex-col gap-1 text-xs">
-              <div>Results: {results.length}</div>
-            </div>
-            
-            {/* Legend */}
-            <div className="border-t border-gray-700 pt-2">
-              <div className="text-xs text-gray-400 mb-2">Hierarchy Levels</div>
-              <div className="flex flex-col gap-1">
-                {Object.entries(HIERARCHY_COLORS)
-                  .filter(([level]) => level !== 'ALL_PODS' && level !== 'FEED')
-                  .map(([level, color]) => (
-                  <div key={level} className="flex items-center gap-2">
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{
-                        backgroundColor: color,
-                        boxShadow: `0 0 8px ${color}`,
-                      }}
-                    />
-                    <span className="text-xs text-gray-300 capitalize">
-                      {level.replace('_', ' ').toLowerCase()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Research Session Section */}
-            <div className="border-t border-gray-700 pt-2">
-              <button
-                onClick={() => setIsResearchCollapsed(!isResearchCollapsed)}
-                className="w-full flex items-center justify-between mb-2 hover:text-gray-300 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Layers className="w-3.5 h-3.5" />
-                  <span className="text-[0.65rem] font-medium">Research</span>
-                  {researchSessionItems.length > 0 && (
-                    <span className="text-[0.6rem] text-gray-400">
-                      ({researchSessionItems.length}/{MAX_RESEARCH_ITEMS})
-                    </span>
-                  )}
-                </div>
-                {isResearchCollapsed ? (
-                  <ChevronDown className="w-3 h-3" />
-                ) : (
-                  <ChevronUp className="w-3 h-3" />
-                )}
-              </button>
-
-              {!isResearchCollapsed && (
-                <>
-                  {researchSessionItems.length > 0 ? (
-                    <div 
-                      className="space-y-2 overflow-y-auto"
-                      style={{
-                        maxHeight: researchSessionItems.length > RESEARCH_SESSION_CONFIG.MAX_VISIBLE_ITEMS 
-                          ? `${RESEARCH_SESSION_CONFIG.MAX_VISIBLE_ITEMS * 38}px` // ~38px per item (including gap)
-                          : 'none'
-                      }}
-                    >
-                      {researchSessionItems.map((item) => {
-                        // Use same logic as HoverPreview for content preview
-                        const contentPreview = item.summary || item.quote || 'No preview';
-                        const hierarchyColor = getHierarchyColor(item.hierarchyLevel);
-                        
-                        return (
-                          <div
-                            key={item.shareLink}
-                            className="bg-gray-900/50 rounded p-1.5 hover:bg-gray-900/70 transition-colors group"
-                            onMouseEnter={(e) => {
-                              // Clear any existing timeout
-                              if (researchHoverTimeoutRef.current) {
-                                clearTimeout(researchHoverTimeoutRef.current);
-                              }
-                              
-                              setHoveredResearchItem(item);
-                              setMousePosition({ x: e.clientX, y: e.clientY });
-                              
-                              // Set timeout for 2 seconds before showing tooltip
-                              researchHoverTimeoutRef.current = setTimeout(() => {
-                                setShowResearchTooltip(true);
-                              }, 1000);
-                            }}
-                            onMouseMove={(e) => {
-                              setMousePosition({ x: e.clientX, y: e.clientY });
-                            }}
-                            onMouseLeave={() => {
-                              // Clear timeout if user moves away before 2 seconds
-                              if (researchHoverTimeoutRef.current) {
-                                clearTimeout(researchHoverTimeoutRef.current);
-                              }
-                              setHoveredResearchItem(null);
-                              setShowResearchTooltip(false);
-                            }}
-                          >
-                            <div className="flex gap-1.5 items-start">
-                              {/* Hierarchy Dot */}
-                              <div
-                                className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5"
-                                style={{
-                                  backgroundColor: hierarchyColor,
-                                  boxShadow: `0 0 4px 1px ${hierarchyColor}`,
-                                  border: `1px solid ${hierarchyColor}`,
-                                }}
-                              />
-                              
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-1">
-                                  <p className="text-[0.65rem] text-gray-300 line-clamp-1 leading-tight">
-                                    {contentPreview}
-                                  </p>
-                                  <button
-                                    onClick={() => onRemoveFromResearch?.(item.shareLink)}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-400 flex-shrink-0"
-                                    aria-label="Remove"
-                                  >
-                                    <X className="w-2.5 h-2.5" />
-                                  </button>
-                                </div>
-                                <p className="text-[0.6rem] text-gray-500 mt-0.5 leading-tight line-clamp-1">
-                                  {item.episode}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-[0.65rem] text-gray-500 text-center py-2">
-                      No items yet
-                      <div className="text-[0.6rem] text-gray-600 mt-1">
-                        Right-click stars to add
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Action buttons - visible even when collapsed */}
-              {researchSessionItems.length > 0 && (
-                <div className="flex gap-1 mt-2">
-                  <button
-                    onClick={onClearResearch}
-                    className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
-                    title="Clear all items"
-                    aria-label="Clear all items"
-                  >
-                    <X className="w-3.5 h-3.5 mx-auto" />
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      Clear All
-                    </span>
-                  </button>
-                  
-                        <button
-                          onClick={async () => {
-                            if (isSaving) return; // Prevent double-click
-                            
-                            try {
-                              setIsSaving(true);
-                              showSaveToast('loading', 'Saving...');
-                              
-                              const result = await saveResearchSession((researchSessionItems || []) as ResearchSessionItem[]);
-                              
-                              setIsSaving(false);
-                              if (result.success) {
-                                console.log('Research session saved:', result.data);
-                                showSaveToast('success', 'Session saved');
-                              }
-                            } catch (error) {
-                              setIsSaving(false);
-                              console.error('Failed to save research session:', error);
-                              showSaveToast('error', 'Save failed');
-                            }
-                          }}
-                          disabled={isSaving}
-                          className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Save session"
-                          aria-label="Save session"
-                        >
-                          <Save className="w-3.5 h-3.5 mx-auto" />
-                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                            Save
-                          </span>
-                        </button>
-                  
-                  <button
-                    onClick={() => {
-                      // Open analysis panel first, then close context
-                      if (onOpenAnalysisPanel) {
-                        printLog(`[AI Analysis] Galaxy submenu: user clicked Analyze button (items=${researchSessionItems.length})`);
-                        onOpenAnalysisPanel();
-                      }
-                      // Small delay to ensure analysis opens before context closes
-                      setTimeout(() => {
-                        if (onCloseContextPanel) {
-                          onCloseContextPanel();
-                        }
-                      }, 0);
-                    }}
-                    className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
-                    title="AI Analysis (Beta)"
-                    aria-label="AI Analysis (Beta)"
-                  >
-                    <BrainCircuit className="w-3.5 h-3.5 mx-auto" />
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      AI Analysis (Beta)
-                    </span>
-                  </button>
-                  
-                  <button
-                    onClick={handleShareSession}
-                    disabled={isSharing || !researchSessionItems || researchSessionItems.length === 0}
-                    className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Share session"
-                    aria-label="Share session"
-                  >
-                    <Share2 className="w-3.5 h-3.5 mx-auto" />
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      Share
-                    </span>
-                  </button>
-                </div>
-              )}
+      <div
+        className={`absolute top-2 right-4 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 text-sm z-10 ${
+          compactStats ? 'px-2 py-1.5 max-w-[220px]' : 'max-w-[200px] max-h-[calc(100vh-8rem)] flex flex-col'
+        }`}
+      >
+        {compactStats ? (
+          <div className="flex items-center gap-2 min-w-0">
+            <Search className="w-4 h-4 flex-shrink-0 text-gray-400" />
+            <div className="text-xs text-gray-200 truncate min-w-0" title={query || undefined}>
+              {(query && query.trim()) ? query : 'Search'}
+              <span className="text-gray-500"> • </span>
+              <span className="text-gray-200">{results.length}</span>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="overflow-y-auto flex-1 px-3 py-2">
+            <div className="flex flex-col gap-3">
+              {/* Query Display */}
+              {query && (
+                <>
+                  <div className="flex items-start gap-2 min-w-0 group relative">
+                    <Search className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400" />
+                    <div 
+                      className="text-xs text-gray-200 line-clamp-2 break-words overflow-hidden flex-1 cursor-help"
+                      title={query}
+                    >
+                      {query}
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-700" />
+                </>
+              )}
+              
+              {/* Stats */}
+              <div className="flex flex-col gap-1 text-xs">
+                <div>Results: {results.length}</div>
+              </div>
+              
+              {/* Legend */}
+              <div className="border-t border-gray-700 pt-2">
+                <div className="text-xs text-gray-400 mb-2">Hierarchy Levels</div>
+                <div className="flex flex-col gap-1">
+                  {Object.entries(HIERARCHY_COLORS)
+                    .filter(([level]) => level !== 'ALL_PODS' && level !== 'FEED')
+                    .map(([level, color]) => (
+                    <div key={level} className="flex items-center gap-2">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{
+                          backgroundColor: color,
+                          boxShadow: `0 0 8px ${color}`,
+                        }}
+                      />
+                      <span className="text-xs text-gray-300 capitalize">
+                        {level.replace('_', ' ').toLowerCase()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Research Session Section */}
+              <div className="border-t border-gray-700 pt-2">
+                <button
+                  onClick={() => setIsResearchCollapsed(!isResearchCollapsed)}
+                  className="w-full flex items-center justify-between mb-2 hover:text-gray-300 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-3.5 h-3.5" />
+                    <span className="text-[0.65rem] font-medium">Research</span>
+                    {researchSessionItems.length > 0 && (
+                      <span className="text-[0.6rem] text-gray-400">
+                        ({researchSessionItems.length}/{MAX_RESEARCH_ITEMS})
+                      </span>
+                    )}
+                  </div>
+                  {isResearchCollapsed ? (
+                    <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronUp className="w-3 h-3" />
+                  )}
+                </button>
+
+                {!isResearchCollapsed && (
+                  <>
+                    {researchSessionItems.length > 0 ? (
+                      <div 
+                        className="space-y-2 overflow-y-auto"
+                        style={{
+                          maxHeight: researchSessionItems.length > RESEARCH_SESSION_CONFIG.MAX_VISIBLE_ITEMS 
+                            ? `${RESEARCH_SESSION_CONFIG.MAX_VISIBLE_ITEMS * 38}px` // ~38px per item (including gap)
+                            : 'none'
+                        }}
+                      >
+                        {researchSessionItems.map((item) => {
+                          // Use same logic as HoverPreview for content preview
+                          const contentPreview = item.summary || item.quote || 'No preview';
+                          const hierarchyColor = getHierarchyColor(item.hierarchyLevel);
+                          
+                          return (
+                            <div
+                              key={item.shareLink}
+                              className="bg-gray-900/50 rounded p-1.5 hover:bg-gray-900/70 transition-colors group"
+                              onMouseEnter={(e) => {
+                                // Clear any existing timeout
+                                if (researchHoverTimeoutRef.current) {
+                                  clearTimeout(researchHoverTimeoutRef.current);
+                                }
+                                
+                                setHoveredResearchItem(item);
+                                setMousePosition({ x: e.clientX, y: e.clientY });
+                                
+                                // Set timeout for 2 seconds before showing tooltip
+                                researchHoverTimeoutRef.current = setTimeout(() => {
+                                  setShowResearchTooltip(true);
+                                }, 1000);
+                              }}
+                              onMouseMove={(e) => {
+                                setMousePosition({ x: e.clientX, y: e.clientY });
+                              }}
+                              onMouseLeave={() => {
+                                // Clear timeout if user moves away before 2 seconds
+                                if (researchHoverTimeoutRef.current) {
+                                  clearTimeout(researchHoverTimeoutRef.current);
+                                }
+                                setHoveredResearchItem(null);
+                                setShowResearchTooltip(false);
+                              }}
+                            >
+                              <div className="flex gap-1.5 items-start">
+                                {/* Hierarchy Dot */}
+                                <div
+                                  className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5"
+                                  style={{
+                                    backgroundColor: hierarchyColor,
+                                    boxShadow: `0 0 4px 1px ${hierarchyColor}`,
+                                    border: `1px solid ${hierarchyColor}`,
+                                  }}
+                                />
+                                
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-1">
+                                    <p className="text-[0.65rem] text-gray-300 line-clamp-1 leading-tight">
+                                      {contentPreview}
+                                    </p>
+                                    <button
+                                      onClick={() => onRemoveFromResearch?.(item.shareLink)}
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-400 flex-shrink-0"
+                                      aria-label="Remove"
+                                    >
+                                      <X className="w-2.5 h-2.5" />
+                                    </button>
+                                  </div>
+                                  <p className="text-[0.6rem] text-gray-500 mt-0.5 leading-tight line-clamp-1">
+                                    {item.episode}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-[0.65rem] text-gray-500 text-center py-2">
+                        No items yet
+                        <div className="text-[0.6rem] text-gray-600 mt-1">
+                          Right-click stars to add
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Action buttons - visible even when collapsed */}
+                {researchSessionItems.length > 0 && (
+                  <div className="flex gap-1 mt-2">
+                    <button
+                      onClick={onClearResearch}
+                      className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
+                      title="Clear all items"
+                      aria-label="Clear all items"
+                    >
+                      <X className="w-3.5 h-3.5 mx-auto" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Clear All
+                      </span>
+                    </button>
+                    
+                          <button
+                            onClick={async () => {
+                              if (isSaving) return; // Prevent double-click
+                              
+                              try {
+                                setIsSaving(true);
+                                showSaveToast('loading', 'Saving...');
+                                
+                                const result = await saveResearchSession((researchSessionItems || []) as ResearchSessionItem[]);
+                                
+                                setIsSaving(false);
+                                if (result.success) {
+                                  console.log('Research session saved:', result.data);
+                                  showSaveToast('success', 'Session saved');
+                                }
+                              } catch (error) {
+                                setIsSaving(false);
+                                console.error('Failed to save research session:', error);
+                                showSaveToast('error', 'Save failed');
+                              }
+                            }}
+                            disabled={isSaving}
+                            className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Save session"
+                            aria-label="Save session"
+                          >
+                            <Save className="w-3.5 h-3.5 mx-auto" />
+                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                              Save
+                            </span>
+                          </button>
+                    
+                    <button
+                      onClick={() => {
+                        // Open analysis panel first, then close context
+                        if (onOpenAnalysisPanel) {
+                          printLog(`[AI Analysis] Galaxy submenu: user clicked Analyze button (items=${researchSessionItems.length})`);
+                          onOpenAnalysisPanel();
+                        }
+                        // Small delay to ensure analysis opens before context closes
+                        setTimeout(() => {
+                          if (onCloseContextPanel) {
+                            onCloseContextPanel();
+                          }
+                        }, 0);
+                      }}
+                      className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative"
+                      title="AI Analysis (Beta)"
+                      aria-label="AI Analysis (Beta)"
+                    >
+                      <BrainCircuit className="w-3.5 h-3.5 mx-auto" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        AI Analysis (Beta)
+                      </span>
+                    </button>
+                    
+                    <button
+                      onClick={handleShareSession}
+                      disabled={isSharing || !researchSessionItems || researchSessionItems.length === 0}
+                      className="flex-1 p-1.5 border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-600 transition-colors group relative disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Share session"
+                      aria-label="Share session"
+                    >
+                      <Share2 className="w-3.5 h-3.5 mx-auto" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/95 text-white text-[0.6rem] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Share
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       )}
 
       {/* 3D Canvas */}
       <Canvas
-        style={{ width: '100%', height: '100%' }}
+        // Prevent the browser from hijacking touch gestures (scroll/pinch-zoom) which can
+        // cause OrbitControls to receive inconsistent touch state and crash on mobile.
+        style={{ width: '100%', height: '100%', touchAction: 'none' }}
         resize={{ scroll: false, debounce: 0 }}
+        onCreated={({ gl }) => {
+          // Belt + suspenders: ensure the actual canvas element disables default touch actions.
+          try {
+            (gl.domElement as any).style.touchAction = 'none';
+          } catch {
+            // ignore
+          }
+        }}
       >
         <PerspectiveCamera
           ref={cameraRef}
@@ -2170,8 +2236,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           ref={controlsRef}
           enabled={!isAnimatingCamera}
           enableRotate={true}
-          enablePan={true}
-          enableZoom={true}
+          enablePan={!isTouchLikePointer}
+          enableZoom={!isTouchLikePointer}
           panSpeed={1}
           zoomSpeed={1}
           minDistance={5}
