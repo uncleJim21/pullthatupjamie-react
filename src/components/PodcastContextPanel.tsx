@@ -103,6 +103,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const allowCollapse = !isBottomLayout;
   const [mobileView, setMobileView] = useState<'details' | 'context'>('details');
   const contentRef = useRef<HTMLDivElement>(null);
+  const detailsScrollRef = useRef<HTMLDivElement>(null);
   const scrollLogRef = useRef<{ lastAt: number }>({ lastAt: 0 });
   const touchLogRef = useRef<{ lastAt: number }>({ lastAt: 0 });
   const {
@@ -124,7 +125,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     if (now - scrollLogRef.current.lastAt < 500) return; // throttle
     scrollLogRef.current.lastAt = now;
     printLog(
-      `[ScrollDebug] ${label} scroll: top=${Math.round(el.scrollTop)} clientH=${Math.round(el.clientHeight)} scrollH=${Math.round(el.scrollHeight)}`,
+      `[ScrollDebug] ${label} scroll: top=${Math.round(el.scrollTop)} clientH=${Math.round(el.clientHeight)} scrollH=${Math.round(el.scrollHeight)} canScroll=${el.scrollHeight > el.clientHeight}`,
     );
   };
 
@@ -134,6 +135,77 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     touchLogRef.current.lastAt = now;
     printLog(`[ScrollDebug] ${label} touch`);
   };
+
+  // Debug: log container dimensions whenever layout mode or loading state changes
+  useEffect(() => {
+    if (!isBottomLayout || isLoading) return;
+    
+    // Check Context pane scroll container
+    const contextEl = contentRef.current;
+    if (contextEl && mobileView === 'context') {
+      const rect = contextEl.getBoundingClientRect();
+      const computedStyle = window.getComputedStyle(contextEl);
+      printLog(
+        `[ScrollDebug] ContextPane scroll: ` +
+        `clientH=${contextEl.clientHeight} scrollH=${contextEl.scrollHeight} ` +
+        `boundingH=${Math.round(rect.height)} ` +
+        `overflow=${computedStyle.overflowY} ` +
+        `canScroll=${contextEl.scrollHeight > contextEl.clientHeight}`
+      );
+    }
+    
+    // Check Details pane scroll container
+    const detailsEl = detailsScrollRef.current;
+    if (detailsEl && mobileView === 'details') {
+      const rect = detailsEl.getBoundingClientRect();
+      const parent = detailsEl.parentElement;
+      const parentRect = parent?.getBoundingClientRect();
+      const computedStyle = window.getComputedStyle(detailsEl);
+      printLog(
+        `[ScrollDebug] DetailsPane scroll: ` +
+        `clientH=${detailsEl.clientHeight} scrollH=${detailsEl.scrollHeight} ` +
+        `boundingH=${Math.round(rect.height)} ` +
+        `parentH=${parentRect ? Math.round(parentRect.height) : 'n/a'} ` +
+        `overflow=${computedStyle.overflowY} ` +
+        `touchAction=${computedStyle.touchAction} ` +
+        `canScroll=${detailsEl.scrollHeight > detailsEl.clientHeight}`
+      );
+    } else if (mobileView === 'details') {
+      printLog(`[ScrollDebug] detailsScrollRef is NULL - Details scroll container not mounted`);
+    }
+    
+    // Also log after a delay to catch post-render state AND trace parent chain
+    const timer = setTimeout(() => {
+      const el = detailsScrollRef.current;
+      if (el && mobileView === 'details') {
+        printLog(
+          `[ScrollDebug] DetailsPane (delayed): ` +
+          `clientH=${el.clientHeight} scrollH=${el.scrollHeight} ` +
+          `canScroll=${el.scrollHeight > el.clientHeight}`
+        );
+        
+        // Trace the parent chain to find where height constraint breaks
+        let current: HTMLElement | null = el;
+        let depth = 0;
+        while (current && depth < 10) {
+          const rect = current.getBoundingClientRect();
+          const style = window.getComputedStyle(current);
+          printLog(
+            `[ScrollDebug] Parent[${depth}]: ` +
+            `tag=${current.tagName} ` +
+            `boundingH=${Math.round(rect.height)} ` +
+            `overflow=${style.overflow} ` +
+            `display=${style.display} ` +
+            `flexDir=${style.flexDirection || 'n/a'} ` +
+            `minH=${style.minHeight}`
+          );
+          current = current.parentElement;
+          depth++;
+        }
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [isBottomLayout, isLoading, viewMode, mobileView]);
 
   // Interpret paragraphId: if it matches the paragraph pattern guid_p{number}, treat as paragraph.
   // Otherwise, treat it as a chapterId for chapter-level hierarchy.
@@ -722,7 +794,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     >
       {/* Split Content Area */}
       {(!allowCollapse || !isCollapsed) ? (
-      <div className={`flex-1 min-h-0 overflow-hidden ${isBottomLayout ? 'flex' : 'flex'}`}>
+      <div className={`flex-1 min-h-0 overflow-hidden flex`}>
         <div className={`flex-1 min-h-0 overflow-hidden ${isBottomLayout ? 'flex flex-col' : 'flex'}`}>
         {/* Left Side - Adjacent Paragraphs (Hidden in Chapter Mode) */}
         {viewMode !== ViewMode.CHAPTER && (!isBottomLayout || mobileView === 'context') && (
@@ -810,10 +882,10 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
         {/* Right Side - Hierarchy Details */}
         {(!isBottomLayout || mobileView === 'details' || viewMode === ViewMode.CHAPTER) && (
-        <div className={`flex flex-col bg-[#0A0A0A] min-h-0 ${
-          isBottomLayout ? 'flex-1 w-full' : (viewMode === ViewMode.CHAPTER ? 'flex-1' : 'w-[320px]')
+        <div className={`bg-[#0A0A0A] ${
+          isBottomLayout ? 'flex-1 w-full relative' : (viewMode === ViewMode.CHAPTER ? 'flex-1 flex flex-col' : 'w-[320px] flex flex-col')
         }`}>
-          <div className="p-3 border-b border-gray-800 flex items-center gap-2 justify-between">
+          <div className="p-3 border-b border-gray-800 flex items-center gap-2 justify-between flex-shrink-0">
             <div className="flex items-center gap-2">
               {canGoBack && (
                 <button
@@ -839,11 +911,13 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
           </div>
           
           <div
-            className={`flex-1 min-h-0 overflow-y-auto p-4 ${isBottomLayout ? 'pb-24' : ''}`}
+            ref={detailsScrollRef}
+            className={`overflow-y-auto p-4 ${isBottomLayout ? 'absolute left-0 right-0 bottom-0 pb-24' : 'flex-1 min-h-0'}`}
             style={{
               WebkitOverflowScrolling: 'touch',
               touchAction: 'pan-y',
               overscrollBehavior: 'contain',
+              ...(isBottomLayout ? { top: '52px' } : {}),
             }}
             onScroll={(e) => logScrollMetrics('DetailsPane', e.currentTarget)}
             onTouchStart={() => logTouch('DetailsPane')}

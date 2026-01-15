@@ -356,6 +356,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [instructions] = useState(DEFAULT_INSTRUCTIONS);
   const contentRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const sessionId = propSessionId || getCurrentSessionId();
 
   type AnalysisSource = 'current_search' | 'compiled_session';
@@ -564,6 +565,34 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
     onCloseSessions();
   };
 
+  // Debug: log sheet mode and layout info
+  useEffect(() => {
+    if (!isBottomLayout || !isPanelOpen) return;
+    printLog(
+      `[ScrollDebug] UnifiedSidePanel bottom layout: sheetMode=${defaultSheetMode} ` +
+      `activeMode=${activeMode} isContextMode=${activeMode === PanelMode.CONTEXT}`
+    );
+    // Log sheet dimensions after transition completes
+    const timer = setTimeout(() => {
+      const el = sheetRef.current;
+      if (!el) {
+        printLog(`[ScrollDebug] sheetRef is NULL`);
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      const computedStyle = window.getComputedStyle(el);
+      printLog(
+        `[ScrollDebug] Sheet container: ` +
+        `boundingH=${Math.round(rect.height)} ` +
+        `computedH=${computedStyle.height} ` +
+        `overflow=${computedStyle.overflow} ` +
+        `display=${computedStyle.display} ` +
+        `flexDir=${computedStyle.flexDirection}`
+      );
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [isBottomLayout, isPanelOpen, defaultSheetMode, activeMode]);
+
   if (isBottomLayout) {
     // If nothing is open, hide the sheet entirely (consistent with existing open/close state).
     if (!isPanelOpen) {
@@ -575,15 +604,15 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
     // Reduced by ~30% from 60vh → 42vh.
     const sheetHeight = sheetMode === 'full' ? '92vh' : sheetMode === 'peek' ? '42vh' : '44px';
 
-    return (
-      <div className="fixed left-0 right-0 bottom-0 z-[70]">
-        <div
-          className="bg-black border-t border-gray-800 rounded-t-xl shadow-2xl overflow-hidden flex flex-col"
-          style={{
-            height: sheetHeight,
-            transition: 'height 240ms ease',
-          }}
-        >
+    const sheet = (
+      <div
+        ref={sheetRef}
+        className="bg-black border-t border-gray-800 rounded-t-xl shadow-2xl overflow-hidden flex flex-col pointer-events-auto"
+        style={{
+          height: sheetHeight,
+          transition: 'height 240ms ease',
+        }}
+      >
           {/* Sheet header: handle + tabs + controls */}
           <div className="border-b border-gray-800 bg-[#0A0A0A]">
             <div className="flex items-center justify-between px-3 pt-2 pb-1 gap-2">
@@ -684,7 +713,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           {/* Content area */}
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             {isContextMode ? (
-              <div className="flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 <PodcastContextPanel
                   layoutMode="bottom"
                   paragraphId={paragraphId}
@@ -736,7 +765,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                   </button>
                 </div>
 
-                <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
+                <div ref={contentRef} className="flex-1 min-h-0 overflow-y-auto p-4">
                   {showAnalysisSourceChooser ? (
                     <div className="max-w-xl w-full pt-6 text-gray-200">
                       <div className="space-y-4">
@@ -1000,10 +1029,10 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                 )}
               </div>
             ) : (
-              <div className="flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 {/* Sessions tab content is already self-contained; keep behavior consistent */}
                 <div className="flex-1 min-h-0 bg-black flex flex-col overflow-hidden">
-                  <div className="flex-1 overflow-y-auto p-4">
+                  <div className="flex-1 min-h-0 overflow-y-auto p-4">
                     {isLoadingSessions ? (
                       <div className="flex flex-col items-center justify-center h-full text-gray-400">
                         <Loader className="w-8 h-8 animate-spin mb-4" />
@@ -1091,7 +1120,14 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
               </div>
             )}
           </div>
-        </div>
+      </div>
+    );
+
+    // Both expanded and peek/dock: use pointer-events-none on wrapper, pointer-events-auto on sheet.
+    // The sheet's z-index ensures it's above the galaxy. No backdrop needed.
+    return (
+      <div className="fixed left-0 right-0 bottom-0 z-[70] pointer-events-none">
+        {sheet}
       </div>
     );
   }
