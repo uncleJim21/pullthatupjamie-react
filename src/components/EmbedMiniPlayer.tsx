@@ -259,22 +259,22 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
                   boxShadow: `0 0 4px 1px ${getHierarchyColor()}`,
                 }}
               />
-              <p className="text-xs text-gray-400 uppercase tracking-wider">
+              <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider">
                 {hierarchyLevel}
               </p>
             </div>
             
-            <h3 className="text-sm font-medium text-white line-clamp-1 mb-0.5">
+            <h3 className="text-xs md:text-sm font-medium text-white line-clamp-1 mb-0.5">
               {episodeTitle || 'Episode'}
             </h3>
             
             {creator && (
-              <p className="text-xs text-gray-500 line-clamp-1">
+              <p className="text-[10px] md:text-xs text-gray-500 line-clamp-1">
                 {creator}
               </p>
             )}
             
-            <p className="text-xs text-gray-400 line-clamp-2 mt-1">
+            <p className="text-[10px] md:text-xs text-gray-400 line-clamp-2 mt-1">
               {displayText}
             </p>
           </div>
@@ -320,7 +320,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
                   <Play className="w-4 h-4 md:w-5 md:h-5" />
                 )}
               </button>
-              <span className="text-xs md:text-sm text-gray-400 min-w-[42px] md:min-w-[52px] text-right font-mono">
+              <span className="text-[10px] md:text-sm text-gray-400 min-w-[36px] md:min-w-[52px] text-right font-mono">
                 {formatTime(currentTime)}
               </span>
             </div>
