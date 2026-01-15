@@ -392,18 +392,14 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       ? controllerCurrentTime
       : defaultClipStart;
 
-  // Auto-play for Galaxy star clicks using shared controller
+  // Auto-play for Galaxy star clicks / auto-select first result using shared controller.
+  // This should work for any selected result that provides a timeContext (not just "guid_p123" ids),
+  // so that "autoPlayOnStarClick" consistently starts playback immediately.
   useEffect(() => {
-    printLog(`[AutoPlay Effect] Triggered - isParagraphId: ${isParagraphId}, isOpen: ${isOpen}, autoPlayOnOpen: ${autoPlayOnOpen}`);
+    printLog(`[AutoPlay Effect] Triggered - isOpen: ${isOpen}, autoPlayOnOpen: ${autoPlayOnOpen}`);
     printLog(`[AutoPlay Effect] effectiveAudioUrl: ${effectiveAudioUrl}`);
     printLog(`[AutoPlay Effect] timeContext: ${JSON.stringify(timeContext)}`);
     
-    // Only allow auto-play in paragraph-driven mode.
-    // In chapter mode this can lead to starting from t=0 or a stale timestamp.
-    if (!isParagraphId) {
-      printLog('[AutoPlay Effect] Skipped - not paragraph ID');
-      return;
-    }
     if (!effectiveAudioUrl || !autoPlayOnOpen || !timeContext) {
       printLog(`[AutoPlay Effect] Skipped - missing required values: audioUrl=${!!effectiveAudioUrl}, autoPlay=${autoPlayOnOpen}, timeContext=${!!timeContext}`);
       return;
@@ -441,7 +437,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       startTime: timeContext.start_time,
       endTime: timeContext.end_time,
     });
-  }, [effectiveAudioUrl, autoPlayOnOpen, timeContext?.start_time, timeContext?.end_time, contextTrackId, playTrack, isOpen, isParagraphId]);
+  }, [effectiveAudioUrl, autoPlayOnOpen, timeContext?.start_time, timeContext?.end_time, contextTrackId, playTrack, isOpen]);
 
   const handleEpisodePlayPause = async () => {
     if (!effectiveAudioUrl) return;

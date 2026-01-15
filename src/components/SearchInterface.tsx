@@ -2103,6 +2103,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           }
           printLog(`[AutoSelect] AutoPlay setting: ${autoPlay}`);
           setAutoPlayContextOnOpen(autoPlay);
+
+          // Non-embed: start playback immediately when we auto-select the first result after search.
+          maybeDispatchAutoPlay({
+            enabled: autoPlay,
+            shareLink: firstResult.shareLink,
+            audioUrl: firstResult.audioUrl,
+            startTime: firstResult.timeContext?.start_time ?? 0,
+            endTime: firstResult.timeContext?.end_time,
+          });
           
           // Small delay to ensure state updates propagate
           setTimeout(() => {
@@ -2370,6 +2379,36 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     shareLink?: string;
   } | null>(null);
   const [autoPlayContextOnOpen, setAutoPlayContextOnOpen] = useState(false);
+  const autoPlayDispatchKeyRef = useRef<string | null>(null);
+
+  const maybeDispatchAutoPlay = (args: {
+    shareLink?: string;
+    audioUrl?: string;
+    startTime?: number | null;
+    endTime?: number | null;
+    enabled: boolean;
+  }) => {
+    if (isEmbedMode) return;
+    if (!args.enabled) return;
+    if (!args.audioUrl || !args.shareLink) return;
+
+    const startTime = args.startTime ?? 0;
+    const endTime = args.endTime ?? undefined;
+    const key = `${args.shareLink}-${startTime}-${endTime ?? 'null'}`;
+    if (autoPlayDispatchKeyRef.current === key) return;
+    autoPlayDispatchKeyRef.current = key;
+
+    window.dispatchEvent(
+      new CustomEvent('playAudioTrack', {
+        detail: {
+          id: args.shareLink,
+          audioUrl: args.audioUrl,
+          startTime,
+          endTime,
+        },
+      }),
+    );
+  };
   // Track the effective width of the podcast context panel so we can center the floating search bar
   const [contextPanelWidth, setContextPanelWidth] = useState(0);
   // Keep a ref so the narrow-layout ResizeObserver can incorporate the latest panel width
@@ -3126,19 +3165,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   setSelectedAudioContext(audioContext);
                   setAutoPlayContextOnOpen(autoPlay);
 
-                  // If Analysis tab is open, the Context panel may not be mounted, so trigger playback directly.
-                  if (isAnalysisPanelOpen && autoPlay && result.audioUrl) {
-                    window.dispatchEvent(
-                      new CustomEvent('playAudioTrack', {
-                        detail: {
-                          id: result.shareLink,
-                          audioUrl: result.audioUrl,
-                          startTime: result.timeContext?.start_time ?? 0,
-                          endTime: result.timeContext?.end_time,
-                        },
-                      }),
-                    );
-                  }
+                  // Non-embed: if autoplay is enabled, start playback immediately (independent of which panel is mounted).
+                  maybeDispatchAutoPlay({
+                    enabled: autoPlay,
+                    shareLink: result.shareLink,
+                    audioUrl: result.audioUrl,
+                    startTime: result.timeContext?.start_time ?? 0,
+                    endTime: result.timeContext?.end_time,
+                  });
                   
                   // In embed mode, trigger playback immediately via AudioController
                   if (isEmbedMode && autoPlay && result.audioUrl) {
