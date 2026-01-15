@@ -103,6 +103,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const allowCollapse = !isBottomLayout;
   const [mobileView, setMobileView] = useState<'details' | 'context'>('details');
   const contentRef = useRef<HTMLDivElement>(null);
+  const scrollLogRef = useRef<{ lastAt: number }>({ lastAt: 0 });
+  const touchLogRef = useRef<{ lastAt: number }>({ lastAt: 0 });
   const {
     currentTrack,
     isPlaying: controllerIsPlaying,
@@ -116,6 +118,22 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
     seekBy,
   } = useAudioController();
   const autoPlayKeyRef = useRef<string | null>(null);
+
+  const logScrollMetrics = (label: string, el: HTMLDivElement) => {
+    const now = Date.now();
+    if (now - scrollLogRef.current.lastAt < 500) return; // throttle
+    scrollLogRef.current.lastAt = now;
+    printLog(
+      `[ScrollDebug] ${label} scroll: top=${Math.round(el.scrollTop)} clientH=${Math.round(el.clientHeight)} scrollH=${Math.round(el.scrollHeight)}`,
+    );
+  };
+
+  const logTouch = (label: string) => {
+    const now = Date.now();
+    if (now - touchLogRef.current.lastAt < 500) return; // throttle
+    touchLogRef.current.lastAt = now;
+    printLog(`[ScrollDebug] ${label} touch`);
+  };
 
   // Interpret paragraphId: if it matches the paragraph pattern guid_p{number}, treat as paragraph.
   // Otherwise, treat it as a chapterId for chapter-level hierarchy.
@@ -699,7 +717,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   return (
     <div
       className={`bg-black flex flex-col transition-all duration-300 ease-in-out ${panelWidthClass} overflow-hidden flex-shrink-0 min-h-0 ${
-        isBottomLayout ? 'h-full' : 'sticky top-0 h-screen border-l border-gray-800'
+        isBottomLayout ? 'flex-1 min-h-0' : 'sticky top-0 h-screen border-l border-gray-800'
       }`}
     >
       {/* Split Content Area */}
@@ -721,6 +739,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               touchAction: 'pan-y',
               overscrollBehavior: 'contain',
             }}
+            onScroll={(e) => logScrollMetrics('ContextPane', e.currentTarget)}
+            onTouchStart={() => logTouch('ContextPane')}
+            onTouchMove={() => logTouch('ContextPane')}
           >
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -824,6 +845,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               touchAction: 'pan-y',
               overscrollBehavior: 'contain',
             }}
+            onScroll={(e) => logScrollMetrics('DetailsPane', e.currentTarget)}
+            onTouchStart={() => logTouch('DetailsPane')}
+            onTouchMove={() => logTouch('DetailsPane')}
           >
             {isLoading ? (
               <div className="flex items-center justify-center py-12">

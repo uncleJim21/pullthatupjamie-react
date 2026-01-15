@@ -2409,6 +2409,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       }),
     );
   };
+
   // Track the effective width of the podcast context panel so we can center the floating search bar
   const [contextPanelWidth, setContextPanelWidth] = useState(0);
   // Keep a ref so the narrow-layout ResizeObserver can incorporate the latest panel width
@@ -2428,6 +2429,66 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [isNarrowLayout, setIsNarrowLayout] = useState(false);
   // Narrow layout: show a compact mini player by default; user can expand to see UnifiedSidePanel.
   const [isNarrowInfoExpanded, setIsNarrowInfoExpanded] = useState(false);
+
+  // Debug: log the key layout flags driving scroll + touch behavior on mobile.
+  useEffect(() => {
+    printLog(
+      `[ScrollDebug] flags changed: isEmbedMode=${isEmbedMode} isNarrowLayout=${isNarrowLayout} isNarrowInfoExpanded=${isNarrowInfoExpanded}`,
+    );
+  }, [isEmbedMode, isNarrowLayout, isNarrowInfoExpanded]);
+
+  // Lock background scroll when the narrow expanded bottom-sheet is open.
+  // Without this, touch scrolling can "chain" to the underlying page (PageBanner/etc)
+  // instead of scrolling the sheet content.
+  useEffect(() => {
+    const shouldLock = !isEmbedMode && Boolean(isNarrowLayout && isNarrowInfoExpanded);
+    printLog(`[ScrollDebug] scrollLock evaluate: shouldLock=${shouldLock}`);
+    if (!shouldLock) return;
+
+    const body = document.body;
+    const html = document.documentElement;
+
+    const prev = {
+      bodyOverflow: body.style.overflow,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
+      bodyWidth: body.style.width,
+      htmlOverscroll: html.style.overscrollBehavior,
+    };
+
+    const scrollY = window.scrollY || 0;
+    printLog(
+      `[ScrollDebug] scrollLock APPLY: scrollY=${scrollY} body(overflow=${body.style.overflow || '(empty)'} position=${body.style.position || '(empty)'} top=${body.style.top || '(empty)'})`,
+    );
+
+    html.style.overscrollBehavior = 'none';
+    body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    printLog(
+      `[ScrollDebug] scrollLock APPLIED: body(overflow=${body.style.overflow} position=${body.style.position} top=${body.style.top}) html(overscrollBehavior=${html.style.overscrollBehavior || '(empty)'})`,
+    );
+
+    return () => {
+      printLog('[ScrollDebug] scrollLock CLEANUP');
+      html.style.overscrollBehavior = prev.htmlOverscroll;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.position = prev.bodyPosition;
+      body.style.top = prev.bodyTop;
+      body.style.left = prev.bodyLeft;
+      body.style.right = prev.bodyRight;
+      body.style.width = prev.bodyWidth;
+      window.scrollTo(0, scrollY);
+      printLog(
+        `[ScrollDebug] scrollLock CLEANED: body(overflow=${body.style.overflow || '(empty)'} position=${body.style.position || '(empty)'} top=${body.style.top || '(empty)'})`,
+      );
+    };
+  }, [isEmbedMode, isNarrowLayout, isNarrowInfoExpanded]);
 
   useEffect(() => {
     const el = mainContentRef.current;
@@ -3108,6 +3169,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             >
               <SemanticGalaxyView
                 results={galaxyResults}
+                disableInteractions={Boolean(isNarrowLayout && isNarrowInfoExpanded)}
                 onStarClick={(result) => {
                   printLog(`[StarClick] Star clicked: ${result.shareLink}`);
                   printLog(`[StarClick] Audio URL: ${result.audioUrl}`);

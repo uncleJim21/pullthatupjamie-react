@@ -578,7 +578,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
     return (
       <div className="fixed left-0 right-0 bottom-0 z-[70]">
         <div
-          className="bg-black border-t border-gray-800 rounded-t-xl shadow-2xl overflow-hidden"
+          className="bg-black border-t border-gray-800 rounded-t-xl shadow-2xl overflow-hidden flex flex-col"
           style={{
             height: sheetHeight,
             transition: 'height 240ms ease',
@@ -682,9 +682,9 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           </div>
 
           {/* Content area */}
-          <div className="h-full min-h-0 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             {isContextMode ? (
-              <div className="h-full min-h-0">
+              <div className="flex-1 min-h-0 overflow-hidden">
                 <PodcastContextPanel
                   layoutMode="bottom"
                   paragraphId={paragraphId}
@@ -714,7 +714,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                 />
               </div>
             ) : isAnalysisMode ? (
-              <div className="h-full bg-black flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 bg-black flex flex-col overflow-hidden">
                 {/* Header (bottom-sheet variant) */}
                 <div className="p-3 border-b border-gray-800 bg-[#0A0A0A] flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -1000,9 +1000,9 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                 )}
               </div>
             ) : (
-              <div className="h-full">
+              <div className="flex-1 min-h-0 overflow-hidden">
                 {/* Sessions tab content is already self-contained; keep behavior consistent */}
-                <div className="h-full bg-black flex flex-col overflow-hidden">
+                <div className="flex-1 min-h-0 bg-black flex flex-col overflow-hidden">
                   <div className="flex-1 overflow-y-auto p-4">
                     {isLoadingSessions ? (
                       <div className="flex flex-col items-center justify-center h-full text-gray-400">

@@ -334,6 +334,8 @@ interface SemanticGalaxyViewProps {
   nebulaDimOpacity?: number; // Configurable nebula dim opacity (defaults to NEBULA_CONFIG.DIM_OPACITY)
   brandImage?: string; // Brand logo image URL for embed mode
   brandColors?: string[]; // Brand colors for embed mode (stars will use first color)
+  // When true, disable all touch/mouse interactions for the canvas (useful when a mobile bottom-sheet is expanded).
+  disableInteractions?: boolean;
 }
 
 // Transform color to compensate for additive blending brightening
@@ -1469,6 +1471,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   nebulaDimOpacity,
   brandImage,
   brandColors,
+  disableInteractions = false,
 }) => {
   const [isTouchLikePointer, setIsTouchLikePointer] = useState(false);
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
@@ -1648,6 +1651,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   // Safe pinch-to-zoom (mobile): adjust camera distance along the OrbitControls target vector.
   // We attach native pointer listeners in capture phase so OrbitControls never sees 2-finger gestures.
   useEffect(() => {
+    if (disableInteractions) return;
     const el = canvasDomRef.current;
     if (!el) return;
 
@@ -1762,7 +1766,18 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       el.removeEventListener('pointercancel', onPointerUpOrCancel, { capture: true } as any);
       el.removeEventListener('pointerleave', onPointerUpOrCancel, { capture: true } as any);
     };
-  }, [isTouchLikePointer]);
+  }, [isTouchLikePointer, disableInteractions]);
+
+  // If interactions are disabled (e.g. bottom-sheet expanded), ensure the canvas won't intercept touches at all.
+  useEffect(() => {
+    const el = canvasDomRef.current as any;
+    if (!el) return;
+    try {
+      el.style.pointerEvents = disableInteractions ? 'none' : 'auto';
+    } catch {
+      // ignore
+    }
+  }, [disableInteractions]);
 
   // Track mouse position for hover preview
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -2369,17 +2384,23 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           fov={75}
         />
         
-        <OrbitControls
-          ref={controlsRef}
-          enabled={!isAnimatingCamera}
-          enableRotate={true}
-          enablePan={!isTouchLikePointer}
-          enableZoom={!isTouchLikePointer}
-          panSpeed={1}
-          zoomSpeed={1}
-          minDistance={5}
-          maxDistance={50}
-        />
+        {/* IMPORTANT: When interactions are disabled (mobile bottom-sheet expanded),
+            fully unmount OrbitControls so it removes its document-level listeners.
+            Merely setting enabled={false} can still leave touch handlers attached that
+            interfere with scrolling. */}
+        {!disableInteractions && (
+          <OrbitControls
+            ref={controlsRef}
+            enabled={!isAnimatingCamera}
+            enableRotate={true}
+            enablePan={!isTouchLikePointer}
+            enableZoom={!isTouchLikePointer}
+            panSpeed={1}
+            zoomSpeed={1}
+            minDistance={5}
+            maxDistance={50}
+          />
+        )}
 
         <AnimatedCamera
           key={cameraAnimKey}
