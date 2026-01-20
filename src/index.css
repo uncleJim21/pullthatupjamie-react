@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Ensure full-viewport black background to avoid white overscroll on macOS */
+/* Ensure full-viewport height and black base for overscroll */
 html, body, #root {
   height: 100%;
   background-color: #000000;

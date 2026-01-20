@@ -27,6 +27,7 @@ import ShareModal from './ShareModal.tsx';
 import TutorialModal from './TutorialModal.tsx';
 import WelcomeModal from './WelcomeModal.tsx';
 import AccountButton from './AccountButton.tsx';
+import NebulaBackground from './NebulaBackground.tsx';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 import AuthService from '../services/authService.ts';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
@@ -136,6 +137,10 @@ const defaultBackoff: BackoffConfig = {
   maxDelay: 8000,      // Max out at 30 seconds
   factor: 1.1           // Increase by 50% each time
 };
+
+// Black overlay opacity - controls how much nebula shows through (0 = full nebula, 1 = solid black)
+// 0.5 = 50% dimming matches SemanticGalaxyView default
+const LANDING_NEBULA_DIM_OPACITY = 0.5;
 
 const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionSuccessPopupProps) => (
   <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
@@ -2512,10 +2517,30 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     window.dispatchEvent(new Event('stopAllAudio'));
   };
 
+  // Check if we should show nebula background
+  const showNebulaBackground = !hasSearchedInMode(searchMode) && !isClipBatchPage && !isSharePage;
+  
   return (
     <AudioControllerProvider>
+    {/* Nebula background - rendered at root level for proper layering */}
+    {showNebulaBackground && (
+      <div 
+        style={{ 
+          position: 'fixed',
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: 'none',
+        }}
+      >
+        <NebulaBackground dimOpacity={LANDING_NEBULA_DIM_OPACITY} />
+      </div>
+    )}
     <div 
-      className="min-h-screen bg-black text-white flex"
+      className="min-h-screen text-white flex relative"
+      style={{ 
+        zIndex: 1,
+        backgroundColor: showNebulaBackground ? 'transparent' : '#000000',
+      }}
       onMouseEnter={() => isEmbedMode && setIsEmbedHovered(true)}
       onMouseLeave={() => isEmbedMode && setIsEmbedHovered(false)}
       onClick={() => {
@@ -2527,6 +2552,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     >
       {/* Main Content Area - Left Side */}
       <div ref={mainContentRef} className="flex-1 min-w-0 transition-all duration-300">
+        {/* Content wrapper */}
+        <div className="relative">
         {/* Welcome Modal - Hidden in embed mode */}
         {!isEmbedMode && (
           <WelcomeModal
@@ -2819,23 +2846,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           </div>
         ) : (
           !hasSearchedInMode(searchMode) && (
-            <div className="flex justify-center items-center py-6 select-none mt-4">
-              <div className="flex items-center gap-4">
-                <img
-                  src="/jamie-logo.png"
-                  alt="Jamie Logo"
-                  width={128}
-                  height={128}
-                  className="w-24 h-24"
-                />
-                <div>
-                  <h1 className="text-3xl font-bold">Pull That Up Jamie!</h1>
-                  <p className="text-gray-400 text-md text-shadow-light-white">
-                    {searchMode === 'web-search' ? 'Instantly pull up anything with private web search + AI.' : ''}
-                    {searchMode === 'podcast-search' ? 'Find the exact moment of your favorite podcast' : ''}
-                  </p>
-                </div>
-              </div>
+            <div className="flex flex-col justify-center items-center py-12 select-none mt-4">
+              <h1 
+                className="text-4xl md:text-5xl text-white text-center mb-3"
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600 }}
+              >
+                Break free from the timeline.
+              </h1>
+              <p 
+                className="text-gray-400 text-lg md:text-xl text-center"
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400 }}
+              >
+                Search podcasts by meaning, not minutes.
+              </p>
             </div>
           )
         )}
@@ -3848,6 +3871,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onComplete={() => {}}
         platform={SocialPlatform.Twitter}
       />
+        </div>{/* End content wrapper */}
       </div>
 
       {/* Unified Side Panel (Context + Analysis) for Split-Screen Mode - Hidden in embed mode.
