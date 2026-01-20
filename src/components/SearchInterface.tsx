@@ -2552,8 +2552,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     >
       {/* Main Content Area - Left Side */}
       <div ref={mainContentRef} className="flex-1 min-w-0 transition-all duration-300">
-        {/* Content wrapper */}
-        <div className="relative">
         {/* Welcome Modal - Hidden in embed mode */}
         {!isEmbedMode && (
           <WelcomeModal
@@ -3871,7 +3869,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onComplete={() => {}}
         platform={SocialPlatform.Twitter}
       />
-        </div>{/* End content wrapper */}
       </div>
 
       {/* Unified Side Panel (Context + Analysis) for Split-Screen Mode - Hidden in embed mode.
