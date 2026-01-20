@@ -139,8 +139,8 @@ const defaultBackoff: BackoffConfig = {
 };
 
 // Black overlay opacity - controls how much nebula shows through (0 = full nebula, 1 = solid black)
-// 0.5 = 50% dimming matches SemanticGalaxyView default
-const LANDING_NEBULA_DIM_OPACITY = 0.5;
+// 0.4 = 40% dimming, showing more of the nebula
+const LANDING_NEBULA_DIM_OPACITY = 0.4;
 
 const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionSuccessPopupProps) => (
   <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
