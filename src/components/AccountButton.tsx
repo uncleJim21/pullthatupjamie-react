@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, LayoutDashboard, BookOpen, Headphones, Search } from 'lucide-react';
+import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, LayoutDashboard, BookOpen, Headphones } from 'lucide-react';
 import BitcoinConnectButton from './BitcoinConnectButton.tsx';
 import { useNavigate } from 'react-router-dom';
 import AuthService from '../services/authService.ts';
@@ -195,21 +195,6 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
                 >
                   <Headphones size={20} />
                   <span>Search Podcasts</span>
-                </button>
-                <button
-                  onClick={() => {
-                    // Check if we need to reload by comparing URLs
-                    if (window.location.pathname === '/app' && window.location.search.includes('mode=web-search')) {
-                      window.location.reload();
-                    } else {
-                      window.location.href = '/app/?mode=web-search';
-                    }
-                    setIsOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
-                >
-                  <Search size={20} />
-                  <span>Search Web</span>
                 </button>
               </>
             )}

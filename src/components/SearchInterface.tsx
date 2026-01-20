@@ -1,7 +1,7 @@
 import { performSearch } from '../lib/searxng.ts';
 import { fetchClipById, checkClipStatus } from '../services/clipService.ts';
 import { useSearchParams, useParams } from 'react-router-dom'; 
-import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, SearchViewStyle, SearchResultViewStyle, DISABLE_CLIPPING,ShareModalContext } from '../constants/constants.ts';
+import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_URL, AIClipsViewStyle, SearchViewStyle, SearchResultViewStyle, DISABLE_CLIPPING, ShareModalContext, NavigationMode } from '../constants/constants.ts';
 import { handleQuoteSearch, handleQuoteSearch3D } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -2555,6 +2555,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             onTutorialClick={handleTutorialClick}
             isUserSignedIn={isUserSignedIn}
             setIsUserSignedIn={setIsUserSignedIn}
+            navigationMode={NavigationMode.CLEAN}
           />
         )}
 
