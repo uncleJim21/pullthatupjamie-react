@@ -338,22 +338,21 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
       {/* Hover overlay - subtle white glow */}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/5" />
       
-      {/* Explore indicator - top right */}
-      <div className="absolute top-2 right-2 flex items-center gap-1 text-gray-500 text-xs opacity-60 group-hover:opacity-100 transition-opacity">
-        <span>Explore</span>
-        <ArrowUpRight className="w-3 h-3" />
+      {/* Top stripe - subtle dark bar with arrow icon */}
+      <div className="absolute top-0 left-0 right-0 bg-black/60 px-3 py-1.5 border-b border-gray-800 flex items-center justify-end">
+        <ArrowUpRight className="w-4 h-4 text-gray-400" />
       </div>
       
       {/* Title bar - solid black tab with title + subtitle */}
       {displayTitle && (
         <div className="absolute bottom-0 left-0 right-0 bg-black/95 px-3 py-2.5 border-t border-gray-800">
           <p 
-            className="text-white font-medium truncate leading-tight"
+            className="text-gray-100 font-medium truncate leading-tight"
             style={{ fontSize: 'clamp(0.75rem, 2.5vw, 0.875rem)' }}
           >
             {displayTitle}
           </p>
-          <p className="text-gray-500 text-xs truncate mt-0.5">
+          <p className="text-gray-400 text-xs truncate mt-0.5">
             {points.length} moment{points.length !== 1 ? 's' : ''}
           </p>
         </div>
