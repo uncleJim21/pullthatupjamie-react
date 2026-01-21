@@ -1,16 +1,108 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { ArrowUpRight } from 'lucide-react';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
 
 // ============================================================================
-// CONFIGURATION
+// COLOR UTILITIES - Match SemanticGalaxyView rendering
+// ============================================================================
+
+/**
+ * Transform color to compensate for additive blending brightening.
+ * This darkens/saturates colors so they look correct after being brightened.
+ * CRITICAL: Without this, additive blending washes colors to white.
+ */
+const transformColorForBlending = (hexColor: string, factor: number = 0.5): string => {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  
+  // Darken by multiplying each channel by the factor
+  const newR = Math.round(r * factor);
+  const newG = Math.round(g * factor);
+  const newB = Math.round(b * factor);
+  
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
+
+/**
+ * Boost saturation for preview cards to improve hue readability.
+ * Previews are smaller, so colors need to "pop" more.
+ */
+const boostSaturation = (hexColor: string, boostFactor: number = 1.3): string => {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+  
+  // Convert RGB to HSL
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+  
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  
+  // Boost saturation (clamp to 1.0)
+  const newS = Math.min(1, s * boostFactor);
+  
+  // Convert back to RGB
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
+  
+  const q = l < 0.5 ? l * (1 + newS) : l + newS - l * newS;
+  const p = 2 * l - q;
+  const newR = Math.round(hue2rgb(p, q, h + 1/3) * 255);
+  const newG = Math.round(hue2rgb(p, q, h) * 255);
+  const newB = Math.round(hue2rgb(p, q, h - 1/3) * 255);
+  
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
+
+// ============================================================================
+// CONFIGURATION - Matches SemanticGalaxyView star styling
 // ============================================================================
 const MINI_GALAXY_CONFIG = {
-  STAR_SIZE: 0.15,
-  CAMERA_DISTANCE: 8,
-  ROTATION_SPEED: 0.1, // Gentle auto-rotation
-  GLOW_INTENSITY: 0.8,
+  CAMERA_DISTANCE: 5,
+  ROTATION_SPEED: 0.13,
+  // Color processing for preview cards
+  COLOR_BLEND_FACTOR: 0.55,    // Darker than embed (0.65) to compensate for small size
+  SATURATION_BOOST: 1.4,       // Boost saturation for better hue readability
+  // Star visual config - tuned for preview readability
+  STAR: {
+    CORE_SIZE: 0.052,
+    CORE_GLOW_SIZE: 0.104,
+    CORE_GLOW_OPACITY: 0.5,    // Reduced from 0.6
+    // Main diffraction spikes (4 cross pattern)
+    SPIKE_LENGTH: 0.455,
+    SPIKE_WIDTH: 0.0195,
+    SPIKE_OPACITY: 0.55,       // Reduced from 0.7
+    // More halo layers for smoother falloff (matches embed approach)
+    HALO_LAYERS: [
+      { size: 0.10, opacity: 0.35 },
+      { size: 0.15, opacity: 0.25 },
+      { size: 0.20, opacity: 0.18 },
+      { size: 0.26, opacity: 0.12 },
+      { size: 0.33, opacity: 0.06 },
+      { size: 0.42, opacity: 0.03 },
+    ],
+  },
 };
 
 // ============================================================================
@@ -24,13 +116,77 @@ interface StarPoint {
 
 interface FeaturedGalaxyCardProps {
   shareId: string;
-  fallbackTitle?: string; // Fallback if backend doesn't return title
-  fallbackColor?: string; // Fallback if backend doesn't return brandColors
+  fallbackTitle?: string;
+  fallbackColor?: string;
   onClick?: () => void;
 }
 
 // ============================================================================
-// MINI STAR FIELD COMPONENT
+// INDIVIDUAL STAR WITH CROSS SPIKES
+// ============================================================================
+const MiniStar: React.FC<{
+  position: [number, number, number];
+  color: THREE.Color;
+  scale?: number;
+}> = ({ position, color, scale = 1 }) => {
+  const config = MINI_GALAXY_CONFIG.STAR;
+  
+  return (
+    <group position={position} scale={scale}>
+      {/* Bright Core */}
+      <mesh>
+        <sphereGeometry args={[config.CORE_SIZE, 8, 8]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+      
+      {/* Core Glow */}
+      <mesh>
+        <sphereGeometry args={[config.CORE_GLOW_SIZE, 8, 8]} />
+        <meshBasicMaterial
+          color={color}
+          opacity={config.CORE_GLOW_OPACITY}
+          transparent
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Soft Halos */}
+      {config.HALO_LAYERS.map((layer, index) => (
+        <mesh key={`halo-${index}`}>
+          <sphereGeometry args={[layer.size, 8, 8]} />
+          <meshBasicMaterial
+            color={color}
+            opacity={layer.opacity}
+            transparent
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+      ))}
+      
+      {/* 4 Main Diffraction Spikes (Cross Pattern) */}
+      {[0, 1, 2, 3].map((i) => {
+        const angle = (i / 4) * Math.PI * 2;
+        return (
+          <mesh key={`spike-${i}`} rotation={[0, 0, angle]}>
+            <boxGeometry args={[config.SPIKE_LENGTH, config.SPIKE_WIDTH, config.SPIKE_WIDTH]} />
+            <meshBasicMaterial
+              color={color}
+              opacity={config.SPIKE_OPACITY}
+              transparent
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+            />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+};
+
+// ============================================================================
+// MINI STAR FIELD COMPONENT - Using individual cross-shaped stars
 // ============================================================================
 const MiniStarField: React.FC<{
   points: StarPoint[];
@@ -38,28 +194,25 @@ const MiniStarField: React.FC<{
 }> = ({ points, themeColor }) => {
   const groupRef = useRef<THREE.Group>(null);
   
-  // Convert hex to THREE.Color
-  const color = useMemo(() => new THREE.Color(themeColor), [themeColor]);
+  // Process color for additive blending: boost saturation, then darken
+  // This preserves hue identity while preventing washout
+  const processedColor = useMemo(() => {
+    const boosted = boostSaturation(themeColor, MINI_GALAXY_CONFIG.SATURATION_BOOST);
+    const transformed = transformColorForBlending(boosted, MINI_GALAXY_CONFIG.COLOR_BLEND_FACTOR);
+    return new THREE.Color(transformed);
+  }, [themeColor]);
   
-  // Create geometry for all stars
-  const { positions, colors } = useMemo(() => {
-    const positions = new Float32Array(points.length * 3);
-    const colors = new Float32Array(points.length * 3);
-    
-    points.forEach((point, i) => {
-      positions[i * 3] = point.x;
-      positions[i * 3 + 1] = point.y;
-      positions[i * 3 + 2] = point.z;
-      
-      // Apply theme color with slight variation
-      const variation = 0.8 + Math.random() * 0.4;
-      colors[i * 3] = color.r * variation;
-      colors[i * 3 + 1] = color.g * variation;
-      colors[i * 3 + 2] = color.b * variation;
+  // Pre-compute star colors with slight variation
+  const starColors = useMemo(() => {
+    return points.map(() => {
+      const variation = 0.8 + Math.random() * 0.4; // Tighter range for more consistent hue
+      return new THREE.Color(
+        processedColor.r * variation,
+        processedColor.g * variation,
+        processedColor.b * variation
+      );
     });
-    
-    return { positions, colors };
-  }, [points, color]);
+  }, [points, processedColor]);
   
   // Gentle rotation animation
   useFrame((state) => {
@@ -72,58 +225,14 @@ const MiniStarField: React.FC<{
   
   return (
     <group ref={groupRef}>
-      <points>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            count={points.length}
-            array={positions}
-            itemSize={3}
-          />
-          <bufferAttribute
-            attach="attributes-color"
-            count={points.length}
-            array={colors}
-            itemSize={3}
-          />
-        </bufferGeometry>
-        <pointsMaterial
-          size={MINI_GALAXY_CONFIG.STAR_SIZE}
-          vertexColors
-          transparent
-          opacity={MINI_GALAXY_CONFIG.GLOW_INTENSITY}
-          sizeAttenuation
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
+      {points.map((point, i) => (
+        <MiniStar
+          key={i}
+          position={[point.x, point.y, point.z]}
+          color={starColors[i]}
+          scale={0.8 + Math.random() * 0.4}
         />
-      </points>
-      
-      {/* Glow layer */}
-      <points>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            count={points.length}
-            array={positions}
-            itemSize={3}
-          />
-          <bufferAttribute
-            attach="attributes-color"
-            count={points.length}
-            array={colors}
-            itemSize={3}
-          />
-        </bufferGeometry>
-        <pointsMaterial
-          size={MINI_GALAXY_CONFIG.STAR_SIZE * 2.5}
-          vertexColors
-          transparent
-          opacity={0.3}
-          sizeAttenuation
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </points>
+      ))}
     </group>
   );
 };
@@ -146,7 +255,6 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
   const [themeColor, setThemeColor] = useState<string>(fallbackColor);
   
   // Fetch session data on mount
-  // Two-step process: shareId → researchSessionId → 3D coordinates
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -165,7 +273,6 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
           setSessionTitle(sharedSession.title);
         }
         if (sharedSession.brandColors && sharedSession.brandColors.length > 0) {
-          // Use first brand color, ensure it has # prefix
           const color = sharedSession.brandColors[0];
           setThemeColor(color.startsWith('#') ? color : `#${color}`);
         }
@@ -198,23 +305,16 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className="relative flex-shrink-0 w-44 h-44 md:w-52 md:h-52 rounded-xl overflow-hidden cursor-pointer group transition-all duration-300 hover:scale-105 hover:shadow-2xl"
-      style={{
-        background: `linear-gradient(135deg, ${themeColor}15 0%, #00000090 100%)`,
-        border: `1px solid ${themeColor}40`,
-      }}
+      className="relative flex-shrink-0 w-44 h-44 md:w-52 md:h-52 rounded-lg overflow-hidden cursor-pointer group transition-all duration-300 hover:scale-[1.02] bg-[#0A0A0A] border border-gray-800 hover:border-gray-600"
     >
       {/* Galaxy Canvas */}
       <div className="absolute inset-0">
         {isLoading ? (
-          <div className="w-full h-full flex items-center justify-center">
-            <div 
-              className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
-              style={{ borderColor: `${themeColor}80`, borderTopColor: 'transparent' }}
-            />
+          <div className="w-full h-full flex items-center justify-center bg-[#0A0A0A]">
+            <div className="w-6 h-6 border-2 border-gray-700 border-t-white rounded-full animate-spin" />
           </div>
         ) : error ? (
-          <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
+          <div className="w-full h-full flex items-center justify-center bg-[#0A0A0A] text-gray-600 text-sm">
             {error}
           </div>
         ) : (
@@ -223,34 +323,41 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
               position: [0, 0, MINI_GALAXY_CONFIG.CAMERA_DISTANCE], 
               fov: 50 
             }}
-            gl={{ antialias: true, alpha: true }}
-            style={{ background: 'transparent' }}
+            gl={{ 
+              antialias: true, 
+              alpha: true,
+              toneMapping: THREE.NoToneMapping, // Preserve color accuracy
+            }}
+            style={{ background: '#0A0A0A' }}
           >
             <MiniStarField points={points} themeColor={themeColor} />
           </Canvas>
         )}
       </div>
       
-      {/* Hover overlay */}
-      <div 
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        style={{
-          background: `radial-gradient(circle at center, ${themeColor}20 0%, transparent 70%)`,
-        }}
-      />
+      {/* Hover overlay - subtle white glow */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/5" />
       
-      {/* Title */}
+      {/* Explore indicator - top right */}
+      <div className="absolute top-2 right-2 flex items-center gap-1 text-gray-500 text-xs opacity-60 group-hover:opacity-100 transition-opacity">
+        <span>Explore</span>
+        <ArrowUpRight className="w-3 h-3" />
+      </div>
+      
+      {/* Title bar - solid black tab with title + subtitle */}
       {displayTitle && (
-        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
-          <p className="text-white text-sm font-medium truncate">{displayTitle}</p>
+        <div className="absolute bottom-0 left-0 right-0 bg-black/95 px-3 py-2.5 border-t border-gray-800">
+          <p 
+            className="text-white font-medium truncate leading-tight"
+            style={{ fontSize: 'clamp(0.75rem, 2.5vw, 0.875rem)' }}
+          >
+            {displayTitle}
+          </p>
+          <p className="text-gray-500 text-xs truncate mt-0.5">
+            {points.length} moment{points.length !== 1 ? 's' : ''}
+          </p>
         </div>
       )}
-      
-      {/* Corner accent */}
-      <div 
-        className="absolute top-2 right-2 w-2 h-2 rounded-full opacity-60 group-hover:opacity-100 transition-opacity"
-        style={{ backgroundColor: themeColor }}
-      />
     </div>
   );
 };

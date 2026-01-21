@@ -23,6 +23,11 @@ export const FEATURED_SESSIONS = [
     fallbackTitle: 'Featured Session 3', 
     fallbackColor: '#9B59B6' // Purple
   },
+  { 
+    shareId: '9e6dcee34a35', 
+    fallbackTitle: 'Featured Session 1', 
+    fallbackColor: '#FF6B6B' // Coral red
+  },
 ];
 
 // ============================================================================
@@ -71,7 +76,7 @@ export const FeaturedGalaxiesCarousel: React.FC<FeaturedGalaxiesCarouselProps> =
     const container = scrollContainerRef.current;
     if (!container) return;
     
-    const scrollAmount = 220; // Slightly more than card width
+    const scrollAmount = 280; // Slightly more than card width (256px + gap)
     container.scrollBy({
       left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: 'smooth',
@@ -79,22 +84,22 @@ export const FeaturedGalaxiesCarousel: React.FC<FeaturedGalaxiesCarouselProps> =
   };
   
   return (
-    <div className="relative w-full max-w-4xl mx-auto">
+    <div className="relative w-full max-w-5xl mx-auto">
       {/* Section header */}
       <div className="flex items-center justify-between mb-4 px-2">
-        <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">
-          Trending Moments
+        <h3 className="text-gray-500 text-sm font-medium uppercase tracking-widest">
+          Explore Popular Ideas
         </h3>
         
         {/* Scroll buttons - desktop only */}
-        <div className="hidden md:flex gap-2">
+        <div className="hidden md:flex gap-1">
           <button
             onClick={() => scrollBy('left')}
             disabled={!canScrollLeft}
-            className={`p-1.5 rounded-full transition-all ${
+            className={`p-1.5 rounded transition-all border ${
               canScrollLeft 
-                ? 'bg-white/10 hover:bg-white/20 text-white' 
-                : 'bg-white/5 text-gray-600 cursor-not-allowed'
+                ? 'border-gray-700 hover:border-gray-500 text-gray-400 hover:text-white' 
+                : 'border-gray-800 text-gray-700 cursor-not-allowed'
             }`}
             aria-label="Scroll left"
           >
@@ -103,10 +108,10 @@ export const FeaturedGalaxiesCarousel: React.FC<FeaturedGalaxiesCarouselProps> =
           <button
             onClick={() => scrollBy('right')}
             disabled={!canScrollRight}
-            className={`p-1.5 rounded-full transition-all ${
+            className={`p-1.5 rounded transition-all border ${
               canScrollRight 
-                ? 'bg-white/10 hover:bg-white/20 text-white' 
-                : 'bg-white/5 text-gray-600 cursor-not-allowed'
+                ? 'border-gray-700 hover:border-gray-500 text-gray-400 hover:text-white' 
+                : 'border-gray-800 text-gray-700 cursor-not-allowed'
             }`}
             aria-label="Scroll right"
           >
@@ -118,7 +123,7 @@ export const FeaturedGalaxiesCarousel: React.FC<FeaturedGalaxiesCarouselProps> =
       {/* Scrollable container */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-4 overflow-x-auto pb-4 px-2 scrollbar-hide snap-x snap-mandatory"
+        className="flex gap-5 overflow-x-auto pb-4 px-2 scrollbar-hide snap-x snap-mandatory"
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
@@ -136,12 +141,12 @@ export const FeaturedGalaxiesCarousel: React.FC<FeaturedGalaxiesCarouselProps> =
         ))}
       </div>
       
-      {/* Fade edges for scroll indication */}
+      {/* Fade edges for scroll indication - hidden on mobile for cleaner look */}
       {canScrollLeft && (
-        <div className="absolute left-0 top-12 bottom-4 w-8 bg-gradient-to-r from-black to-transparent pointer-events-none" />
+        <div className="hidden md:block absolute left-0 top-10 bottom-4 w-12 bg-gradient-to-r from-black to-transparent pointer-events-none" />
       )}
       {canScrollRight && (
-        <div className="absolute right-0 top-12 bottom-4 w-8 bg-gradient-to-l from-black to-transparent pointer-events-none" />
+        <div className="hidden md:block absolute right-0 top-10 bottom-4 w-12 bg-gradient-to-l from-black to-transparent pointer-events-none" />
       )}
     </div>
   );
