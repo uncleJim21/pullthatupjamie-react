@@ -140,7 +140,13 @@ const defaultBackoff: BackoffConfig = {
 
 // Black overlay opacity - controls how much nebula shows through (0 = full nebula, 1 = solid black)
 // 0.4 = 40% dimming, showing more of the nebula
-const LANDING_NEBULA_DIM_OPACITY = 0.4;
+// ============================================================================
+// NEBULA BLACK OVERLAY OPACITY - Tweak this value!
+// 0.0 = full nebula colors (no dimming)
+// 0.5 = 50% dimmed
+// 1.0 = completely black (nebula hidden)
+// ============================================================================
+const LANDING_NEBULA_DIM_OPACITY = 0.70;
 
 const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionSuccessPopupProps) => (
   <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
@@ -3070,7 +3076,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
       {/* Stats display for podcast search mode */}
       {!hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (
-        <div className="text-center mt-8 text-gray-300">
+        <div className="text-center mt-2 text-gray-300">
           <p>Search from over <span className="font-bold">{podcastStats.clipCount.toLocaleString()}</span> podcast moments</p>
         </div>
       )}

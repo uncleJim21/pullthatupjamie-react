@@ -63,15 +63,15 @@ const NEBULA_FRAGMENT_SHADER = `
 
   void mainImage( out vec4 fragColor, in vec2 fragCoord )
   {
-    // FAST TIME - use iTime directly without resolution division
-    float time = iTime;
+    // Slowed down time for gentler movement
+    float time = iTime * 0.1;
     
     // first layer of the kaliset fractal
     vec2 uv = 2.0 * fragCoord / iResolution.xy - 1.0;
     vec2 uvs = uv * iResolution.xy / max(iResolution.x, iResolution.y);
     vec3 p = vec3(uvs / 2.5, 0.0) + vec3(0.8, -1.3, 0.0);
     
-    // FASTER movement - reduced divisors from 32/24/64 to 4/3/8
+    // Gentle nebula drift
     p += 0.45 * vec3(sin(time / 4.0), sin(time / 3.0), sin(time / 8.0));
     
     // adjust first layer position based on mouse movement
@@ -145,23 +145,14 @@ const NebulaScene: React.FC<NebulaSceneProps> = ({ dimOpacity, manualTime }) => 
   }), []);
 
   useFrame(() => {
-    if (!groupRef.current) {
-      console.log('[Nebula useFrame] groupRef not ready');
-      return;
-    }
+    if (!groupRef.current) return;
 
     // Use manually tracked time to ensure continuous animation even when R3F clock pauses
     const time = manualTime;
 
-    // Update shader uniforms directly on the memoized object (this is the key!)
-    const newTime = time * NEBULA_TIME_MULTIPLIER;
-    uniforms.iTime.value = newTime;
+    // Update shader uniforms directly on the memoized object
+    uniforms.iTime.value = time * NEBULA_TIME_MULTIPLIER;
     uniforms.iResolution.value.set(size.width, size.height, 1.0);
-    
-    // Log every second to verify uniform is updating
-    if (Math.floor(time) !== Math.floor(time - 0.017)) {
-      console.log('[Nebula] iTime =', newTime.toFixed(2));
-    }
 
     // Subtle camera drift animation - makes the background feel alive
     const driftX = Math.sin(time * CAMERA_DRIFT_CONFIG.SPEED_X) * CAMERA_DRIFT_CONFIG.AMPLITUDE;
@@ -243,8 +234,7 @@ export interface NebulaBackgroundProps {
 const NebulaCanvasContent: React.FC<{ dimOpacity: number }> = ({ dimOpacity }) => {
   const [time, setTime] = useState(0);
   const startTimeRef = useRef(Date.now());
-  const lastLogTimeRef = useRef(0);
-  const { invalidate, camera } = useThree();
+  const { invalidate } = useThree();
   
   useEffect(() => {
     let animationId: number;
@@ -253,14 +243,6 @@ const NebulaCanvasContent: React.FC<{ dimOpacity: number }> = ({ dimOpacity }) =
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
       setTime(elapsed);
       invalidate(); // Force R3F to re-render
-      
-      // Log position hash every 2 seconds
-      if (elapsed - lastLogTimeRef.current >= 2) {
-        lastLogTimeRef.current = elapsed;
-        const shaderTime = elapsed * NEBULA_TIME_MULTIPLIER;
-        console.log(`[Nebula] t=${elapsed.toFixed(1)}s shaderT=${shaderTime.toFixed(1)}`);
-      }
-      
       animationId = requestAnimationFrame(animate);
     };
     
@@ -269,7 +251,7 @@ const NebulaCanvasContent: React.FC<{ dimOpacity: number }> = ({ dimOpacity }) =
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [invalidate, camera]);
+  }, [invalidate]);
   
   return <NebulaScene dimOpacity={dimOpacity} manualTime={time} />;
 };
