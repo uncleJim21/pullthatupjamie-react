@@ -202,9 +202,9 @@ const MiniStarField: React.FC<{
     return new THREE.Color(transformed);
   }, [themeColor]);
   
-  // Pre-compute star colors with slight variation
-  const starColors = useMemo(() => {
-    return points.map(() => {
+  // Pre-compute star colors and scales with slight variation (memoized to prevent twinkling on re-render)
+  const { starColors, starScales } = useMemo(() => {
+    const colors = points.map(() => {
       const variation = 0.8 + Math.random() * 0.4; // Tighter range for more consistent hue
       return new THREE.Color(
         processedColor.r * variation,
@@ -212,6 +212,8 @@ const MiniStarField: React.FC<{
         processedColor.b * variation
       );
     });
+    const scales = points.map(() => 0.8 + Math.random() * 0.4);
+    return { starColors: colors, starScales: scales };
   }, [points, processedColor]);
   
   // Gentle rotation animation
@@ -230,7 +232,7 @@ const MiniStarField: React.FC<{
           key={i}
           position={[point.x, point.y, point.z]}
           color={starColors[i]}
-          scale={0.8 + Math.random() * 0.4}
+          scale={starScales[i]}
         />
       ))}
     </group>

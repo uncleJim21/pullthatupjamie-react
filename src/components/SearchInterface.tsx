@@ -3086,10 +3086,39 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {!hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && !isEmbedMode && !isSharePage && !isClipBatchPage && (
         <div className="mt-12 px-4">
           <FeaturedGalaxiesCarousel 
-            onSessionClick={(shareId, title) => {
-              // Update URL and trigger warp speed navigation
+            onSessionClick={async (shareId, fallbackTitle) => {
+              // Update URL first for proper navigation state
               setSearchParams({ sharedSession: shareId });
-              loadResearchSessionWithWarpSpeed(shareId, title);
+              
+              try {
+                // Resolve shareId (12-char) to researchSessionId (24-char MongoDB ObjectId)
+                const sharedSession = await fetchSharedResearchSession(shareId);
+                
+                if (!sharedSession || !sharedSession.researchSessionId) {
+                  throw new Error('Session not found or invalid');
+                }
+                
+                const mongoDbId = sharedSession.researchSessionId;
+                const sessionTitle = sharedSession.title || fallbackTitle;
+                
+                // Store brand data if present
+                if (sharedSession.brandImage) {
+                  setBrandImage(sharedSession.brandImage);
+                }
+                if (sharedSession.brandColors && sharedSession.brandColors.length > 0) {
+                  setBrandColors(sharedSession.brandColors);
+                }
+                
+                // Now load with the proper MongoDB ObjectId
+                await loadResearchSessionWithWarpSpeed(mongoDbId, sessionTitle);
+              } catch (error) {
+                console.error('Error loading featured session:', error);
+                setSearchState(prev => ({
+                  ...prev,
+                  error: error as Error,
+                  isLoading: false
+                }));
+              }
             }}
           />
         </div>

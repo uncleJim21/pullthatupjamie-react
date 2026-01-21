@@ -9,25 +9,40 @@ import FeaturedGalaxyCard from './FeaturedGalaxyCard.tsx';
 // ============================================================================
 export const FEATURED_SESSIONS = [
   { 
-    shareId: '0d1acd2cc1f4', 
-    fallbackTitle: 'Featured Session 1', 
+    shareId: '91105b0bb50c', 
+    fallbackTitle: 'Stacker News', 
+    fallbackColor: '#FF6B6B' // Coral red
+  },
+  { 
+    shareId: '9e6dcee34a35', 
+    fallbackTitle: 'Modern Chains', 
+    fallbackColor: '#FF6B6B' // Coral red
+  },
+  { 
+    shareId: 'fed92c59ad03', 
+    fallbackTitle: 'Branta in the Media', 
+    fallbackColor: '#9B59B6' // Purple
+  },
+  { 
+    shareId: '7ae7f2326685', 
+    fallbackTitle: 'Maple: Private AI', 
+    fallbackColor: '#4ECDC4' // Teal
+  },
+  { 
+    shareId: 'f0895b9bd053', 
+    fallbackTitle: 'CASCDR', 
     fallbackColor: '#FF6B6B' // Coral red
   },
   { 
     shareId: 'cbf690fca3d0', 
-    fallbackTitle: 'Featured Session 2', 
+    fallbackTitle: 'Green Candle', 
     fallbackColor: '#4ECDC4' // Teal
   },
   { 
-    shareId: 'fed92c59ad03', 
-    fallbackTitle: 'Featured Session 3', 
-    fallbackColor: '#9B59B6' // Purple
-  },
-  { 
-    shareId: '9e6dcee34a35', 
-    fallbackTitle: 'Featured Session 1', 
+    shareId: '0d1acd2cc1f4', 
+    fallbackTitle: 'What Is Money', 
     fallbackColor: '#FF6B6B' // Coral red
-  },
+  }
 ];
 
 // ============================================================================
@@ -46,6 +61,12 @@ export const FeaturedGalaxiesCarousel: React.FC<FeaturedGalaxiesCarouselProps> =
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  
+  // Drag-to-scroll state
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeftStart, setScrollLeftStart] = useState(0);
+  const hasDraggedRef = useRef(false); // Track if user actually dragged (to prevent click)
   
   // Check scroll position and update button states
   const updateScrollButtons = () => {
@@ -81,6 +102,52 @@ export const FeaturedGalaxiesCarousel: React.FC<FeaturedGalaxiesCarouselProps> =
       left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: 'smooth',
     });
+  };
+  
+  // Drag-to-scroll handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    setIsDragging(true);
+    hasDraggedRef.current = false;
+    setStartX(e.pageX - container.offsetLeft);
+    setScrollLeftStart(container.scrollLeft);
+  };
+  
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    e.preventDefault();
+    const x = e.pageX - container.offsetLeft;
+    const walk = (x - startX) * 1.5; // Multiplier for scroll speed
+    
+    // Mark as dragged if moved more than 5px (to distinguish from click)
+    if (Math.abs(walk) > 5) {
+      hasDraggedRef.current = true;
+    }
+    
+    container.scrollLeft = scrollLeftStart - walk;
+  };
+  
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+  
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+  
+  // Handle card click - only fire if not dragging
+  const handleCardClick = (shareId: string, title: string) => {
+    if (hasDraggedRef.current) {
+      // Reset the flag and don't fire click
+      hasDraggedRef.current = false;
+      return;
+    }
+    onSessionClick(shareId, title);
   };
   
   return (
@@ -120,22 +187,28 @@ export const FeaturedGalaxiesCarousel: React.FC<FeaturedGalaxiesCarouselProps> =
         </div>
       </div>
       
-      {/* Scrollable container */}
+      {/* Scrollable container with drag-to-scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-5 overflow-x-auto pb-4 px-2 scrollbar-hide snap-x snap-mandatory"
+        className={`flex gap-5 overflow-x-auto pb-4 px-2 scrollbar-hide select-none ${
+          isDragging ? 'cursor-grabbing' : 'cursor-grab'
+        }`}
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
         }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
       >
         {FEATURED_SESSIONS.map((session) => (
-          <div key={session.shareId} className="snap-start">
+          <div key={session.shareId} className="flex-shrink-0">
             <FeaturedGalaxyCard
               shareId={session.shareId}
               fallbackTitle={session.fallbackTitle}
               fallbackColor={session.fallbackColor}
-              onClick={() => onSessionClick(session.shareId, session.fallbackTitle || 'Featured Session')}
+              onClick={() => handleCardClick(session.shareId, session.fallbackTitle || 'Featured Session')}
             />
           </div>
         ))}
