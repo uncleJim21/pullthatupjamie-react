@@ -40,6 +40,7 @@ import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from './EmbedMiniPlayer.tsx';
 import PoweredByJamiePill from './PoweredByJamiePill.tsx';
+import FeaturedGalaxiesCarousel from './FeaturedGalaxiesCarousel.tsx';
 import { ResearchSessionItem, clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId, saveResearchSessionWithRetry, getCurrentSessionId } from '../services/researchSessionService.ts';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
 
@@ -366,7 +367,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Get the mode from URL parameters if available
   // Historically supported ?mode=web-search, but web search is now deprecated.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const modeParam = searchParams.get('mode');
   const queryParam = searchParams.get('q');
   const isWebSearchDeprecated = modeParam === 'web-search';
@@ -3078,6 +3079,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {!hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (
         <div className="text-center mt-2 text-gray-300">
           <p>Search from over <span className="font-bold">{podcastStats.clipCount.toLocaleString()}</span> podcast moments</p>
+        </div>
+      )}
+
+      {/* Featured Galaxies Carousel - shown on landing page */}
+      {!hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && !isEmbedMode && !isSharePage && !isClipBatchPage && (
+        <div className="mt-12 px-4">
+          <FeaturedGalaxiesCarousel 
+            onSessionClick={(shareId, title) => {
+              // Update URL and trigger warp speed navigation
+              setSearchParams({ sharedSession: shareId });
+              loadResearchSessionWithWarpSpeed(shareId, title);
+            }}
+          />
         </div>
       )}
 
