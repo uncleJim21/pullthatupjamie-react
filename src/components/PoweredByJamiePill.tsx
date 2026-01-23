@@ -17,7 +17,9 @@ const PoweredByJamiePill: React.FC<PoweredByJamiePillProps> = ({ sharedSessionId
       className={[
         'inline-flex items-center gap-2',
         'rounded-full border border-white/15 bg-black/80 backdrop-blur-sm',
-        'px-3 py-1.5 text-[11px] font-medium text-white',
+        // Mobile: smaller padding (logo only), Desktop: full padding
+        'p-1.5 sm:px-3 sm:py-1.5',
+        'text-[11px] font-medium text-white',
         'hover:bg-black/90 hover:border-white/25',
         'shadow-lg',
         'select-none',
@@ -26,11 +28,12 @@ const PoweredByJamiePill: React.FC<PoweredByJamiePillProps> = ({ sharedSessionId
       aria-label="Powered by Jamie"
       title="Powered by Jamie"
     >
-      <span className="whitespace-nowrap">Powered by Jamie</span>
+      {/* Mobile: hide text, Desktop: show text */}
+      <span className="whitespace-nowrap hidden sm:inline">Powered by Jamie</span>
       <img
         src="/default-source-favicon.png"
         alt="Jamie"
-        className="h-4 w-4 rounded-sm"
+        className="h-5 w-5 sm:h-4 sm:w-4 rounded-sm"
         draggable={false}
       />
     </a>

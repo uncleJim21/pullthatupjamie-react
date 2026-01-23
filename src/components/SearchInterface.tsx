@@ -207,6 +207,10 @@ interface PodcastStats {
 }
 
 export default function SearchInterface({ isSharePage = false, isClipBatchPage = false }: SearchInterfaceProps) {  
+  // Check embed mode early (before any hooks) so state initializers can reference it
+  // Uses window.location directly since URL doesn't change during component lifecycle
+  const isEmbedMode = new URLSearchParams(window.location.search).get('embed') === 'true';
+  
   const [query, setQuery] = useState('');
   
   // Search view style state (Classic vs Split Screen)
@@ -239,10 +243,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   // Track warp speed deceleration completion
-  const [isDecelerationComplete, setIsDecelerationComplete] = useState(true);
+  // In embed mode, start as false so warp speed animation plays from the beginning
+  const [isDecelerationComplete, setIsDecelerationComplete] = useState(!isEmbedMode);
   
   // Result view style state (List vs Galaxy)
+  // In embed mode, always use GALAXY view
   const [resultViewStyle, setResultViewStyle] = useState<SearchResultViewStyle>(() => {
+    if (isEmbedMode) return SearchResultViewStyle.GALAXY;
     const saved = localStorage.getItem('searchResultViewStyle');
     return saved === SearchResultViewStyle.LIST ? SearchResultViewStyle.LIST : SearchResultViewStyle.GALAXY;
   });
@@ -402,7 +409,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [clipProgress, setClipProgress] = useState<ClipProgressData | undefined>(undefined);
   const pollIntervals = new Map<string, NodeJS.Timeout>();
   const STORAGE_KEY = 'selectedPodcastSources';
-  const [searchState, setSearchState] = useState<SearchState>(initialSearchState);
+  // In embed mode, start with loading state so galaxy loading animation shows immediately
+  const [searchState, setSearchState] = useState<SearchState>(() => ({
+    ...initialSearchState,
+    isLoading: isEmbedMode
+  }));
   // Create a ref to store the last used selectedSources
   const lastUsedSourcesRef = useRef<Set<string>>(new Set());
   const [selectedSources, setSelectedSources] = useState<Set<string>>(() => {
@@ -422,9 +433,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     return new Set<string>();
   });
   const [gridFadeOut, setGridFadeOut] = useState(false);
+  // In embed mode, start with search history true so landing page is skipped
   const [searchHistory, setSearchHistory] = useState({
     'web-search': false,
-    'podcast-search': isSharePage || isClipBatchPage
+    'podcast-search': isSharePage || isClipBatchPage || isEmbedMode
   });
   const hasSearchedInMode = (mode: SearchMode): boolean => {
     if (!searchHistory[mode]) return false;
@@ -1604,9 +1616,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Load shared research session from URL parameter with warp speed animation
   const sharedSessionId = searchParams.get('sharedSession');
   const researchSessionId = searchParams.get('researchSessionId');
-  
-  // Check if we're in embed mode (for embedded shared sessions)
-  const isEmbedMode = searchParams.get('embed') === 'true';
   
   // Reusable function to load a research session with warp speed animation
   const loadResearchSessionWithWarpSpeed = async (sessionId: string, sessionTitle: string = 'Research Session') => {

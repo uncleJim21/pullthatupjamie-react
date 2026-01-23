@@ -1962,12 +1962,13 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       {/* Left Side Controls - Vertical Stack */}
       <div className="absolute top-4 left-4 z-20 flex flex-col gap-3">
         {/* Brand Image - Top Left Corner (embed mode) */}
+        {/* Mobile: h-8 (~30% smaller), Desktop: h-12 */}
         {brandImage && (
           <div className="pointer-events-none w-fit">
             <img 
               src={brandImage} 
               alt="Brand Logo" 
-              className="h-12 w-auto object-contain rounded-md shadow-xl"
+              className="h-8 sm:h-12 w-auto object-contain rounded-md shadow-xl"
               onError={(e) => {
                 // Hide image if it fails to load
                 e.currentTarget.style.display = 'none';
@@ -1977,10 +1978,11 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         )}
         
         {/* Shared Session Title Banner */}
+        {/* Mobile: smaller text and padding, Desktop: larger */}
         {sharedSessionTitle && (
           <div className="pointer-events-none">
-            <div className="bg-black/90 backdrop-blur-sm border border-white/20 rounded-full px-6 py-3 shadow-xl">
-              <h2 className="text-white text-lg font-medium tracking-wide">
+            <div className="bg-black/90 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 sm:px-6 sm:py-3 shadow-xl">
+              <h2 className="text-white text-sm sm:text-lg font-medium tracking-wide">
                 {sharedSessionTitle}
               </h2>
             </div>

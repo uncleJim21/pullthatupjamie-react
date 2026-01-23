@@ -47,7 +47,7 @@ const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionS
   </div>
 );
 
-const HomePage: React.FC = () => {
+const ForPodcastersPage: React.FC = () => {
   const navigate = useNavigate();
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -456,4 +456,4 @@ const HomePage: React.FC = () => {
   );
 };
 
-export default HomePage; 
+export default ForPodcastersPage; 
