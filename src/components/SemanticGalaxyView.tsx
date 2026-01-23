@@ -336,6 +336,8 @@ interface SemanticGalaxyViewProps {
   brandColors?: string[]; // Brand colors for embed mode (stars will use first color)
   // When true, disable all touch/mouse interactions for the canvas (useful when a mobile bottom-sheet is expanded).
   disableInteractions?: boolean;
+  // Compact height mode: hide non-essential UI (reset button, title) for very short viewports
+  isCompactHeight?: boolean;
 }
 
 // Transform color to compensate for additive blending brightening
@@ -1472,6 +1474,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   brandImage,
   brandColors,
   disableInteractions = false,
+  isCompactHeight = false,
 }) => {
   const [isTouchLikePointer, setIsTouchLikePointer] = useState(false);
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
@@ -1977,9 +1980,9 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           </div>
         )}
         
-        {/* Shared Session Title Banner */}
+        {/* Shared Session Title Banner - hidden in compact height mode */}
         {/* Mobile: smaller text and padding, Desktop: larger */}
-        {sharedSessionTitle && (
+        {sharedSessionTitle && !isCompactHeight && (
           <div className="pointer-events-none">
             <div className="bg-black/90 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 sm:px-6 sm:py-3 shadow-xl">
               <h2 className="text-white text-sm sm:text-lg font-medium tracking-wide">
@@ -2001,14 +2004,16 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           </div>
         )} */}
         
-        {/* Camera reset button */}
-        <button
-          onClick={handleResetCamera}
-          className="px-2.5 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm flex items-center gap-1 w-fit"
-        >
-          <RotateCcw className="w-4 h-4" />
-          <span className="hidden sm:inline">Reset</span>
-        </button>
+        {/* Camera reset button - hidden in compact height mode */}
+        {!isCompactHeight && (
+          <button
+            onClick={handleResetCamera}
+            className="px-2.5 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm flex items-center gap-1 w-fit"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span className="hidden sm:inline">Reset</span>
+          </button>
+        )}
 
         {/* Options Menu */}
         {!hideOptions && (

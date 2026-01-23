@@ -105,7 +105,7 @@ const StoryIcon: React.FC<{ isHovered: boolean }> = ({ isHovered }) => (
 
 // ============================================================
 // HERO SEGMENT — Grid One
-// A stage with a single artifact. Calm, confident, invitational.
+// Layout: Iframe left, Copy right (headline, subhead, body, CTA)
 // ============================================================
 const HeroSegment: React.FC = () => {
   const navigate = useNavigate();
@@ -121,27 +121,23 @@ const HeroSegment: React.FC = () => {
   }, []);
 
   // Parallax values based on scroll
-  const spotlightY = scrollY * 0.3; // Moves slower than scroll
-  const spotlightScale = 1 + (scrollY * 0.0003); // Subtle expansion
-  const spotlightOpacity = Math.max(0.03, 0.08 - (scrollY * 0.0001)); // Fades slightly
+  const spotlightY = scrollY * 0.3;
+  const spotlightScale = 1 + (scrollY * 0.0003);
+  const spotlightOpacity = Math.max(0.03, 0.08 - (scrollY * 0.0001));
 
   return (
     <section
+      className="hero-section"
       style={{
         minHeight: '80vh',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        padding: '60px 40px 80px',
         position: 'relative',
-        overflow: 'visible', // Allow stage plane to extend
+        overflow: 'visible',
       }}
     >
-      {/* ========================================
-          STAGE PLANE — Unmistakable backdrop
-          Visible spotlight/vignette behind content
-          Parallax: moves slower, expands, fades on scroll
-          ======================================== */}
+      {/* Stage plane — subtle backdrop with parallax */}
       <div
         style={{
           position: 'absolute',
@@ -150,7 +146,7 @@ const HeroSegment: React.FC = () => {
           right: '-5%',
           bottom: '-10%',
           background: `
-            radial-gradient(ellipse 70% 60% at 40% 50%, 
+            radial-gradient(ellipse 70% 60% at 35% 50%, 
               rgba(255,255,255,${spotlightOpacity}) 0%, 
               rgba(255,255,255,${spotlightOpacity * 0.5}) 30%,
               rgba(255,255,255,${spotlightOpacity * 0.125}) 60%,
@@ -158,22 +154,6 @@ const HeroSegment: React.FC = () => {
             )
           `,
           transform: `translateY(${spotlightY}px) scale(${spotlightScale})`,
-          transition: 'transform 0.1s ease-out',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
-      
-      {/* Secondary ambient glow for depth — parallax at different rate */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '20%',
-          left: '10%',
-          width: '80%',
-          height: '60%',
-          background: `radial-gradient(ellipse 100% 80% at 50% 50%, rgba(255,255,255,${spotlightOpacity * 0.6}) 0%, transparent 70%)`,
-          transform: `translateY(${scrollY * 0.15}px)`,
           transition: 'transform 0.1s ease-out',
           pointerEvents: 'none',
           zIndex: 0,
@@ -193,86 +173,106 @@ const HeroSegment: React.FC = () => {
         }}
       />
 
-      {/* ========================================
-          HEADLINE + SUBHEAD — Tightly grouped
-          ======================================== */}
-      <div style={{ textAlign: 'center', marginBottom: '56px', position: 'relative', zIndex: 2 }}>
-        <h1
-          style={{
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 600,
-            fontSize: '52px',
-            color: '#ffffff',
-            marginBottom: '8px',
-            letterSpacing: '-0.025em',
-          }}
-        >
-          Ideas don't live in lists.
-        </h1>
-        <p
-          style={{
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 400,
-            fontSize: '26px',
-            color: 'rgba(255,255,255,0.6)',
-            letterSpacing: '-0.01em',
-          }}
-        >
-          They live in relationships.
-        </p>
-      </div>
+      {/* Responsive CSS */}
+      <style>
+        {`
+          .hero-section {
+            padding: 80px 60px;
+          }
+          .hero-content {
+            display: flex;
+            flex-direction: row;
+            gap: 80px;
+            max-width: 1300px;
+            width: 100%;
+            margin: 0 auto;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+          }
+          .hero-artifact {
+            flex: 0 0 auto;
+            width: 500px;
+            position: relative;
+          }
+          .hero-copy {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+          }
+          .hero-headline {
+            font-size: 64px;
+          }
+          .hero-subhead {
+            font-size: 28px;
+          }
+          .hero-body {
+            font-size: 17px;
+          }
+          @media (max-width: 1000px) {
+            .hero-section {
+              padding: 60px 28px;
+            }
+            .hero-content {
+              flex-direction: column;
+              gap: 36px;
+              align-items: center;
+              text-align: center;
+            }
+            .hero-artifact {
+              width: 100%;
+              max-width: 360px;
+              order: 2;
+            }
+            .hero-copy {
+              align-items: center;
+              order: 1;
+            }
+            .hero-headline {
+              font-size: 36px !important;
+            }
+            .hero-subhead {
+              font-size: 20px !important;
+              margin-bottom: 20px !important;
+            }
+            .hero-body {
+              font-size: 15px !important;
+              margin-bottom: 28px !important;
+            }
+            .hero-cta {
+              margin-left: auto;
+              margin-right: auto;
+              align-self: center !important;
+            }
+          }
+        `}
+      </style>
 
-      {/* ========================================
-          MAIN CONTENT — Iframe + Side Copy
-          ======================================== */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'row',
-          gap: '56px',
-          maxWidth: '1400px',
-          width: '100%',
-          margin: '0 auto',
-          alignItems: 'flex-start',
-          position: 'relative',
-          zIndex: 2,
-        }}
-      >
-        {/* ========================================
-            ARTIFACT — Jamie iframe as elevated window
-            ======================================== */}
-        <div
-          style={{
-            flex: 1.3,
-            position: 'relative',
-            transform: 'translateY(24px)', // Asymmetric offset
-          }}
-        >
-          {/* Glow behind iframe — visible depth cue */}
+      {/* Main content — Iframe + Copy side by side */}
+      <div className="hero-content">
+        {/* ARTIFACT — Square iframe */}
+        <div className="hero-artifact">
+          {/* Glow behind iframe */}
           <div
             style={{
               position: 'absolute',
               inset: '-24px',
-              background: 'radial-gradient(ellipse 100% 100% at 50% 50%, rgba(255,255,255,0.06) 0%, transparent 60%)',
+              background: 'radial-gradient(ellipse 100% 100% at 50% 50%, rgba(255,255,255,0.05) 0%, transparent 60%)',
               borderRadius: '20px',
               pointerEvents: 'none',
             }}
           />
           
-          {/* Iframe container — elevated with visible shadow/glow */}
+          {/* Iframe container — square */}
           <div
             style={{
-              aspectRatio: '16 / 9',
+              aspectRatio: '1 / 1',
               borderRadius: '12px',
               overflow: 'hidden',
-              border: '1px solid rgba(255,255,255,0.12)',
+              border: '1px solid rgba(255,255,255,0.1)',
               backgroundColor: '#000000',
-              boxShadow: `
-                0 4px 24px rgba(0,0,0,0.5),
-                0 0 0 1px rgba(255,255,255,0.05),
-                0 0 60px rgba(255,255,255,0.04),
-                inset 0 1px 0 rgba(255,255,255,0.08)
-              `,
+              boxShadow: '0 4px 32px rgba(0,0,0,0.5)',
               position: 'relative',
             }}
           >
@@ -288,12 +288,12 @@ const HeroSegment: React.FC = () => {
             />
           </div>
 
-          {/* Instructional microcopy — attached to artifact */}
+          {/* Instructional microcopy */}
           <p
             style={{
               fontFamily: 'Inter, sans-serif',
               fontSize: '14px',
-              color: 'rgba(255,255,255,0.45)',
+              color: 'rgba(255,255,255,0.4)',
               marginTop: '16px',
               textAlign: 'center',
               letterSpacing: '0.01em',
@@ -303,76 +303,86 @@ const HeroSegment: React.FC = () => {
           </p>
         </div>
 
-        {/* ========================================
-            SIDE COPY — Secondary presence
-            ======================================== */}
-        <div
-          style={{
-            flex: 0.7,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            paddingTop: '32px',
-          }}
-        >
+        {/* COPY — Headline, subhead, body, CTA stacked */}
+        <div className="hero-copy">
+          {/* Headline — Large and bold */}
+          <h1
+            className="hero-headline"
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 700,
+              lineHeight: 1.05,
+              color: '#ffffff',
+              marginBottom: '24px',
+              letterSpacing: '-0.03em',
+            }}
+          >
+            Ideas don't live in lists.
+          </h1>
+
+          {/* Subhead */}
           <p
+            className="hero-subhead"
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 500,
+              color: 'rgba(255,255,255,0.7)',
+              marginBottom: '32px',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            They live in relationships.
+          </p>
+
+          {/* Body copy */}
+          <p
+            className="hero-body"
             style={{
               fontFamily: 'Inter, sans-serif',
               fontWeight: 400,
-              fontSize: '18px',
-              lineHeight: 1.75,
-              color: 'rgba(255,255,255,0.7)',
-              marginBottom: '8px',
+              lineHeight: 1.7,
+              color: 'rgba(255,255,255,0.55)',
+              marginBottom: '40px',
+              maxWidth: '440px',
             }}
           >
             Jamie lets you explore information the way it actually connects.
-          </p>
-          <p
-            style={{
-              fontFamily: 'Inter, sans-serif',
-              fontWeight: 400,
-              fontSize: '18px',
-              lineHeight: 1.75,
-              color: 'rgba(255,255,255,0.5)',
-              marginBottom: '32px',
-            }}
-          >
             Conversations are just the beginning.
           </p>
 
-          {/* Ghost/outline CTA — secondary, not competing */}
+          {/* CTA — White filled button, right-aligned */}
           <button
+            className="hero-cta"
             onClick={() => navigate('/app')}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '8px',
-              padding: '12px 20px',
-              fontSize: '15px',
-              fontWeight: 500,
+              gap: '10px',
+              padding: '14px 28px',
+              fontSize: '16px',
+              fontWeight: 600,
               fontFamily: 'Inter, sans-serif',
-              backgroundColor: 'transparent',
-              color: 'rgba(255,255,255,0.7)',
-              border: '1px solid rgba(255,255,255,0.25)',
+              backgroundColor: '#ffffff',
+              color: '#000000',
+              border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
               width: 'fit-content',
               letterSpacing: '-0.01em',
+              alignSelf: 'flex-end',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
-              e.currentTarget.style.color = 'rgba(255,255,255,0.9)';
+              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.9)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)';
-              e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+              e.currentTarget.style.backgroundColor = '#ffffff';
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
-            Explore this map
-            <ArrowRight size={16} />
+            Explore Podcast App
+            <ArrowRight size={18} />
           </button>
         </div>
       </div>
@@ -637,6 +647,7 @@ const LandingPage: React.FC = () => {
         minHeight: '100vh',
         color: 'white',
         position: 'relative',
+        overflowX: 'hidden',
       }}
     >
       {/* Full-page gradient overlay for depth */}

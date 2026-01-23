@@ -2450,6 +2450,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [isNarrowLayout, setIsNarrowLayout] = useState(false);
   // Narrow layout: show a compact mini player by default; user can expand to see UnifiedSidePanel.
   const [isNarrowInfoExpanded, setIsNarrowInfoExpanded] = useState(false);
+  
+  // Compact height mode: for very short viewports (e.g., landscape mobile, small embeds)
+  // Hide non-essential UI elements to maximize galaxy visibility
+  const COMPACT_HEIGHT_THRESHOLD = 500; // pixels
+  const [isCompactHeight, setIsCompactHeight] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerHeight < COMPACT_HEIGHT_THRESHOLD;
+    }
+    return false;
+  });
 
   // Debug: log the key layout flags driving scroll + touch behavior on mobile.
   useEffect(() => {
@@ -2457,6 +2467,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       `[ScrollDebug] flags changed: isEmbedMode=${isEmbedMode} isNarrowLayout=${isNarrowLayout} isNarrowInfoExpanded=${isNarrowInfoExpanded}`,
     );
   }, [isEmbedMode, isNarrowLayout, isNarrowInfoExpanded]);
+
+  // Track viewport height for compact mode (embed/landscape scenarios)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleResize = () => {
+      setIsCompactHeight(window.innerHeight < COMPACT_HEIGHT_THRESHOLD);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // DISABLED: Scroll lock was breaking nested scroll on mobile.
   // The bottom sheet's z-index and pointer-events should be sufficient.
@@ -3318,6 +3340,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 nebulaDimOpacity={isEmbedMode ? 0.78 : undefined}
                 brandImage={isEmbedMode ? (brandImage || undefined) : undefined}
                 brandColors={isEmbedMode ? (brandColors || undefined) : undefined}
+                isCompactHeight={isEmbedMode && isCompactHeight}
               />
             </div>
           ) : (
@@ -3754,6 +3777,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           trackId={selectedAudioContext?.shareLink || 'embed-player'}
           isExpanded={isNarrowInfoExpanded}
           onExpandChange={(expanded) => setIsNarrowInfoExpanded(expanded)}
+          isCompactHeight={isEmbedMode && isCompactHeight}
           onPrevious={selectedAudioContext && currentResultIndex > 0 ? () => {
             const prevIndex = currentResultIndex - 1;
             const prevResult = galaxyResults[prevIndex];

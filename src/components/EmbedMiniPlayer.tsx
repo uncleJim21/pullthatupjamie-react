@@ -36,6 +36,8 @@ interface EmbedMiniPlayerProps {
   // Optional expand/collapse affordance (app mode)
   isExpanded?: boolean;
   onExpandChange?: (expanded: boolean) => void;
+  // Compact height mode: hide non-essential UI for very short viewports
+  isCompactHeight?: boolean;
 }
 
 const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
@@ -57,6 +59,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   trackId,
   isExpanded,
   onExpandChange,
+  isCompactHeight = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -93,13 +96,14 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   // Auto-play when track changes AND user is hovering AND audio is unlocked (embed mode only)
   const autoPlayKeyRef = useRef<string | null>(null);
   
+  // Auto-play logic for embed mode
+  // Once audio is unlocked (user clicked), we don't pause on mouse leave anymore.
+  // The hover detection is only needed to work around browser autoplay policies.
   useEffect(() => {
     if (mode !== 'embed') return;
-    if (!audioUrl || !timeContext || !isHovered || !audioUnlocked) {
-      // Pause if user leaves
-      if (!isHovered && isPlaying) {
-        pause();
-      }
+    
+    // Need audio unlocked and track info to play
+    if (!audioUrl || !timeContext || !audioUnlocked) {
       return;
     }
     
@@ -117,7 +121,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
       startTime: timeContext.start_time,
       endTime: timeContext.end_time,
     });
-  }, [mode, trackId, audioUrl, timeContext, playTrack, isHovered, isPlaying, pause, audioUnlocked]);
+  }, [mode, trackId, audioUrl, timeContext, playTrack, audioUnlocked]);
 
   // Format time as MM:SS
   const formatTime = (seconds: number): string => {
@@ -196,36 +200,38 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
       ref={containerRef}
       className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-sm border-t border-gray-700 z-30"
     >
-      <div className="max-w-screen-xl mx-auto px-4 py-3">
-        {mode === 'embed' && (!isHovered || !audioUnlocked) ? (
-          // Not hovering OR audio not unlocked - show brand logo and message
-          <div className="flex items-center justify-center gap-4 py-2 cursor-pointer hover:bg-white/5 transition-colors rounded-lg">
+      <div className={`max-w-screen-xl mx-auto px-4 ${isCompactHeight ? 'py-1.5' : 'py-3'}`}>
+        {mode === 'embed' && !audioUnlocked ? (
+          // Audio not unlocked yet - show brand logo and "Click to play" message
+          <div className="flex items-center justify-center gap-3 sm:gap-4 py-2 cursor-pointer hover:bg-white/5 transition-colors rounded-lg">
             {brandImage && (
               <img
                 src={brandImage}
                 alt="Brand Logo"
-                className="h-12 w-auto object-contain rounded"
+                className="h-8 sm:h-12 w-auto max-w-[120px] sm:max-w-[180px] object-contain rounded flex-shrink-0"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                 }}
               />
             )}
-            <div className="text-center">
-              <p className="text-lg font-medium text-white">
-                {audioUnlocked ? 'Hover to play' : 'Click or tap to play'}
+            <div className="text-center flex-shrink-0">
+              <p className="text-base sm:text-lg font-medium text-white">
+                Click or tap to play
               </p>
               <p className="text-xs text-gray-400">
-                {audioUnlocked ? 'Explore podcast moments' : 'Unlock audio playback'}
+                Unlock audio playback
               </p>
             </div>
           </div>
         ) : (
           // Hovering - show full player
           <div className="flex items-center gap-4">
-          {/* Episode Image - Simple responsive sizing focused on mobile */}
+          {/* Episode Image - Smaller in compact height mode */}
           <div className="flex-shrink-0">
             {episodeImage && !imageError ? (
-              <div className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded overflow-hidden relative bg-gray-800">
+              <div className={`rounded overflow-hidden relative bg-gray-800 ${
+                isCompactHeight ? 'w-10 h-10' : 'w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20'
+              }`}>
                 {!imageLoaded && (
                   <div className="absolute inset-0 bg-gray-800 animate-pulse" />
                 )}
@@ -242,45 +248,52 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
                 />
               </div>
             ) : (
-              <div className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded bg-gray-800 flex items-center justify-center">
-                <Podcast className="w-6 h-6 md:w-8 md:h-8 text-gray-600" />
+              <div className={`rounded bg-gray-800 flex items-center justify-center ${
+                isCompactHeight ? 'w-10 h-10' : 'w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20'
+              }`}>
+                <Podcast className={isCompactHeight ? 'w-5 h-5 text-gray-600' : 'w-6 h-6 md:w-8 md:h-8 text-gray-600'} />
               </div>
             )}
           </div>
 
           {/* Content Info */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              {/* Hierarchy indicator */}
-              <div
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{
-                  backgroundColor: getHierarchyColor(),
-                  boxShadow: `0 0 4px 1px ${getHierarchyColor()}`,
-                }}
-              />
-              <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider">
-                {hierarchyLevel}
-              </p>
-            </div>
+            {/* Hierarchy indicator - hidden in compact height mode */}
+            {!isCompactHeight && (
+              <div className="flex items-center gap-2 mb-1">
+                <div
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{
+                    backgroundColor: getHierarchyColor(),
+                    boxShadow: `0 0 4px 1px ${getHierarchyColor()}`,
+                  }}
+                />
+                <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider">
+                  {hierarchyLevel}
+                </p>
+              </div>
+            )}
             
-            <h3 className="text-xs md:text-sm font-medium text-white line-clamp-1 mb-0.5">
+            <h3 className={`font-medium text-white line-clamp-1 ${isCompactHeight ? 'text-[10px]' : 'text-xs md:text-sm mb-0.5'}`}>
               {episodeTitle || 'Episode'}
             </h3>
             
             {creator && (
-              <p className="text-[10px] md:text-xs text-gray-500 line-clamp-1">
+              <p className={`text-gray-500 line-clamp-1 ${isCompactHeight ? 'text-[9px]' : 'text-[10px] md:text-xs'}`}>
                 {creator}
               </p>
             )}
             
-            <p className="text-[10px] md:text-xs text-gray-400 line-clamp-2 mt-1">
-              {displayText}
-            </p>
+            {/* Transcript text - hidden in compact height mode */}
+            {!isCompactHeight && (
+              <p className="text-[10px] md:text-xs text-gray-400 line-clamp-2 mt-1">
+                {displayText}
+              </p>
+            )}
           </div>
 
           {/* Playback Controls - Responsive sizing */}
-          <div className="flex flex-col gap-1.5 flex-shrink-0">
+          <div className={`flex flex-col flex-shrink-0 ${isCompactHeight ? 'gap-1' : 'gap-1.5'}`}>
             {/* Expand/collapse (app mode) */}
             {mode === 'app' && typeof onExpandChange === 'function' && (
               <div className="flex justify-end">
@@ -302,66 +315,74 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
               </div>
             )}
             {/* Row 1: Play and Time */}
-            <div className="flex gap-2 md:gap-3 items-center">
+            <div className={`flex items-center ${isCompactHeight ? 'gap-1.5' : 'gap-2 md:gap-3'}`}>
               <button
                 onClick={handlePlayPause}
                 disabled={!audioUrl}
-                className={`h-8 w-8 md:h-11 md:w-11 flex items-center justify-center rounded-full text-black transition-colors ${
+                className={`flex items-center justify-center rounded-full text-black transition-colors ${
+                  isCompactHeight ? 'h-7 w-7' : 'h-8 w-8 md:h-11 md:w-11'
+                } ${
                   !audioUrl
                     ? 'bg-gray-700 cursor-not-allowed'
                     : 'bg-white hover:bg-gray-200'
                 }`}
               >
                 {isBuffering ? (
-                  <div className="animate-spin rounded-full h-4 w-4 md:h-5 md:w-5 border-b-2 border-black" />
+                  <div className={`animate-spin rounded-full border-b-2 border-black ${isCompactHeight ? 'h-3 w-3' : 'h-4 w-4 md:h-5 md:w-5'}`} />
                 ) : isPlaying ? (
-                  <span className="text-xs md:text-sm font-semibold">||</span>
+                  <span className={`font-semibold ${isCompactHeight ? 'text-[10px]' : 'text-xs md:text-sm'}`}>||</span>
                 ) : (
-                  <Play className="w-4 h-4 md:w-5 md:h-5" />
+                  <Play className={isCompactHeight ? 'w-3.5 h-3.5' : 'w-4 h-4 md:w-5 md:h-5'} />
                 )}
               </button>
-              <span className="text-[10px] md:text-sm text-gray-400 min-w-[36px] md:min-w-[52px] text-right font-mono">
+              <span className={`text-gray-400 text-right font-mono ${isCompactHeight ? 'text-[9px] min-w-[32px]' : 'text-[10px] md:text-sm min-w-[36px] md:min-w-[52px]'}`}>
                 {formatTime(currentTime)}
               </span>
             </div>
             
-            {/* Row 2: Skip Back | Skip Forward */}
-            <div className="flex gap-1 md:gap-1.5">
-              <button
-                onClick={() => isTrackActive && seekBy(-5)}
-                disabled={!isTrackActive || !audioUrl}
-                className="px-3 py-1.5 md:px-4 md:py-2 rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
-                title="Back 5 seconds"
-              >
-                <RotateCcw className="w-3.5 h-3.5 md:w-4 md:h-4" />
-              </button>
-              <button
-                onClick={() => isTrackActive && seekBy(5)}
-                disabled={!isTrackActive || !audioUrl}
-                className="px-3 py-1.5 md:px-4 md:py-2 rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
-                title="Forward 5 seconds"
-              >
-                <RotateCw className="w-3.5 h-3.5 md:w-4 md:h-4" />
-              </button>
-            </div>
+            {/* Row 2: Skip Back | Skip Forward - hidden in compact height mode */}
+            {!isCompactHeight && (
+              <div className="flex gap-1 md:gap-1.5">
+                <button
+                  onClick={() => isTrackActive && seekBy(-5)}
+                  disabled={!isTrackActive || !audioUrl}
+                  className="px-3 py-1.5 md:px-4 md:py-2 rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                  title="Back 5 seconds"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                </button>
+                <button
+                  onClick={() => isTrackActive && seekBy(5)}
+                  disabled={!isTrackActive || !audioUrl}
+                  className="px-3 py-1.5 md:px-4 md:py-2 rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                  title="Forward 5 seconds"
+                >
+                  <RotateCw className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                </button>
+              </div>
+            )}
             
             {/* Row 3: Previous Track | Next Track */}
-            <div className="flex gap-1 md:gap-1.5">
+            <div className={`flex ${isCompactHeight ? 'gap-0.5' : 'gap-1 md:gap-1.5'}`}>
               <button
                 onClick={onPrevious}
                 disabled={!onPrevious}
-                className="px-3 py-1.5 md:px-4 md:py-2 rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                className={`rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center ${
+                  isCompactHeight ? 'px-2 py-1' : 'px-3 py-1.5 md:px-4 md:py-2'
+                }`}
                 title="Previous track"
               >
-                <ChevronsLeft className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <ChevronsLeft className={isCompactHeight ? 'w-3 h-3' : 'w-3.5 h-3.5 md:w-4 md:h-4'} />
               </button>
               <button
                 onClick={onNext}
                 disabled={!onNext}
-                className="px-3 py-1.5 md:px-4 md:py-2 rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                className={`rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center ${
+                  isCompactHeight ? 'px-2 py-1' : 'px-3 py-1.5 md:px-4 md:py-2'
+                }`}
                 title="Next track"
               >
-                <ChevronsRight className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <ChevronsRight className={isCompactHeight ? 'w-3 h-3' : 'w-3.5 h-3.5 md:w-4 md:h-4'} />
               </button>
             </div>
           </div>
