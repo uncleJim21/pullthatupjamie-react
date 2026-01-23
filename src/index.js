@@ -7,6 +7,8 @@ import PodcastFeedPage from './components/podcast/PodcastFeedPage.tsx';
 import DashboardPage from './components/podcast/DashboardPage.tsx';
 import LandingPage from './components/LandingPage.tsx';
 import ForPodcastersPage from './components/ForPodcastersPage.tsx';
+import PrivacyPage from './components/PrivacyPage.tsx';
+import TermsPage from './components/TermsPage.tsx';
 import TryJamieWizard from './components/TryJamieWizard.tsx';
 import AutomationSettingsPage from './components/AutomationSettingsPage.tsx';
 import TwitterTest from './pages/TwitterTest.tsx';
@@ -120,6 +122,8 @@ const App = () => (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/for-podcasters" element={<ForPodcastersPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       <Route path="/app" element={<SearchInterface />} />
       <Route path="/app/share" element={<SearchInterface isSharePage={true} />} />
       <Route path="/app/feed/:feedId" element={<PodcastFeedPage />} />

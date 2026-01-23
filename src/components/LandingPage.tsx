@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Github, Twitter, Mail } from 'lucide-react';
 import PageBanner from './PageBanner.tsx';
 import { NavigationMode } from '../constants/constants.ts';
 
@@ -335,7 +335,7 @@ const HeroSegment: React.FC = () => {
               letterSpacing: '-0.01em',
             }}
           >
-            Jamie turns AI into a space you can navigate.
+            Jamie turns raw data into a space you can navigate.
           </p>
 
           {/* Body copy */}
@@ -660,6 +660,440 @@ const EntryPointsSection: React.FC = () => {
   );
 };
 
+// ============================================================
+// WHY JAMIE EXISTS — Section Three
+// Story-driven section with illustration
+// ============================================================
+const WhyJamieExistsSection: React.FC = () => {
+  return (
+    <section
+      className="why-jamie-section"
+      style={{
+        minHeight: '80vh',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '100px 60px',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Responsive CSS */}
+      <style>
+        {`
+          .why-jamie-content {
+            display: flex;
+            flex-direction: row;
+            gap: 60px;
+            max-width: 1300px;
+            width: 100%;
+            margin: 0 auto;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+          }
+          .why-jamie-text {
+            flex: 1;
+          }
+          .why-jamie-image {
+            flex: 0 0 380px;
+            position: relative;
+          }
+          @media (max-width: 1100px) {
+            .why-jamie-content {
+              flex-direction: column;
+              gap: 48px;
+              text-align: center;
+            }
+            .why-jamie-text {
+              max-width: 100%;
+              order: 1;
+            }
+            .why-jamie-image {
+              flex: 0 0 auto;
+              width: 100%;
+              max-width: 360px;
+              order: 2;
+            }
+          }
+          @media (max-width: 600px) {
+            .why-jamie-section {
+              padding: 60px 28px !important;
+            }
+            .why-jamie-title {
+              font-size: 32px !important;
+            }
+          }
+        `}
+      </style>
+
+      {/* Content */}
+      <div className="why-jamie-content">
+        {/* Text column */}
+        <div className="why-jamie-text">
+          <h2
+            className="why-jamie-title"
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 600,
+              fontSize: '42px',
+              color: '#ffffff',
+              marginBottom: '32px',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
+            }}
+          >
+            Why Jamie Exists
+          </h2>
+
+          <p
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '19px',
+              lineHeight: 1.8,
+              color: 'rgba(255,255,255,0.85)',
+              marginBottom: '20px',
+            }}
+          >
+            We don't have an information problem.
+            <br />
+            We have a sense-making problem.
+          </p>
+
+          <p
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '17px',
+              lineHeight: 1.8,
+              color: 'rgba(255,255,255,0.6)',
+              marginBottom: '20px',
+            }}
+          >
+            AI has flooded the world with answers, many of them wrong, shallow, or disconnected from reality. Prompting has replaced understanding. Context gets flattened. Meaning gets lost.
+          </p>
+
+          <p
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '17px',
+              lineHeight: 1.8,
+              color: 'rgba(255,255,255,0.6)',
+              marginBottom: '20px',
+            }}
+          >
+            Meanwhile, the most valuable ideas still live in real sources: authentic conversations, podcasts, internal knowledge, research, and long-form thinking.
+          </p>
+
+          <p
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '17px',
+              lineHeight: 1.8,
+              color: 'rgba(255,255,255,0.75)',
+              marginBottom: '20px',
+              fontWeight: 500,
+            }}
+          >
+            The problem is the tools.
+          </p>
+
+          <p
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '17px',
+              lineHeight: 1.8,
+              color: 'rgba(255,255,255,0.6)',
+              marginBottom: '20px',
+            }}
+          >
+            Jamie was built to turn real information into something you can navigate, not just query. It takes genuine data, from podcasts to process documentation to archives, and makes it intelligible, explorable, and connected.
+          </p>
+
+          <p
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '18px',
+              lineHeight: 1.8,
+              color: 'rgba(255,255,255,0.85)',
+            }}
+          >
+            So humans can actually think again. Debate ideas. Grow. Learn. And become everything they were meant to be.
+          </p>
+        </div>
+
+        {/* Image column */}
+        <div className="why-jamie-image">
+          <img
+            src="/why-jamie-hero.png"
+            alt="Scientist exploring a constellation of connected ideas"
+            style={{
+              width: '100%',
+              height: 'auto',
+              borderRadius: '12px',
+              filter: 'grayscale(100%)',
+              opacity: 0.9,
+            }}
+          />
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ============================================================
+// FOOTER — Links, contact, legal
+// ============================================================
+const Footer: React.FC = () => {
+  const [emailRevealed, setEmailRevealed] = useState(false);
+
+  return (
+    <footer
+      style={{
+        marginTop: '120px',
+        padding: '60px 40px 40px',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        position: 'relative',
+        zIndex: 2,
+      }}
+    >
+      <div
+        style={{
+          maxWidth: '1300px',
+          margin: '0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '40px',
+        }}
+      >
+        {/* Main footer content */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '48px',
+            justifyContent: 'space-between',
+          }}
+        >
+          {/* Brand */}
+          <div style={{ minWidth: '200px' }}>
+            <h4
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#ffffff',
+                marginBottom: '16px',
+              }}
+            >
+              Pull That Up Jamie
+            </h4>
+            <p
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '14px',
+                color: 'rgba(255,255,255,0.5)',
+                lineHeight: 1.6,
+                maxWidth: '280px',
+              }}
+            >
+              Turning information into something you can navigate.
+            </p>
+          </div>
+
+          {/* Connect */}
+          <div style={{ minWidth: '160px' }}>
+            <h5
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: 'rgba(255,255,255,0.7)',
+                marginBottom: '16px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}
+            >
+              Connect
+            </h5>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              <li style={{ marginBottom: '12px' }}>
+                <a
+                  href="https://github.com/uncleJim21/pullthatupjamie-react"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: '14px',
+                    color: 'rgba(255,255,255,0.55)',
+                    textDecoration: 'none',
+                    transition: 'color 0.2s ease',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.9)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.55)'}
+                >
+                  <Github size={16} />
+                  GitHub
+                </a>
+              </li>
+              <li style={{ marginBottom: '12px' }}>
+                <a
+                  href="https://x.com/PullThatUpJ_AI"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: '14px',
+                    color: 'rgba(255,255,255,0.55)',
+                    textDecoration: 'none',
+                    transition: 'color 0.2s ease',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.9)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.55)'}
+                >
+                  <Twitter size={16} />
+                  X / Twitter
+                </a>
+              </li>
+              <li>
+                {emailRevealed ? (
+                  <a
+                    href="mailto:jim@cascdr.xyz"
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: '14px',
+                      color: 'rgba(200,180,140,0.8)',
+                      textDecoration: 'none',
+                      transition: 'color 0.2s ease',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(200,180,140,1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(200,180,140,0.8)'}
+                  >
+                    <Mail size={16} />
+                    jim@cascdr.xyz
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => setEmailRevealed(true)}
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: '14px',
+                      color: 'rgba(255,255,255,0.55)',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      transition: 'color 0.2s ease',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.9)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.55)'}
+                  >
+                    <Mail size={16} />
+                    Email (click to reveal)
+                  </button>
+                )}
+              </li>
+            </ul>
+          </div>
+
+          {/* Legal */}
+          <div style={{ minWidth: '160px' }}>
+            <h5
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: 'rgba(255,255,255,0.7)',
+                marginBottom: '16px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}
+            >
+              Legal
+            </h5>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              <li style={{ marginBottom: '12px' }}>
+                <a
+                  href="/privacy"
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: '14px',
+                    color: 'rgba(255,255,255,0.55)',
+                    textDecoration: 'none',
+                    transition: 'color 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.9)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.55)'}
+                >
+                  Privacy Policy
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/terms"
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: '14px',
+                    color: 'rgba(255,255,255,0.55)',
+                    textDecoration: 'none',
+                    transition: 'color 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.9)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.55)'}
+                >
+                  Terms of Service
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom bar */}
+        <div
+          style={{
+            paddingTop: '24px',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}
+        >
+          <p
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '13px',
+              color: 'rgba(255,255,255,0.4)',
+            }}
+          >
+            © {new Date().getFullYear()} Pull That Up Jamie. Open source under GPL-3.0.
+          </p>
+          <p
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '13px',
+              color: 'rgba(255,255,255,0.4)',
+            }}
+          >
+            Built for sense-making.
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+};
+
 const LandingPage: React.FC = () => {
   return (
     <div
@@ -701,6 +1135,12 @@ const LandingPage: React.FC = () => {
 
         {/* Section Two: Three Entry Points */}
         <EntryPointsSection />
+
+        {/* Section Three: Why Jamie Exists */}
+        <WhyJamieExistsSection />
+
+        {/* Footer */}
+        <Footer />
       </div>
     </div>
   );
