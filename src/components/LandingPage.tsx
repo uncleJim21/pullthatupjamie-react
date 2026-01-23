@@ -317,7 +317,7 @@ const HeroSegment: React.FC = () => {
               letterSpacing: '-0.03em',
             }}
           >
-            Ideas don't live in lists.
+            Stop prompting. Start exploring.
           </h1>
 
           {/* Subhead */}
@@ -331,7 +331,7 @@ const HeroSegment: React.FC = () => {
               letterSpacing: '-0.01em',
             }}
           >
-            They live in relationships.
+            Jamie turns AI into a space you can navigate.
           </p>
 
           {/* Body copy */}
