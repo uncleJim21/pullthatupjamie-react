@@ -14,54 +14,58 @@ interface EntryPoint {
 }
 
 // ============================================================
-// ABSTRACT ICONS — Conceptual, thin stroke, monochrome
+// ABSTRACT ICONS — Conceptual, thin stroke, with accent glow
+// Size increased 15-20% for better visual anchoring
 // ============================================================
+const accentColor = 'rgba(200, 180, 140, 1)'; // Warm amber accent
+const accentGlow = 'rgba(200, 180, 140, 0.4)';
+
 const DiscoverIcon: React.FC<{ isHovered: boolean }> = ({ isHovered }) => (
   <svg
-    width="48"
-    height="48"
+    width="56"
+    height="56"
     viewBox="0 0 48 48"
     fill="none"
     style={{
-      opacity: isHovered ? 0.9 : 0.5,
-      filter: isHovered ? 'drop-shadow(0 0 8px rgba(255,255,255,0.3))' : 'none',
-      transition: 'opacity 0.25s ease, filter 0.25s ease',
+      opacity: isHovered ? 1 : 0.6,
+      filter: isHovered ? `drop-shadow(0 0 12px ${accentGlow})` : 'none',
+      transition: 'opacity 0.2s ease, filter 0.2s ease',
     }}
   >
     {/* Constellation / branching nodes */}
-    <circle cx="24" cy="12" r="3" stroke="white" strokeWidth="1.5" fill="none" />
+    <circle cx="24" cy="12" r="3" stroke={isHovered ? accentColor : 'white'} strokeWidth="1.5" fill="none" style={{ transition: 'stroke 0.2s ease' }} />
     <circle cx="12" cy="28" r="3" stroke="white" strokeWidth="1.5" fill="none" />
     <circle cx="36" cy="28" r="3" stroke="white" strokeWidth="1.5" fill="none" />
     <circle cx="20" cy="38" r="2" stroke="white" strokeWidth="1.5" fill="none" />
     <circle cx="32" cy="40" r="2" stroke="white" strokeWidth="1.5" fill="none" />
     {/* Connecting lines */}
-    <line x1="24" y1="15" x2="14" y2="26" stroke="white" strokeWidth="1" opacity="0.6" />
-    <line x1="24" y1="15" x2="34" y2="26" stroke="white" strokeWidth="1" opacity="0.6" />
-    <line x1="14" y1="30" x2="19" y2="36" stroke="white" strokeWidth="1" opacity="0.6" />
-    <line x1="34" y1="30" x2="31" y2="38" stroke="white" strokeWidth="1" opacity="0.6" />
+    <line x1="24" y1="15" x2="14" y2="26" stroke="white" strokeWidth="1" opacity="0.5" />
+    <line x1="24" y1="15" x2="34" y2="26" stroke="white" strokeWidth="1" opacity="0.5" />
+    <line x1="14" y1="30" x2="19" y2="36" stroke="white" strokeWidth="1" opacity="0.5" />
+    <line x1="34" y1="30" x2="31" y2="38" stroke="white" strokeWidth="1" opacity="0.5" />
   </svg>
 );
 
 const AutomateIcon: React.FC<{ isHovered: boolean }> = ({ isHovered }) => (
   <svg
-    width="48"
-    height="48"
+    width="56"
+    height="56"
     viewBox="0 0 48 48"
     fill="none"
     style={{
-      opacity: isHovered ? 0.9 : 0.5,
-      filter: isHovered ? 'drop-shadow(0 0 8px rgba(255,255,255,0.3))' : 'none',
+      opacity: isHovered ? 1 : 0.6,
+      filter: isHovered ? `drop-shadow(0 0 12px ${accentGlow})` : 'none',
       transition: 'opacity 0.25s ease, filter 0.25s ease',
     }}
   >
     {/* Loop / interlinked system */}
     <circle cx="16" cy="16" r="6" stroke="white" strokeWidth="1.5" fill="none" />
     <circle cx="32" cy="16" r="6" stroke="white" strokeWidth="1.5" fill="none" />
-    <circle cx="24" cy="32" r="6" stroke="white" strokeWidth="1.5" fill="none" />
+    <circle cx="24" cy="32" r="6" stroke={isHovered ? accentColor : 'white'} strokeWidth="1.5" fill="none" style={{ transition: 'stroke 0.25s ease' }} />
     {/* Connecting arcs */}
-    <path d="M22 16 L26 16" stroke="white" strokeWidth="1" opacity="0.6" />
-    <path d="M18 21 L21 28" stroke="white" strokeWidth="1" opacity="0.6" />
-    <path d="M30 21 L27 28" stroke="white" strokeWidth="1" opacity="0.6" />
+    <path d="M22 16 L26 16" stroke="white" strokeWidth="1" opacity="0.5" />
+    <path d="M18 21 L21 28" stroke="white" strokeWidth="1" opacity="0.5" />
+    <path d="M30 21 L27 28" stroke="white" strokeWidth="1" opacity="0.5" />
     {/* Center dot */}
     <circle cx="24" cy="20" r="1.5" fill="white" opacity="0.4" />
   </svg>
@@ -69,18 +73,18 @@ const AutomateIcon: React.FC<{ isHovered: boolean }> = ({ isHovered }) => (
 
 const StoryIcon: React.FC<{ isHovered: boolean }> = ({ isHovered }) => (
   <svg
-    width="48"
-    height="48"
+    width="56"
+    height="56"
     viewBox="0 0 48 48"
     fill="none"
     style={{
-      opacity: isHovered ? 0.9 : 0.5,
-      filter: isHovered ? 'drop-shadow(0 0 8px rgba(255,255,255,0.3))' : 'none',
+      opacity: isHovered ? 1 : 0.6,
+      filter: isHovered ? `drop-shadow(0 0 12px ${accentGlow})` : 'none',
       transition: 'opacity 0.25s ease, filter 0.25s ease',
     }}
   >
     {/* Path / framed cluster */}
-    <rect x="8" y="8" width="32" height="32" rx="4" stroke="white" strokeWidth="1.5" fill="none" opacity="0.4" />
+    <rect x="8" y="8" width="32" height="32" rx="4" stroke={isHovered ? accentColor : 'white'} strokeWidth="1.5" fill="none" opacity="0.35" style={{ transition: 'stroke 0.25s ease' }} />
     {/* Inner path/journey */}
     <circle cx="16" cy="16" r="2" stroke="white" strokeWidth="1.5" fill="none" />
     <circle cx="32" cy="24" r="2" stroke="white" strokeWidth="1.5" fill="none" />
@@ -91,14 +95,14 @@ const StoryIcon: React.FC<{ isHovered: boolean }> = ({ isHovered }) => (
       stroke="white" 
       strokeWidth="1" 
       fill="none" 
-      opacity="0.6"
+      opacity="0.5"
     />
     <path 
       d="M30 26 C26 28, 24 30, 22 32" 
       stroke="white" 
       strokeWidth="1" 
       fill="none" 
-      opacity="0.6"
+      opacity="0.5"
     />
   </svg>
 );
@@ -393,9 +397,15 @@ const HeroSegment: React.FC = () => {
 // ============================================================
 // ENTRY POINTS SECTION — Section Two
 // Three doors the user can step through. Not a feature grid.
-// Calm, curious, inviting.
+// Each card is an entry point — inviting, confident, explorable.
 // ============================================================
-const EntryPointCard: React.FC<{ entry: EntryPoint }> = ({ entry }) => {
+
+// Accent colors for CTAs and hover states
+const ctaAccent = 'rgba(200, 180, 140, 1)'; // Warm amber
+const ctaAccentMuted = 'rgba(200, 180, 140, 0.7)';
+const ctaAccentBright = 'rgba(220, 200, 160, 1)';
+
+const EntryPointCard: React.FC<{ entry: EntryPoint; isPrimary?: boolean }> = ({ entry, isPrimary = false }) => {
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -411,6 +421,11 @@ const EntryPointCard: React.FC<{ entry: EntryPoint }> = ({ entry }) => {
     }
   };
 
+  // Micro-asymmetry: Discover card has faster/stronger response
+  const transitionSpeed = isPrimary ? '0.2s' : '0.3s';
+  const hoverLift = isPrimary ? '-5px' : '-4px';
+  const restLift = isPrimary ? '-1px' : '0';
+
   return (
     <div
       className="entry-point-card"
@@ -424,28 +439,29 @@ const EntryPointCard: React.FC<{ entry: EntryPoint }> = ({ entry }) => {
         padding: '40px 32px',
         cursor: 'pointer',
         position: 'relative',
-        transform: isHovered ? 'translateY(-3px)' : 'translateY(0)',
-        transition: 'all 0.25s ease',
+        transform: isHovered ? `translateY(${hoverLift})` : `translateY(${restLift})`,
+        transition: `all ${transitionSpeed} ease`,
         boxShadow: isHovered 
-          ? '0 8px 32px rgba(255,255,255,0.04)' 
-          : 'none',
+          ? `0 16px 48px rgba(0,0,0,0.35), inset 0 0 40px rgba(200,180,140,0.03)` 
+          : isPrimary ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
         borderRadius: '16px',
         background: isHovered 
-          ? 'rgba(255,255,255,0.015)' 
+          ? 'rgba(255,255,255,0.025)' 
           : 'transparent',
-        // Subtle border as threshold
+        // Border as doorway threshold — hint of accent on hover
         border: isHovered 
-          ? '1px solid rgba(255,255,255,0.15)' 
-          : '1px solid rgba(255,255,255,0.06)',
+          ? '1px solid rgba(200,180,140,0.25)' 
+          : `1px solid rgba(255,255,255,${isPrimary ? '0.12' : '0.10'})`,
       }}
     >
-      {/* Icon — abstract, conceptual */}
+      {/* Icon — centered, larger, anchors the card */}
       <div
         style={{
-          marginBottom: '20px',
-          height: '48px',
+          marginBottom: '24px',
+          height: '56px',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
         {renderIcon()}
@@ -455,11 +471,12 @@ const EntryPointCard: React.FC<{ entry: EntryPoint }> = ({ entry }) => {
       <h3
         style={{
           fontFamily: 'Inter, sans-serif',
-          fontSize: '26px',
+          fontSize: '24px',
           fontWeight: 600,
           color: '#ffffff',
           marginBottom: '12px',
           letterSpacing: '-0.02em',
+          textAlign: 'center',
         }}
       >
         {entry.title}
@@ -469,28 +486,29 @@ const EntryPointCard: React.FC<{ entry: EntryPoint }> = ({ entry }) => {
       <p
         style={{
           fontFamily: 'Inter, sans-serif',
-          fontSize: '16px',
+          fontSize: '15px',
           fontWeight: 500,
-          color: 'rgba(255,255,255,0.65)',
-          marginBottom: '20px',
+          color: 'rgba(255,255,255,0.6)',
+          marginBottom: '16px',
           lineHeight: 1.5,
+          textAlign: 'center',
         }}
       >
         {entry.oneLiner}
       </p>
 
       {/* Body copy */}
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: '28px', textAlign: 'center' }}>
         {entry.body.map((line, idx) => (
           <p
             key={idx}
             style={{
               fontFamily: 'Inter, sans-serif',
-              fontSize: '15px',
+              fontSize: '14px',
               fontWeight: 400,
-              color: 'rgba(255,255,255,0.45)',
+              color: 'rgba(255,255,255,0.4)',
               lineHeight: 1.7,
-              marginBottom: idx < entry.body.length - 1 ? '8px' : '0',
+              marginBottom: idx < entry.body.length - 1 ? '6px' : '0',
             }}
           >
             {line}
@@ -498,30 +516,33 @@ const EntryPointCard: React.FC<{ entry: EntryPoint }> = ({ entry }) => {
         ))}
       </div>
 
-      {/* Text CTA — arrow appears only on hover */}
-      <span
-        style={{
-          fontFamily: 'Inter, sans-serif',
-          fontSize: '14px',
-          fontWeight: 500,
-          color: isHovered ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.4)',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px',
-          transition: 'color 0.2s ease',
-          letterSpacing: '0.01em',
-        }}
-      >
-        {entry.cta}
-        <ArrowRight 
-          size={14} 
+      {/* CTA — accent color, arrow on hover only */}
+      <div style={{ textAlign: 'center' }}>
+        <span
           style={{
-            opacity: isHovered ? 1 : 0,
-            transform: isHovered ? 'translateX(0)' : 'translateX(-4px)',
-            transition: 'opacity 0.2s ease, transform 0.2s ease',
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '14px',
+            fontWeight: 600,
+            color: isHovered ? ctaAccentBright : ctaAccentMuted,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: `color ${transitionSpeed} ease`,
+            letterSpacing: '0.01em',
           }}
-        />
-      </span>
+        >
+          {entry.cta}
+          <ArrowRight 
+            size={14} 
+            style={{
+              opacity: isHovered ? 1 : 0,
+              transform: isHovered ? 'translateX(2px)' : 'translateX(-4px)',
+              transition: `opacity ${transitionSpeed} ease, transform ${transitionSpeed} ease`,
+              color: ctaAccentBright,
+            }}
+          />
+        </span>
+      </div>
     </div>
   );
 };
@@ -632,7 +653,7 @@ const EntryPointsSection: React.FC = () => {
       {/* Entry Points Grid */}
       <div className="entry-points-grid">
         {entryPoints.map((entry, i) => (
-          <EntryPointCard key={i} entry={entry} />
+          <EntryPointCard key={i} entry={entry} isPrimary={i === 0} />
         ))}
       </div>
     </section>
