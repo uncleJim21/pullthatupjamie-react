@@ -350,7 +350,7 @@ const HeroSegment: React.FC = () => {
               maxWidth: '440px',
             }}
           >
-            Jamie lets you explore information the way it actually connects.
+            Jamie helps you turn a deluge of data into real insight.
             Conversations are just the beginning.
           </p>
 
