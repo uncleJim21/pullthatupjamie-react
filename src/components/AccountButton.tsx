@@ -173,22 +173,17 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
           }}
         >
           <div className="p-2 space-y-1">
-            {/* Bitcoin Connect */}
-            <div className="p-2">
+            {/* Bitcoin Connect - Hidden for now (Lightning auth deprecated) */}
+            {/* <div className="p-2">
               <BitcoinConnectButton onConnect={onConnect} />
-            </div>
+            </div> */}
 
-            {/* Navigation Items (only in CLEAN mode) */}
-            {navigationMode === NavigationMode.CLEAN && (
+            {/* Navigation Items - Show "Search Podcasts" only when NOT on /app */}
+            {navigationMode === NavigationMode.CLEAN && !window.location.pathname.startsWith('/app') && (
               <>
                 <button
                   onClick={() => {
-                    // Check if we need to reload by comparing URLs
-                    if (window.location.pathname === '/app' && !window.location.search.includes('mode=web-search')) {
-                      window.location.reload();
-                    } else {
-                      window.location.href = '/app';
-                    }
+                    window.location.href = '/app';
                     setIsOpen(false);
                   }}
                   className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"

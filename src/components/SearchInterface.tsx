@@ -1851,12 +1851,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     return () => clearTimeout(timeout); // Cleanup timeout
   }, [requestAuthMethod]);
 
+  // Feature flag: Lightning auth is deprecated, disable auto-initialization
+  const ENABLE_LIGHTNING_AUTH = false;
+  
   useEffect(() => {
-    if(!isLightningInitialized && localStorage.getItem('bc:config') && localStorage.getItem('isSubscribed') !== 'true'){
+    if(ENABLE_LIGHTNING_AUTH && !isLightningInitialized && localStorage.getItem('bc:config') && localStorage.getItem('isSubscribed') !== 'true'){
       printLog('Initializing lightning from stored config...');
       initializeLightning();
     } else {
-      printLog(`Not initializing lightning:${JSON.stringify({
+      printLog(`Not initializing lightning (feature disabled or conditions not met):${JSON.stringify({
+        featureEnabled: ENABLE_LIGHTNING_AUTH,
         isLightningInitialized,
         hasConfig: !!localStorage.getItem('bc:config'),
         isSubscribed: localStorage.getItem('isSubscribed')
