@@ -4,7 +4,7 @@
  */
 
 // Debug mode - set this to false for production
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 
 /**
  * Get the frontend URL based on environment
@@ -47,9 +47,21 @@ function getBackendUrl() {
   return 'https://pullthatupjamie-explore-alpha-xns9k.ondigitalocean.app';
 }
 
+/**
+ * Get the auth server URL
+ */
+function getAuthUrl() {
+  if (DEBUG_MODE) {
+    return 'http://localhost:6111';
+  }
+  
+  return 'https://cascdr-auth-backend-cw4nk.ondigitalocean.app';
+}
+
 // Export for ES6 modules (React)
 export const FRONTEND_URL = getFrontendUrl();
 export const API_URL = getBackendUrl();
+export const AUTH_URL = getAuthUrl();
 export { DEBUG_MODE };
 
 // Export for CommonJS (Node.js)
@@ -57,6 +69,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     FRONTEND_URL: getFrontendUrl(),
     API_URL: getBackendUrl(),
+    AUTH_URL: getAuthUrl(),
     DEBUG_MODE
   };
 }

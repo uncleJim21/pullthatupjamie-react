@@ -1,4 +1,20 @@
-import { API_URL, AuthConfig, RequestAuthMethod, SEARCH_LIMITS } from "../constants/constants.ts";
+import { API_URL, AuthConfig, SEARCH_LIMITS } from "../constants/constants.ts";
+
+/**
+ * Build authorization headers using JWT Bearer token
+ */
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+}
 
 export interface PodcastSearchParams {
   query: string;
@@ -13,7 +29,7 @@ export interface PodcastSearchParams {
 
 export const handleQuoteSearch = async (
   queryToUse: string,
-  auth:AuthConfig, 
+  auth: AuthConfig,  // Kept for backward compatibility, but auth now uses JWT from localStorage
   selectedFeedIds?: string[],
   minDate?: string,
   maxDate?: string,
@@ -22,19 +38,7 @@ export const handleQuoteSearch = async (
   guid?: string
 ) => {
   try{
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    // Only add Authorization header for LIGHTNING and SQUARE auth
-    if (auth.type === RequestAuthMethod.LIGHTNING) {
-      const { preimage, paymentHash } = auth.credentials;
-      headers.Authorization = `${preimage}:${paymentHash}`;
-    } else if (auth.type === RequestAuthMethod.SQUARE) {
-      const { username } = auth.credentials;
-      headers.Authorization = `Basic ${btoa(`${username}:`)}`;
-    }
-    // FREE tier doesn't need an auth header
+    const headers = getAuthHeaders();
 
     const body: PodcastSearchParams = { 
       query: queryToUse,
@@ -81,7 +85,7 @@ export const handleQuoteSearch = async (
 
 export const handleQuoteSearch3D = async (
   queryToUse: string,
-  auth: AuthConfig,
+  auth: AuthConfig,  // Kept for backward compatibility, but auth now uses JWT from localStorage
   selectedFeedIds?: string[],
   minDate?: string,
   maxDate?: string,
@@ -91,19 +95,7 @@ export const handleQuoteSearch3D = async (
   guid?: string
 ) => {
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    // Only add Authorization header for LIGHTNING and SQUARE auth
-    if (auth.type === RequestAuthMethod.LIGHTNING) {
-      const { preimage, paymentHash } = auth.credentials;
-      headers.Authorization = `${preimage}:${paymentHash}`;
-    } else if (auth.type === RequestAuthMethod.SQUARE) {
-      const { username } = auth.credentials;
-      headers.Authorization = `Basic ${btoa(`${username}:`)}`;
-    }
-    // FREE tier doesn't need an auth header
+    const headers = getAuthHeaders();
 
     const body: any = {
       query: queryToUse,

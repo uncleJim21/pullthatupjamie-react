@@ -1,8 +1,13 @@
 // services/authService.ts
-import { API_URL,DEBUG_AUTH, printLog } from "../constants/constants.ts";
+import { API_URL, AUTH_URL, printLog } from "../constants/constants.ts";
+
+// Auth provider types for the new provider-agnostic system
+export type AuthProvider = 'email' | 'nostr' | 'twitter';
+
 interface SignInResponse {
     token: string;
     subscriptionValid: boolean;
+    subscriptionType: 'subscriber' | 'admin' | null;
     message: string;
 }
 
@@ -22,17 +27,22 @@ interface TwitterStatusResponse {
 }
 
 class AuthService {
-    private static readonly AUTH_SERVER_URL = DEBUG_AUTH ? 'http://localhost:4020' : 'https://cascdr-auth-backend-cw4nk.ondigitalocean.app';
     private static readonly ADMIN_PRIVS_KEY = 'admin_privs';
 
+    /**
+     * Email sign-in using the new provider-based auth system
+     */
     static async signIn(email: string, password: string): Promise<SignInResponse> {
         try {
-            const response = await fetch(`${this.AUTH_SERVER_URL}/signin`, {
+            const response = await fetch(`${AUTH_URL}/auth/signin`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({
+                    provider: 'email',
+                    credentials: { email, password }
+                }),
             });
 
             if (!response.ok) {
@@ -44,6 +54,7 @@ class AuthService {
             return {
                 token: data.token,
                 subscriptionValid: data.subscriptionValid,
+                subscriptionType: data.subscriptionType || null,
                 message: data.message
             };
         } catch (error) {
@@ -52,14 +63,20 @@ class AuthService {
         }
     }
 
+    /**
+     * Email sign-up using the new provider-based auth system
+     */
     static async signUp(email: string, password: string): Promise<SignInResponse> {
         try {
-            const response = await fetch(`${this.AUTH_SERVER_URL}/signup`, {
+            const response = await fetch(`${AUTH_URL}/auth/signup`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({
+                    provider: 'email',
+                    credentials: { email, password }
+                }),
             });
 
             if (!response.ok) {
@@ -71,6 +88,7 @@ class AuthService {
             return {
                 token: data.token,
                 subscriptionValid: data.subscriptionValid,
+                subscriptionType: data.subscriptionType || null,
                 message: data.message
             };
         } catch (error) {

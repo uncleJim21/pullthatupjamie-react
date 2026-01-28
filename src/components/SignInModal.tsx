@@ -1,7 +1,8 @@
 // components/SignInModal.tsx
 import React, { useState } from 'react';
 import AuthService from '../services/authService.ts';
-import JamieAuthService from '../services/jamieAuth.ts';
+// JamieAuthService.registerSubscription is no longer needed - 
+// subscription sync is now handled by the auth server
 
 type AuthMode = 'signin' | 'signup';
 
@@ -54,15 +55,21 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSig
         ? await AuthService.signIn(email, password)
         : await AuthService.signUp(email, password);
 
+      // Store auth token and user identifier
       localStorage.setItem('auth_token', authResponse.token);
       localStorage.setItem('squareId', email);
 
-      if (authResponse.subscriptionValid) {
-        const jamieRegistration = await JamieAuthService.registerSubscription(email);
-        localStorage.setItem('isSubscribed','true');
-        if (!jamieRegistration.success) {
-          console.error('Jamie registration failed:', jamieRegistration.message);
+      // Set subscription status based on new subscriptionType field
+      // subscriptionType can be: 'subscriber', 'admin', or null
+      if (authResponse.subscriptionValid || authResponse.subscriptionType) {
+        localStorage.setItem('isSubscribed', 'true');
+        // Store subscription type for future use (admin detection, etc.)
+        if (authResponse.subscriptionType) {
+          localStorage.setItem('subscriptionType', authResponse.subscriptionType);
         }
+      } else {
+        localStorage.removeItem('isSubscribed');
+        localStorage.removeItem('subscriptionType');
       }
 
       setEmail("");

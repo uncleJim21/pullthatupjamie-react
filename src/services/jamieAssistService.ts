@@ -1,4 +1,20 @@
-import { API_URL, AuthConfig, RequestAuthMethod, printLog, ShareModalContext } from "../constants/constants.ts";
+import { API_URL, AuthConfig, printLog, ShareModalContext } from "../constants/constants.ts";
+
+/**
+ * Build authorization headers using JWT Bearer token
+ */
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+}
 
 // Custom error class to include HTTP status
 export class JamieAssistError extends Error {
@@ -14,7 +30,7 @@ export class JamieAssistError extends Error {
 export const generateAssistContent = async (
   lookupHash: string,
   additionalPrefs: string = "",
-  auth: AuthConfig,
+  auth: AuthConfig,  // Kept for backward compatibility, but auth now uses JWT from localStorage
   onContentUpdate: (content: string) => void,
   context: ShareModalContext = ShareModalContext.OTHER,
   videoMetadata?: {
@@ -35,24 +51,7 @@ export const generateAssistContent = async (
     
     printLog(`Generating assist content for clip: ${lookupHash}`);
     
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    // Add Authorization header based on auth type
-    if (auth.type === RequestAuthMethod.LIGHTNING && auth.credentials) {
-      const { preimage, paymentHash } = auth.credentials;
-      headers.Authorization = `${preimage}:${paymentHash}`;
-    } else if (auth.type === RequestAuthMethod.SQUARE && auth.credentials) {
-      const { username } = auth.credentials;
-      headers.Authorization = `Basic ${btoa(`${username}:`)}`;
-    } else if (auth.type === RequestAuthMethod.ADMIN) {
-      // Handle admin authentication - use Basic auth with username
-      const username = localStorage.getItem('squareId');
-      if (username) {
-        headers.Authorization = `Basic ${btoa(`${username}:`)}`;
-      }
-    }
+    const headers = getAuthHeaders();
 
     const response = await fetch(`${API_URL}/api/jamie-assist/${lookupHash}`, {
       method: 'POST',

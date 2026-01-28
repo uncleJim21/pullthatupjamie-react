@@ -1,5 +1,21 @@
-import { API_URL, AuthConfig, RequestAuthMethod } from "../constants/constants.ts";
+import { API_URL, AuthConfig } from "../constants/constants.ts";
 import { ClipRequestResponse } from "../types/clips.ts";
+
+/**
+ * Build authorization headers using JWT Bearer token
+ */
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+}
 
 export async function fetchClipById(clipId: string) {
   try {
@@ -18,23 +34,12 @@ export async function fetchClipById(clipId: string) {
 }
 
 export async function makeClip(clipId: string, 
-  auth:AuthConfig, 
+  auth: AuthConfig,  // Kept for backward compatibility, but auth now uses JWT from localStorage
   startTime:number|null,
   endTime:number|null
 ): Promise<ClipRequestResponse> {
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    // Only add Authorization header for LIGHTNING and SQUARE auth
-    if (auth.type === RequestAuthMethod.LIGHTNING && auth.credentials) {
-      const { preimage, paymentHash } = auth.credentials;
-      headers.Authorization = `${preimage}:${paymentHash}`;
-    } else if (auth.type === RequestAuthMethod.SQUARE) {
-      const { username } = auth.credentials;
-      headers.Authorization = `Basic ${btoa(`${username}:`)}`;
-    }
+    const headers = getAuthHeaders();
 
     let body = JSON.stringify({
       clipId: clipId

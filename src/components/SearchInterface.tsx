@@ -1469,26 +1469,30 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   };
 
   const updateAuthMethodAndRegisterModalStatus = async () => {
-     if(localStorage.getItem('squareId')) {
+    // Check if user is signed in (has auth token from new auth system)
+    if (localStorage.getItem('auth_token') && localStorage.getItem('squareId')) {
       setRequestAuthMethod(RequestAuthMethod.SQUARE);
-      const email = localStorage.getItem('squareId') as string;
-      const success = await registerSubscription(email);
-      printLog(`Registration result:${success}`);
+      printLog('Auth method set to SQUARE (signed in user)');
       return;
-    }else if (localStorage.getItem('bc:config')) {
-      setRequestAuthMethod(RequestAuthMethod.LIGHTNING);
-      return;
-    } 
-    else {
-      // Check Free Tier Eligibility
-      const eligible = await checkFreeTierEligibility();
-      if (eligible) {
-        setRequestAuthMethod(RequestAuthMethod.FREE);
-        return;
-      }
     }
-    setRequestAuthMethod(RequestAuthMethod.FREE_EXPENDED);
-    setIsRegisterModalOpen(true);
+    
+    // Legacy: Check for Lightning wallet connection
+    if (localStorage.getItem('bc:config')) {
+      setRequestAuthMethod(RequestAuthMethod.LIGHTNING);
+      printLog('Auth method set to LIGHTNING');
+      return;
+    }
+    
+    // Default to FREE for anonymous users
+    // TODO: Phase 3 will replace this with useEntitlements hook 
+    // that checks /api/on-demand/checkEligibility
+    setRequestAuthMethod(RequestAuthMethod.FREE);
+    printLog('Auth method set to FREE (anonymous user)');
+    
+    // NOTE: Removed obsolete calls:
+    // - registerSubscription() - now handled by auth server
+    // - checkFreeTierEligibility() - replaced by entitlements system
+    // - RegisterModal auto-open - will be handled by quota exceeded flow
   };
   
 
