@@ -1,6 +1,38 @@
 import { API_URL } from "../constants/constants.ts";
+import { throwIfQuotaExceeded } from "../types/errors.ts";
 
 const BASE_URL = API_URL;
+
+// Entitlement quota info for a single entitlement type
+export interface EntitlementQuota {
+  eligible: boolean;
+  used: number;
+  max: number;
+  remaining: number;
+  isUnlimited: boolean;
+  periodLengthDays: number;
+  periodStart: string;
+  nextResetDate: string;
+  daysUntilReset: number;
+}
+
+// Response from /api/on-demand/checkEligibility
+export interface CheckEligibilityResponse {
+  success: boolean;
+  tier: 'anonymous' | 'registered' | 'subscriber' | 'admin';
+  identifier?: string;
+  identifierType?: string;
+  hasUser: boolean;
+  entitlements: {
+    'search-quotes': EntitlementQuota;
+    'search-quotes-3d': EntitlementQuota;
+    'make-clip': EntitlementQuota;
+    'jamie-assist': EntitlementQuota;
+    'ai-analyze': EntitlementQuota;
+    'submit-on-demand-run': EntitlementQuota;
+    [key: string]: EntitlementQuota;
+  };
+}
 
 export interface OnDemandRunRequest {
   message: string;
@@ -57,6 +89,9 @@ class TryJamieService {
       body: JSON.stringify(request),
     });
     
+    // Check for quota exceeded (429) - throws QuotaExceededError with structured data
+    await throwIfQuotaExceeded(res, 'submit-on-demand-run');
+    
     if (!res.ok) {
       // Handle different error cases
       if (res.status === 401) {
@@ -75,16 +110,9 @@ class TryJamieService {
         } else if (errorData.error) {
           errorMessage = errorData.error;
         }
-        
-        // Handle quota exceeded specifically
-        if (res.status === 429 || errorMessage.toLowerCase().includes('limit exceeded') || errorMessage.toLowerCase().includes('quota')) {
-          throw new Error('On-demand run limit exceeded. Please upgrade your plan to continue.');
-        }
       } catch (parseError) {
         // If we can't parse the error response, use status-based messages
-        if (res.status === 429) {
-          errorMessage = 'Too many requests. Please try again later.';
-        } else if (res.status >= 500) {
+        if (res.status >= 500) {
           errorMessage = 'Server error. Please try again later.';
         } else if (res.status === 403) {
           errorMessage = 'Access denied. You may not have permission to perform this action.';
@@ -192,6 +220,34 @@ class TryJamieService {
     } catch (error) {
       // Network errors or other unexpected errors
       return { success: false, message: `Network error during quota update: ${error}` };
+    }
+  }
+
+  /**
+   * Check eligibility for on-demand features.
+   * Returns quota info for all entitlements including 'submit-on-demand-run'.
+   */
+  static async checkEligibility(): Promise<CheckEligibilityResponse | null> {
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    try {
+      const res = await fetch(`${BASE_URL}/api/on-demand/checkEligibility`, {
+        headers,
+      });
+      
+      if (!res.ok) {
+        console.error(`checkEligibility failed with status ${res.status}`);
+        return null;
+      }
+      
+      return await res.json();
+    } catch (error) {
+      console.error('Error checking eligibility:', error);
+      return null;
     }
   }
 }

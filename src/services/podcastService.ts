@@ -1,4 +1,5 @@
 import { API_URL, AuthConfig, SEARCH_LIMITS } from "../constants/constants.ts";
+import { throwIfQuotaExceeded } from "../types/errors.ts";
 
 /**
  * Build authorization headers using JWT Bearer token
@@ -69,6 +70,9 @@ export const handleQuoteSearch = async (
       body: JSON.stringify(body)
     });
   
+    // Check for quota exceeded (429) - throws QuotaExceededError
+    await throwIfQuotaExceeded(response, 'search-quotes');
+  
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -130,6 +134,9 @@ export const handleQuoteSearch3D = async (
       headers,
       body: JSON.stringify(body)
     });
+
+    // Check for quota exceeded (429) - throws QuotaExceededError
+    await throwIfQuotaExceeded(response, 'search-quotes-3d');
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

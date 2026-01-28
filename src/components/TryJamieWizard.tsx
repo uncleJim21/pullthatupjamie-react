@@ -3,11 +3,13 @@ import { API_URL, printLog } from '../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
 import PageBanner from './PageBanner.tsx';
 import rssService, { PodcastFeed, PodcastEpisode, FeedInfo } from '../services/rssService.ts';
-import TryJamieService, { OnDemandRunRequest } from '../services/tryJamieService.ts';
+import TryJamieService, { OnDemandRunRequest, EntitlementQuota } from '../services/tryJamieService.ts';
 import SignInModal from './SignInModal.tsx';
 import CheckoutModal from './CheckoutModal.tsx';
 import JamieLoadingScreen from './JamieLoadingScreen.tsx';
 import TutorialModal from './TutorialModal.tsx';
+import { QuotaExceededModal, QuotaExceededData } from './QuotaExceededModal.tsx';
+import { QuotaExceededError } from '../types/errors.ts';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -154,18 +156,8 @@ const TryJamieWizard: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [processingFailed, setProcessingFailed] = useState(false);
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
-  const [quotaInfo, setQuotaInfo] = useState<{
-    eligible: boolean;
-    remainingRuns: number;
-    totalLimit: number;
-    usedThisPeriod: number;
-    periodStart: string;
-    nextResetDate: string;
-    daysUntilReset: number;
-    authType?: 'ip' | 'user';
-    userEmail?: string;
-    clientIp?: string;
-  } | null>(null);
+  // Quota info for the submit-on-demand-run entitlement
+  const [quotaInfo, setQuotaInfo] = useState<EntitlementQuota | null>(null);
   const [imageLoadedStates, setImageLoadedStates] = useState<Record<string, boolean>>({});
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const navigate = useNavigate();
@@ -174,6 +166,10 @@ const TryJamieWizard: React.FC = () => {
   const [onboardingState, setOnboardingState] = useState<OnboardingState>({ status: 'idle' });
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const isInSuccessFlow = useRef(false);
+  
+  // Quota exceeded modal state (for 429 errors from API)
+  const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
+  const [checkoutProductName, setCheckoutProductName] = useState<'jamie-basic' | 'jamie-pro' | undefined>(undefined);
   
   // Debug state changes
   useEffect(() => {
@@ -234,45 +230,17 @@ const TryJamieWizard: React.FC = () => {
     }
   }, [quotaInfo]); // Only watch quotaInfo to avoid interference
 
-  // Function to check on-demand run eligibility
+  // Function to check on-demand run eligibility using the new response schema
   const checkQuotaEligibility = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
+      const eligibilityData = await TryJamieService.checkEligibility();
       
-      // Add JWT token if available
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${API_URL}/api/on-demand/checkEligibility`, {
-        method: 'GET',
-        headers: headers
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          // Handle both new and old API response formats
-          const quotaData = data.quotaInfo || data.eligibility || data;
-          setQuotaInfo({
-            eligible: data.eligible !== undefined ? data.eligible : (typeof quotaData?.eligible === 'boolean' ? quotaData.eligible : true),
-            remainingRuns: quotaData?.remainingRuns || 0,
-            totalLimit: quotaData?.totalLimit || 0,
-            usedThisPeriod: quotaData?.usedThisPeriod || 0,
-            periodStart: quotaData?.periodStart || '',
-            nextResetDate: quotaData?.nextResetDate || '',
-            daysUntilReset: parseInt(quotaData?.daysUntilReset, 10) || 0,
-            authType: data.authType || 'user',
-            userEmail: data.userEmail,
-            clientIp: data.clientIp
-          });
-        }
+      if (eligibilityData?.success && eligibilityData.entitlements?.['submit-on-demand-run']) {
+        setQuotaInfo(eligibilityData.entitlements['submit-on-demand-run']);
+        printLog(`[checkQuotaEligibility] Quota info set: ${JSON.stringify(eligibilityData.entitlements['submit-on-demand-run'])}`);
       }
     } catch (error) {
-      printLog(`Error checking quota eligibility: ${error}`);
+      printLog(`[checkQuotaEligibility] Error: ${error}`);
     }
   };
 
@@ -558,10 +526,19 @@ const TryJamieWizard: React.FC = () => {
         printLog(`Job submission error: ${e}`);
         setProcessing(false);
         
-        // Check if the error is due to quota exceeded or authentication
+        // Check if the error is due to quota exceeded (new 429 handler)
+        if (e instanceof QuotaExceededError) {
+          printLog(`Quota exceeded for submit-on-demand-run: ${JSON.stringify(e.data)}`);
+          setQuotaExceededData(e.data);
+          // Go back to step 3 so user can try again after upgrade
+          setCurrentStep(3);
+          return;
+        }
+        
+        // Check if the error is due to quota exceeded or authentication (legacy string-based check)
         if (e instanceof Error) {
           if (e.message.includes('limit exceeded') || e.message.includes('quota')) {
-            // Show quota exceeded modal
+            // Show quota exceeded modal (legacy flow)
             setOnboardingState({ status: 'quota_exceeded' });
             // Go back to step 3 so user can try again after upgrade
             setCurrentStep(3);
@@ -1037,16 +1014,10 @@ const TryJamieWizard: React.FC = () => {
         <div className="absolute top-24 left-1/2 transform -translate-x-1/2 sm:left-auto sm:right-6 sm:transform-none flex flex-col items-center sm:items-end space-y-2 mb-8">
           <div className="text-white text-sm bg-black/50 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-700 shadow-lg">
             <div className="flex items-center space-x-2">
-              <span>{quotaInfo.remainingRuns}/{quotaInfo.totalLimit} Free Runs left</span>
+              <span>{quotaInfo.remaining}/{quotaInfo.max} Free Runs left</span>
               <span className="text-gray-400">•</span>
-              <span>{quotaInfo.daysUntilReset} Days Until Reset</span>
-              {quotaInfo.authType === 'ip' && (
-                <>
-                  <span className="text-gray-400">•</span>
-                  <span className="text-gray-400 text-xs">IP-based</span>
-                </>
-              )}
-              {quotaInfo.authType === 'user' && quotaInfo.userEmail && (
+              <span>{quotaInfo.daysUntilReset} Day{quotaInfo.daysUntilReset !== 1 ? 's' : ''} Until Reset</span>
+              {isUserSignedIn && (
                 <>
                   <span className="text-gray-400">•</span>
                   <span className="text-gray-400 text-xs">Account</span>
@@ -1092,12 +1063,44 @@ const TryJamieWizard: React.FC = () => {
       {/* Checkout Modal */}
       <CheckoutModal 
         isOpen={onboardingState.status === 'checkout'} 
-        onClose={() => setOnboardingState({ status: 'idle' })} 
+        onClose={() => {
+          setOnboardingState({ status: 'idle' });
+          setCheckoutProductName(undefined);
+        }} 
         onSuccess={handleUpgradeSuccess}
-        productName="jamie-pro"
+        productName={checkoutProductName || "jamie-pro"}
       />
 
-      {/* Quota Exceeded Modal */}
+      {/* Quota Exceeded Modal (new 429 handler) */}
+      <QuotaExceededModal
+        isOpen={!!quotaExceededData}
+        onClose={() => setQuotaExceededData(null)}
+        data={quotaExceededData || { tier: 'anonymous', used: 0, max: 0 }}
+        onSignUp={() => {
+          setQuotaExceededData(null);
+          setOnboardingState({ status: 'sign_in', upgradeIntent: false });
+        }}
+        onUpgrade={() => {
+          setQuotaExceededData(null);
+          setCheckoutProductName('jamie-basic');
+          if (isUserSignedIn) {
+            setOnboardingState({ status: 'checkout' });
+          } else {
+            setOnboardingState({ status: 'sign_in', upgradeIntent: true });
+          }
+        }}
+        onUpgradePro={() => {
+          setQuotaExceededData(null);
+          setCheckoutProductName('jamie-pro');
+          if (isUserSignedIn) {
+            setOnboardingState({ status: 'checkout' });
+          } else {
+            setOnboardingState({ status: 'sign_in', upgradeIntent: true });
+          }
+        }}
+      />
+
+      {/* Quota Exceeded Modal (legacy - for non-429 quota checks) */}
       {onboardingState.status === 'quota_exceeded' && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
           <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
@@ -1106,9 +1109,9 @@ const TryJamieWizard: React.FC = () => {
             </h2>
             <p className="text-gray-400 mb-6">
               {isUserSignedIn ? (
-                `You've processed ${quotaInfo?.usedThisPeriod || 0} out of ${quotaInfo?.totalLimit || 0} free episodes this month. Upgrade to Jamie Pro for unlimited episode processing and instant access to all your favorite podcasts.`
+                `You've processed ${quotaInfo?.used || 0} out of ${quotaInfo?.max || 0} free episodes this month. Upgrade to Jamie Pro for unlimited episode processing and instant access to all your favorite podcasts.`
               ) : (
-                `You've processed ${quotaInfo?.usedThisPeriod || 0} out of ${quotaInfo?.totalLimit || 0} free episodes this week. Sign up for an account to get more free episodes or upgrade to Jamie Pro for unlimited processing.`
+                `You've processed ${quotaInfo?.used || 0} out of ${quotaInfo?.max || 0} free episodes this week. Sign up for an account to get more free episodes or upgrade to Jamie Pro for unlimited processing.`
               )}
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">

@@ -1,4 +1,5 @@
 import { API_URL, printLog } from "../constants/constants.ts";
+import { throwIfQuotaExceeded } from "../types/errors.ts";
 
 export interface AnalysisRequest {
   instructions: string;
@@ -65,6 +66,9 @@ export async function analyzeResearchSession(
       headers: getAuthHeaders(),
       body: JSON.stringify({ instructions })
     });
+    
+    // Check for quota exceeded (429) - throws QuotaExceededError
+    await throwIfQuotaExceeded(response, 'ai-analyze');
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -134,6 +138,9 @@ export async function analyzeAdHocResearch(
       headers: getAuthHeaders(),
       body: JSON.stringify({ instructions, pineconeIds })
     });
+
+    // Check for quota exceeded (429) - throws QuotaExceededError
+    await throwIfQuotaExceeded(response, 'ai-analyze');
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

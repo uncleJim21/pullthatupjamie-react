@@ -31,6 +31,8 @@ import NebulaBackground from './NebulaBackground.tsx';
 import SocialShareModal, { SocialPlatform } from './SocialShareModal.tsx';
 import AuthService from '../services/authService.ts';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
+import { QuotaExceededModal, QuotaExceededData } from './QuotaExceededModal.tsx';
+import { QuotaExceededError } from '../types/errors.ts';
 import ImageWithLoader from './ImageWithLoader.tsx';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
 import UnifiedSidePanel from './UnifiedSidePanel.tsx';
@@ -468,7 +470,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
            isShareModalOpen ||
            isTutorialOpen ||
            isWelcomeOpen ||
-           isSocialShareModalOpen;
+           isSocialShareModalOpen ||
+           !!quotaExceededData;
   };
 
   //Modals
@@ -477,6 +480,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
   const [isClipTrackerCollapsed, setIsClipTrackerCollapsed] = useState(true);
+  
+  // Quota exceeded modal state
+  const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
+  const [checkoutProductName, setCheckoutProductName] = useState<'jamie-basic' | 'jamie-pro' | undefined>(undefined);
 
 
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
@@ -1296,6 +1303,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       setQuery("");
       printLog("Quote search completed successfully");
     } catch (error) {
+      // Handle quota exceeded errors with dedicated modal
+      if (error instanceof QuotaExceededError) {
+        printLog(`Quota exceeded for search-quotes: ${JSON.stringify(error.data)}`);
+        setQuotaExceededData(error.data);
+        setSearchState(prev => ({ ...prev, isLoading: false }));
+        return;
+      }
       console.error("Error during quote search:", error);
       setSearchState(prev => ({
         ...prev,
@@ -1409,6 +1423,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       setQuery("");
       printLog("3D quote search completed successfully");
     } catch (error) {
+      // Handle quota exceeded errors with dedicated modal
+      if (error instanceof QuotaExceededError) {
+        printLog(`Quota exceeded for search-quotes-3d: ${JSON.stringify(error.data)}`);
+        setQuotaExceededData(error.data);
+        setSearchState(prev => ({ ...prev, isLoading: false }));
+        return;
+      }
       console.error("Error during 3D quote search:", error);
       setSearchState(prev => ({
         ...prev,
@@ -2808,7 +2829,36 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onSubscribeSelect={handleSubscribeSelect} 
       />
 
-      <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => {setIsCheckoutModalOpen(false)}} onSuccess={handleUpgradeSuccess} />
+      <CheckoutModal 
+        isOpen={isCheckoutModalOpen} 
+        onClose={() => {
+          setIsCheckoutModalOpen(false);
+          setCheckoutProductName(undefined);
+        }} 
+        onSuccess={handleUpgradeSuccess}
+        productName={checkoutProductName}
+      />
+
+      {/* Quota Exceeded Modal */}
+      <QuotaExceededModal
+        isOpen={!!quotaExceededData}
+        onClose={() => setQuotaExceededData(null)}
+        data={quotaExceededData || { tier: 'anonymous', used: 0, max: 0 }}
+        onSignUp={() => {
+          setQuotaExceededData(null);
+          setIsSignInModalOpen(true);
+        }}
+        onUpgrade={() => {
+          setQuotaExceededData(null);
+          setCheckoutProductName('jamie-basic');
+          setIsCheckoutModalOpen(true);
+        }}
+        onUpgradePro={() => {
+          setQuotaExceededData(null);
+          setCheckoutProductName('jamie-pro');
+          setIsCheckoutModalOpen(true);
+        }}
+      />
 
       {isUpgradeSuccessPopUpOpen && (
         <SubscriptionSuccessPopup onClose={() => setIsUpgradeSuccessPopUpOpen(false)} />

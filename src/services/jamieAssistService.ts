@@ -1,4 +1,5 @@
 import { API_URL, AuthConfig, printLog, ShareModalContext } from "../constants/constants.ts";
+import { throwIfQuotaExceeded } from "../types/errors.ts";
 
 /**
  * Build authorization headers using JWT Bearer token
@@ -16,7 +17,7 @@ function getAuthHeaders(): Record<string, string> {
   return headers;
 }
 
-// Custom error class to include HTTP status
+// Custom error class to include HTTP status (kept for backward compatibility)
 export class JamieAssistError extends Error {
   status: number;
   
@@ -63,12 +64,12 @@ export const generateAssistContent = async (
       })
     });
 
+    // Check for quota exceeded (429) - throws QuotaExceededError with structured data
+    await throwIfQuotaExceeded(response, 'jamie-assist');
+
     if (!response.ok) {
-      // Handle different error status codes
-      if (response.status === 429) {
-        printLog('Jamie Assist rate limit exceeded (429)');
-        throw new JamieAssistError('Rate limit exceeded. Please upgrade your account.', 429);
-      } else if (response.status === 401 || response.status === 403) {
+      // Handle other error status codes
+      if (response.status === 401 || response.status === 403) {
         printLog(`Jamie Assist authentication error (${response.status})`);
         throw new JamieAssistError('Authentication failed. Please sign in again.', response.status);
       } else {

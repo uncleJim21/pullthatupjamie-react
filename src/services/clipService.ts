@@ -1,5 +1,6 @@
 import { API_URL, AuthConfig } from "../constants/constants.ts";
 import { ClipRequestResponse } from "../types/clips.ts";
+import { throwIfQuotaExceeded } from "../types/errors.ts";
 
 /**
  * Build authorization headers using JWT Bearer token
@@ -57,6 +58,9 @@ export async function makeClip(clipId: string,
       body: body
     });
   
+    // Check for quota exceeded (429) - throws QuotaExceededError
+    await throwIfQuotaExceeded(response, 'make-clip');
+  
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -64,7 +68,7 @@ export async function makeClip(clipId: string,
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('quote search error:', error);
+    console.error('make clip error:', error);
     throw error;
   }
 }
