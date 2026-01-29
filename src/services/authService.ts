@@ -32,6 +32,17 @@ interface TwitterStatusResponse {
     twitterUsername?: string;
 }
 
+interface TwitterExchangeResponse {
+    token: string;
+    isNewUser: boolean;
+    user: {
+        twitterUsername?: string;
+        twitterId?: string;
+        subscriptionValid?: boolean;
+        subscriptionType?: 'subscriber' | 'admin' | null;
+    };
+}
+
 class AuthService {
     private static readonly ADMIN_PRIVS_KEY = 'admin_privs';
 
@@ -371,6 +382,57 @@ class AuthService {
             printLog(`Twitter auth error: ${error}`);
             if (error instanceof TypeError && error.message === 'Failed to fetch') {
                 throw new Error(`Could not connect to server at ${API_URL}. Please ensure the server is running and CORS is enabled.`);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Initiate Twitter OAuth by redirecting to the backend's auth-initiate endpoint
+     * This kicks off the OAuth flow - user will be redirected to Twitter
+     */
+    static initiateTwitterOAuth(): void {
+        const frontendUrl = window.location.origin;
+        const redirectUri = encodeURIComponent(`${frontendUrl}/auth/twitter/complete`);
+        const authUrl = `${API_URL}/api/twitter/auth-initiate?redirect_uri=${redirectUri}`;
+        
+        printLog(`Initiating Twitter OAuth, redirecting to: ${authUrl}`);
+        window.location.href = authUrl;
+    }
+
+    /**
+     * Exchange a temporary Twitter auth code for a JWT token
+     * Called on the callback page after Twitter redirects back
+     */
+    static async exchangeTwitterCode(code: string): Promise<TwitterExchangeResponse> {
+        try {
+            printLog(`Exchanging Twitter code at ${AUTH_URL}/auth/twitter/exchange`);
+            
+            const response = await fetch(`${AUTH_URL}/auth/twitter/exchange`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ code }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'Failed to exchange Twitter authorization code');
+            }
+
+            printLog(`Twitter exchange successful, user: ${data.user?.twitterUsername}`);
+            
+            return {
+                token: data.token,
+                isNewUser: data.isNewUser,
+                user: data.user
+            };
+        } catch (error) {
+            console.error('Twitter code exchange error:', error);
+            if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                throw new Error(`Could not connect to auth server at ${AUTH_URL}. Please ensure the server is running.`);
             }
             throw error;
         }

@@ -1,6 +1,6 @@
 // components/SignInModal.tsx
 import React, { useState } from 'react';
-import { Twitter, Mail, ArrowLeft, Loader2 } from 'lucide-react';
+import { Mail, ArrowLeft, Loader2 } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import '../types/nostr.ts'; // Import for window.nostr types
 
@@ -141,8 +141,15 @@ export const SignInModal: React.FC<SignInModalProps> = ({
   };
 
   const handleTwitterAuth = () => {
-    // X OAuth - placeholder for future implementation
-    setError('X (Twitter) authentication coming soon!');
+    // Initiate Twitter OAuth - this will redirect to Twitter
+    setIsLoading(true);
+    setError('');
+    setProvider('twitter');
+    
+    // Small delay to show loading state before redirect
+    setTimeout(() => {
+      AuthService.initiateTwitterOAuth();
+    }, 300);
   };
 
   const resetForm = () => {
@@ -242,23 +249,21 @@ export const SignInModal: React.FC<SignInModalProps> = ({
           </svg>
         </button>
 
-        {/* X (Twitter) - Coming Soon */}
+        {/* X (Twitter) */}
         <button
           onClick={handleTwitterAuth}
-          disabled
-          className="w-full flex items-center gap-3 p-3 bg-gray-900/50 border border-gray-800 rounded-xl hover:border-gray-700 hover:bg-gray-900 transition-all group opacity-50 cursor-not-allowed relative"
+          className="w-full flex items-center gap-3 p-3 bg-gray-900/50 border border-gray-800 rounded-xl hover:border-gray-600 hover:bg-gray-900 transition-all group"
         >
           <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center border border-gray-700 flex-shrink-0">
-            <Twitter className="w-5 h-5 text-white" />
+            <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="currentColor">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
           </div>
           <div className="flex-1 text-left">
-            <div className="flex items-center gap-2">
-              <span className="text-white text-sm font-medium">Continue with X</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-400">Coming Soon</span>
-            </div>
+            <span className="text-white text-sm font-medium">Continue with X</span>
             <p className="hidden sm:block text-gray-500 text-xs mt-0.5">Use your X account</p>
           </div>
-          <svg className="w-4 h-4 text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
@@ -569,6 +574,13 @@ export const SignInModal: React.FC<SignInModalProps> = ({
           {provider === 'select' && renderProviderSelection()}
           {provider === 'email' && renderEmailForm()}
           {provider === 'nostr' && renderNostrAuth()}
+          {provider === 'twitter' && isLoading && (
+            <div className="text-center py-8">
+              <Loader2 className="w-8 h-8 text-white animate-spin mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white mb-2">Redirecting to X</h2>
+              <p className="text-gray-400">You'll be redirected to authorize with X...</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

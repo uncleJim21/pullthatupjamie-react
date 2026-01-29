@@ -12,6 +12,7 @@ import TermsPage from './components/TermsPage.tsx';
 import TryJamieWizard from './components/TryJamieWizard.tsx';
 import AutomationSettingsPage from './components/AutomationSettingsPage.tsx';
 import TwitterTest from './pages/TwitterTest.tsx';
+import TwitterAuthCallback from './pages/TwitterAuthCallback.tsx';
 import { DEBUG_MODE } from './constants/constants.ts';
 import { inject } from "@vercel/analytics"
 
@@ -134,6 +135,7 @@ const App = () => (
       <Route path="/app/feed/:feedId/myRssVideos" element={<PodcastFeedPage initialView="uploads" defaultTab="rss-feed" />} />
       <Route path="/app/automation-settings" element={<AutomationSettingsPage />} />
       <Route path="/try-jamie" element={<TryJamieWizard />} />
+      <Route path="/auth/twitter/complete" element={<TwitterAuthCallback />} />
       {DEBUG_MODE && <Route path="/twitter-test" element={<TwitterTest />} />}
       
       {/* Redirect old URLs to new structure */}
