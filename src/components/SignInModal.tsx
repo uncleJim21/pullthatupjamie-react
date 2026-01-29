@@ -198,7 +198,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({
       {/* Provider Cards */}
       <div className="space-y-2">
         {/* Email */}
-        <button
+          <button
           onClick={() => setProvider('email')}
           className="w-full flex items-center gap-3 p-3 bg-gray-900/50 border border-gray-800 rounded-xl hover:border-gray-600 hover:bg-gray-900 transition-all group"
         >
@@ -246,11 +246,11 @@ export const SignInModal: React.FC<SignInModalProps> = ({
           </div>
           <svg className="w-4 h-4 text-gray-500 group-hover:text-purple-400 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
+            </svg>
+          </button>
 
         {/* X (Twitter) */}
-        <button
+            <button
           onClick={handleTwitterAuth}
           className="w-full flex items-center gap-3 p-3 bg-gray-900/50 border border-gray-800 rounded-xl hover:border-gray-600 hover:bg-gray-900 transition-all group"
         >
@@ -266,7 +266,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({
           <svg className="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-        </button>
+            </button>
       </div>
 
       {/* Mode Toggle */}
@@ -275,10 +275,10 @@ export const SignInModal: React.FC<SignInModalProps> = ({
           {mode === 'signin' ? (
             <>
               Don't have an account?{' '}
-              <button 
-                onClick={() => setMode('signup')} 
+            <button
+              onClick={() => setMode('signup')}
                 className="text-white hover:text-gray-300 font-medium transition-colors underline"
-              >
+            >
                 Sign up
               </button>
             </>
@@ -290,11 +290,11 @@ export const SignInModal: React.FC<SignInModalProps> = ({
                 className="text-white hover:text-gray-300 font-medium transition-colors underline"
               >
                 Sign in
-              </button>
+            </button>
             </>
           )}
         </p>
-      </div>
+          </div>
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-center gap-2 mt-4">
@@ -334,85 +334,85 @@ export const SignInModal: React.FC<SignInModalProps> = ({
         </div>
         <h2 className="text-xl font-bold text-white">
           {mode === 'signin' ? 'Sign in with Email' : 'Sign up with Email'}
-        </h2>
+          </h2>
       </div>
 
       <form onSubmit={handleEmailSubmit} className="space-y-4">
-        <div>
+            <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-400 mb-1">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
             className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500/50 transition-colors"
-            placeholder="Enter your email"
-            required
-          />
-        </div>
-
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-400 mb-1">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500/50 transition-colors"
-            placeholder="Enter your password"
-            required
-          />
-        </div>
-
-        {mode === 'signup' && (
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-400 mb-1">
-              Confirm Password
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500/50 transition-colors"
-              placeholder="Confirm your password"
-              required
-            />
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-center gap-2">
-            <svg viewBox="0 0 24 24" className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span className="text-red-200 text-sm">{error}</span>
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full bg-white text-black rounded-lg px-4 py-3 font-medium hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-white/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          {isLoading ? (
-            <div className="flex items-center justify-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              {mode === 'signin' ? 'Signing In...' : 'Creating Account...'}
+                placeholder="Enter your email"
+                required
+              />
             </div>
-          ) : mode === 'signin' ? (
-            'Sign In'
-          ) : (
-            'Create Account'
-          )}
-        </button>
-      </form>
+
+            <div>
+          <label htmlFor="password" className="block text-sm font-medium text-gray-400 mb-1">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+            className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500/50 transition-colors"
+                placeholder="Enter your password"
+                required
+              />
+            </div>
+
+            {mode === 'signup' && (
+              <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-400 mb-1">
+                  Confirm Password
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500/50 transition-colors"
+                  placeholder="Confirm your password"
+                  required
+                />
+              </div>
+            )}
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-center gap-2">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span className="text-red-200 text-sm">{error}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+          className="w-full bg-white text-black rounded-lg px-4 py-3 font-medium hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-white/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+                  {mode === 'signin' ? 'Signing In...' : 'Creating Account...'}
+                </div>
+              ) : mode === 'signin' ? (
+                'Sign In'
+              ) : (
+                'Create Account'
+              )}
+            </button>
+          </form>
 
       {/* Mode Toggle */}
       <div className="pt-4 border-t border-gray-800">

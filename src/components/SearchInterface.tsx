@@ -1502,12 +1502,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       setRequestAuthMethod(RequestAuthMethod.LIGHTNING);
       printLog('Auth method set to LIGHTNING');
       return;
-    }
+    } 
     
     // Default to FREE for anonymous users
     // TODO: Phase 3 will replace this with useEntitlements hook 
     // that checks /api/on-demand/checkEligibility
-    setRequestAuthMethod(RequestAuthMethod.FREE);
+        setRequestAuthMethod(RequestAuthMethod.FREE);
     printLog('Auth method set to FREE (anonymous user)');
     
     // NOTE: Removed obsolete calls:
@@ -1853,7 +1853,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   // Feature flag: Lightning auth is deprecated, disable auto-initialization
   const ENABLE_LIGHTNING_AUTH = false;
-  
+
   useEffect(() => {
     if(ENABLE_LIGHTNING_AUTH && !isLightningInitialized && localStorage.getItem('bc:config') && localStorage.getItem('isSubscribed') !== 'true'){
       printLog('Initializing lightning from stored config...');

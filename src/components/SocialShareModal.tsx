@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Loader2, Twitter, Sparkles, ChevronUp, ChevronRight, Info, Save, Check, Pin, Clock, FileText, Link as LinkIcon } from 'lucide-react';
 import { printLog, API_URL, ShareModalContext } from '../constants/constants.ts';
-import PlatformIntegrationService from '../services/platformIntegrationService.ts';
+import PlatformIntegrationService, { 
+  TwitterCapabilities, 
+  TwitterContentType, 
+  isTwitterPostingAllowed 
+} from '../services/platformIntegrationService.ts';
 import { generateAssistContent, JamieAssistError } from '../services/jamieAssistService.ts';
 import { twitterService } from '../services/twitterService.ts';
 import AuthService from '../services/authService.ts';
@@ -98,6 +102,11 @@ interface PlatformState {
   success: boolean | null;
   error: string | null;
   username?: string;
+  // Twitter-specific extended state
+  capabilities?: TwitterCapabilities;
+  requiresMediaAuth?: boolean;
+  mediaAuthUrl?: string;
+  mediaAuthMessage?: string;
 }
 
 // Update the TwitterTweetResponse type
@@ -1217,19 +1226,24 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
   // Check Twitter authentication status using shared service
   const checkTwitterAuth = async () => {
     try {
-      const twitterState = await PlatformIntegrationService.checkTwitterAuth();
+      const twitterAuthState = await PlatformIntegrationService.checkTwitterAuth();
       setTwitterState(prev => ({
         ...prev,
-        authenticated: twitterState.authenticated,
-        available: twitterState.available,
-        username: twitterState.username,
+        authenticated: twitterAuthState.authenticated,
+        available: twitterAuthState.available,
+        username: twitterAuthState.username,
+        // Extended capabilities
+        capabilities: twitterAuthState.capabilities,
+        requiresMediaAuth: twitterAuthState.requiresMediaAuth,
+        mediaAuthUrl: twitterAuthState.mediaAuthUrl,
+        mediaAuthMessage: twitterAuthState.mediaAuthMessage,
         // Auto-uncheck if not authenticated
-        enabled: twitterState.authenticated ? prev.enabled : false
+        enabled: twitterAuthState.authenticated ? prev.enabled : false
       }));
-      setHasValidTokens(twitterState.authenticated);
+      setHasValidTokens(twitterAuthState.authenticated);
       
       // Save updated state to localStorage if Twitter was unchecked due to no auth
-      if (!twitterState.authenticated) {
+      if (!twitterAuthState.authenticated) {
         savePlatformDefaults(false, nostrState.enabled);
       }
     } catch (error) {
@@ -1238,6 +1252,10 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         ...prev, 
         authenticated: false, 
         username: undefined,
+        capabilities: undefined,
+        requiresMediaAuth: undefined,
+        mediaAuthUrl: undefined,
+        mediaAuthMessage: undefined,
         enabled: false // Auto-uncheck on error
       }));
       setHasValidTokens(false);
@@ -3455,86 +3473,97 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             <div className="mb-6">
           <div className="space-y-3">
             {/* Twitter Platform */}
-            <div className="flex items-center justify-between p-3 bg-gray-900/60 border border-gray-700 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <Twitter className="w-6 h-6 text-blue-400" />
-                <div className="flex-1">
-                  {isAdmin && twitterState.authenticated ? (
-                    successUrls.twitter ? (
-                      <a 
-                        href={successUrls.twitter} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-white text-sm hover:text-blue-400 transition-colors"
-                      >
-                        Post Successful - View on Twitter
-                      </a>
-                    ) : isVideoTooLongForTwitter ? (
-                      <div className="flex flex-col">
-                        <p className="text-white text-sm">Signed in as @{twitterState.username}</p>
-                        <p className="text-red-400 text-xs mt-1">
-                          Video too long ({Math.floor(videoDuration! / 60)}:{Math.floor(videoDuration! % 60).toString().padStart(2, '0')}) - Twitter max is 2:30
+            {(() => {
+              // Determine content type based on whether we have media
+              const hasMedia = !!(fileUrl || renderUrl);
+              const contentType = hasMedia ? TwitterContentType.WITH_MEDIA : TwitterContentType.TEXT_ONLY;
+              const postingCheck = isTwitterPostingAllowed(twitterState, contentType);
+              // Treat "can't post this content type" as "not fully connected"
+              const isFullyConnected = twitterState.authenticated && postingCheck.allowed;
+              
+              return (
+                <div className="flex items-center justify-between p-3 bg-gray-900/60 border border-gray-700 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Twitter className="w-6 h-6 text-blue-400" />
+                    <div className="flex-1">
+                      {isAdmin && isFullyConnected ? (
+                        successUrls.twitter ? (
+                          <a 
+                            href={successUrls.twitter} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-white text-sm hover:text-blue-400 transition-colors"
+                          >
+                            Post Successful - View on Twitter
+                          </a>
+                        ) : isVideoTooLongForTwitter ? (
+                          <div className="flex flex-col">
+                            <p className="text-white text-sm">Signed in as @{twitterState.username}</p>
+                            <p className="text-red-400 text-xs mt-1">
+                              Video too long ({Math.floor(videoDuration! / 60)}:{Math.floor(videoDuration! % 60).toString().padStart(2, '0')}) - Twitter max is 2:30
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-white text-sm">Signed in as @{twitterState.username}</p>
+                        )
+                      ) : isVideoTooLongForTwitter ? (
+                        <div className="flex flex-col">
+                          <p className="text-white text-sm">
+                            {isAdmin ? 'Connect to post directly' : 'Web sharing available'}
+                          </p>
+                          <p className="text-red-400 text-xs mt-1">
+                            Video too long ({Math.floor(videoDuration! / 60)}:{Math.floor(videoDuration! % 60).toString().padStart(2, '0')}) - Twitter max is 2:30
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-white text-sm">
+                          {isAdmin ? 'Connect to post directly' : 'Web sharing available'}
                         </p>
-                      </div>
-                    ) : (
-                      <p className="text-white text-sm">Signed in as @{twitterState.username}</p>
-                    )
-                  ) : isVideoTooLongForTwitter ? (
-                    <div className="flex flex-col">
-                      <p className="text-white text-sm">
-                        {isAdmin ? 'Connect to post directly' : 'Web sharing available'}
-                      </p>
-                      <p className="text-red-400 text-xs mt-1">
-                        Video too long ({Math.floor(videoDuration! / 60)}:{Math.floor(videoDuration! % 60).toString().padStart(2, '0')}) - Twitter max is 2:30
-                      </p>
+                      )}
                     </div>
-                  ) : (
-                    <p className="text-white text-sm">
-                      {isAdmin ? 'Connect to post directly' : 'Web sharing available'}
-                    </p>
-                  )}
-                </div>
-                {isAdmin && (
-                  <div className="flex items-center space-x-2">
-                    {twitterState.authenticated ? (
-                      <button
-                        onClick={disconnectTwitter}
-                        disabled={twitterState.currentOperation === OperationType.CONNECTING || twitterState.currentOperation === OperationType.DISCONNECTING}
-                        className="px-3 py-1 text-xs bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
-                      >
-                        {twitterState.currentOperation === OperationType.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={connectTwitter}
-                        disabled={twitterState.currentOperation === OperationType.CONNECTING}
-                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50"
-                      >
-                        {twitterState.currentOperation === OperationType.CONNECTING ? 'Connecting...' : 'Connect'}
-                      </button>
+                    {isAdmin && (
+                      <div className="flex items-center space-x-2">
+                        {isFullyConnected ? (
+                          <button
+                            onClick={disconnectTwitter}
+                            disabled={twitterState.currentOperation === OperationType.CONNECTING || twitterState.currentOperation === OperationType.DISCONNECTING}
+                            className="px-3 py-1 text-xs bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+                          >
+                            {twitterState.currentOperation === OperationType.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={connectTwitter}
+                            disabled={twitterState.currentOperation === OperationType.CONNECTING}
+                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50"
+                          >
+                            {twitterState.currentOperation === OperationType.CONNECTING ? 'Connecting...' : 'Connect'}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-              <div className="flex items-center space-x-2 ml-2">
-                {twitterState.currentOperation === OperationType.CONNECTING && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
-                {twitterState.currentOperation === OperationType.PUBLISHING && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
-                {twitterState.success === true && <Check className="w-4 h-4 text-green-500" />}
-                {twitterState.success === false && <X className="w-4 h-4 text-red-500" />}
-                <input
-                  type="checkbox"
-                  checked={twitterState.enabled}
-                  onChange={(e) => {
-                    const newEnabled = e.target.checked;
-                    setTwitterState(prev => ({ ...prev, enabled: newEnabled }));
-                    savePlatformDefaults(newEnabled, nostrState.enabled);
-                  }}
-                  disabled={!twitterState.authenticated || isVideoTooLongForTwitter}
-                  className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 disabled:opacity-50"
-                  title={isVideoTooLongForTwitter ? "Video exceeds Twitter's 2:30 limit" : ""}
-                />
-              </div>
-            </div>
+                  <div className="flex items-center space-x-2 ml-2">
+                    {twitterState.currentOperation === OperationType.CONNECTING && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
+                    {twitterState.currentOperation === OperationType.PUBLISHING && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
+                    {twitterState.success === true && <Check className="w-4 h-4 text-green-500" />}
+                    {twitterState.success === false && <X className="w-4 h-4 text-red-500" />}
+                    <input
+                      type="checkbox"
+                      checked={twitterState.enabled}
+                      onChange={(e) => {
+                        const newEnabled = e.target.checked;
+                        setTwitterState(prev => ({ ...prev, enabled: newEnabled }));
+                        savePlatformDefaults(newEnabled, nostrState.enabled);
+                      }}
+                      disabled={!isFullyConnected || isVideoTooLongForTwitter}
+                      className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 disabled:opacity-50"
+                      title={isVideoTooLongForTwitter ? "Video exceeds Twitter's 2:30 limit" : ""}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Nostr Platform */}
             <div className="flex items-center justify-between p-3 bg-gray-900/60 border border-gray-700 rounded-lg">

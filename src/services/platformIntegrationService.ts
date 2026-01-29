@@ -14,13 +14,45 @@ declare global {
   }
 }
 
-// Platform state interface
+// Content type enum for posting capability checks
+export enum TwitterContentType {
+  TEXT_ONLY = 'text_only',
+  WITH_MEDIA = 'with_media'
+}
+
+// Twitter capabilities from auth response
+export interface TwitterCapabilities {
+  canPostText: boolean;
+  canUploadMedia: boolean;
+  canRefreshTokens: boolean;
+}
+
+// Twitter auth status response
+export interface TwitterAuthStatus {
+  authenticated: boolean;
+  twitterId?: string;
+  twitterUsername?: string;
+  capabilities?: TwitterCapabilities;
+  oauth2Status?: 'valid' | 'expired' | 'missing';
+  oauth1Status?: 'valid' | 'expired' | 'missing';
+  expiresAt?: string;
+  requiresMediaAuth?: boolean;
+  mediaAuthUrl?: string;
+  mediaAuthMessage?: string;
+}
+
+// Platform state interface (extended with Twitter capabilities)
 export interface PlatformState {
   enabled: boolean;
   available: boolean;
   authenticated: boolean;
   username?: string;
   error?: string;
+  // Twitter-specific extended state
+  capabilities?: TwitterCapabilities;
+  requiresMediaAuth?: boolean;
+  mediaAuthUrl?: string;
+  mediaAuthMessage?: string;
 }
 
 // Twitter OAuth response interface
@@ -30,6 +62,53 @@ interface TwitterOAuthResponse {
   error?: string;
   requiresReauth?: boolean;
   username?: string;
+}
+
+/**
+ * Check if Twitter posting is allowed for the given content type
+ * @param state - The platform state from checkTwitterAuth
+ * @param contentType - What type of content we want to post
+ * @returns Object with allowed status and optional message explaining why not
+ */
+export function isTwitterPostingAllowed(
+  state: PlatformState,
+  contentType: TwitterContentType
+): { allowed: boolean; message?: string } {
+  // Not authenticated at all
+  if (!state.authenticated) {
+    return { allowed: false, message: 'Twitter not connected' };
+  }
+
+  // No capabilities info - fall back to legacy behavior (assume can post)
+  if (!state.capabilities) {
+    return { allowed: true };
+  }
+
+  // Check based on content type
+  if (contentType === TwitterContentType.TEXT_ONLY) {
+    if (state.capabilities.canPostText) {
+      return { allowed: true };
+    }
+    return { allowed: false, message: 'Cannot post text tweets' };
+  }
+
+  // WITH_MEDIA: need both text and media capabilities
+  if (contentType === TwitterContentType.WITH_MEDIA) {
+    if (state.capabilities.canPostText && state.capabilities.canUploadMedia) {
+      return { allowed: true };
+    }
+    
+    if (!state.capabilities.canUploadMedia && state.requiresMediaAuth) {
+      return { 
+        allowed: false, 
+        message: state.mediaAuthMessage || 'Media uploads require additional authorization'
+      };
+    }
+    
+    return { allowed: false, message: 'Cannot upload media' };
+  }
+
+  return { allowed: false, message: 'Unknown content type' };
 }
 
 // Platform integration service
@@ -103,6 +182,7 @@ export class PlatformIntegrationService {
 
   /**
    * Check Twitter OAuth status (copied from SocialShareModal)
+   * Now returns extended capabilities for granular posting permissions
    */
   static async checkTwitterAuth(): Promise<PlatformState> {
     printLog('Checking Twitter auth status in PlatformIntegrationService...');
@@ -132,14 +212,19 @@ export class PlatformIntegrationService {
       });
       
       if (response.ok) {
-        const data = await response.json();
+        const data: TwitterAuthStatus = await response.json();
         printLog(`Twitter auth check response: ${JSON.stringify(data)}`);
         
         return {
           enabled: true,
           available: true,
           authenticated: data.authenticated === true,
-          username: data.authenticated ? data.twitterUsername : undefined
+          username: data.authenticated ? data.twitterUsername : undefined,
+          // Extended capabilities
+          capabilities: data.capabilities,
+          requiresMediaAuth: data.requiresMediaAuth,
+          mediaAuthUrl: data.mediaAuthUrl,
+          mediaAuthMessage: data.mediaAuthMessage
         };
       } else {
         printLog(`Twitter auth check failed with status ${response.status}`);

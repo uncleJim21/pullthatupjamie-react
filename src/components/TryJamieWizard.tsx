@@ -234,7 +234,7 @@ const TryJamieWizard: React.FC = () => {
   const checkQuotaEligibility = async () => {
     try {
       const eligibilityData = await TryJamieService.checkEligibility();
-      
+
       if (eligibilityData?.success && eligibilityData.entitlements?.['submit-on-demand-run']) {
         setQuotaInfo(eligibilityData.entitlements['submit-on-demand-run']);
         printLog(`[checkQuotaEligibility] Quota info set: ${JSON.stringify(eligibilityData.entitlements['submit-on-demand-run'])}`);

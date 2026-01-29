@@ -183,7 +183,7 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
               <>
                 <button
                   onClick={() => {
-                    window.location.href = '/app';
+                      window.location.href = '/app';
                     setIsOpen(false);
                   }}
                   className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
