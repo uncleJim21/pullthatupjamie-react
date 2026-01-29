@@ -1079,9 +1079,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   similarity={{ combined: 1, vector: 1 }}
                   episodeImage={feedData?.logoUrl || ''}
                   listenLink={featuredEpisode.listenLink || featuredEpisode.audioUrl}
-                  isPlaying={currentlyPlayingId === featuredEpisode.id}
-                  onPlayPause={handlePlayPause}
-                  onEnded={handleEnded}
                   shareUrl={createFeedShareUrl(feedId || '')}
                   shareLink=""
                 />
@@ -1105,10 +1102,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                     }}
                     similarity={{ combined: 1, vector: 1 }}
                     episodeImage={feedData?.logoUrl || ''}
-                      listenLink={episode.audioUrl || episode.listenLink}
-                    isPlaying={currentlyPlayingId === episode.id}
-                    onPlayPause={handlePlayPause}
-                    onEnded={handleEnded}
+                    listenLink={episode.audioUrl || episode.listenLink}
                     shareUrl={createFeedShareUrl(feedId || '')}
                     shareLink=""
                   />
@@ -1137,9 +1131,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       similarity={{ combined: 1, vector: 1 }}
                       episodeImage={feedData?.logoUrl || ''}
                       listenLink={featuredEpisode.listenLink || featuredEpisode.audioUrl}
-                      isPlaying={currentlyPlayingId === featuredEpisode.id}
-                      onPlayPause={handlePlayPause}
-                      onEnded={handleEnded}
                       shareUrl={createFeedShareUrl(feedId || '')}
                       shareLink=""
                     />
@@ -1163,10 +1154,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         }}
                         similarity={{ combined: 1, vector: 1 }}
                         episodeImage={feedData?.logoUrl || ''}
-                      listenLink={episode.audioUrl || episode.listenLink}
-                        isPlaying={currentlyPlayingId === episode.id}
-                        onPlayPause={handlePlayPause}
-                        onEnded={handleEnded}
+                        listenLink={episode.audioUrl || episode.listenLink}
                         shareUrl={createFeedShareUrl(feedId || '')}
                         shareLink=""
                       />
