@@ -4,6 +4,7 @@ import { Headphones, Search, LayoutDashboard } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import AccountButton from './AccountButton.tsx';
 import SignInModal from './SignInModal.tsx';
+import SignUpSuccessModal from './SignUpSuccessModal.tsx';
 import CheckoutModal from './CheckoutModal.tsx';
 import {printLog, NavigationMode} from '../constants/constants.ts';
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus.ts';
@@ -44,6 +45,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
   const [isProDashboardModalOpen, setIsProDashboardModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isUpgradeSuccessPopupOpen, setIsUpgradeSuccessPopupOpen] = useState(false);
+  const [isSignUpSuccessModalOpen, setIsSignUpSuccessModalOpen] = useState(false);
   const [checkoutProductName, setCheckoutProductName] = useState<'jamie-plus' | 'jamie-pro'>('jamie-plus');
   const navigate = useNavigate();
   
@@ -240,8 +242,18 @@ const PageBanner: React.FC<PageBannerProps> = ({
       propsSetIsUserSignedIn(true);
     }
     
-    // For sign up success, we just close the modal and sign in the user
-    // No need to trigger upgrade flow or pro dashboard modal
+    // Show the sign-up success modal with upgrade prompt
+    setIsSignUpSuccessModalOpen(true);
+  };
+
+  const handleSignUpSuccessUpgrade = () => {
+    setIsSignUpSuccessModalOpen(false);
+    setCheckoutProductName('jamie-plus');
+    setIsCheckoutModalOpen(true);
+  };
+
+  const handleSignUpSuccessSkip = () => {
+    setIsSignUpSuccessModalOpen(false);
   };
 
   const handleUpgrade = () => {
@@ -481,6 +493,14 @@ const PageBanner: React.FC<PageBannerProps> = ({
         onClose={() => setIsSignInModalOpen(false)}
         onSignInSuccess={handleSignInSuccess}
         onSignUpSuccess={handleSignUpSuccess}
+      />
+
+      {/* Sign Up Success Modal - prompts upgrade after account creation */}
+      <SignUpSuccessModal
+        isOpen={isSignUpSuccessModalOpen}
+        onClose={() => setIsSignUpSuccessModalOpen(false)}
+        onUpgrade={handleSignUpSuccessUpgrade}
+        onSkip={handleSignUpSuccessSkip}
       />
 
       {/* Checkout Modal - uses correct product based on subscription status */}

@@ -86,6 +86,7 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
     } else {
       setAdminFeed(null);
       setShowNickname(false);
+      setNickname(null);
     }
   }, [isSignedIn]);
 

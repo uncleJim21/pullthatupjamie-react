@@ -7,10 +7,12 @@ import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RegisterModal } from './RegisterModal.tsx';
 import {SignInModal} from './SignInModal.tsx'
+import SignUpSuccessModal from './SignUpSuccessModal.tsx'
 import LightningService from '../services/lightning.ts'
 import {ClipProgress, ClipStatus, ClipRequest} from '../types/clips.ts'
 import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
+import { notifyAuthStateChanged } from '../hooks/useSubscriptionStatus.ts';
 import {CheckoutModal} from './CheckoutModal.tsx'
 import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
@@ -477,6 +479,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   //Modals
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
+  const [isSignUpSuccessModalOpen, setIsSignUpSuccessModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
   const [isClipTrackerCollapsed, setIsClipTrackerCollapsed] = useState(true);
@@ -567,6 +570,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     localStorage.removeItem('auth_token');
     localStorage.removeItem('squareId');
     localStorage.removeItem('isSubscribed');
+    localStorage.removeItem('subscriptionType');
+    localStorage.removeItem('authProvider');
     
     // Remove adminFeedId and adminFeedUrl from localStorage and reset state
     const settings = localStorage.getItem('userSettings');
@@ -580,6 +585,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     setAdminFeedUrl(null);
     
     setRequestAuthMethod(RequestAuthMethod.FREE);
+    setIsUserSignedIn(false);
+    
+    // Notify all subscription status hooks to refresh
+    notifyAuthStateChanged();
   };
 
   const initializeLightning = async () => {
@@ -2663,7 +2672,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     >
       {/* Main Content Area - Left Side */}
       <div ref={mainContentRef} className="flex-1 min-w-0 transition-all duration-300">
-        {/* Welcome Modal - Hidden in embed mode */}
+        {/* Welcome Modal - Temporarily disabled
         {!isEmbedMode && (
           <WelcomeModal
             isOpen={isWelcomeOpen}
@@ -2671,6 +2680,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             onGetStarted={handleWelcomeGetStarted}
           />
         )}
+        */}
 
         {/* Tutorial Modal - Hidden in embed mode */}
         {!isEmbedMode && (
@@ -2866,10 +2876,24 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 });
             }
           } else {
-            handleUpgrade();
+            // Show sign-up success modal with upgrade prompt
+            setIsSignUpSuccessModalOpen(true);
           }
         }}
       />
+      
+      {/* Sign Up Success Modal - prompts upgrade after account creation */}
+      <SignUpSuccessModal
+        isOpen={isSignUpSuccessModalOpen}
+        onClose={() => setIsSignUpSuccessModalOpen(false)}
+        onUpgrade={() => {
+          setIsSignUpSuccessModalOpen(false);
+          setCheckoutProductName('jamie-plus');
+          setIsCheckoutModalOpen(true);
+        }}
+        onSkip={() => setIsSignUpSuccessModalOpen(false)}
+      />
+      
       <RegisterModal 
         isOpen={isRegisterModalOpen} 
         onClose={handleCloseRegisterModal} 
