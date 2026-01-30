@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Mail, ArrowLeft, Loader2 } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import '../types/nostr.ts'; // Import for window.nostr types
+import { notifyAuthStateChanged } from '../hooks/useSubscriptionStatus.ts';
 
 type AuthMode = 'signin' | 'signup';
 type AuthProvider = 'select' | 'email' | 'nostr' | 'twitter';
@@ -84,6 +85,9 @@ export const SignInModal: React.FC<SignInModalProps> = ({
         localStorage.removeItem('subscriptionType');
       }
 
+      // Notify all subscription status hooks to refresh
+      notifyAuthStateChanged();
+
       resetForm();
       mode === 'signin' ? onSignInSuccess() : onSignUpSuccess();
       onClose();
@@ -127,6 +131,9 @@ export const SignInModal: React.FC<SignInModalProps> = ({
         localStorage.removeItem('isSubscribed');
         localStorage.removeItem('subscriptionType');
       }
+
+      // Notify all subscription status hooks to refresh
+      notifyAuthStateChanged();
 
       resetForm();
       // Nostr auth is always "sign in" - there's no separate "sign up" for Nostr

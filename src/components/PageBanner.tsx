@@ -4,7 +4,9 @@ import { Headphones, Search, LayoutDashboard } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import AccountButton from './AccountButton.tsx';
 import SignInModal from './SignInModal.tsx';
+import CheckoutModal from './CheckoutModal.tsx';
 import {printLog, NavigationMode} from '../constants/constants.ts';
+import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus.ts';
 
 interface PageBannerProps {
   logoText?: string;
@@ -40,7 +42,13 @@ const PageBanner: React.FC<PageBannerProps> = ({
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isProDashboardModalOpen, setIsProDashboardModalOpen] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isUpgradeSuccessPopupOpen, setIsUpgradeSuccessPopupOpen] = useState(false);
+  const [checkoutProductName, setCheckoutProductName] = useState<'jamie-plus' | 'jamie-pro'>('jamie-plus');
   const navigate = useNavigate();
+  
+  // Use centralized subscription status hook
+  const subscriptionStatus = useSubscriptionStatus();
 
   // Track banner width, not just window width, so the header can react when
   // the PodcastContextPanel narrows the main content area.
@@ -212,6 +220,8 @@ const PageBanner: React.FC<PageBannerProps> = ({
     setIsUserSignedIn(true);
     setIsSignInModalOpen(false);
     
+    // Note: subscription status refreshes automatically via auth-state-changed event
+    
     // Update parent state if provided
     if (propsSetIsUserSignedIn) {
       propsSetIsUserSignedIn(true);
@@ -223,6 +233,8 @@ const PageBanner: React.FC<PageBannerProps> = ({
     setIsUserSignedIn(true);
     setIsSignInModalOpen(false);
     
+    // Note: subscription status refreshes automatically via auth-state-changed event
+    
     // Update parent state if provided
     if (propsSetIsUserSignedIn) {
       propsSetIsUserSignedIn(true);
@@ -233,11 +245,30 @@ const PageBanner: React.FC<PageBannerProps> = ({
   };
 
   const handleUpgrade = () => {
+    // Refresh subscription status to get latest
+    subscriptionStatus.refresh();
+    
     if (onUpgrade) {
+      // If parent provided a handler, use it
       onUpgrade();
     } else {
-      printLog("Upgrade clicked - no handler provided");
+      // Otherwise, use internal checkout modal
+      const upgradeProduct = subscriptionStatus.getUpgradeProduct();
+      if (upgradeProduct) {
+        printLog(`[PageBanner] Opening checkout for product: ${upgradeProduct}`);
+        setCheckoutProductName(upgradeProduct);
+        setIsCheckoutModalOpen(true);
+      } else {
+        printLog("[PageBanner] User is already Pro, no upgrade available");
+      }
     }
+  };
+  
+  const handleCheckoutSuccess = () => {
+    setIsCheckoutModalOpen(false);
+    setIsUpgradeSuccessPopupOpen(true);
+    // Refresh subscription status after successful upgrade
+    subscriptionStatus.refresh();
   };
 
   const handleProDashboardUpgrade = () => {
@@ -247,10 +278,11 @@ const PageBanner: React.FC<PageBannerProps> = ({
       // If not signed in, show sign in modal
       setIsSignInModalOpen(true);
     } else {
-      // If signed in, call parent upgrade handler
-      if (onUpgrade) {
-        onUpgrade();
-      }
+      // If signed in, open checkout modal directly for Pro
+      // (Pro Dashboard upgrade always goes to Pro)
+      printLog("[PageBanner] Pro Dashboard upgrade - opening checkout for jamie-pro");
+      setCheckoutProductName('jamie-pro');
+      setIsCheckoutModalOpen(true);
     }
   };
 
@@ -450,6 +482,38 @@ const PageBanner: React.FC<PageBannerProps> = ({
         onSignInSuccess={handleSignInSuccess}
         onSignUpSuccess={handleSignUpSuccess}
       />
+
+      {/* Checkout Modal - uses correct product based on subscription status */}
+      <CheckoutModal
+        isOpen={isCheckoutModalOpen}
+        onClose={() => setIsCheckoutModalOpen(false)}
+        onSuccess={handleCheckoutSuccess}
+        productName={checkoutProductName}
+      />
+      
+      {/* Upgrade Success Popup */}
+      {isUpgradeSuccessPopupOpen && (
+        <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-[120]">
+          <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
+            <h2 className="text-white text-lg font-bold mb-4">
+              {checkoutProductName === 'jamie-pro' ? 'Welcome to Jamie Pro!' : 'Welcome to Jamie Plus!'}
+            </h2>
+            <p className="text-gray-400 mb-4">
+              {checkoutProductName === 'jamie-pro' ? (
+                'A team member will be in contact with you within 1 business day to complete your onboarding. In the meantime enjoy additional on demand episode runs.'
+              ) : (
+                'Enjoy enhanced access to Jamie features!'
+              )}
+            </p>
+            <button
+              onClick={() => setIsUpgradeSuccessPopupOpen(false)}
+              className="mt-4 px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Pro Dashboard Modal */}
       {isProDashboardModalOpen && (

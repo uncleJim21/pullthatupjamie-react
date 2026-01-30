@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import AuthService from '../services/authService.ts';
+import { notifyAuthStateChanged } from '../hooks/useSubscriptionStatus.ts';
 
 type AuthStatus = 'processing' | 'exchanging' | 'success' | 'error';
 
@@ -61,6 +62,9 @@ const TwitterAuthCallback: React.FC = () => {
           localStorage.removeItem('isSubscribed');
           localStorage.removeItem('subscriptionType');
         }
+
+        // Notify all subscription status hooks to refresh
+        notifyAuthStateChanged();
 
         setStatus('success');
 

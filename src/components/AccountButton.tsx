@@ -4,6 +4,7 @@ import BitcoinConnectButton from './BitcoinConnectButton.tsx';
 import { useNavigate } from 'react-router-dom';
 import AuthService from '../services/authService.ts';
 import { NavigationMode } from '../constants/constants.ts';
+import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus.ts';
 
 interface AccountButtonProps {
   onConnect: () => void;
@@ -34,10 +35,13 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
   const [showNickname, setShowNickname] = useState(false);
-  const [showUpgrade, setShowUpgrade] = useState(false);
   const [adminFeed, setAdminFeed] = useState<AdminFeed | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
+  
+  // Use centralized subscription status hook
+  // (automatically refreshes when auth-state-changed event fires)
+  const subscriptionStatus = useSubscriptionStatus();
 
   // Check for mobile screen size
   useEffect(() => {
@@ -74,14 +78,6 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
       };
       
       checkAdmin();
-      
-      // Show upgrade button unless user already has Pro (admin)
-      setTimeout(() => {
-        const subscriptionType = localStorage.getItem('subscriptionType');
-        // Hide upgrade only for Pro (admin) users
-        // Show for everyone else (free, amber/Plus, or subscribed without specific type)
-        setShowUpgrade(subscriptionType !== 'admin');
-      }, 1000);
 
       // Add small delay before showing nickname to ensure smooth transition
       setTimeout(() => {
@@ -211,8 +207,8 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
               </button>
             )}
 
-            {/* Upgrade Button */}
-            {showUpgrade && isSignedIn && (
+            {/* Upgrade Button - only show if not already Pro */}
+            {subscriptionStatus.shouldShowUpgrade() && isSignedIn && (
               <button
                 onClick={() => {
                   onUpgradeClick();
