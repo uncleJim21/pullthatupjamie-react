@@ -1,5 +1,5 @@
 // components/SignInModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, ArrowLeft, Loader2 } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import '../types/nostr.ts'; // Import for window.nostr types
@@ -37,6 +37,13 @@ export const SignInModal: React.FC<SignInModalProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Sync mode with initialMode prop when it changes (e.g., reopening modal)
+  useEffect(() => {
+    if (initialMode) {
+      setMode(initialMode);
+    }
+  }, [initialMode]);
 
   const validateEmail = (email: string) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -89,8 +96,9 @@ export const SignInModal: React.FC<SignInModalProps> = ({
       notifyAuthStateChanged();
 
       resetForm();
+      // Note: Don't call onClose() here - the success handlers already close the modal
+      // and calling onClose() can cause race conditions with state updates
       mode === 'signin' ? onSignInSuccess() : onSignUpSuccess();
-      onClose();
     } catch (err) {
       console.error('Auth error:', err);
       setError(err instanceof Error ? err.message : 'Authentication failed');
@@ -137,8 +145,8 @@ export const SignInModal: React.FC<SignInModalProps> = ({
 
       resetForm();
       // Nostr auth is always "sign in" - there's no separate "sign up" for Nostr
+      // Note: Don't call onClose() here - the success handler already closes the modal
       onSignInSuccess();
-      onClose();
     } catch (err) {
       console.error('Nostr auth error:', err);
       setError(err instanceof Error ? err.message : 'Nostr authentication failed');

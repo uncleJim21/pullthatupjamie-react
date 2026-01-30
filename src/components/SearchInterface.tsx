@@ -479,6 +479,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   //Modals
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
+  const [signInModalInitialMode, setSignInModalInitialMode] = useState<'signin' | 'signup'>('signin');
   const [isSignUpSuccessModalOpen, setIsSignUpSuccessModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
@@ -487,6 +488,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Quota exceeded modal state
   const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
   const [checkoutProductName, setCheckoutProductName] = useState<'jamie-plus' | 'jamie-pro' | undefined>(undefined);
+  // Track if we're in a quota recovery flow (user came from quota exceeded modal)
+  const [isQuotaRecoveryFlow, setIsQuotaRecoveryFlow] = useState(false);
 
 
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
@@ -2745,11 +2748,21 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         )}
         <SignInModal
         isOpen={isSignInModalOpen}
-        onClose={() => setIsSignInModalOpen(false)}
+        onClose={() => {
+          setIsSignInModalOpen(false);
+          setSignInModalInitialMode('signin'); // Reset to default for next open
+          // If user bailed out of quota recovery flow, reload to reset UI state
+          if (isQuotaRecoveryFlow) {
+            setIsQuotaRecoveryFlow(false);
+            window.location.reload();
+          }
+        }}
+        initialMode={signInModalInitialMode}
         onSignInSuccess={() => {
           setRequestAuthMethod(RequestAuthMethod.SQUARE);
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
+          setIsQuotaRecoveryFlow(false); // Clear recovery flag on successful sign-in
           
           // For clipBatch pages, retry access after authentication without page reload
           if (isClipBatchPage && runId && feedId) {
@@ -2815,6 +2828,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onSignUpSuccess={() => {
           setIsUserSignedIn(true);
           setIsSignInModalOpen(false);
+          // Note: Don't clear isQuotaRecoveryFlow here - let SignUpSuccessModal handle the flow
           
           // For clipBatch pages, retry access after authentication without page reload
           if (isClipBatchPage && runId && feedId) {
@@ -2885,13 +2899,28 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {/* Sign Up Success Modal - prompts upgrade after account creation */}
       <SignUpSuccessModal
         isOpen={isSignUpSuccessModalOpen}
-        onClose={() => setIsSignUpSuccessModalOpen(false)}
+        onClose={() => {
+          setIsSignUpSuccessModalOpen(false);
+          // If user came from quota flow and dismisses, reload to reset UI
+          if (isQuotaRecoveryFlow) {
+            setIsQuotaRecoveryFlow(false);
+            window.location.reload();
+          }
+        }}
         onUpgrade={() => {
           setIsSignUpSuccessModalOpen(false);
+          // Keep isQuotaRecoveryFlow true - CheckoutModal will handle reload on close
           setCheckoutProductName('jamie-plus');
           setIsCheckoutModalOpen(true);
         }}
-        onSkip={() => setIsSignUpSuccessModalOpen(false)}
+        onSkip={() => {
+          setIsSignUpSuccessModalOpen(false);
+          // If user came from quota flow and skips upgrade, reload to reset UI
+          if (isQuotaRecoveryFlow) {
+            setIsQuotaRecoveryFlow(false);
+            window.location.reload();
+          }
+        }}
       />
       
       <RegisterModal 
@@ -2906,27 +2935,43 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onClose={() => {
           setIsCheckoutModalOpen(false);
           setCheckoutProductName(undefined);
+          // If user bailed out of quota recovery flow, reload to reset UI state
+          if (isQuotaRecoveryFlow) {
+            setIsQuotaRecoveryFlow(false);
+            window.location.reload();
+          }
         }} 
-        onSuccess={handleUpgradeSuccess}
+        onSuccess={() => {
+          setIsQuotaRecoveryFlow(false); // Clear recovery flag on success
+          handleUpgradeSuccess();
+        }}
         productName={checkoutProductName}
       />
 
       {/* Quota Exceeded Modal */}
       <QuotaExceededModal
         isOpen={!!quotaExceededData}
-        onClose={() => setQuotaExceededData(null)}
+        onClose={() => {
+          setQuotaExceededData(null);
+          // Reload page when user dismisses quota modal without taking action
+          window.location.reload();
+        }}
         data={quotaExceededData || { tier: 'anonymous', used: 0, max: 0 }}
         onSignUp={() => {
           setQuotaExceededData(null);
+          setIsQuotaRecoveryFlow(true); // Track that we came from quota exceeded
+          setSignInModalInitialMode('signup');
           setIsSignInModalOpen(true);
         }}
         onUpgrade={() => {
           setQuotaExceededData(null);
+          setIsQuotaRecoveryFlow(true); // Track that we came from quota exceeded
           setCheckoutProductName('jamie-plus');
           setIsCheckoutModalOpen(true);
         }}
         onUpgradePro={() => {
           setQuotaExceededData(null);
+          setIsQuotaRecoveryFlow(true); // Track that we came from quota exceeded
           setCheckoutProductName('jamie-pro');
           setIsCheckoutModalOpen(true);
         }}
@@ -4241,7 +4286,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               }
             } : undefined
           }
-          onQuotaExceededSignUp={() => setIsSignInModalOpen(true)}
+          onQuotaExceededSignUp={() => {
+            setSignInModalInitialMode('signup');
+            setIsSignInModalOpen(true);
+          }}
           onQuotaExceededUpgrade={() => {
             setCheckoutProductName('jamie-plus');
             setIsCheckoutModalOpen(true);
