@@ -1,5 +1,5 @@
 import { API_URL, printLog } from "../constants/constants.ts";
-import { throwIfQuotaExceeded } from "../types/errors.ts";
+import { throwIfQuotaExceeded, QuotaExceededError } from "../types/errors.ts";
 
 export interface AnalysisRequest {
   instructions: string;
@@ -100,6 +100,10 @@ export async function analyzeResearchSession(
       analysis: fullText
     };
   } catch (error) {
+    // Re-throw QuotaExceededError so callers can show the modal
+    if (error instanceof QuotaExceededError) {
+      throw error;
+    }
     console.error('Analyze research session error:', error);
     return {
       success: false,
@@ -172,6 +176,10 @@ export async function analyzeAdHocResearch(
       analysis: fullText
     };
   } catch (error) {
+    // Re-throw QuotaExceededError so callers can show the modal
+    if (error instanceof QuotaExceededError) {
+      throw error;
+    }
     console.error('Analyze ad-hoc research error:', error);
     return {
       success: false,

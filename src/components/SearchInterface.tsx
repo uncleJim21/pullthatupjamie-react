@@ -4173,6 +4173,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               }
             } : undefined
           }
+          onQuotaExceededSignUp={() => setIsSignInModalOpen(true)}
+          onQuotaExceededUpgrade={() => {
+            setCheckoutProductName('jamie-plus');
+            setIsCheckoutModalOpen(true);
+          }}
+          onQuotaExceededUpgradePro={() => {
+            setCheckoutProductName('jamie-pro');
+            setIsCheckoutModalOpen(true);
+          }}
         />
       )}
     </div>

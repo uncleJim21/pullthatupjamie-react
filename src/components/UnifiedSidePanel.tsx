@@ -8,6 +8,8 @@ import { getCurrentSessionId, fetchAllResearchSessions, ResearchSession } from '
 import PodcastContextPanel from './PodcastContextPanel.tsx';
 import { AuthConfig, printLog } from '../constants/constants.ts';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
+import { QuotaExceededError } from '../types/errors.ts';
+import QuotaExceededModal, { QuotaExceededData } from './QuotaExceededModal.tsx';
 
 type AnalysisCardJson = {
   pineconeId: string;
@@ -308,6 +310,11 @@ interface UnifiedSidePanelProps {
   // control to invoke this callback.
   onRequestCollapseToMiniPlayer?: () => void;
   defaultSheetMode?: 'peek' | 'full' | 'dock';
+  
+  // Quota exceeded modal callbacks
+  onQuotaExceededSignUp?: () => void;
+  onQuotaExceededUpgrade?: () => void;
+  onQuotaExceededUpgradePro?: () => void;
 }
 
 const DEFAULT_INSTRUCTIONS = "Analyze this research session and summarize the main themes, key insights, and definitive conclusion. Keep it succinct and to the point no more than a few sentences when focus is on a single episode. You can take a bit more liberty when talking about common themes or disagreements. Don't explicitly mention the word research session.";
@@ -344,6 +351,9 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   onNextTrack,
   onRequestCollapseToMiniPlayer,
   defaultSheetMode = 'peek',
+  onQuotaExceededSignUp,
+  onQuotaExceededUpgrade,
+  onQuotaExceededUpgradePro,
 }) => {
   // Determine which mode is active
   const [activeMode, setActiveMode] = useState<PanelMode>(PanelMode.CONTEXT);
@@ -391,6 +401,9 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   const [sessions, setSessions] = useState<ResearchSession[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
+  
+  // Quota exceeded state
+  const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
   
   // Update active mode based on which panel is being opened from parent
   useEffect(() => {
@@ -462,14 +475,23 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
       }
     };
 
-    const result = effectiveSource === 'current_search'
-      ? await analyzeAdHocResearch(uniqueIds, instructions, onChunk)
-      : await analyzeResearchSession(compiledSessionId as string, instructions, onChunk);
+    try {
+      const result = effectiveSource === 'current_search'
+        ? await analyzeAdHocResearch(uniqueIds, instructions, onChunk)
+        : await analyzeResearchSession(compiledSessionId as string, instructions, onChunk);
 
-    setIsAnalyzing(false);
+      setIsAnalyzing(false);
 
-    if (!result.success) {
-      setError(result.error || 'Analysis failed');
+      if (!result.success) {
+        setError(result.error || 'Analysis failed');
+      }
+    } catch (err) {
+      setIsAnalyzing(false);
+      if (err instanceof QuotaExceededError) {
+        setQuotaExceededData(err.data);
+      } else {
+        setError(err instanceof Error ? err.message : 'Analysis failed');
+      }
     }
   };
 
@@ -1126,9 +1148,28 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
     // Both expanded and peek/dock: use pointer-events-none on wrapper, pointer-events-auto on sheet.
     // The sheet's z-index ensures it's above the galaxy. No backdrop needed.
     return (
-      <div className="fixed left-0 right-0 bottom-0 z-[70] pointer-events-none">
-        {sheet}
-      </div>
+      <>
+        <div className="fixed left-0 right-0 bottom-0 z-[70] pointer-events-none">
+          {sheet}
+        </div>
+        <QuotaExceededModal
+          isOpen={quotaExceededData !== null}
+          onClose={() => setQuotaExceededData(null)}
+          data={quotaExceededData || { tier: 'anonymous', used: 0, max: 0 }}
+          onSignUp={() => {
+            setQuotaExceededData(null);
+            onQuotaExceededSignUp?.();
+          }}
+          onUpgrade={() => {
+            setQuotaExceededData(null);
+            onQuotaExceededUpgrade?.();
+          }}
+          onUpgradePro={() => {
+            setQuotaExceededData(null);
+            onQuotaExceededUpgradePro?.();
+          }}
+        />
+      </>
     );
   }
 
@@ -1700,6 +1741,23 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
           )}
         </div>
       )}
+      <QuotaExceededModal
+        isOpen={quotaExceededData !== null}
+        onClose={() => setQuotaExceededData(null)}
+        data={quotaExceededData || { tier: 'anonymous', used: 0, max: 0 }}
+        onSignUp={() => {
+          setQuotaExceededData(null);
+          onQuotaExceededSignUp?.();
+        }}
+        onUpgrade={() => {
+          setQuotaExceededData(null);
+          onQuotaExceededUpgrade?.();
+        }}
+        onUpgradePro={() => {
+          setQuotaExceededData(null);
+          onQuotaExceededUpgradePro?.();
+        }}
+      />
     </div>
   );
 };

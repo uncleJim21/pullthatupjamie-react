@@ -1,5 +1,6 @@
 // components/QuotaExceededModal.tsx
 import React from 'react';
+import { Orbit } from 'lucide-react';
 
 // User tier types from the new auth system
 export type UserTier = 'anonymous' | 'registered' | 'subscriber' | 'admin';
@@ -18,24 +19,31 @@ interface QuotaExceededModalProps {
   onClose: () => void;
   data: QuotaExceededData;
   onSignUp?: () => void;      // For anonymous -> registered
-  onUpgrade?: () => void;     // For registered -> subscriber (Basic)
+  onUpgrade?: () => void;     // For registered -> subscriber (Plus)
   onUpgradePro?: () => void;  // For subscriber -> admin (Jamie Pro)
+  onPreview?: () => void;     // Optional: preview what upgrade unlocks
 }
 
 /**
- * Format the reset date for display
+ * Format the reset time in a friendly way
  */
-function formatResetDate(resetDate?: string, daysUntilReset?: number): string {
+function formatResetTime(resetDate?: string, daysUntilReset?: number): string {
   if (daysUntilReset !== undefined) {
-    if (daysUntilReset === 0) return 'today';
-    if (daysUntilReset === 1) return 'tomorrow';
-    return `in ${daysUntilReset} days`;
+    if (daysUntilReset === 0) return 'tomorrow';
+    if (daysUntilReset === 1) return 'in 2 days';
+    return `in ${daysUntilReset + 1} days`;
   }
   
   if (resetDate) {
     try {
       const date = new Date(resetDate);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const now = new Date();
+      const diffMs = date.getTime() - now.getTime();
+      const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+      
+      if (diffHours <= 24) return 'tomorrow';
+      if (diffHours <= 48) return 'in 2 days';
+      return date.toLocaleDateString('en-US', { weekday: 'long' });
     } catch {
       return 'soon';
     }
@@ -45,18 +53,59 @@ function formatResetDate(resetDate?: string, daysUntilReset?: number): string {
 }
 
 /**
- * Get human-readable name for entitlement type
+ * Get accomplishment text based on entitlement type
  */
-function getEntitlementLabel(type?: string): string {
-  const labels: Record<string, string> = {
-    'search-quotes': 'searches',
-    'search-quotes-3d': '3D searches',
-    'make-clip': 'clips',
-    'jamie-assist': 'AI assists',
-    'ai-analyze': 'AI analyses',
-    'submit-on-demand-run': 'on-demand runs',
-  };
-  return labels[type || ''] || 'requests';
+function getAccomplishmentText(type?: string, used?: number): string {
+  const count = used || 0;
+  
+  switch (type) {
+    case 'search-quotes':
+      return `You explored ${count} idea${count !== 1 ? 's' : ''} across the podcast universe`;
+    case 'search-quotes-3d':
+      return `You mapped ${count} concept${count !== 1 ? 's' : ''} in 3D space`;
+    case 'make-clip':
+      return `You captured ${count} moment${count !== 1 ? 's' : ''} worth sharing`;
+    case 'jamie-assist':
+      return `Jamie helped craft ${count} post${count !== 1 ? 's' : ''} for you`;
+    case 'ai-analyze':
+      return `You uncovered insights from ${count} analysis session${count !== 1 ? 's' : ''}`;
+    case 'submit-on-demand-run':
+      return `You added ${count} podcast${count !== 1 ? 's' : ''} to your library`;
+    default:
+      return `You've been exploring with Jamie`;
+  }
+}
+
+/**
+ * Get momentum-oriented title
+ */
+function getMomentumTitle(tier: UserTier): string {
+  switch (tier) {
+    case 'anonymous':
+      return "You're on a roll";
+    case 'registered':
+      return "You've hit today's limit";
+    case 'subscriber':
+      return "You've maxed out this cycle";
+    default:
+      return "Pause in exploration";
+  }
+}
+
+/**
+ * Get continuation CTA text
+ */
+function getContinuationCTA(tier: UserTier): string {
+  switch (tier) {
+    case 'anonymous':
+      return "Continue with a free account";
+    case 'registered':
+      return "Keep exploring with Jamie Plus";
+    case 'subscriber':
+      return "Go unlimited with Jamie Pro";
+    default:
+      return "Continue";
+  }
 }
 
 export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
@@ -66,92 +115,55 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
   onSignUp,
   onUpgrade,
   onUpgradePro,
+  onPreview,
 }) => {
   if (!isOpen) return null;
 
   const { tier, used, max, resetDate, daysUntilReset, entitlementType } = data;
-  const resetText = formatResetDate(resetDate, daysUntilReset);
-  const entitlementLabel = getEntitlementLabel(entitlementType);
+  const resetTime = formatResetTime(resetDate, daysUntilReset);
+  const accomplishment = getAccomplishmentText(entitlementType, used);
+  const title = getMomentumTitle(tier);
+  const ctaText = getContinuationCTA(tier);
 
-  // Determine content based on tier
-  const getTierContent = () => {
+  // Determine the primary action based on tier
+  const getPrimaryAction = () => {
     switch (tier) {
       case 'anonymous':
-        return {
-          title: 'Free Limit Reached',
-          message: `You've used all ${max} free ${entitlementLabel}. Create an account to get more.`,
-          primaryButton: 'Create Account',
-          primaryAction: onSignUp,
-          secondaryMessage: 'Already have an account? Sign in to continue.',
-          showUpgradeHint: true,
-        };
-      
+        return onSignUp;
       case 'registered':
-        return {
-          title: 'Monthly Limit Reached',
-          message: `You've used all ${max} ${entitlementLabel} this month.`,
-          primaryButton: 'Upgrade to Jamie Plus',
-          primaryAction: onUpgrade,
-          secondaryMessage: `Your quota resets ${resetText}.`,
-          showUpgradeHint: false,
-          upgradeDescription: 'Unlock higher limits, visual exploration, and AI insights with Jamie Plus.',
-        };
-      
+        return onUpgrade;
       case 'subscriber':
-        return {
-          title: 'Plan Limit Reached',
-          message: `You've used all ${max} ${entitlementLabel} on your Plus plan.`,
-          primaryButton: 'Upgrade to Jamie Pro',
-          primaryAction: onUpgradePro,
-          secondaryMessage: `Your quota resets ${resetText}.`,
-          showUpgradeHint: false,
-          upgradeDescription: 'Get unlimited access and premium features with Jamie Pro.',
-        };
-      
-      case 'admin':
-        // Admins should never see this, but handle gracefully
-        return {
-          title: 'Unexpected Limit',
-          message: 'Something went wrong. Please contact support.',
-          primaryButton: 'Close',
-          primaryAction: onClose,
-          secondaryMessage: '',
-          showUpgradeHint: false,
-        };
-      
+        return onUpgradePro;
       default:
-        return {
-          title: 'Limit Reached',
-          message: `You've used all ${max} ${entitlementLabel}.`,
-          primaryButton: 'Close',
-          primaryAction: onClose,
-          secondaryMessage: `Your quota resets ${resetText}.`,
-          showUpgradeHint: false,
-        };
+        return onClose;
     }
   };
 
-  const content = getTierContent();
+  const primaryAction = getPrimaryAction();
 
   return (
-    <div className="fixed inset-0 z-50">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-[100]">
+      {/* Backdrop with subtle blur to hint at content behind */}
+      <div 
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm" 
+        onClick={onClose} 
+      />
       
       {/* Modal */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
-        <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 shadow-xl relative">
-          {/* Close Button */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm px-4">
+        <div className="bg-[#0a0a0a] border border-gray-800/50 rounded-2xl p-8 shadow-2xl relative">
+          
+          {/* Subtle close affordance */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-white transition"
+            className="absolute top-4 right-4 text-gray-600 hover:text-gray-400 transition"
             aria-label="Close"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
-              strokeWidth={2}
+              strokeWidth={1.5}
               stroke="currentColor"
               className="w-5 h-5"
             >
@@ -159,76 +171,52 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
             </svg>
           </button>
 
-          {/* Warning Icon */}
-          <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-amber-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
+          {/* Icon - Orbit to represent exploration */}
+          <div className="flex justify-center mb-6">
+            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+              <Orbit className="w-6 h-6 text-white/80" />
             </div>
           </div>
 
-          {/* Title */}
-          <h2 className="text-xl font-bold text-white text-center mb-2">
-            {content.title}
+          {/* Momentum title */}
+          <h2 className="text-xl font-medium text-white text-center mb-3">
+            {title}
           </h2>
 
-          {/* Usage indicator */}
-          <div className="flex justify-center mb-4">
-            <div className="bg-gray-800 rounded-full px-4 py-1 text-sm">
-              <span className="text-amber-500 font-semibold">{used}</span>
-              <span className="text-gray-400"> / {max} used</span>
-            </div>
-          </div>
-
-          {/* Message */}
-          <p className="text-gray-300 text-center mb-4">
-            {content.message}
+          {/* Accomplishment - what they achieved */}
+          <p className="text-gray-400 text-center text-sm mb-8">
+            {accomplishment}
           </p>
 
-          {/* Upgrade description (for registered/subscriber) */}
-          {content.upgradeDescription && (
-            <p className="text-gray-400 text-sm text-center mb-6">
-              {content.upgradeDescription}
-            </p>
-          )}
-
-          {/* Primary CTA */}
-          {content.primaryAction && (
+          {/* Primary CTA - continuation focused */}
+          {primaryAction && (
             <button
-              onClick={content.primaryAction}
-              className="w-full bg-white text-black rounded-lg px-4 py-3 font-medium hover:bg-gray-100 transition-colors mb-3"
+              onClick={primaryAction}
+              className="w-full bg-white text-black rounded-xl px-4 py-3.5 font-medium hover:bg-gray-100 transition-colors mb-4"
             >
-              {content.primaryButton}
+              {ctaText}
             </button>
           )}
 
-          {/* Secondary message / reset info */}
-          {content.secondaryMessage && (
-            <p className="text-gray-500 text-sm text-center">
-              {content.secondaryMessage}
+          {/* Secondary path - low emphasis */}
+          <div className="text-center space-y-3">
+            {tier !== 'anonymous' && onPreview && (
+              <button
+                onClick={onPreview}
+                className="text-gray-500 text-sm hover:text-gray-300 transition-colors"
+              >
+                Preview what's included →
+              </button>
+            )}
+            
+            {/* Soft reset reminder */}
+            <p className="text-gray-600 text-xs">
+              {tier === 'anonymous' 
+                ? "No credit card required"
+                : `Your limit refreshes ${resetTime}`
+              }
             </p>
-          )}
-
-          {/* Skip/Close for non-upgrade scenarios */}
-          {tier !== 'admin' && (
-            <button
-              onClick={onClose}
-              className="w-full mt-3 text-gray-400 text-sm hover:text-white transition-colors"
-            >
-              Maybe later
-            </button>
-          )}
+          </div>
         </div>
       </div>
     </div>

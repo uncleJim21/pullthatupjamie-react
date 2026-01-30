@@ -54,6 +54,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paymentFailed, setPaymentFailed] = useState(false);
   const [card, setCard] = useState<SquareCard | null>(null);
 
+  // Sync selectedPlan with productName prop when it changes (e.g., modal reopens with different product)
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedPlan(productName === 'jamie-pro' ? 'pro' : 'basic');
+    }
+  }, [isOpen, productName]);
+
   // Determine the plan display information
   const displayPrice = selectedPlan === 'basic' ? (customPrice || MONTHLY_PRICE_STRING.replace('$', '')) : "49.99";
   const displayDescription = selectedPlan === 'basic' ? (customDescription || "Do more with the podcasts you love.") : "Full automation. Unlimited usage.";
@@ -186,36 +193,38 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+    <div className="fixed inset-0 flex items-center justify-center z-[110] bg-black bg-opacity-50">
       <div className="bg-black w-[95%] sm:w-[90%] max-h-[90vh] overflow-auto shadow-[0_0_15px_rgba(255,255,255,0.4)] rounded-lg">
         <div className="flex flex-col lg:flex-row h-full">
           {/* Desktop benefits section */}
           <div className="w-full lg:w-1/3 p-4 hidden lg:flex flex-col items-center justify-center">
-            {/* Plan Selector */}
-            <div className="w-full max-w-sm mb-4">
-              <div className="flex rounded-lg border border-gray-800 p-1 bg-black">
-                <button
-                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                    selectedPlan === 'basic'
-                      ? 'bg-white text-black'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                  onClick={() => setSelectedPlan('basic')}
-                >
-                  Plus
-                </button>
-                <button
-                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                    selectedPlan === 'pro'
-                      ? 'bg-white text-black'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                  onClick={() => setSelectedPlan('pro')}
-                >
-                  Pro
-                </button>
+            {/* Plan Selector - hide if only one option available */}
+            {productName !== 'jamie-pro' && (
+              <div className="w-full max-w-sm mb-4">
+                <div className="flex rounded-lg border border-gray-800 p-1 bg-black">
+                  <button
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                      selectedPlan === 'basic'
+                        ? 'bg-white text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                    onClick={() => setSelectedPlan('basic')}
+                  >
+                    Plus
+                  </button>
+                  <button
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                      selectedPlan === 'pro'
+                        ? 'bg-white text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                    onClick={() => setSelectedPlan('pro')}
+                  >
+                    Pro
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
             
             <PricingCard 
               plan={displayPlan}
@@ -226,8 +235,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
 
           <div className="w-full lg:w-2/3">
-            {/* Mobile plan selector - only on step 1 */}
-            {activeStep === 1 && (
+            {/* Mobile plan selector - only on step 1, hide if only Pro option */}
+            {activeStep === 1 && productName !== 'jamie-pro' && (
               <div className="lg:hidden p-3 border-b border-gray-700">
                 <div className="flex rounded-lg border border-gray-800 p-1 bg-black mb-3 max-w-xs mx-auto">
                   <button
