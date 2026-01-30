@@ -90,17 +90,17 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
         return {
           title: 'Monthly Limit Reached',
           message: `You've used all ${max} ${entitlementLabel} this month.`,
-          primaryButton: 'Upgrade to Jamie Basic',
+          primaryButton: 'Upgrade to Jamie Plus',
           primaryAction: onUpgrade,
           secondaryMessage: `Your quota resets ${resetText}.`,
           showUpgradeHint: false,
-          upgradeDescription: 'Unlock more searches, clips, and AI features with Jamie Basic.',
+          upgradeDescription: 'Unlock higher limits, visual exploration, and AI insights with Jamie Plus.',
         };
       
       case 'subscriber':
         return {
           title: 'Plan Limit Reached',
-          message: `You've used all ${max} ${entitlementLabel} on your Basic plan.`,
+          message: `You've used all ${max} ${entitlementLabel} on your Plus plan.`,
           primaryButton: 'Upgrade to Jamie Pro',
           primaryAction: onUpgradePro,
           secondaryMessage: `Your quota resets ${resetText}.`,

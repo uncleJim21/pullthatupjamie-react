@@ -169,7 +169,7 @@ const TryJamieWizard: React.FC = () => {
   
   // Quota exceeded modal state (for 429 errors from API)
   const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
-  const [checkoutProductName, setCheckoutProductName] = useState<'jamie-basic' | 'jamie-pro' | undefined>(undefined);
+  const [checkoutProductName, setCheckoutProductName] = useState<'jamie-plus' | 'jamie-pro' | undefined>(undefined);
   
   // Debug state changes
   useEffect(() => {
@@ -1082,7 +1082,7 @@ const TryJamieWizard: React.FC = () => {
         }}
         onUpgrade={() => {
           setQuotaExceededData(null);
-          setCheckoutProductName('jamie-basic');
+          setCheckoutProductName('jamie-plus');
           if (isUserSignedIn) {
             setOnboardingState({ status: 'checkout' });
           } else {

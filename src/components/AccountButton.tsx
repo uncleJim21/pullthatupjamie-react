@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, LayoutDashboard, BookOpen, Headphones } from 'lucide-react';
+import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, LayoutDashboard, Headphones } from 'lucide-react';
 import BitcoinConnectButton from './BitcoinConnectButton.tsx';
 import { useNavigate } from 'react-router-dom';
 import AuthService from '../services/authService.ts';
@@ -221,18 +221,6 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
                 <span>Upgrade</span>
               </button>
             )}
-
-            {/* Tutorial Button */}
-            <button
-              onClick={() => {
-                onTutorialClick();
-                setIsOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
-            >
-              <BookOpen size={20} />
-              <span>Tutorial</span>
-            </button>
 
             {/* Sign In/Out */}
             <button

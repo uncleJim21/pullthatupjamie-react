@@ -56,18 +56,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Determine the plan display information
   const displayPrice = selectedPlan === 'basic' ? (customPrice || MONTHLY_PRICE_STRING.replace('$', '')) : "49.99";
-  const displayDescription = selectedPlan === 'basic' ? (customDescription || "Productivity and Privacy at your fingertips with Jamie & other CASCDR apps.") : "Unlock unlimited podcast processing and access to all Jamie features";
+  const displayDescription = selectedPlan === 'basic' ? (customDescription || "Do more with the podcasts you love.") : "Full automation. Unlimited usage.";
   const displayFeatures = selectedPlan === 'basic' ? (customFeatures || [
-    "Unlimited web & podcast searches",
-    "Access 20+ CASCDR Apps",
-    "Early previews of new features"
+    "More searches, clips, and AI assists each month",
+    "Visual concept exploration with 3D maps",
+    "AI summaries and key point analysis",
+    "Add any podcast to Jamie's searchable library"
   ]) : [
-    "Your Pod Feed Auto Transcribed & Searchable",
-    "AI Curated Clips & Email Alerts",
-    "AI Assist for Social Media",
-    "Easy Nostr/Twitter Crossposting"
+    "Auto transcribe & search every episode from your feed",
+    "Curated clips + automation pipeline",
+    "Video editing from browser",
+    "Crosspost in seconds"
   ];
-  const displayPlan = selectedPlan === 'basic' ? "Basic Plan" : "Jamie Pro Plan";
+  const displayPlan = selectedPlan === 'basic' ? "Jamie Plus" : "Jamie Pro";
   const currentProductName = selectedPlan === 'basic' ? "amber" : "jamie-pro";
 
   const handleNext = () => setActiveStep(activeStep + 1);
@@ -201,7 +202,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   }`}
                   onClick={() => setSelectedPlan('basic')}
                 >
-                  Basic
+                  Plus
                 </button>
                 <button
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
@@ -237,7 +238,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     }`}
                     onClick={() => setSelectedPlan('basic')}
                   >
-                    Basic
+                    Plus
                   </button>
                   <button
                     className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${

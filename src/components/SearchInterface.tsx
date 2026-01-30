@@ -483,7 +483,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Quota exceeded modal state
   const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
-  const [checkoutProductName, setCheckoutProductName] = useState<'jamie-basic' | 'jamie-pro' | undefined>(undefined);
+  const [checkoutProductName, setCheckoutProductName] = useState<'jamie-plus' | 'jamie-pro' | undefined>(undefined);
 
 
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
@@ -2854,7 +2854,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         }}
         onUpgrade={() => {
           setQuotaExceededData(null);
-          setCheckoutProductName('jamie-basic');
+          setCheckoutProductName('jamie-plus');
           setIsCheckoutModalOpen(true);
         }}
         onUpgradePro={() => {
