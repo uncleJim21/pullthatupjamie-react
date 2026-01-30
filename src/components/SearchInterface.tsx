@@ -1500,6 +1500,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   const handleSearch = async (e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
+    
     if (searchMode === 'podcast-search') {
       try {
         // New search: collapse context panel and clear any stale audio/UI context
@@ -2298,6 +2299,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   }, [selectedSources]);
 
   // Welcome modal state for first-time visitors
+  // NOTE: WelcomeModal is currently disabled/commented out, so always initialize to false
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(() => {
     // Check if this is the user's first visit
     const settings = localStorage.getItem('userSettings');
@@ -2315,7 +2317,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       localStorage.setItem('userSettings', JSON.stringify(userSettings));
     }
     
-    return userSettings.isFirstVisit !== false; // Default to true if not set
+    // WelcomeModal is disabled - always return false to prevent blocking the UI
+    return false;
   });
 
   // Tutorial modal state
