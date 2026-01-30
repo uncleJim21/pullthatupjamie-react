@@ -509,7 +509,51 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   } = useJamieAuth();
 
   const handleUpgrade = () => {
-    printLog(`handleUpgrade`)
+    // Determine appropriate upgrade based on current subscription
+    // Check multiple sources: localStorage and JWT token
+    let currentSubscriptionType = localStorage.getItem('subscriptionType');
+    let isSubscribed = localStorage.getItem('isSubscribed') === 'true';
+    
+    // Fallback: decode JWT token to get subscription info if localStorage is empty
+    if (!currentSubscriptionType) {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          console.log('[handleUpgrade] JWT payload keys:', Object.keys(payload));
+          console.log('[handleUpgrade] JWT payload full:', JSON.stringify(payload, null, 2));
+          if (payload.subscriptionType) {
+            currentSubscriptionType = payload.subscriptionType;
+            // Also save to localStorage for future use
+            localStorage.setItem('subscriptionType', payload.subscriptionType);
+          }
+          if (payload.subscriptionValid) {
+            isSubscribed = true;
+            localStorage.setItem('isSubscribed', 'true');
+          }
+        } catch (e) {
+          console.error('[handleUpgrade] Error decoding JWT:', e);
+        }
+      }
+    }
+    
+    console.log('[handleUpgrade] subscriptionType:', currentSubscriptionType, 'isSubscribed:', isSubscribed);
+    
+    let targetProduct: 'jamie-plus' | 'jamie-pro';
+    if (currentSubscriptionType === 'admin') {
+      // Already Pro, nothing to upgrade to
+      console.log('[handleUpgrade] User already has Pro subscription, skipping');
+      return;
+    } else if (currentSubscriptionType === 'amber' || currentSubscriptionType === 'subscriber' || isSubscribed) {
+      // Already Plus (amber) or subscribed without specific type - upgrade to Pro
+      targetProduct = 'jamie-pro';
+    } else {
+      // Free user, upgrade to Plus
+      targetProduct = 'jamie-plus';
+    }
+    
+    console.log('[handleUpgrade] Setting checkoutProductName to:', targetProduct);
+    setCheckoutProductName(targetProduct);
     setIsCheckoutModalOpen(true);
   }
 

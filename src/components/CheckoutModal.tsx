@@ -39,7 +39,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   const [activeStep, setActiveStep] = useState(1);
   const [consent, setConsent] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro'>(productName === 'jamie-pro' ? 'pro' : 'basic');
+  const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro'>('basic');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -54,12 +54,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paymentFailed, setPaymentFailed] = useState(false);
   const [card, setCard] = useState<SquareCard | null>(null);
 
-  // Sync selectedPlan with productName prop when it changes (e.g., modal reopens with different product)
+  // Sync selectedPlan with productName prop - always derive from prop when it changes
   useEffect(() => {
-    if (isOpen) {
-      setSelectedPlan(productName === 'jamie-pro' ? 'pro' : 'basic');
-    }
-  }, [isOpen, productName]);
+    const newPlan = productName === 'jamie-pro' ? 'pro' : 'basic';
+    console.log('[CheckoutModal] productName changed:', productName, '-> selectedPlan:', newPlan);
+    setSelectedPlan(newPlan);
+  }, [productName]);
 
   // Determine the plan display information
   const displayPrice = selectedPlan === 'basic' ? (customPrice || MONTHLY_PRICE_STRING.replace('$', '')) : "49.99";

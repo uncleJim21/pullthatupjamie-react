@@ -75,9 +75,12 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
       
       checkAdmin();
       
-      // Check if user is subscribed
+      // Show upgrade button unless user already has Pro (admin)
       setTimeout(() => {
-        setShowUpgrade(localStorage.getItem('isSubscribed') !== 'true');
+        const subscriptionType = localStorage.getItem('subscriptionType');
+        // Hide upgrade only for Pro (admin) users
+        // Show for everyone else (free, amber/Plus, or subscribed without specific type)
+        setShowUpgrade(subscriptionType !== 'admin');
       }, 1000);
 
       // Add small delay before showing nickname to ensure smooth transition
