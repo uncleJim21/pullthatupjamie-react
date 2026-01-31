@@ -1,6 +1,6 @@
 // components/SignInModal.tsx
 import React, { useState, useEffect } from 'react';
-import { Mail, ArrowLeft, Loader2 } from 'lucide-react';
+import { Mail, ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import '../types/nostr.ts'; // Import for window.nostr types
 import { notifyAuthStateChanged } from '../hooks/useSubscriptionStatus.ts';
@@ -37,6 +37,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [nostrSuccessNpub, setNostrSuccessNpub] = useState<string | null>(null);
 
   // Sync mode with initialMode prop when it changes (e.g., reopening modal)
   useEffect(() => {
@@ -143,10 +144,9 @@ export const SignInModal: React.FC<SignInModalProps> = ({
       // Notify all subscription status hooks to refresh
       notifyAuthStateChanged();
 
-      resetForm();
-      // Nostr auth is always "sign in" - there's no separate "sign up" for Nostr
-      // Note: Don't call onClose() here - the success handler already closes the modal
-      onSignInSuccess();
+      // Show success state with npub before closing
+      setNostrSuccessNpub(npub);
+      setIsLoading(false);
     } catch (err) {
       console.error('Nostr auth error:', err);
       setError(err instanceof Error ? err.message : 'Nostr authentication failed');
@@ -172,6 +172,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({
     setPassword('');
     setConfirmPassword('');
     setError('');
+    setNostrSuccessNpub(null);
   };
 
   const handleBack = () => {
@@ -484,7 +485,35 @@ export const SignInModal: React.FC<SignInModalProps> = ({
       </div>
 
       <div className="text-center py-6">
-        {hasNostrExtension() ? (
+        {nostrSuccessNpub ? (
+          // Success state - show confirmation with npub
+          <>
+            <div className="w-16 h-16 rounded-full bg-purple-900/30 border border-purple-500 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-10 h-10 text-purple-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-white mb-2">
+              Sign in successful!
+            </h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Connected as:
+            </p>
+            <div className="bg-purple-900/20 border border-purple-600/30 rounded-lg p-3 mb-6">
+              <p className="text-purple-300 font-mono text-xs break-all">
+                {nostrSuccessNpub}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setNostrSuccessNpub(null);
+                resetForm();
+                onSignInSuccess();
+              }}
+              className="w-full bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-lg px-4 py-3 font-medium hover:from-purple-500 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+            >
+              Continue
+            </button>
+          </>
+        ) : hasNostrExtension() ? (
           <>
             <div className="w-16 h-16 rounded-full bg-purple-900/30 border border-purple-600/50 flex items-center justify-center mx-auto mb-4">
               <img 
