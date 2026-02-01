@@ -4,11 +4,10 @@ import { Stepper, Step, StepLabel, Button, Typography, Box, Paper, FormControlLa
 import PricingCard from './PricingCard.tsx';
 import AddressForm from './AddressForm.tsx';
 import PaymentFormComponent from './PaymentFormComponent.tsx';
-import TryJamieService from '../services/tryJamieService.ts';
 import { MONTHLY_PRICE_STRING, DEBUG_MODE, printLog } from '../constants/constants.ts';
 
 const steps = ['Sign In', 'Billing', 'Card'];
-const paymentServerUrl = DEBUG_MODE ? "http://localhost:4020" : "https://cascdr-auth-backend-cw4nk.ondigitalocean.app";
+const paymentServerUrl = DEBUG_MODE ? "http://localhost:6111" : "https://cascdr-auth-backend-cw4nk.ondigitalocean.app";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -115,13 +114,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 "country":formData.country
             }
             }
+            const authToken = localStorage.getItem('auth_token');
             const response = await fetch(`${paymentServerUrl}/purchase-subscription`, {
                 method: 'POST',
                 headers: {
-                  'Content-Type': 'application/json'
+                  'Content-Type': 'application/json',
+                  ...(authToken && { 'Authorization': `Bearer ${authToken}` })
                 },
                 body: JSON.stringify({
-                  email: userEmail,
                   paymentToken,
                   productName: currentProductName,
                   cardholderName,
@@ -140,14 +140,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             statusContainer.innerHTML = "Payment Successful";
             }
             
-            // Update quota after successful payment (non-blocking)
-            try {
-              await TryJamieService.updateOnDemandQuota();
-              printLog('Quota updated successfully after payment');
-            } catch (error) {
-              printLog(`Quota update failed after payment: ${error}`);
-              // Continue with success flow even if quota update fails
-            }
             setIsPaymentProcessing(false);
             onSuccess();
         } else {
