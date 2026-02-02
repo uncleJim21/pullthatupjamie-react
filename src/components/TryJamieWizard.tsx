@@ -1013,24 +1013,32 @@ const TryJamieWizard: React.FC = () => {
       {quotaInfo && (
         <div className="absolute top-24 left-1/2 transform -translate-x-1/2 sm:left-auto sm:right-6 sm:transform-none flex flex-col items-center sm:items-end space-y-2 mb-8">
           <div className="text-white text-sm bg-black/50 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-700 shadow-lg">
-            <div className="flex items-center space-x-2">
-              <span>{quotaInfo.remaining}/{quotaInfo.max} Free Runs left</span>
-              <span className="text-gray-400">•</span>
-              <span>{quotaInfo.daysUntilReset} Day{quotaInfo.daysUntilReset !== 1 ? 's' : ''} Until Reset</span>
-              {isUserSignedIn && (
-                <>
-                  <span className="text-gray-400">•</span>
-                  <span className="text-gray-400 text-xs">Account</span>
-                </>
-              )}
-            </div>
+            {quotaInfo.isUnlimited ? (
+              <div className="flex items-center space-x-2">
+                <span><strong>Pro</strong>: Unlimited Runs</span>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <span>{quotaInfo.remaining}/{quotaInfo.max} Free Runs left</span>
+                <span className="text-gray-400">•</span>
+                <span>{quotaInfo.daysUntilReset} Day{quotaInfo.daysUntilReset !== 1 ? 's' : ''} Until Reset</span>
+                {isUserSignedIn && (
+                  <>
+                    <span className="text-gray-400">•</span>
+                    <span className="text-gray-400 text-xs">Account</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
-          <button
-            onClick={handleUpgrade}
-            className="bg-white text-black hover:bg-gray-200 px-2 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg"
-          >
-            {isUserSignedIn ? 'Upgrade for Full Pro Experience' : 'Sign Up for More Runs'}
+          {!quotaInfo.isUnlimited && (
+            <button
+              onClick={handleUpgrade}
+              className="bg-white text-black hover:bg-gray-200 px-2 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg"
+            >
+              {isUserSignedIn ? 'Upgrade for Full Pro Experience' : 'Sign Up for More Runs'}
             </button>
+          )}
         </div>
       )}
       
