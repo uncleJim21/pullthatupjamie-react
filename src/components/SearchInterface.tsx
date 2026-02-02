@@ -2937,7 +2937,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           }
         }} 
         onSuccess={() => {
-          setIsQuotaRecoveryFlow(false); // Clear recovery flag on success
+          // Keep isQuotaRecoveryFlow - will trigger reload after success modal closes
           handleUpgradeSuccess();
         }}
         productName={checkoutProductName}
@@ -2974,7 +2974,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
       <UpgradeSuccessModal
         isOpen={isUpgradeSuccessPopUpOpen}
-        onClose={() => setIsUpgradeSuccessPopUpOpen(false)}
+        onClose={() => {
+          setIsUpgradeSuccessPopUpOpen(false);
+          // Reload page if user upgraded from quota-exceeded state to refresh stale search
+          if (isQuotaRecoveryFlow) {
+            setIsQuotaRecoveryFlow(false);
+            window.location.reload();
+          }
+        }}
         planName={purchasedPlanName}
       />
       
