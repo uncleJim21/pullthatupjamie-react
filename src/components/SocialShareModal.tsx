@@ -24,20 +24,7 @@ import ScheduledPostSlots from './ScheduledPostSlots.tsx';
 import { mentionService } from '../services/mentionService.ts';
 import { useUserSettings } from '../hooks/useUserSettings.ts';
 import { generatePrimalUrl, relayPool } from '../utils/nostrUtils.ts';
-
-// Define type for Nostr window extension
-declare global {
-  interface Window {
-    nostr?: {
-      getPublicKey: () => Promise<string>;
-      signEvent: (event: any) => Promise<any>;
-      nip04?: {
-        encrypt?: (pubkey: string, plaintext: string) => Promise<string>;
-        decrypt?: (pubkey: string, ciphertext: string) => Promise<string>;
-      };
-    };
-  }
-}
+import '../types/nostr.ts'; // Import for Window.nostr type augmentation
 
 export enum SocialPlatform {
   Twitter = 'twitter',
@@ -100,7 +87,7 @@ interface PlatformState {
   authenticated: boolean;
   currentOperation: OperationType;
   success: boolean | null;
-  error: string | null;
+  error?: string;
   username?: string;
   // Twitter-specific extended state
   capabilities?: TwitterCapabilities;
@@ -206,7 +193,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     authenticated: false,
     currentOperation: OperationType.IDLE,
     success: null,
-    error: null,
+    error: undefined,
     username: undefined
   });
   
@@ -216,7 +203,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     authenticated: false,
     currentOperation: OperationType.IDLE,
     success: null,
-    error: null
+    error: undefined
   });
 
   const [relayConnections, setRelayConnections] = useState<{[key: string]: WebSocket | null}>({});
@@ -1632,7 +1619,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 // Create Primal.net URL using shared utility
                 const primalUrl = generatePrimalUrl(signedEvent.id);
                 setSuccessUrls(prev => ({ ...prev, nostr: primalUrl }));
-                setNostrState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: true, error: null }));
+                setNostrState(prev => ({ ...prev, currentOperation: OperationType.IDLE, success: true, error: undefined }));
                 resolve(true);
               }
             }
