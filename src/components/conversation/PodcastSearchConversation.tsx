@@ -62,7 +62,7 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
                 onSocialShareModalOpen={onSocialShareModalOpen}
                 presentationContext={PresentationContext.clipBatch}
                 viewMode={AIClipsViewStyle.GRID}
-                isHighlighted={selectedParagraphId === quoteId && index === 0}
+                isHighlighted={false}
                 onResultClick={onResultClick}
               />
             );
@@ -89,7 +89,7 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
               onShareModalOpen={onShareModalOpen}
               onSocialShareModalOpen={onSocialShareModalOpen}
               presentationContext={isClipBatchPage ? PresentationContext.clipBatch : PresentationContext.search}
-              isHighlighted={selectedParagraphId === quoteId}
+              isHighlighted={isClipBatchPage ? false : selectedParagraphId === quoteId}
               onResultClick={onResultClick}
             />
           );

@@ -254,7 +254,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Result view style state (List vs Galaxy)
   // In embed mode, always use GALAXY view
+  // In clip batch page, always use LIST view
   const [resultViewStyle, setResultViewStyle] = useState<SearchResultViewStyle>(() => {
+    if (isClipBatchPage) return SearchResultViewStyle.LIST;
     if (isEmbedMode) return SearchResultViewStyle.GALAXY;
     const saved = localStorage.getItem('searchResultViewStyle');
     return saved === SearchResultViewStyle.LIST ? SearchResultViewStyle.LIST : SearchResultViewStyle.GALAXY;
@@ -3354,8 +3356,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {/* Conversation History / Galaxy View */}
       {((conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && searchMode === 'podcast-search') && (
         <div>
-          {/* View Toggle - Hidden in embed mode - show during loading in galaxy mode OR when we have results */}
-          {!isEmbedMode && (conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && (
+          {/* View Toggle - Hidden in embed mode and clip batch page - show during loading in galaxy mode OR when we have results */}
+          {!isEmbedMode && !isClipBatchPage && (conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && (
           <div className="flex justify-center mt-4 mb-3">
             <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
               <button
