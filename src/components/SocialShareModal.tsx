@@ -920,7 +920,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setIsPollingTokens(true);
     printLog('Starting token polling...');
     
+    let pollCount = 0;
+    const MAX_POLLS = 60; // ~2 minutes at 1.8s intervals
+    
     const interval = setInterval(async () => {
+      pollCount++;
+      
       try {
         const token = localStorage.getItem('auth_token');
         if (!token) {
@@ -929,7 +934,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           return;
         }
 
-        printLog(`Polling tokens at ${API_URL}/api/twitter/tokens`);
+        printLog(`Polling tokens at ${API_URL}/api/twitter/tokens (attempt ${pollCount}/${MAX_POLLS})`);
         const response = await fetch(`${API_URL}/api/twitter/tokens`, {
           method: 'POST',
           headers: {
@@ -946,30 +951,72 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
           const data = await response.json();
           printLog(`Polling response: ${JSON.stringify(data)}`);
           
-          // Only stop polling when authenticated is true
-          if (data.authenticated === true) {
-            printLog('Authentication successful! Stopping polling.');
+          // Check if we have full capabilities (both OAuth2 and OAuth1 complete)
+          const hasFullCapabilities = data.authenticated === true && 
+            data.oauth2Status === 'valid' && 
+            (data.oauth1Status === 'valid' || data.requiresMediaAuth === false);
+          
+          // Also accept if authenticated and no more auth is required
+          const isFullyComplete = data.authenticated === true && !data.requiresMediaAuth;
+          
+          if (hasFullCapabilities || isFullyComplete) {
+            printLog('Full authentication successful! Stopping polling.');
             setHasValidTokens(true);
             setIsPollingTokens(false);
             clearInterval(interval);
             setPollingInterval(null);
             
-            // Update Twitter auth state
-            setTwitterState(prev => ({ 
-              ...prev, 
-              authenticated: true,
-              username: data.twitterUsername
-            }));
+            // Fetch full Twitter state including capabilities
+            await checkTwitterAuth();
+          } else if (data.authenticated === true) {
+            // Authenticated but still waiting for OAuth1 (media auth)
+            printLog(`Authenticated but waiting for media auth. oauth1Status=${data.oauth1Status}, requiresMediaAuth=${data.requiresMediaAuth}`);
+            
+            // Update state to show partial progress
+            setHasValidTokens(true);
+            
+            // Check if we've hit the limit
+            if (pollCount >= MAX_POLLS) {
+              printLog('Max polling attempts reached. Stopping with partial auth.');
+              setIsPollingTokens(false);
+              clearInterval(interval);
+              setPollingInterval(null);
+              await checkTwitterAuth();
+            }
           } else {
             printLog(`Still waiting for authentication. Current status: authenticated=${data.authenticated}`);
+            
+            // Check if we've hit the limit
+            if (pollCount >= MAX_POLLS) {
+              printLog('Max polling attempts reached. Stopping polling.');
+              setIsPollingTokens(false);
+              clearInterval(interval);
+              setPollingInterval(null);
+            }
           }
         } else {
           printLog(`Polling request failed with status ${response.status}`);
+          
+          // Check if we've hit the limit
+          if (pollCount >= MAX_POLLS) {
+            printLog('Max polling attempts reached after failures. Stopping polling.');
+            setIsPollingTokens(false);
+            clearInterval(interval);
+            setPollingInterval(null);
+          }
         }
       } catch (error) {
         printLog(`Error during token polling: ${error}`);
+        
+        // Check if we've hit the limit
+        if (pollCount >= MAX_POLLS) {
+          printLog('Max polling attempts reached after error. Stopping polling.');
+          setIsPollingTokens(false);
+          clearInterval(interval);
+          setPollingInterval(null);
+        }
       }
-    }, 1800); // Poll every 3 seconds
+    }, 1800); // Poll every 1.8 seconds
     
     setPollingInterval(interval);
   };
