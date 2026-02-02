@@ -8,6 +8,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { RegisterModal } from './RegisterModal.tsx';
 import {SignInModal} from './SignInModal.tsx'
 import SignUpSuccessModal from './SignUpSuccessModal.tsx'
+import UpgradeSuccessModal from './UpgradeSuccessModal.tsx'
 import LightningService from '../services/lightning.ts'
 import {ClipProgress, ClipStatus, ClipRequest} from '../types/clips.ts'
 import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
@@ -483,6 +484,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [isSignUpSuccessModalOpen, setIsSignUpSuccessModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
+  const [purchasedPlanName, setPurchasedPlanName] = useState<'jamie-plus' | 'jamie-pro'>('jamie-plus');
   const [isClipTrackerCollapsed, setIsClipTrackerCollapsed] = useState(true);
   
   // Quota exceeded modal state
@@ -565,6 +567,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   const handleUpgradeSuccess = () => {
     setIsCheckoutModalOpen(false);
+    setPurchasedPlanName(checkoutProductName || 'jamie-plus'); // Track what was purchased
     setIsUpgradeSuccessPopUpOpen(true); // Show the popup
   };
   
@@ -2980,9 +2983,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         }}
       />
 
-      {isUpgradeSuccessPopUpOpen && (
-        <SubscriptionSuccessPopup onClose={() => setIsUpgradeSuccessPopUpOpen(false)} />
-      )}
+      <UpgradeSuccessModal
+        isOpen={isUpgradeSuccessPopUpOpen}
+        onClose={() => setIsUpgradeSuccessPopUpOpen(false)}
+        planName={purchasedPlanName}
+      />
       
       {/* { DEBUG_MODE &&
         (<button
