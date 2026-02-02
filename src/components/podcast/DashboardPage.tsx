@@ -6,6 +6,7 @@ import { FRONTEND_URL } from '../../constants/constants.ts';
 import { createClipShareUrl } from '../../utils/urlUtils.ts';
 import PageBanner from '../PageBanner.tsx';
 import TutorialModal from '../TutorialModal.tsx';
+import { clearUserData } from '../../utils/signOut.ts';
 import WelcomeModal from '../WelcomeModal.tsx';
 import { AudioControllerProvider } from '../../context/AudioControllerContext.tsx';
 
@@ -67,11 +68,7 @@ const DashboardPage: React.FC = () => {
   };
 
   const handleSignOut = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('squareId');
-    localStorage.removeItem('isSubscribed');
-    localStorage.removeItem('subscriptionType');
-    localStorage.removeItem('authProvider');
+    clearUserData();
     setIsUserSignedIn(false);
     window.location.href = '/';
   };

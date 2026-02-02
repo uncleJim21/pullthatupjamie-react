@@ -10,6 +10,7 @@ import {SignInModal} from './SignInModal.tsx'
 import SignUpSuccessModal from './SignUpSuccessModal.tsx'
 import UpgradeSuccessModal from './UpgradeSuccessModal.tsx'
 import LightningService from '../services/lightning.ts'
+import { clearUserData } from '../utils/signOut.ts'
 import {ClipProgress, ClipStatus, ClipRequest} from '../types/clips.ts'
 import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
@@ -573,23 +574,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
 
   const handleSignOut = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('squareId');
-    localStorage.removeItem('isSubscribed');
-    localStorage.removeItem('subscriptionType');
-    localStorage.removeItem('authProvider');
+    clearUserData();
     
-    // Remove adminFeedId and adminFeedUrl from localStorage and reset state
-    const settings = localStorage.getItem('userSettings');
-    if (settings) {
-      const userSettings = JSON.parse(settings);
-      delete userSettings.adminFeedId;
-      delete userSettings.adminFeedUrl;
-      localStorage.setItem('userSettings', JSON.stringify(userSettings));
-    }
+    // Reset component state
     setAdminFeedId(null);
     setAdminFeedUrl(null);
-    
     setRequestAuthMethod(RequestAuthMethod.FREE);
     setIsUserSignedIn(false);
     

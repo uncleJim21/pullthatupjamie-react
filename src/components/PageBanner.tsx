@@ -8,6 +8,7 @@ import SignUpSuccessModal from './SignUpSuccessModal.tsx';
 import CheckoutModal from './CheckoutModal.tsx';
 import {printLog, NavigationMode} from '../constants/constants.ts';
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus.ts';
+import { clearUserData } from '../utils/signOut.ts';
 
 interface PageBannerProps {
   logoText?: string;
@@ -302,11 +303,7 @@ const PageBanner: React.FC<PageBannerProps> = ({
     if (onSignOut) {
       onSignOut();
     } else {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('squareId');
-      localStorage.removeItem('isSubscribed');
-      localStorage.removeItem('subscriptionType');
-      localStorage.removeItem('authProvider');
+      clearUserData();
       
       // Update internal state
       setIsUserSignedIn(false);

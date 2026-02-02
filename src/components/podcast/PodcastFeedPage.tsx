@@ -22,6 +22,7 @@ import CheckoutModal from '../CheckoutModal.tsx';
 import UploadService, { UploadItem, PaginationData } from '../../services/uploadService.ts';
 import { createFeedShareUrl } from '../../utils/urlUtils.ts';
 import PageBanner from '../PageBanner.tsx';
+import { clearUserData } from '../../utils/signOut.ts';
 import SocialShareModal from '../SocialShareModal.tsx';
 import TutorialModal from '../TutorialModal.tsx';
 import WelcomeModal from '../WelcomeModal.tsx';
@@ -695,11 +696,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   
   // Handle sign out
   const handleSignOut = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('squareId');
-    localStorage.removeItem('isSubscribed');
-    localStorage.removeItem('subscriptionType');
-    localStorage.removeItem('authProvider');
+    clearUserData();
     setIsUserSignedIn(false);
     setIsAdmin(false);
     

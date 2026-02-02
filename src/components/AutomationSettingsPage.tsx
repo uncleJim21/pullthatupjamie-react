@@ -7,6 +7,7 @@ import { getAutomationSettings, saveAutomationSettings, AutomationSettings, Plat
 import PlatformIntegrationService, { PlatformState } from '../services/platformIntegrationService.ts';
 import SignInModal from './SignInModal.tsx';
 import { API_URL, printLog } from '../constants/constants.ts';
+import { clearUserData } from '../utils/signOut.ts';
 
 // Define type for Nostr window extension
 declare global {
@@ -723,11 +724,7 @@ const AutomationSettingsPage: React.FC = () => {
   
   // Handle sign out
   const handleSignOut = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('squareId');
-    localStorage.removeItem('isSubscribed');
-    localStorage.removeItem('subscriptionType');
-    localStorage.removeItem('authProvider');
+    clearUserData();
     setIsUserSignedIn(false);
     
     // Redirect to main app after sign out
