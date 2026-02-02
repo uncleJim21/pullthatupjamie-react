@@ -133,9 +133,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             throw new Error('Payment request failed');
             }
 
-            await response.json();
+            const data = await response.json();
             
-            localStorage.setItem("isSubscribed", "true")
+            localStorage.setItem("isSubscribed", "true");
+            // Use subscriptionType from backend response, or optimistic update with client-side product name
+            const subscriptionType = data.subscriptionType || currentProductName;
+            localStorage.setItem("subscriptionType", subscriptionType);
+            
             if(statusContainer) {
             statusContainer.innerHTML = "Payment Successful";
             }

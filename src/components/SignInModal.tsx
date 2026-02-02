@@ -81,6 +81,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({
       // Store auth token and user identifier
       localStorage.setItem('auth_token', authResponse.token);
       localStorage.setItem('squareId', email);
+      localStorage.setItem('authProvider', 'email');
 
       // Set subscription status based on new subscriptionType field
       if (authResponse.subscriptionValid || authResponse.subscriptionType) {

@@ -726,6 +726,8 @@ const AutomationSettingsPage: React.FC = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('squareId');
     localStorage.removeItem('isSubscribed');
+    localStorage.removeItem('subscriptionType');
+    localStorage.removeItem('authProvider');
     setIsUserSignedIn(false);
     
     // Redirect to main app after sign out

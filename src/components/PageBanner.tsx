@@ -305,6 +305,8 @@ const PageBanner: React.FC<PageBannerProps> = ({
       localStorage.removeItem('auth_token');
       localStorage.removeItem('squareId');
       localStorage.removeItem('isSubscribed');
+      localStorage.removeItem('subscriptionType');
+      localStorage.removeItem('authProvider');
       
       // Update internal state
       setIsUserSignedIn(false);

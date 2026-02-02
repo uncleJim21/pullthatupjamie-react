@@ -69,6 +69,9 @@ const DashboardPage: React.FC = () => {
   const handleSignOut = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('squareId');
+    localStorage.removeItem('isSubscribed');
+    localStorage.removeItem('subscriptionType');
+    localStorage.removeItem('authProvider');
     setIsUserSignedIn(false);
     window.location.href = '/';
   };

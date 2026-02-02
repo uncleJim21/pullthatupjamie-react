@@ -698,6 +698,8 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     localStorage.removeItem('auth_token');
     localStorage.removeItem('squareId');
     localStorage.removeItem('isSubscribed');
+    localStorage.removeItem('subscriptionType');
+    localStorage.removeItem('authProvider');
     setIsUserSignedIn(false);
     setIsAdmin(false);
     
