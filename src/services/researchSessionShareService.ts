@@ -1,5 +1,6 @@
 import { API_URL } from "../constants/constants.ts";
 import { getCurrentSessionId } from './researchSessionService.ts';
+import { getOrCreateClientId } from "../utils/clientId.ts";
 
 // Types for sharing a research session
 export interface ShareNode {
@@ -56,17 +57,6 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 /**
- * Get client ID if not authenticated
- */
-function getClientId(): string | null {
-  const token = localStorage.getItem('auth_token');
-  if (token) {
-    return null; // Authenticated, don't need clientId
-  }
-  return localStorage.getItem('research_client_id');
-}
-
-/**
  * Share a research session - creates an immutable snapshot with layout
  */
 export async function shareResearchSession(
@@ -74,13 +64,10 @@ export async function shareResearchSession(
   request: ShareResearchSessionRequest
 ): Promise<ShareResearchSessionResponse> {
   try {
-    const clientId = getClientId();
+    const clientId = getOrCreateClientId(); // Always send for session migration
     
-    // Build URL with clientId query param if needed
-    let url = `${API_URL}/api/research-sessions/${sessionId}/share`;
-    if (clientId) {
-      url += `?clientId=${encodeURIComponent(clientId)}`;
-    }
+    // Always include clientId for migration support
+    const url = `${API_URL}/api/research-sessions/${sessionId}/share?clientId=${encodeURIComponent(clientId)}`;
     
     const response = await fetch(url, {
       method: 'POST',

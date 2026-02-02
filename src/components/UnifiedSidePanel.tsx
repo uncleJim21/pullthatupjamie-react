@@ -1575,7 +1575,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                   <div className="border-t border-gray-800 p-3 bg-[#0A0A0A]">
                     <button
                       onClick={() => void handleAnalyze()}
-                      disabled={!sessionId}
+                      disabled={!sessionId && effectiveAnalysisSource === 'compiled_session'}
                       className="w-full px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-900 disabled:cursor-not-allowed text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <RotateCcw className="w-4 h-4" />

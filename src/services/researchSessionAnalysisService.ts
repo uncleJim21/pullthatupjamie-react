@@ -1,5 +1,6 @@
 import { API_URL, printLog } from "../constants/constants.ts";
 import { throwIfQuotaExceeded, QuotaExceededError } from "../types/errors.ts";
+import { getOrCreateClientId } from "../utils/clientId.ts";
 
 export interface AnalysisRequest {
   instructions: string;
@@ -31,13 +32,6 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 /**
- * Get or retrieve client ID for anonymous users
- */
-function getClientId(): string | null {
-  return localStorage.getItem('research_client_id');
-}
-
-/**
  * Analyze a research session with streaming response
  * @param sessionId - The research session ID
  * @param instructions - Analysis instructions for the AI
@@ -51,13 +45,10 @@ export async function analyzeResearchSession(
 ): Promise<AnalysisResponse> {
   try {
     const token = localStorage.getItem('auth_token');
-    const clientId = token ? undefined : getClientId();
+    const clientId = getOrCreateClientId(); // Always send for session migration
     
-    // Build URL with clientId if not authenticated
-    let url = `${API_URL}/api/research-sessions/${sessionId}/analyze`;
-    if (clientId) {
-      url += `?clientId=${encodeURIComponent(clientId)}`;
-    }
+    // Always include clientId for migration support
+    const url = `${API_URL}/api/research-sessions/${sessionId}/analyze?clientId=${encodeURIComponent(clientId)}`;
 
     printLog(`[AI Analysis] Request: sessionId=${sessionId} url=${url} instructionsLen=${instructions.length} authed=${Boolean(token)}`);
     
@@ -126,12 +117,10 @@ export async function analyzeAdHocResearch(
 ): Promise<AnalysisResponse> {
   try {
     const token = localStorage.getItem('auth_token');
-    const clientId = token ? undefined : getClientId();
+    const clientId = getOrCreateClientId(); // Always send for session migration
 
-    let url = `${API_URL}/api/research/analyze`;
-    if (clientId) {
-      url += `?clientId=${encodeURIComponent(clientId)}`;
-    }
+    // Always include clientId for migration support
+    const url = `${API_URL}/api/research/analyze?clientId=${encodeURIComponent(clientId)}`;
 
     printLog(
       `[AI Analysis] Request (ad-hoc): pineconeIds=${pineconeIds.length} url=${url} instructionsLen=${instructions.length} authed=${Boolean(token)}`,

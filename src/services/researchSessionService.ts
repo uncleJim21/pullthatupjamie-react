@@ -1,8 +1,6 @@
 import { API_URL, printLog } from "../constants/constants.ts";
-import { v4 as uuidv4 } from 'uuid';
+import { getOrCreateClientId, getCurrentClientId as getClientIdFromUtil } from "../utils/clientId.ts";
 
-// Storage key for client ID
-const CLIENT_ID_KEY = 'research_client_id';
 const SESSION_ID_KEY = 'research_session_id';
 const SESSION_TIMESTAMP_KEY = 'research_session_timestamp';
 const SESSION_VERSION_KEY = 'research_session_version'; // For optimistic locking
@@ -79,19 +77,6 @@ export interface ResearchSessionResponse {
   message?: string;
 }
 
-/**
- * Get or create a client ID for anonymous users
- */
-function getOrCreateClientId(): string {
-  let clientId = localStorage.getItem(CLIENT_ID_KEY);
-  
-  if (!clientId) {
-    clientId = `client_${uuidv4()}`;
-    localStorage.setItem(CLIENT_ID_KEY, clientId);
-  }
-  
-  return clientId;
-}
 
 /**
  * Get the current session ID if it exists and is not expired
@@ -245,8 +230,7 @@ export async function createResearchSession(items: ResearchSessionItem[]): Promi
       throw new Error(`Maximum ${MAX_RESEARCH_ITEMS} items allowed per session`);
     }
     
-    const token = localStorage.getItem('auth_token');
-    const clientId = token ? undefined : getOrCreateClientId();
+    const clientId = getOrCreateClientId(); // Always send for session migration
     const pineconeIds = itemsToPineconeIds(items);
     const itemsPayload = itemsToPayload(items);
     const lastItemMetadata = buildLastItemMetadata(items);
@@ -256,16 +240,12 @@ export async function createResearchSession(items: ResearchSessionItem[]): Promi
       pineconeIds,
       items: itemsPayload,
       lastItemMetadata,
+      clientId, // Always include for migration support
     };
     
     // Add coordinates if available
     if (coordinatesById) {
       payload.coordinatesById = coordinatesById;
-    }
-    
-    // Add clientId only if not authenticated
-    if (clientId) {
-      payload.clientId = clientId;
     }
     
     const response = await fetch(`${API_URL}/api/research-sessions`, {
@@ -308,8 +288,7 @@ export async function createEphemeralResearchSession(items: ResearchSessionItem[
       throw new Error(`Maximum ${MAX_RESEARCH_ITEMS} items allowed per session`);
     }
 
-    const token = localStorage.getItem('auth_token');
-    const clientId = token ? undefined : getOrCreateClientId();
+    const clientId = getOrCreateClientId(); // Always send for session migration
     const pineconeIds = itemsToPineconeIds(items);
     const itemsPayload = itemsToPayload(items);
     const lastItemMetadata = buildLastItemMetadata(items);
@@ -319,14 +298,11 @@ export async function createEphemeralResearchSession(items: ResearchSessionItem[
       pineconeIds,
       items: itemsPayload,
       lastItemMetadata,
+      clientId, // Always include for migration support
     };
 
     if (coordinatesById) {
       payload.coordinatesById = coordinatesById;
-    }
-
-    if (clientId) {
-      payload.clientId = clientId;
     }
 
     const response = await fetch(`${API_URL}/api/research-sessions`, {
@@ -365,8 +341,7 @@ export async function updateResearchSession(
       throw new Error(`Maximum ${MAX_RESEARCH_ITEMS} items allowed per session`);
     }
     
-    const token = localStorage.getItem('auth_token');
-    const clientId = token ? undefined : getOrCreateClientId();
+    const clientId = getOrCreateClientId(); // Always send for session migration
     const pineconeIds = itemsToPineconeIds(items);
     const itemsPayload = itemsToPayload(items);
     const lastItemMetadata = buildLastItemMetadata(items);
@@ -377,6 +352,7 @@ export async function updateResearchSession(
       pineconeIds,
       items: itemsPayload,
       lastItemMetadata,
+      clientId, // Always include for migration support
     };
     
     // Add expected version for optimistic locking
@@ -387,11 +363,6 @@ export async function updateResearchSession(
     // Add coordinates if available
     if (coordinatesById) {
       payload.coordinatesById = coordinatesById;
-    }
-    
-    // Add clientId only if not authenticated
-    if (clientId) {
-      payload.clientId = clientId;
     }
     
     const response = await fetch(`${API_URL}/api/research-sessions/${sessionId}`, {
@@ -495,7 +466,7 @@ export function clearLocalSession(): void {
  * Get the current client ID (useful for debugging)
  */
 export function getCurrentClientId(): string | null {
-  return localStorage.getItem(CLIENT_ID_KEY);
+  return getClientIdFromUtil();
 }
 
 /**
@@ -589,14 +560,10 @@ export async function loadCurrentSession(): Promise<ResearchSessionItem[]> {
  */
 export async function fetchAllResearchSessions(): Promise<ResearchSession[]> {
   try {
-    const token = localStorage.getItem('auth_token');
-    const clientId = token ? undefined : getOrCreateClientId();
+    const clientId = getOrCreateClientId(); // Always send for session migration
     
-    // Build URL with clientId if not authenticated
-    let url = `${API_URL}/api/research-sessions`;
-    if (clientId) {
-      url += `?clientId=${encodeURIComponent(clientId)}`;
-    }
+    // Always include clientId for migration support
+    const url = `${API_URL}/api/research-sessions?clientId=${encodeURIComponent(clientId)}`;
     
     const response = await fetch(url, {
       method: 'GET',
