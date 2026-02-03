@@ -2269,7 +2269,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
                       <div className="text-[0.65rem] text-gray-500 text-center py-2">
                         No items yet
                         <div className="text-[0.6rem] text-gray-600 mt-1">
-                          Right-click stars to add
+                          Right-click or use stack button
                         </div>
                       </div>
                     )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronDown, ChevronUp, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -543,6 +543,12 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
       : effectiveAnalysisSource === 'compiled_session'
         ? 'Compiled Session'
         : null;
+  const effectiveSourceColor =
+    effectiveAnalysisSource === 'current_search'
+      ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+      : effectiveAnalysisSource === 'compiled_session'
+        ? 'bg-green-100/40 text-green-400 border-green-300/30'
+        : 'bg-gray-700/20 text-gray-400 border-gray-700/30';
 
   // Calculate panel width including tabs
   const panelWidth = !isPanelOpen ? 0 : isCollapsed ? 32 : 600;
@@ -769,9 +775,19 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                 {/* Header (bottom-sheet variant) */}
                 <div className="p-3 border-b border-gray-800 bg-[#0A0A0A] flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-400">AI Analysis (Beta)</h3>
+                    <h3 className="text-sm font-medium text-gray-400">AI Analysis</h3>
                     {effectiveSourceLabel && (
-                      <span className="text-[11px] text-gray-600 truncate">• {effectiveSourceLabel}</span>
+                      <button
+                        onClick={() => {
+                          setShowAnalysisModeChooser(false);
+                          setShowAnalysisSourceChooser(true);
+                        }}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity ${effectiveSourceColor}`}
+                        style={{ cursor: 'pointer' }}
+                        title="Click to change analysis source"
+                      >
+                        {effectiveSourceLabel}
+                      </button>
                     )}
                   </div>
                   <button
@@ -789,9 +805,19 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
 
                 <div ref={contentRef} className="flex-1 min-h-0 overflow-y-auto p-4">
                   {showAnalysisSourceChooser ? (
-                    <div className="max-w-xl w-full pt-6 text-gray-200">
+                    <div className="max-w-xl w-full pt-2 text-gray-200">
                       <div className="space-y-4">
-                        <div className="text-lg font-semibold text-white">Choose What to Analyze</div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setShowAnalysisSourceChooser(false)}
+                            className="p-1.5 -ml-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors"
+                            aria-label="Back to analysis"
+                            title="Back to analysis"
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                          <div className="text-lg font-semibold text-white">Choose What to Analyze</div>
+                        </div>
 
                         <button
                           onClick={() => {
@@ -800,11 +826,16 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                             void handleAnalyze('current_search');
                           }}
                           disabled={isAnalyzing}
-                          className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                          className={`w-full p-4 rounded-lg border transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed ${
+                            analysisSource === 'current_search'
+                              ? 'border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/15'
+                              : 'border-gray-700 bg-gray-900/40 hover:bg-gray-900/70'
+                          }`}
                         >
                           <div className="flex items-center gap-2 text-sm font-semibold text-white">
                             <TextSearch className="w-4 h-4 text-blue-400" />
-                            <span>Current Search (Recommended)</span>
+                            <span>Current Search</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-normal">Recommended</span>
                           </div>
                           <div className="text-xs text-gray-400 mt-1">Analyze the items currently on screen</div>
                         </button>
@@ -816,10 +847,14 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                             void handleAnalyze('compiled_session');
                           }}
                           disabled={isAnalyzing}
-                          className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                          className={`w-full p-4 rounded-lg border transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed ${
+                            analysisSource === 'compiled_session'
+                              ? 'border-green-300/40 bg-green-100/30 hover:bg-green-100/40'
+                              : 'border-gray-700 bg-gray-900/40 hover:bg-gray-900/70'
+                          }`}
                         >
                           <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                            <Layers className="w-4 h-4 text-gray-300" />
+                            <Layers className="w-4 h-4 text-green-400" />
                             <span>Compiled Session</span>
                           </div>
                           <div className="text-xs text-gray-400 mt-1">Analyze the items you compiled into your current session</div>
@@ -833,7 +868,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                         Add items to your research session to perform AI analysis
                       </p>
                       <p className="text-xs text-gray-600 text-center px-8 mt-2">
-                        Long-press stars in the galaxy and select "Add to Research"
+                        Right-click stars or use the stack button in the info panel
                       </p>
                     </div>
                   ) : error ? (
@@ -1280,9 +1315,19 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
               <div className="flex-1 flex flex-col border-r border-gray-800 min-w-0">
                 <div className="p-3 border-b border-gray-800 bg-[#0A0A0A] flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-400">AI Analysis (Beta)</h3>
+                    <h3 className="text-sm font-medium text-gray-400">AI Analysis</h3>
                     {effectiveSourceLabel && (
-                      <span className="text-[11px] text-gray-600 truncate">• {effectiveSourceLabel}</span>
+                      <button
+                        onClick={() => {
+                          setShowAnalysisModeChooser(false);
+                          setShowAnalysisSourceChooser(true);
+                        }}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity ${effectiveSourceColor}`}
+                        style={{ cursor: 'pointer' }}
+                        title="Click to change analysis source"
+                      >
+                        {effectiveSourceLabel}
+                      </button>
                     )}
                   </div>
                   <button
@@ -1301,9 +1346,19 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
 
                 <div ref={contentRef} className="flex-1 overflow-y-auto p-4">
                   {showAnalysisSourceChooser ? (
-                    <div className="max-w-xl w-full pt-6 text-gray-200">
+                    <div className="max-w-xl w-full pt-2 text-gray-200">
                       <div className="space-y-4">
-                        <div className="text-lg font-semibold text-white">Choose What to Analyze</div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setShowAnalysisSourceChooser(false)}
+                            className="p-1.5 -ml-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors"
+                            aria-label="Back to analysis"
+                            title="Back to analysis"
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                          <div className="text-lg font-semibold text-white">Choose What to Analyze</div>
+                        </div>
 
                         <button
                           onClick={() => {
@@ -1313,11 +1368,16 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                             void handleAnalyze('current_search');
                           }}
                           disabled={isAnalyzing}
-                          className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                          className={`w-full p-4 rounded-lg border transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed ${
+                            analysisSource === 'current_search'
+                              ? 'border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/15'
+                              : 'border-gray-700 bg-gray-900/40 hover:bg-gray-900/70'
+                          }`}
                         >
                           <div className="flex items-center gap-2 text-sm font-semibold text-white">
                             <TextSearch className="w-4 h-4 text-blue-400" />
-                            <span>Current Search (Recommended)</span>
+                            <span>Current Search</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-normal">Recommended</span>
                           </div>
                           <div className="text-xs text-gray-400 mt-1">
                             Analyze the items currently on screen
@@ -1332,10 +1392,14 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                             void handleAnalyze('compiled_session');
                           }}
                           disabled={isAnalyzing}
-                          className="w-full p-4 rounded-lg border border-gray-700 bg-gray-900/40 hover:bg-gray-900/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                          className={`w-full p-4 rounded-lg border transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed ${
+                            analysisSource === 'compiled_session'
+                              ? 'border-green-300/40 bg-green-100/30 hover:bg-green-100/40'
+                              : 'border-gray-700 bg-gray-900/40 hover:bg-gray-900/70'
+                          }`}
                         >
                           <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                            <Layers className="w-4 h-4 text-gray-300" />
+                            <Layers className="w-4 h-4 text-green-400" />
                             <span>Compiled Session</span>
                           </div>
                           <div className="text-xs text-gray-400 mt-1">
@@ -1351,7 +1415,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                         Add items to your research session to perform AI analysis
                       </p>
                       <p className="text-xs text-gray-600 text-center px-8 mt-2">
-                        Right-click stars in the galaxy and select "Add to Research"
+                        Right-click stars or use the stack button in the info panel
                       </p>
                     </div>
                   ) : error ? (
