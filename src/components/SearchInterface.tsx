@@ -1935,7 +1935,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           setSearchState(prev => ({ ...prev, isLoading: true }));
           setSearchHistory(prev => ({...prev, [searchMode]: true}));
           
-          // Call the search with the direct query parameter
+          // Switch to galaxy view for the 3D search results
+          setResultViewStyle(SearchResultViewStyle.GALAXY);
+          localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.GALAXY);
+          setIsDecelerationComplete(false);
+          
+          // Call the 3D search with the direct query parameter
           const performSearchWithQuery = async () => {
             try {
               const auth = await getAuth() as AuthConfig;
@@ -1953,17 +1958,34 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 feedIdsToUse = Array.from(selectedSources) as string[];
               }
               
-              const quoteResults = await handleQuoteSearch(
+              const shouldExtractAxisLabels = getShowAxisLabels();
+              printLog(`[Auto-search 3D] Extracting axis labels: ${shouldExtractAxisLabels}`);
+              
+              // Use 3D search for galaxy view
+              const quoteResults3D = await handleQuoteSearch3D(
                 queryParam, 
                 auth, 
                 feedIdsToUse,
                 searchFilters.minDate || undefined,
                 searchFilters.maxDate || undefined,
-                undefined,
-                undefined,
+                undefined, // episodeName
+                undefined, // hierarchyLevels
+                shouldExtractAxisLabels,
                 (searchFilters.episodeGuid || '').trim() || undefined
               );
               
+              printLog(`[Auto-search 3D] Received ${quoteResults3D.results?.length || 0} results from API`);
+              
+              // Store 3D results for galaxy view
+              setGalaxyResults(quoteResults3D.results || []);
+              
+              // Store axis labels if returned
+              if (quoteResults3D.axisLabels) {
+                setAxisLabels(quoteResults3D.axisLabels);
+                printLog(`[Auto-search 3D] Received axis labels: ${JSON.stringify(quoteResults3D.axisLabels)}`);
+              }
+              
+              // Also update conversation for list view compatibility
               setConversation(prev => [...prev, {
                 id: nextConversationId.current++,
                 type: 'podcast-search' as const,
@@ -1971,12 +1993,12 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 timestamp: new Date(),
                 isStreaming: false,
                 data: {
-                  quotes: quoteResults.results
+                  quotes: quoteResults3D.results
                 }
               }]);
               setQuery("");
             } catch (error) {
-              console.error("Error during auto quote search:", error);
+              console.error("Error during auto 3D quote search:", error);
               setSearchState(prev => ({
                 ...prev,
                 error: error as Error,
