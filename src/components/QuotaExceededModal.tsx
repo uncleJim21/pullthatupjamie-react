@@ -1,6 +1,6 @@
 // components/QuotaExceededModal.tsx
 import React from 'react';
-import { Orbit } from 'lucide-react';
+import { Orbit, RadioTower } from 'lucide-react';
 
 // User tier types from the new auth system
 export type UserTier = 'anonymous' | 'registered' | 'subscriber' | 'admin';
@@ -22,6 +22,7 @@ interface QuotaExceededModalProps {
   onUpgrade?: () => void;     // For registered -> subscriber (Plus)
   onUpgradePro?: () => void;  // For subscriber -> admin (Jamie Pro)
   onPreview?: () => void;     // Optional: preview what upgrade unlocks
+  icon?: 'orbit' | 'radio-tower'; // Icon style: orbit for search, radio-tower for podcast processing
 }
 
 /**
@@ -116,6 +117,7 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
   onUpgrade,
   onUpgradePro,
   onPreview,
+  icon = 'orbit', // Default to orbit for general use
 }) => {
   if (!isOpen) return null;
 
@@ -124,6 +126,9 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
   const accomplishment = getAccomplishmentText(entitlementType, used);
   const title = getMomentumTitle(tier);
   const ctaText = getContinuationCTA(tier);
+  
+  // Render the appropriate icon
+  const IconComponent = icon === 'radio-tower' ? RadioTower : Orbit;
 
   // Determine the primary action based on tier
   const getPrimaryAction = () => {
@@ -171,10 +176,10 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
             </svg>
           </button>
 
-          {/* Icon - Orbit to represent exploration */}
+          {/* Icon - contextual based on entitlement type */}
           <div className="flex justify-center mb-6">
             <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
-              <Orbit className="w-6 h-6 text-white/80" />
+              <IconComponent className="w-6 h-6 text-white/80" />
             </div>
           </div>
 
