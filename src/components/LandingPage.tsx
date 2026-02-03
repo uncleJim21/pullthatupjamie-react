@@ -374,9 +374,37 @@ const HeroSegment: React.FC = () => {
   const spotlightOpacity = Math.max(0.03, 0.08 - (scrollY * 0.0001));
 
   return (
-    <section
-      className="hero-section"
-      style={{
+    <>
+      {/* Fade-up animation styles */}
+      <style>
+        {`
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(30px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          
+          .animate-fade-up {
+            animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+          }
+          
+          .animate-delay-1 { animation-delay: 0.1s; }
+          .animate-delay-2 { animation-delay: 0.25s; }
+          .animate-delay-3 { animation-delay: 0.4s; }
+          .animate-delay-4 { animation-delay: 0.55s; }
+          .animate-delay-5 { animation-delay: 0.7s; }
+          .animate-delay-6 { animation-delay: 0.85s; }
+        `}
+      </style>
+      <section
+        className="hero-section"
+        style={{
         minHeight: '80vh',
         display: 'flex',
         flexDirection: 'column',
@@ -500,7 +528,7 @@ const HeroSegment: React.FC = () => {
       {/* Main content — Iframe + Copy side by side */}
       <div className="hero-content">
         {/* ARTIFACT — Square iframe */}
-        <div className="hero-artifact">
+        <div className="hero-artifact animate-fade-up animate-delay-2">
           {/* Glow behind iframe */}
           <div
             style={{
@@ -555,7 +583,7 @@ const HeroSegment: React.FC = () => {
         <div className="hero-copy">
           {/* Headline — Large and bold */}
           <h1
-            className="hero-headline"
+            className="hero-headline animate-fade-up animate-delay-1"
             style={{
               fontFamily: 'Inter, sans-serif',
               fontWeight: 700,
@@ -570,7 +598,7 @@ const HeroSegment: React.FC = () => {
 
           {/* Subhead */}
           <p
-            className="hero-subhead"
+            className="hero-subhead animate-fade-up animate-delay-2"
             style={{
               fontFamily: 'Inter, sans-serif',
               fontWeight: 500,
@@ -584,7 +612,7 @@ const HeroSegment: React.FC = () => {
 
           {/* Body copy */}
           <p
-            className="hero-body"
+            className="hero-body animate-fade-up animate-delay-3"
             style={{
               fontFamily: 'Inter, sans-serif',
               fontWeight: 400,
@@ -600,7 +628,7 @@ const HeroSegment: React.FC = () => {
 
           {/* CTA — White filled button, right-aligned */}
           <button
-            className="hero-cta"
+            className="hero-cta animate-fade-up animate-delay-4"
             onClick={() => navigate('/app')}
             style={{
               display: 'inline-flex',
@@ -635,6 +663,7 @@ const HeroSegment: React.FC = () => {
         </div>
       </div>
     </section>
+    </>
   );
 };
 
@@ -649,9 +678,30 @@ const ctaAccent = 'rgba(200, 180, 140, 1)'; // Warm amber
 const ctaAccentMuted = 'rgba(200, 180, 140, 0.7)';
 const ctaAccentBright = 'rgba(220, 200, 160, 1)';
 
-const EntryPointCard: React.FC<{ entry: EntryPoint; isPrimary?: boolean }> = ({ entry, isPrimary = false }) => {
+const EntryPointCard: React.FC<{ entry: EntryPoint; isPrimary?: boolean; index?: number }> = ({ entry, isPrimary = false, index = 0 }) => {
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const cardRef = React.useRef<HTMLDivElement>(null);
+
+  // Intersection Observer for scroll-triggered animation
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          // Add a staggered delay based on index
+          setTimeout(() => setIsVisible(true), index * 150);
+        }
+      },
+      { threshold: 0.2 }
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [index]);
 
   // Render the appropriate icon based on type
   const renderIcon = () => {
@@ -672,6 +722,7 @@ const EntryPointCard: React.FC<{ entry: EntryPoint; isPrimary?: boolean }> = ({ 
 
   return (
     <div
+      ref={cardRef}
       className="entry-point-card"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -683,8 +734,13 @@ const EntryPointCard: React.FC<{ entry: EntryPoint; isPrimary?: boolean }> = ({ 
         padding: '40px 32px',
         cursor: 'pointer',
         position: 'relative',
-        transform: isHovered ? `translateY(${hoverLift})` : `translateY(${restLift})`,
-        transition: `all ${transitionSpeed} ease`,
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible 
+          ? (isHovered ? `translateY(${hoverLift})` : `translateY(${restLift})`) 
+          : 'translateY(30px)',
+        transition: isVisible 
+          ? `all ${transitionSpeed} ease` 
+          : 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
         boxShadow: isHovered 
           ? `0 16px 48px rgba(0,0,0,0.35), inset 0 0 40px rgba(200,180,140,0.03)` 
           : isPrimary ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
@@ -897,7 +953,7 @@ const EntryPointsSection: React.FC = () => {
       {/* Entry Points Grid */}
       <div className="entry-points-grid">
         {entryPoints.map((entry, i) => (
-          <EntryPointCard key={i} entry={entry} isPrimary={i === 0} />
+          <EntryPointCard key={i} entry={entry} isPrimary={i === 0} index={i} />
         ))}
       </div>
     </section>
@@ -909,8 +965,29 @@ const EntryPointsSection: React.FC = () => {
 // Story-driven section with illustration
 // ============================================================
 const WhyJamieExistsSection: React.FC = () => {
+  const [isVisible, setIsVisible] = useState(false);
+  const sectionRef = React.useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+        }
+      },
+      { threshold: 0.15 }
+    );
+
+    if (sectionRef.current) {
+      observer.observe(sectionRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <section
+      ref={sectionRef}
       className="why-jamie-section"
       style={{
         minHeight: '80vh',
@@ -984,6 +1061,9 @@ const WhyJamieExistsSection: React.FC = () => {
               marginBottom: '32px',
               letterSpacing: '-0.02em',
               lineHeight: 1.15,
+              opacity: isVisible ? 1 : 0,
+              transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+              transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           >
             Why Jamie Exists
@@ -996,6 +1076,9 @@ const WhyJamieExistsSection: React.FC = () => {
               lineHeight: 1.8,
               color: 'rgba(255,255,255,0.85)',
               marginBottom: '20px',
+              opacity: isVisible ? 1 : 0,
+              transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+              transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s',
             }}
           >
             We don't have an information problem.
@@ -1010,6 +1093,9 @@ const WhyJamieExistsSection: React.FC = () => {
               lineHeight: 1.8,
               color: 'rgba(255,255,255,0.6)',
               marginBottom: '20px',
+              opacity: isVisible ? 1 : 0,
+              transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+              transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s',
             }}
           >
             AI has flooded the world with answers, many of them wrong, shallow, or disconnected from reality. Prompting has replaced understanding. Context gets flattened. Meaning gets lost.
@@ -1022,6 +1108,9 @@ const WhyJamieExistsSection: React.FC = () => {
               lineHeight: 1.8,
               color: 'rgba(255,255,255,0.6)',
               marginBottom: '20px',
+              opacity: isVisible ? 1 : 0,
+              transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+              transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s',
             }}
           >
             Meanwhile, the most valuable ideas still live in real sources: authentic conversations, podcasts, internal knowledge, research, and long-form thinking.
@@ -1035,6 +1124,9 @@ const WhyJamieExistsSection: React.FC = () => {
               color: 'rgba(255,255,255,0.75)',
               marginBottom: '20px',
               fontWeight: 500,
+              opacity: isVisible ? 1 : 0,
+              transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+              transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s',
             }}
           >
             The problem is the tools.
@@ -1047,6 +1139,9 @@ const WhyJamieExistsSection: React.FC = () => {
               lineHeight: 1.8,
               color: 'rgba(255,255,255,0.6)',
               marginBottom: '20px',
+              opacity: isVisible ? 1 : 0,
+              transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+              transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.5s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.5s',
             }}
           >
             Jamie was built to turn real information into something you can navigate, not just query. It takes genuine data, from podcasts to process documentation to archives, and makes it intelligible, explorable, and connected.
@@ -1058,6 +1153,9 @@ const WhyJamieExistsSection: React.FC = () => {
               fontSize: '18px',
               lineHeight: 1.8,
               color: 'rgba(255,255,255,0.85)',
+              opacity: isVisible ? 1 : 0,
+              transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+              transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.6s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.6s',
             }}
           >
             So humans can actually think again. Debate ideas. Grow. Learn. And become everything they were meant to be.
@@ -1065,7 +1163,14 @@ const WhyJamieExistsSection: React.FC = () => {
         </div>
 
         {/* Image column */}
-        <div className="why-jamie-image">
+        <div 
+          className="why-jamie-image"
+          style={{
+            opacity: isVisible ? 1 : 0,
+            transform: isVisible ? 'translateY(0)' : 'translateY(40px)',
+            transition: 'opacity 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s, transform 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s',
+          }}
+        >
           <img
             src="/why-jamie-hero.png"
             alt="Scientist exploring a constellation of connected ideas"
