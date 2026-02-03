@@ -4,6 +4,125 @@ import { ArrowRight, Github, Twitter, Mail } from 'lucide-react';
 import PageBanner from './PageBanner.tsx';
 import { NavigationMode } from '../constants/constants.ts';
 
+// ============================================================
+// STARFIELD CONFIGURATION — Easy to tweak visibility
+// ============================================================
+const STARFIELD_CONFIG = {
+  // Master opacity multiplier (0 = invisible, 1 = full strength)
+  masterOpacity: 0.8,
+  
+  // Individual layer settings
+  layers: {
+    far: {
+      opacity: 0.35,      // Faintest layer
+      speed: 120,         // Seconds per cycle (slowest)
+      dotSize: 1,         // px
+    },
+    mid: {
+      opacity: 0.5,       // Medium brightness
+      speed: 80,          // Seconds per cycle
+      dotSize: 1.5,       // px
+    },
+    near: {
+      opacity: 0.7,       // Brightest layer
+      speed: 50,          // Seconds per cycle (fastest)
+      dotSize: 2,         // px
+    },
+  },
+};
+
+// ============================================================
+// STARFIELD BACKGROUND COMPONENT
+// ============================================================
+const StarfieldBackground: React.FC = () => {
+  const { masterOpacity, layers } = STARFIELD_CONFIG;
+
+  // Generate star positions for a tile (deterministic pattern)
+  const generateStarPattern = (count: number, tileSize: number, dotSize: number) => {
+    const stars: string[] = [];
+    // Use a seeded approach for consistent positions
+    const positions = [
+      [0.05, 0.08], [0.15, 0.25], [0.28, 0.12], [0.42, 0.35], [0.55, 0.18],
+      [0.68, 0.42], [0.82, 0.28], [0.92, 0.55], [0.35, 0.65], [0.48, 0.78],
+      [0.12, 0.88], [0.72, 0.72], [0.88, 0.15], [0.22, 0.45], [0.62, 0.92],
+      [0.08, 0.52], [0.95, 0.82], [0.38, 0.02], [0.75, 0.58], [0.18, 0.72],
+    ];
+    
+    for (let i = 0; i < Math.min(count, positions.length); i++) {
+      const x = positions[i][0] * tileSize;
+      const y = positions[i][1] * tileSize;
+      stars.push(`radial-gradient(${dotSize}px ${dotSize}px at ${x}px ${y}px, white, transparent)`);
+    }
+    return stars.join(', ');
+  };
+
+  return (
+    <>
+      <style>
+        {`
+          @keyframes starfield-drift-far {
+            from { background-position: 0 0; }
+            to { background-position: 500px 300px; }
+          }
+          @keyframes starfield-drift-mid {
+            from { background-position: 0 0; }
+            to { background-position: -400px 250px; }
+          }
+          @keyframes starfield-drift-near {
+            from { background-position: 0 0; }
+            to { background-position: 300px -200px; }
+          }
+        `}
+      </style>
+      
+      {/* Far layer - smallest, faintest, slowest */}
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1,
+          pointerEvents: 'none',
+          opacity: layers.far.opacity * masterOpacity,
+          backgroundImage: generateStarPattern(20, 500, layers.far.dotSize),
+          backgroundSize: '500px 500px',
+          backgroundRepeat: 'repeat',
+          animation: `starfield-drift-far ${layers.far.speed}s linear infinite`,
+        }}
+      />
+      
+      {/* Mid layer - medium size, medium brightness, medium speed */}
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1,
+          pointerEvents: 'none',
+          opacity: layers.mid.opacity * masterOpacity,
+          backgroundImage: generateStarPattern(15, 400, layers.mid.dotSize),
+          backgroundSize: '400px 400px',
+          backgroundRepeat: 'repeat',
+          animation: `starfield-drift-mid ${layers.mid.speed}s linear infinite`,
+        }}
+      />
+      
+      {/* Near layer - largest, brightest, fastest */}
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1,
+          pointerEvents: 'none',
+          opacity: layers.near.opacity * masterOpacity,
+          backgroundImage: generateStarPattern(10, 300, layers.near.dotSize),
+          backgroundSize: '300px 300px',
+          backgroundRepeat: 'repeat',
+          animation: `starfield-drift-near ${layers.near.speed}s linear infinite`,
+        }}
+      />
+    </>
+  );
+};
+
 interface EntryPoint {
   title: string;
   oneLiner: string;
@@ -350,7 +469,7 @@ const HeroSegment: React.FC = () => {
               maxWidth: '440px',
             }}
           >
-            Jamie helps you turn a deluge of data into real insight.
+            Make sense of the data deluge with one of a kind visualizations & insights.
             Conversations are just the beginning.
           </p>
 
@@ -571,17 +690,17 @@ const EntryPointsSection: React.FC = () => {
       link: '/for-podcasters',
       iconType: 'automate',
     },
-    {
-      title: 'Tell Your Story',
-      oneLiner: 'Make complex ideas explorable.',
-      body: [
-        'From books to research to archives, Jamie turns dense material into interactive maps people can actually navigate.',
-        'Built for sense-making, not skimming.',
-      ],
-      cta: 'Explore custom solutions',
-      link: '/for-podcasters',
-      iconType: 'story',
-    },
+    // {
+    //   title: 'Tell Your Story',
+    //   oneLiner: 'Make complex ideas explorable.',
+    //   body: [
+    //     'From books to research to archives, Jamie turns dense material into interactive maps people can actually navigate.',
+    //     'Built for sense-making, not skimming.',
+    //   ],
+    //   cta: 'Explore custom solutions',
+    //   link: '/for-podcasters',
+    //   iconType: 'story',
+    // },
   ];
 
   return (
@@ -1105,6 +1224,9 @@ const LandingPage: React.FC = () => {
         overflowX: 'hidden',
       }}
     >
+      {/* Starfield background - z-index: -1, behind everything */}
+      <StarfieldBackground />
+
       {/* Full-page gradient overlay for depth */}
       <div
         style={{
@@ -1116,12 +1238,12 @@ const LandingPage: React.FC = () => {
             radial-gradient(ellipse 50% 30% at 0% 50%, rgba(255,255,255,0.01) 0%, transparent 50%)
           `,
           pointerEvents: 'none',
-          zIndex: 0,
+          zIndex: 2,
         }}
       />
 
       {/* Page Banner */}
-      <div style={{ position: 'relative', zIndex: 10 }}>
+      <div style={{ position: 'relative', zIndex: 20 }}>
         <PageBanner 
           logoText="Pull That Up Jamie!"
           navigationMode={NavigationMode.CLEAN}
@@ -1129,7 +1251,7 @@ const LandingPage: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div style={{ position: 'relative', zIndex: 10 }}>
         {/* Grid One: Hero — Stage + Artifact */}
         <HeroSegment />
 
