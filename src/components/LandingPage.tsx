@@ -5,118 +5,152 @@ import PageBanner from './PageBanner.tsx';
 import { NavigationMode } from '../constants/constants.ts';
 
 // ============================================================
-// STARFIELD CONFIGURATION — Easy to tweak visibility
+// NEBULA CONFIGURATION — Easy to tweak visibility
 // ============================================================
-const STARFIELD_CONFIG = {
+const NEBULA_CONFIG = {
   // Master opacity multiplier (0 = invisible, 1 = full strength)
-  masterOpacity: 0.8,
+  masterOpacity: 1.0,
   
-  // Individual layer settings
-  layers: {
-    far: {
-      opacity: 0.35,      // Faintest layer
-      speed: 120,         // Seconds per cycle (slowest)
-      dotSize: 1,         // px
+  // Individual blob settings
+  blobs: {
+    // Warm amber blob (ties to your accent color)
+    amber: {
+      opacity: 0.55,
+      color: 'rgba(200, 150, 80, 0.6)',
+      size: '65%',           // Size relative to viewport
+      speed: 25,             // Seconds per cycle (faster = more noticeable)
     },
-    mid: {
-      opacity: 0.5,       // Medium brightness
-      speed: 80,          // Seconds per cycle
-      dotSize: 1.5,       // px
+    // Deep blue/purple blob (cosmic contrast)
+    cosmic: {
+      opacity: 0.45,
+      color: 'rgba(70, 90, 170, 0.5)',
+      size: '75%',
+      speed: 32,
     },
-    near: {
-      opacity: 0.7,       // Brightest layer
-      speed: 50,          // Seconds per cycle (fastest)
-      dotSize: 2,         // px
+    // Subtle white/gray nebula dust
+    dust: {
+      opacity: 0.3,
+      color: 'rgba(255, 255, 255, 0.2)',
+      size: '55%',
+      speed: 40,
     },
   },
 };
 
 // ============================================================
-// STARFIELD BACKGROUND COMPONENT
+// NEBULA BACKGROUND COMPONENT
 // ============================================================
-const StarfieldBackground: React.FC = () => {
-  const { masterOpacity, layers } = STARFIELD_CONFIG;
-
-  // Generate star positions for a tile (deterministic pattern)
-  const generateStarPattern = (count: number, tileSize: number, dotSize: number) => {
-    const stars: string[] = [];
-    // Use a seeded approach for consistent positions
-    const positions = [
-      [0.05, 0.08], [0.15, 0.25], [0.28, 0.12], [0.42, 0.35], [0.55, 0.18],
-      [0.68, 0.42], [0.82, 0.28], [0.92, 0.55], [0.35, 0.65], [0.48, 0.78],
-      [0.12, 0.88], [0.72, 0.72], [0.88, 0.15], [0.22, 0.45], [0.62, 0.92],
-      [0.08, 0.52], [0.95, 0.82], [0.38, 0.02], [0.75, 0.58], [0.18, 0.72],
-    ];
-    
-    for (let i = 0; i < Math.min(count, positions.length); i++) {
-      const x = positions[i][0] * tileSize;
-      const y = positions[i][1] * tileSize;
-      stars.push(`radial-gradient(${dotSize}px ${dotSize}px at ${x}px ${y}px, white, transparent)`);
-    }
-    return stars.join(', ');
-  };
+const NebulaBackground: React.FC = () => {
+  const { masterOpacity, blobs } = NEBULA_CONFIG;
 
   return (
     <>
       <style>
         {`
-          @keyframes starfield-drift-far {
-            from { background-position: 0 0; }
-            to { background-position: 500px 300px; }
+          @keyframes nebula-drift-amber {
+            0% {
+              transform: translate(0%, 0%) scale(1);
+              opacity: ${blobs.amber.opacity * masterOpacity};
+            }
+            25% {
+              transform: translate(15%, 8%) scale(1.15);
+              opacity: ${blobs.amber.opacity * masterOpacity * 0.65};
+            }
+            50% {
+              transform: translate(8%, 18%) scale(0.9);
+              opacity: ${blobs.amber.opacity * masterOpacity * 1.2};
+            }
+            75% {
+              transform: translate(-8%, 10%) scale(1.1);
+              opacity: ${blobs.amber.opacity * masterOpacity * 0.75};
+            }
+            100% {
+              transform: translate(0%, 0%) scale(1);
+              opacity: ${blobs.amber.opacity * masterOpacity};
+            }
           }
-          @keyframes starfield-drift-mid {
-            from { background-position: 0 0; }
-            to { background-position: -400px 250px; }
+          
+          @keyframes nebula-drift-cosmic {
+            0% {
+              transform: translate(0%, 0%) scale(1);
+              opacity: ${blobs.cosmic.opacity * masterOpacity};
+            }
+            33% {
+              transform: translate(-15%, 12%) scale(1.2);
+              opacity: ${blobs.cosmic.opacity * masterOpacity * 1.15};
+            }
+            66% {
+              transform: translate(10%, -8%) scale(0.85);
+              opacity: ${blobs.cosmic.opacity * masterOpacity * 0.7};
+            }
+            100% {
+              transform: translate(0%, 0%) scale(1);
+              opacity: ${blobs.cosmic.opacity * masterOpacity};
+            }
           }
-          @keyframes starfield-drift-near {
-            from { background-position: 0 0; }
-            to { background-position: 300px -200px; }
+          
+          @keyframes nebula-drift-dust {
+            0% {
+              transform: translate(0%, 0%) scale(1) rotate(0deg);
+              opacity: ${blobs.dust.opacity * masterOpacity};
+            }
+            50% {
+              transform: translate(8%, -6%) scale(1.12) rotate(3deg);
+              opacity: ${blobs.dust.opacity * masterOpacity * 1.4};
+            }
+            100% {
+              transform: translate(0%, 0%) scale(1) rotate(0deg);
+              opacity: ${blobs.dust.opacity * masterOpacity};
+            }
           }
         `}
       </style>
       
-      {/* Far layer - smallest, faintest, slowest */}
+      {/* Amber nebula blob - positioned upper left, drifts toward center */}
       <div
         style={{
           position: 'fixed',
-          inset: 0,
+          top: '-20%',
+          left: '-10%',
+          width: blobs.amber.size,
+          height: blobs.amber.size,
           zIndex: 1,
           pointerEvents: 'none',
-          opacity: layers.far.opacity * masterOpacity,
-          backgroundImage: generateStarPattern(20, 500, layers.far.dotSize),
-          backgroundSize: '500px 500px',
-          backgroundRepeat: 'repeat',
-          animation: `starfield-drift-far ${layers.far.speed}s linear infinite`,
+          background: `radial-gradient(ellipse at center, ${blobs.amber.color} 0%, transparent 70%)`,
+          filter: 'blur(60px)',
+          animation: `nebula-drift-amber ${blobs.amber.speed}s ease-in-out infinite`,
         }}
       />
       
-      {/* Mid layer - medium size, medium brightness, medium speed */}
+      {/* Cosmic blue/purple blob - positioned lower right */}
       <div
         style={{
           position: 'fixed',
-          inset: 0,
+          bottom: '-15%',
+          right: '-15%',
+          width: blobs.cosmic.size,
+          height: blobs.cosmic.size,
           zIndex: 1,
           pointerEvents: 'none',
-          opacity: layers.mid.opacity * masterOpacity,
-          backgroundImage: generateStarPattern(15, 400, layers.mid.dotSize),
-          backgroundSize: '400px 400px',
-          backgroundRepeat: 'repeat',
-          animation: `starfield-drift-mid ${layers.mid.speed}s linear infinite`,
+          background: `radial-gradient(ellipse at center, ${blobs.cosmic.color} 0%, transparent 70%)`,
+          filter: 'blur(80px)',
+          animation: `nebula-drift-cosmic ${blobs.cosmic.speed}s ease-in-out infinite`,
         }}
       />
       
-      {/* Near layer - largest, brightest, fastest */}
+      {/* Dust nebula - positioned center, very subtle */}
       <div
         style={{
           position: 'fixed',
-          inset: 0,
+          top: '20%',
+          right: '10%',
+          width: blobs.dust.size,
+          height: blobs.dust.size,
           zIndex: 1,
           pointerEvents: 'none',
-          opacity: layers.near.opacity * masterOpacity,
-          backgroundImage: generateStarPattern(10, 300, layers.near.dotSize),
-          backgroundSize: '300px 300px',
-          backgroundRepeat: 'repeat',
-          animation: `starfield-drift-near ${layers.near.speed}s linear infinite`,
+          background: `radial-gradient(ellipse at center, ${blobs.dust.color} 0%, transparent 60%)`,
+          filter: 'blur(100px)',
+          animation: `nebula-drift-dust ${blobs.dust.speed}s ease-in-out infinite`,
         }}
       />
     </>
@@ -1224,8 +1258,8 @@ const LandingPage: React.FC = () => {
         overflowX: 'hidden',
       }}
     >
-      {/* Starfield background - z-index: -1, behind everything */}
-      <StarfieldBackground />
+      {/* Nebula background - breathing cosmic clouds */}
+      <NebulaBackground />
 
       {/* Full-page gradient overlay for depth */}
       <div
