@@ -5,6 +5,97 @@ import PageBanner from './PageBanner.tsx';
 import { NavigationMode } from '../constants/constants.ts';
 
 // ============================================================
+// TWINKLING STARS CONFIGURATION
+// ============================================================
+const STARS_CONFIG = {
+  masterOpacity: 0.8,
+  twinkleSpeed: 3,      // Base seconds for twinkle cycle
+};
+
+// ============================================================
+// TWINKLING STARS COMPONENT
+// ============================================================
+const TwinklingStars: React.FC = () => {
+  const { masterOpacity, twinkleSpeed } = STARS_CONFIG;
+
+  // Star positions and properties (x%, y%, size, twinkle delay, twinkle duration)
+  const stars = [
+    { x: 5, y: 8, size: 1.5, delay: 0, duration: 3 },
+    { x: 15, y: 25, size: 1, delay: 1.2, duration: 4 },
+    { x: 28, y: 12, size: 2, delay: 0.5, duration: 2.5 },
+    { x: 42, y: 35, size: 1, delay: 2.1, duration: 3.5 },
+    { x: 55, y: 18, size: 1.5, delay: 0.8, duration: 3 },
+    { x: 68, y: 42, size: 1, delay: 1.5, duration: 4.5 },
+    { x: 82, y: 28, size: 2, delay: 0.3, duration: 2 },
+    { x: 92, y: 55, size: 1, delay: 2.5, duration: 3 },
+    { x: 35, y: 65, size: 1.5, delay: 1.8, duration: 3.5 },
+    { x: 48, y: 78, size: 1, delay: 0.6, duration: 4 },
+    { x: 12, y: 88, size: 1.5, delay: 2.2, duration: 2.5 },
+    { x: 72, y: 72, size: 2, delay: 1.1, duration: 3 },
+    { x: 88, y: 15, size: 1, delay: 0.9, duration: 4 },
+    { x: 22, y: 45, size: 1.5, delay: 1.7, duration: 3.5 },
+    { x: 62, y: 92, size: 1, delay: 2.8, duration: 2.5 },
+    { x: 8, y: 52, size: 2, delay: 0.4, duration: 3 },
+    { x: 95, y: 82, size: 1, delay: 1.3, duration: 4 },
+    { x: 38, y: 5, size: 1.5, delay: 2.0, duration: 3 },
+    { x: 75, y: 58, size: 1, delay: 0.7, duration: 3.5 },
+    { x: 18, y: 72, size: 2, delay: 1.9, duration: 2.5 },
+    // Additional stars for density
+    { x: 3, y: 30, size: 1, delay: 0.2, duration: 4.5 },
+    { x: 50, y: 50, size: 1.5, delay: 1.4, duration: 3 },
+    { x: 85, y: 5, size: 1, delay: 2.3, duration: 3.5 },
+    { x: 60, y: 68, size: 1.5, delay: 0.1, duration: 4 },
+    { x: 25, y: 95, size: 1, delay: 1.6, duration: 2.5 },
+  ];
+
+  return (
+    <>
+      <style>
+        {`
+          @keyframes twinkle {
+            0%, 100% {
+              opacity: 0.3;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 1;
+              transform: scale(1.2);
+            }
+          }
+        `}
+      </style>
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1,
+          pointerEvents: 'none',
+          overflow: 'hidden',
+        }}
+      >
+        {stars.map((star, i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: `${star.x}%`,
+              top: `${star.y}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              borderRadius: '50%',
+              backgroundColor: 'white',
+              opacity: masterOpacity,
+              animation: `twinkle ${star.duration * twinkleSpeed}s ease-in-out ${star.delay}s infinite`,
+              boxShadow: `0 0 ${star.size * 2}px ${star.size * 0.5}px rgba(255,255,255,0.3)`,
+            }}
+          />
+        ))}
+      </div>
+    </>
+  );
+};
+
+// ============================================================
 // NEBULA CONFIGURATION — Easy to tweak visibility
 // ============================================================
 const NEBULA_CONFIG = {
@@ -15,24 +106,24 @@ const NEBULA_CONFIG = {
   blobs: {
     // Warm amber blob (ties to your accent color)
     amber: {
-      opacity: 0.55,
+      opacity: 0.40,
       color: 'rgba(200, 150, 80, 0.6)',
       size: '65%',           // Size relative to viewport
-      speed: 25,             // Seconds per cycle (faster = more noticeable)
+      speed: 18,             // Seconds per cycle — faster for more visible movement
     },
     // Deep blue/purple blob (cosmic contrast)
     cosmic: {
       opacity: 0.45,
       color: 'rgba(70, 90, 170, 0.5)',
       size: '75%',
-      speed: 32,
+      speed: 22,
     },
     // Subtle white/gray nebula dust
     dust: {
       opacity: 0.3,
       color: 'rgba(255, 255, 255, 0.2)',
       size: '55%',
-      speed: 40,
+      speed: 28,
     },
   },
 };
@@ -53,16 +144,16 @@ const NebulaBackground: React.FC = () => {
               opacity: ${blobs.amber.opacity * masterOpacity};
             }
             25% {
-              transform: translate(15%, 8%) scale(1.15);
-              opacity: ${blobs.amber.opacity * masterOpacity * 0.65};
+              transform: translate(20%, 12%) scale(1.18);
+              opacity: ${blobs.amber.opacity * masterOpacity * 0.6};
             }
             50% {
-              transform: translate(8%, 18%) scale(0.9);
-              opacity: ${blobs.amber.opacity * masterOpacity * 1.2};
+              transform: translate(10%, 25%) scale(0.85);
+              opacity: ${blobs.amber.opacity * masterOpacity * 1.25};
             }
             75% {
-              transform: translate(-8%, 10%) scale(1.1);
-              opacity: ${blobs.amber.opacity * masterOpacity * 0.75};
+              transform: translate(-12%, 15%) scale(1.12);
+              opacity: ${blobs.amber.opacity * masterOpacity * 0.7};
             }
             100% {
               transform: translate(0%, 0%) scale(1);
@@ -76,12 +167,12 @@ const NebulaBackground: React.FC = () => {
               opacity: ${blobs.cosmic.opacity * masterOpacity};
             }
             33% {
-              transform: translate(-15%, 12%) scale(1.2);
-              opacity: ${blobs.cosmic.opacity * masterOpacity * 1.15};
+              transform: translate(-20%, 18%) scale(1.25);
+              opacity: ${blobs.cosmic.opacity * masterOpacity * 1.2};
             }
             66% {
-              transform: translate(10%, -8%) scale(0.85);
-              opacity: ${blobs.cosmic.opacity * masterOpacity * 0.7};
+              transform: translate(15%, -12%) scale(0.8);
+              opacity: ${blobs.cosmic.opacity * masterOpacity * 0.65};
             }
             100% {
               transform: translate(0%, 0%) scale(1);
@@ -95,8 +186,8 @@ const NebulaBackground: React.FC = () => {
               opacity: ${blobs.dust.opacity * masterOpacity};
             }
             50% {
-              transform: translate(8%, -6%) scale(1.12) rotate(3deg);
-              opacity: ${blobs.dust.opacity * masterOpacity * 1.4};
+              transform: translate(12%, -10%) scale(1.15) rotate(5deg);
+              opacity: ${blobs.dust.opacity * masterOpacity * 1.5};
             }
             100% {
               transform: translate(0%, 0%) scale(1) rotate(0deg);
@@ -1258,6 +1349,9 @@ const LandingPage: React.FC = () => {
         overflowX: 'hidden',
       }}
     >
+      {/* Twinkling stars layer */}
+      <TwinklingStars />
+      
       {/* Nebula background - breathing cosmic clouds */}
       <NebulaBackground />
 
