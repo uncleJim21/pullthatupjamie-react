@@ -283,6 +283,7 @@ interface UnifiedSidePanelProps {
   
   // Analysis panel props
   isAnalysisOpen: boolean;
+  forceAnalysisKey?: number; // Increments to force-switch to Analysis tab even when already open
   onCloseAnalysis: () => void;
   sessionId?: string;
   
@@ -337,6 +338,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   date,
   autoPlayOnOpen,
   isAnalysisOpen,
+  forceAnalysisKey,
   onCloseAnalysis,
   sessionId: propSessionId,
   isSessionsOpen,
@@ -406,6 +408,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
   
   // Update active mode based on which panel is being opened from parent
+  // forceAnalysisKey allows parent to force-switch to Analysis even when isAnalysisOpen was already true
   useEffect(() => {
     if (isContextOpen && !isAnalysisOpen && !isSessionsOpen) {
       setActiveMode(PanelMode.CONTEXT);
@@ -414,7 +417,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
     } else if (isSessionsOpen) {
       setActiveMode(PanelMode.SESSIONS);
     }
-  }, [isContextOpen, isAnalysisOpen, isSessionsOpen]);
+  }, [isContextOpen, isAnalysisOpen, isSessionsOpen, forceAnalysisKey]);
   
   // Handle tab clicks - just switch mode, don't close anything
   const handleModeSwitch = (mode: PanelMode) => {

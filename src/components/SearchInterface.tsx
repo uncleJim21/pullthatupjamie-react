@@ -231,6 +231,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Analysis panel state
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
+  // Key that increments to force-switch to Analysis tab even when already open
+  const [forceAnalysisKey, setForceAnalysisKey] = useState(0);
   
   // Sessions panel state
   const [isSessionsPanelOpen, setIsSessionsPanelOpen] = useState(false);
@@ -3531,6 +3533,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   const sessionId = getCurrentSessionId();
                   printLog(`[AI Analysis] Open requested from Galaxy: sessionId=${sessionId || 'null'} items=${researchSessionItems.length}`);
                   setIsAnalysisPanelOpen(true);
+                  // Increment key to force switch to Analysis tab even if already open
+                  setForceAnalysisKey(prev => prev + 1);
                 }}
                 sharedSessionTitle={sharedSessionTitle}
                 hideStats={isEmbedMode}
@@ -3757,7 +3761,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               !isNarrowLayout &&
               searchMode === 'podcast-search' &&
               searchViewStyle === SearchViewStyle.SPLIT_SCREEN &&
-              isContextPanelOpen
+              (isContextPanelOpen || isAnalysisPanelOpen || isSessionsPanelOpen)
                 ? `${contextPanelWidth}px`
                 : '0',
             // When the mini player is visible (narrow + not expanded), lift the search bar above it.
@@ -4175,6 +4179,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           date={selectedAudioContext?.date}
           autoPlayOnOpen={autoPlayContextOnOpen}
           isAnalysisOpen={isAnalysisPanelOpen}
+          forceAnalysisKey={forceAnalysisKey}
           onCloseAnalysis={() => setIsAnalysisPanelOpen(false)}
           isSessionsOpen={isSessionsPanelOpen}
           onCloseSessions={() => setIsSessionsPanelOpen(false)}
