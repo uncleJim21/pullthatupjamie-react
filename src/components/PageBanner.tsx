@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Headphones, Search, LayoutDashboard } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Headphones, Search, LayoutDashboard, PlusCircle } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import AccountButton from './AccountButton.tsx';
 import SignInModal from './SignInModal.tsx';
@@ -49,6 +49,10 @@ const PageBanner: React.FC<PageBannerProps> = ({
   const [isSignUpSuccessModalOpen, setIsSignUpSuccessModalOpen] = useState(false);
   const [checkoutProductName, setCheckoutProductName] = useState<'jamie-plus' | 'jamie-pro'>('jamie-plus');
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Determine if we're on the /app page (for conditional header buttons)
+  const isOnAppPage = location.pathname === '/app' || location.pathname.startsWith('/app/');
   
   // Use centralized subscription status hook
   const subscriptionStatus = useSubscriptionStatus();
@@ -169,8 +173,8 @@ const PageBanner: React.FC<PageBannerProps> = ({
     };
   }, [isMenuOpen]);
 
-  const handleProDashboardClick = (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleProDashboardClick = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     printLog(`Pro Dashboard clicked, adminFeed: ${JSON.stringify(adminFeed)}, isUserSignedIn: ${isUserSignedIn}`);
     
     // Close mobile menu if open
@@ -185,6 +189,17 @@ const PageBanner: React.FC<PageBannerProps> = ({
       printLog('No admin feed found, showing Pro Dashboard modal');
       setIsProDashboardModalOpen(true);
     }
+  };
+
+  const handleAddEpisodeClick = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    printLog('Add Episode clicked');
+    
+    // Close mobile menu if open
+    setIsMenuOpen(false);
+    
+    // Navigate to TryJamieWizard
+    navigate('/try-jamie');
   };
 
   const navLinkStyle = {
@@ -391,22 +406,38 @@ const PageBanner: React.FC<PageBannerProps> = ({
                 </a>
               </>
             )}
-            <a 
-              href="#" 
-              onClick={handleProDashboardClick}
-              style={{ ...navLinkStyle, cursor: 'pointer' }}
-              className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
-            >
-              <LayoutDashboard size={24} style={iconStyle} />
-              <span>Pro Dashboard</span>
-            </a>
+            {/* Show "Add Episode" on /app, "Pro Dashboard" on landing pages */}
+            {isOnAppPage ? (
+              <a 
+                href="#" 
+                onClick={handleAddEpisodeClick}
+                style={{ ...navLinkStyle, cursor: 'pointer' }}
+                className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+              >
+                <PlusCircle size={24} style={iconStyle} />
+                <span>Add Episode</span>
+              </a>
+            ) : (
+              <a 
+                href="#" 
+                onClick={handleProDashboardClick}
+                style={{ ...navLinkStyle, cursor: 'pointer' }}
+                className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+              >
+                <LayoutDashboard size={24} style={iconStyle} />
+                <span>Pro Dashboard</span>
+              </a>
+            )}
             <AccountButton 
               onConnect={handleConnect}
               onSignInClick={handleSignIn}
               onUpgradeClick={handleUpgrade}
               onSignOut={handleSignOut}
               onTutorialClick={onTutorialClick || (() => {})}
+              onProDashboardClick={() => handleProDashboardClick()}
+              onAddEpisodeClick={() => handleAddEpisodeClick()}
               isSignedIn={isUserSignedIn}
+              isOnAppPage={isOnAppPage}
               navigationMode={navigationMode}
             />
           </nav>
@@ -455,15 +486,28 @@ const PageBanner: React.FC<PageBannerProps> = ({
                   </a>
                 </>
               )}
-              <a 
-                href="#" 
-                onClick={handleProDashboardClick}
-                style={{ ...navLinkStyle, cursor: 'pointer', padding: '8px 12px' }}
-                className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
-              >
-                <LayoutDashboard size={24} style={iconStyle} />
-                <span>Pro Dashboard</span>
-              </a>
+              {/* Show "Add Episode" on /app, "Pro Dashboard" on landing pages */}
+              {isOnAppPage ? (
+                <a 
+                  href="#" 
+                  onClick={handleAddEpisodeClick}
+                  style={{ ...navLinkStyle, cursor: 'pointer', padding: '8px 12px' }}
+                  className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+                >
+                  <PlusCircle size={24} style={iconStyle} />
+                  <span>Add Episode</span>
+                </a>
+              ) : (
+                <a 
+                  href="#" 
+                  onClick={handleProDashboardClick}
+                  style={{ ...navLinkStyle, cursor: 'pointer', padding: '8px 12px' }}
+                  className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+                >
+                  <LayoutDashboard size={24} style={iconStyle} />
+                  <span>Pro Dashboard</span>
+                </a>
+              )}
               <div style={{ 
                 padding: '4px 8px', // Reduced padding to give more space
                 overflow: 'visible', // Changed from hidden to visible
@@ -476,7 +520,10 @@ const PageBanner: React.FC<PageBannerProps> = ({
                   onUpgradeClick={handleUpgrade}
                   onSignOut={handleSignOut}
                   onTutorialClick={onTutorialClick || (() => {})}
+                  onProDashboardClick={() => handleProDashboardClick()}
+                  onAddEpisodeClick={() => handleAddEpisodeClick()}
                   isSignedIn={isUserSignedIn}
+                  isOnAppPage={isOnAppPage}
                   isInMobileMenu={true}
                   navigationMode={navigationMode}
                 />

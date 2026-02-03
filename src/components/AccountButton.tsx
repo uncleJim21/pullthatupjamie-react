@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, LayoutDashboard, Headphones } from 'lucide-react';
+import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, LayoutDashboard, Headphones, PlusCircle } from 'lucide-react';
 import BitcoinConnectButton from './BitcoinConnectButton.tsx';
 import { useNavigate } from 'react-router-dom';
 import AuthService from '../services/authService.ts';
@@ -12,7 +12,10 @@ interface AccountButtonProps {
   onUpgradeClick: () => void;
   onSignOut: () => void;
   onTutorialClick: () => void;
+  onProDashboardClick?: () => void;
+  onAddEpisodeClick?: () => void;
   isSignedIn: boolean;
+  isOnAppPage?: boolean; // Whether we're on /app (affects what shows in dropdown vs header)
   isInMobileMenu?: boolean; // New prop to detect if we're in mobile menu
   navigationMode?: NavigationMode;
 }
@@ -28,7 +31,10 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
   onSignOut,
   onUpgradeClick,
   onTutorialClick,
+  onProDashboardClick,
+  onAddEpisodeClick,
   isSignedIn,
+  isOnAppPage = false,
   isInMobileMenu = false,
   navigationMode = NavigationMode.STANDARD,
 }) => {
@@ -194,17 +200,41 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
               </>
             )}
 
-            {/* Pro Dashboard Button (for admins) */}
-            {adminFeed?.access === 'admin' && (
+            {/* Pro Dashboard Button - show in dropdown when on /app (header shows Add Episode there) */}
+            {isOnAppPage && (
               <button
                 onClick={() => {
-                  navigate(`/app/feed/${adminFeed.feedId}`);
+                  if (adminFeed?.access === 'admin') {
+                    // If admin, navigate directly to their feed
+                    navigate(`/app/feed/${adminFeed.feedId}`);
+                  } else if (onProDashboardClick) {
+                    // Otherwise, use the handler (shows upgrade modal)
+                    onProDashboardClick();
+                  }
                   setIsOpen(false);
                 }}
                 className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
               >
                 <LayoutDashboard size={20} />
                 <span>Pro Dashboard</span>
+              </button>
+            )}
+
+            {/* Add Episode Button - show in dropdown when NOT on /app (header shows it there) */}
+            {!isOnAppPage && (
+              <button
+                onClick={() => {
+                  if (onAddEpisodeClick) {
+                    onAddEpisodeClick();
+                  } else {
+                    navigate('/try-jamie');
+                  }
+                  setIsOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <PlusCircle size={20} />
+                <span>Add Episode</span>
               </button>
             )}
 
