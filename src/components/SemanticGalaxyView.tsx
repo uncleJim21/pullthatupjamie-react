@@ -9,7 +9,7 @@ import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
 import { saveResearchSession, clearLocalSession, ResearchSessionItem, MAX_RESEARCH_ITEMS } from '../services/researchSessionService.ts';
-import { shareCurrentSession, copyToClipboard, ShareNode } from '../services/researchSessionShareService.ts';
+import { shareCurrentSession, ShareNode } from '../services/researchSessionShareService.ts';
 import ResearchAnalysisPanel from './ResearchAnalysisModal.tsx';
 import ShareSessionModal from './ShareSessionModal.tsx';
 
@@ -1894,8 +1894,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
     setIsShareModalOpen(true);
   };
 
-  // Actually perform the share with optional custom title
-  const performShare = async (customTitle?: string) => {
+  // Actually perform the share with optional custom title - returns shareUrl on success
+  const performShare = async (customTitle?: string): Promise<string | null> => {
     try {
       setIsSharing(true);
       showShareToast('loading', 'Creating share link...');
@@ -1922,37 +1922,33 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       if (nodes.length === 0) {
         showShareToast('error', 'No valid items to share');
         setIsSharing(false);
-        setIsShareModalOpen(false);
-        return;
+        return null;
       }
 
       // Use custom title if provided, otherwise use suggested title from last item
       let title = customTitle;
       if (!title) {
-      const lastItem = researchSessionItems[researchSessionItems.length - 1];
+        const lastItem = researchSessionItems[researchSessionItems.length - 1];
         title = lastItem.headline || lastItem.summary || undefined;
       }
 
       const response = await shareCurrentSession(title, nodes);
 
       if (response.success && response.data) {
-        // Copy share URL to clipboard
-        const copied = await copyToClipboard(response.data.shareUrl);
-        if (copied) {
-          showShareToast('success', 'Link copied to clipboard!');
-        } else {
-          showShareToast('success', 'Share link created');
-        }
+        // Hide loading toast - the modal handles success state now
+        setShareToast({ show: false, type: 'success', message: '' });
+        return response.data.shareUrl;
       } else {
         showShareToast('error', 'Failed to create share link');
+        return null;
       }
     } catch (error) {
       console.error('Share session error:', error);
       const message = error instanceof Error ? error.message : 'Failed to share session';
       showShareToast('error', message);
+      return null;
     } finally {
       setIsSharing(false);
-      setIsShareModalOpen(false);
     }
   };
 

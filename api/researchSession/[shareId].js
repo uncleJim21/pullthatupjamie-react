@@ -39,9 +39,42 @@ module.exports = async function handler(req, res) {
 
     const data = await response.json();
     
-    // Extract metadata with fallbacks
-    const title = data.data?.title || 'Shared Research Session';
-    const description = data.data?.description || 'Explore this research session on Pull That Up Jamie';
+    // Extract metadata with smart fallbacks
+    const lastItem = data.data?.lastItemMetadata || {};
+    const nodeCount = data.data?.nodes?.length || 0;
+    
+    // Build title with priority: explicit title > episode name > creator + count
+    let title = data.data?.title;
+    if (!title || title === 'Shared Research Session' || title === 'Untitled Episode Insights') {
+      // Try episode name from lastItemMetadata
+      if (lastItem.episode && lastItem.episode !== 'Unknown episode') {
+        title = lastItem.episode;
+      } else if (lastItem.creator && lastItem.creator !== 'Creator not specified') {
+        title = `${lastItem.creator} - Research Session`;
+      } else {
+        title = nodeCount > 0 ? `Research Session (${nodeCount} clips)` : 'Shared Research Session';
+      }
+    }
+    
+    // Build description with priority: quote > summary > generic with item count
+    let description = data.data?.description;
+    const isPlaceholder = (str) => !str || str === 'Quote unavailable' || str === 'Unknown episode' || str === 'Creator not specified';
+    
+    if (isPlaceholder(description)) {
+      if (!isPlaceholder(lastItem.quote)) {
+        // Use the actual quote, truncated if too long
+        description = lastItem.quote.length > 200 
+          ? lastItem.quote.substring(0, 197) + '...'
+          : lastItem.quote;
+      } else if (!isPlaceholder(lastItem.summary)) {
+        description = lastItem.summary;
+      } else if (lastItem.creator && lastItem.creator !== 'Creator not specified') {
+        description = `A collection of ${nodeCount} podcast clips from ${lastItem.creator} on Pull That Up Jamie`;
+      } else {
+        description = `Explore ${nodeCount} curated podcast clips in this research session on Pull That Up Jamie`;
+      }
+    }
+    
     const previewImageUrl = data.data?.previewImageUrl || `${frontendUrl}/social-preview.png`;
     const canonicalUrl = `${frontendUrl}/researchSession/${shareId}`;
 
