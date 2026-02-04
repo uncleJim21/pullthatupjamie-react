@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BeatLoader } from 'react-spinners';
 import { Stepper, Step, StepLabel, Button, Typography, Box, Paper, FormControlLabel, Checkbox, Grid } from '@mui/material';
 import PricingCard from './PricingCard.tsx';
 import AddressForm from './AddressForm.tsx';
 import PaymentFormComponent from './PaymentFormComponent.tsx';
 import { MONTHLY_PRICE_STRING, DEBUG_MODE, printLog } from '../constants/constants.ts';
+import {
+  trackCheckoutOpened,
+  trackCheckoutCompleted,
+  trackCheckoutAbandoned,
+  getCurrentTier,
+  type CheckoutProduct,
+} from '../services/analyticsService.ts';
 
 const steps = ['Sign In', 'Billing', 'Card'];
 const paymentServerUrl = DEBUG_MODE ? "http://localhost:6111" : "https://cascdr-auth-backend-cw4nk.ondigitalocean.app";
@@ -53,12 +60,28 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paymentFailed, setPaymentFailed] = useState(false);
   const [card, setCard] = useState<SquareCard | null>(null);
 
+  // Analytics: track modal open time for abandonment calculation
+  const modalOpenedAt = useRef<number | null>(null);
+  const checkoutCompletedRef = useRef<boolean>(false);
+  const tierAtOpenRef = useRef(getCurrentTier());
+
   // Sync selectedPlan with productName prop - always derive from prop when it changes
   useEffect(() => {
     const newPlan = productName === 'jamie-pro' ? 'pro' : 'basic';
     console.log('[CheckoutModal] productName changed:', productName, '-> selectedPlan:', newPlan);
     setSelectedPlan(newPlan);
   }, [productName]);
+
+  // Analytics: track checkout opened
+  useEffect(() => {
+    if (isOpen) {
+      modalOpenedAt.current = Date.now();
+      checkoutCompletedRef.current = false;
+      tierAtOpenRef.current = getCurrentTier();
+      const analyticsProduct: CheckoutProduct = productName === 'jamie-pro' ? 'jamie-pro' : 'jamie-plus';
+      trackCheckoutOpened(analyticsProduct, tierAtOpenRef.current);
+    }
+  }, [isOpen, productName]);
 
   // Determine the plan display information
   const displayPrice = selectedPlan === 'basic' ? (customPrice || MONTHLY_PRICE_STRING.replace('$', '')) : "49.99";
@@ -79,6 +102,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const handleNext = () => setActiveStep(activeStep + 1);
   const handleBack = () => setActiveStep(activeStep - 1);
+  
+  // Analytics: track abandonment when closing without completing
+  const handleClose = () => {
+    if (!checkoutCompletedRef.current && modalOpenedAt.current) {
+      const timeOpenMs = Date.now() - modalOpenedAt.current;
+      const analyticsProduct: CheckoutProduct = selectedPlan === 'pro' ? 'jamie-pro' : 'jamie-plus';
+      trackCheckoutAbandoned(analyticsProduct, timeOpenMs);
+    }
+    onClose();
+  };
 
   const handlePayment = async () => {
     setIsPaymentProcessing(true);
@@ -143,6 +176,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             if(statusContainer) {
             statusContainer.innerHTML = "Payment Successful";
             }
+            
+            // Analytics: track checkout completed
+            checkoutCompletedRef.current = true;
+            const analyticsProduct: CheckoutProduct = currentProductName === 'jamie-pro' ? 'jamie-pro' : 'jamie-plus';
+            trackCheckoutCompleted(analyticsProduct, tierAtOpenRef.current);
             
             setIsPaymentProcessing(false);
             onSuccess();
@@ -291,7 +329,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               }}
             >
               <div className="flex justify-end">
-                <button className="text-white text-xl px-3 py-1 absolute top-1 right-1" onClick={onClose}>
+                <button className="text-white text-xl px-3 py-1 absolute top-1 right-1" onClick={handleClose}>
                   X
                 </button>
               </div>

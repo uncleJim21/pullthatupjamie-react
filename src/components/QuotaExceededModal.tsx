@@ -1,6 +1,11 @@
 // components/QuotaExceededModal.tsx
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Orbit, RadioTower } from 'lucide-react';
+import {
+  trackQuotaExceededShown,
+  trackQuotaExceededAction,
+  type QuotaAction,
+} from '../services/analyticsService.ts';
 
 // User tier types from the new auth system
 export type UserTier = 'anonymous' | 'registered' | 'subscriber' | 'admin';
@@ -119,6 +124,47 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
   onPreview,
   icon = 'orbit', // Default to orbit for general use
 }) => {
+  // Track if we've already tracked the "shown" event for this open
+  const hasTrackedShown = useRef(false);
+
+  // Analytics: track when modal is shown
+  useEffect(() => {
+    if (isOpen && !hasTrackedShown.current) {
+      hasTrackedShown.current = true;
+      trackQuotaExceededShown(
+        data.entitlementType || 'unknown',
+        data.used,
+        data.max
+      );
+    }
+    
+    // Reset when modal closes
+    if (!isOpen) {
+      hasTrackedShown.current = false;
+    }
+  }, [isOpen, data.entitlementType, data.used, data.max]);
+
+  // Wrapper functions to track actions
+  const handleClose = () => {
+    trackQuotaExceededAction('dismissed');
+    onClose();
+  };
+
+  const handleSignUp = () => {
+    trackQuotaExceededAction('signup');
+    onSignUp?.();
+  };
+
+  const handleUpgrade = () => {
+    trackQuotaExceededAction('upgrade_plus');
+    onUpgrade?.();
+  };
+
+  const handleUpgradePro = () => {
+    trackQuotaExceededAction('upgrade_pro');
+    onUpgradePro?.();
+  };
+
   if (!isOpen) return null;
 
   const { tier, used, max, resetDate, daysUntilReset, entitlementType } = data;
@@ -130,17 +176,17 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
   // Render the appropriate icon
   const IconComponent = icon === 'radio-tower' ? RadioTower : Orbit;
 
-  // Determine the primary action based on tier
+  // Determine the primary action based on tier (using tracked wrappers)
   const getPrimaryAction = () => {
     switch (tier) {
       case 'anonymous':
-        return onSignUp;
+        return onSignUp ? handleSignUp : undefined;
       case 'registered':
-        return onUpgrade;
+        return onUpgrade ? handleUpgrade : undefined;
       case 'subscriber':
-        return onUpgradePro;
+        return onUpgradePro ? handleUpgradePro : undefined;
       default:
-        return onClose;
+        return handleClose;
     }
   };
 
@@ -151,7 +197,7 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
       {/* Backdrop with subtle blur to hint at content behind */}
       <div 
         className="absolute inset-0 bg-black/80 backdrop-blur-sm" 
-        onClick={onClose} 
+        onClick={handleClose} 
       />
       
       {/* Modal */}
@@ -160,7 +206,7 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
           
           {/* Subtle close affordance */}
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="absolute top-4 right-4 text-gray-600 hover:text-gray-400 transition"
             aria-label="Close"
           >

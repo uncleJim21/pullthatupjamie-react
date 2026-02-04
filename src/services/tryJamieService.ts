@@ -1,5 +1,6 @@
 import { API_URL } from "../constants/constants.ts";
 import { throwIfQuotaExceeded } from "../types/errors.ts";
+import { getAnalyticsHeader } from "./analyticsService.ts";
 
 const BASE_URL = API_URL;
 
@@ -78,7 +79,10 @@ export interface OnDemandJobStatus {
 class TryJamieService {
   static async submitOnDemandRun(request: OnDemandRunRequest): Promise<OnDemandRunResponse> {
     const token = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = { 
+      'Content-Type': 'application/json',
+      ...getAnalyticsHeader(),
+    };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -127,7 +131,9 @@ class TryJamieService {
 
   static async getOnDemandJobStatus(jobId: string): Promise<OnDemandJobStatus> {
     const token = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+      ...getAnalyticsHeader(),
+    };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -177,7 +183,9 @@ class TryJamieService {
    */
   static async checkEligibility(): Promise<CheckEligibilityResponse | null> {
     const token = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+      ...getAnalyticsHeader(),
+    };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }

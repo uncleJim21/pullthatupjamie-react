@@ -10,6 +10,12 @@ import JamieLoadingScreen from './JamieLoadingScreen.tsx';
 import TutorialModal from './TutorialModal.tsx';
 import { QuotaExceededModal, QuotaExceededData } from './QuotaExceededModal.tsx';
 import { QuotaExceededError } from '../types/errors.ts';
+import {
+  trackWizardStepReached,
+  trackProcessingCompleted,
+  cacheUserTier,
+  type WizardStep,
+} from '../services/analyticsService.ts';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -184,6 +190,13 @@ const TryJamieWizard: React.FC = () => {
     }
   }, [onboardingState]);
 
+  // Analytics: track wizard step changes
+  useEffect(() => {
+    if (currentStep >= 1 && currentStep <= 5) {
+      trackWizardStepReached(currentStep as WizardStep);
+    }
+  }, [currentStep]);
+
   const handleTutorialClick = () => {
     setIsTutorialOpen(true);
   };
@@ -248,6 +261,8 @@ const TryJamieWizard: React.FC = () => {
         // Store the user's tier
         if (eligibilityData.tier) {
           setUserTier(eligibilityData.tier);
+          // Analytics: cache the tier for accurate event tracking
+          cacheUserTier(eligibilityData.tier);
           printLog(`[checkQuotaEligibility] User tier: ${eligibilityData.tier}`);
         }
         
@@ -527,6 +542,10 @@ const TryJamieWizard: React.FC = () => {
                 status.stats && 
                 status.stats.episodesProcessed === 0 && 
                 status.stats.episodesFailed > 0;
+              
+              // Analytics: track processing completed
+              const processingSuccess = status.status === 'complete' && !allEpisodesFailed;
+              trackProcessingCompleted(processingSuccess, res.jobId);
               
               if (allEpisodesFailed) {
                 setProcessingFailed(true);
@@ -1096,6 +1115,8 @@ const TryJamieWizard: React.FC = () => {
         onSignInSuccess={handleSignInSuccess}
         onSignUpSuccess={handleSignUpSuccess}
         initialMode="signup"
+        analyticsSource="wizard"
+        analyticsIntent={onboardingState.status === 'sign_in' && onboardingState.upgradeIntent ? 'upgrade' : 'signup'}
       />
 
       {/* Checkout Modal */}

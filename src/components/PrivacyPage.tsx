@@ -106,6 +106,7 @@ const PrivacyPage: React.FC = () => {
             <li>IP address, device information, browser type;</li>
             <li>usage logs, timestamps, performance data;</li>
             <li>cookies or similar technologies.</li>
+            <li>anonymous analytics identifiers used to understand product usage and improve the Service (for example, session identifiers and event logs)</li>
           </ul>
         </div>
 
@@ -203,6 +204,27 @@ const PrivacyPage: React.FC = () => {
           <h2 style={headingStyle}>9. Changes</h2>
           <p style={paragraphStyle}>
             We may update this Privacy Policy at any time. Continued use means acceptance.
+          </p>
+        </div>
+
+        {/* Section 10 */}
+        <div style={sectionStyle}>
+          <h2 style={headingStyle}>10. Analytics</h2>
+          <p style={paragraphStyle}>
+            We collect and analyze anonymous usage data to improve the Service, diagnose issues, and understand how features are used.
+          </p>
+          <p style={paragraphStyle}>This may include:</p>
+          <ul style={listStyle}>
+            <li>session identifiers that are not linked to personal identity;</li>
+            <li>feature usage events (such as searches performed, pages viewed, or buttons clicked);</li>
+            <li>error logs and performance metrics;</li>
+            <li>aggregated statistics about how the Service is used.</li>
+          </ul>
+          <p style={paragraphStyle}>
+            We do not use analytics data to build individual user profiles, target advertisements, or track users across other websites or services.
+          </p>
+          <p style={paragraphStyle}>
+            Where feasible, analytics data is stored in anonymized or aggregated form.
           </p>
         </div>
 
