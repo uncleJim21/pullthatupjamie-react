@@ -323,6 +323,7 @@ interface SemanticGalaxyViewProps {
   researchSessionItems?: ResearchSessionItem[];
   onRemoveFromResearch?: (shareLink: string) => void;
   onClearResearch?: () => void;
+  onSaveResearch?: () => Promise<{ success: boolean; error?: string }>;
   showResearchToast?: boolean;
   isContextPanelOpen?: boolean;
   onCloseContextPanel?: () => void;
@@ -1462,6 +1463,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   researchSessionItems = [],
   onRemoveFromResearch,
   onClearResearch,
+  onSaveResearch,
   showResearchToast = false,
   isContextPanelOpen = false,
   onCloseContextPanel,
@@ -2299,12 +2301,18 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
                                 setIsSaving(true);
                                 showSaveToast('loading', 'Saving...');
                                 
-                                const result = await saveResearchSession((researchSessionItems || []) as ResearchSessionItem[]);
+                                // Use parent handler if provided (handles ownership/forking)
+                                // Otherwise fall back to direct save
+                                const result = onSaveResearch
+                                  ? await onSaveResearch()
+                                  : await saveResearchSession((researchSessionItems || []) as ResearchSessionItem[]);
                                 
                                 setIsSaving(false);
                                 if (result.success) {
                                   console.log('Research session saved:', result.data);
                                   showSaveToast('success', 'Session saved');
+                                } else {
+                                  showSaveToast('error', result.error || 'Save failed');
                                 }
                               } catch (error) {
                                 setIsSaving(false);

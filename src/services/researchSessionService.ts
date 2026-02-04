@@ -224,6 +224,8 @@ function buildCoordinatesById(items: ResearchSessionItem[]): Record<string, { x:
  * Create a new research session (POST)
  */
 export async function createResearchSession(items: ResearchSessionItem[]): Promise<ResearchSessionResponse> {
+  const REQUEST_TIMEOUT_MS = 30000; // 30 second timeout
+  
   try {
     // Enforce 50 item limit
     if (items.length > MAX_RESEARCH_ITEMS) {
@@ -248,29 +250,46 @@ export async function createResearchSession(items: ResearchSessionItem[]): Promi
       payload.coordinatesById = coordinatesById;
     }
     
-    const response = await fetch(`${API_URL}/api/research-sessions`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(payload)
-    });
+    printLog(`[ResearchSession] createResearchSession(): POSTing ${items.length} items (pineconeIds: ${pineconeIds.length})`);
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
+    // Add timeout to prevent indefinite hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     
-    const data = await response.json();
-    
-    // Store the session ID and version for future updates
-    if (data.success && data.data?.id) {
-      printLog(`[ResearchSession] createResearchSession(): received id=${data.data.id}`);
-      setSessionId(data.data.id);
-      if (typeof data.data.__v === 'number') {
-        setSessionVersion(data.data.__v);
+    try {
+      const response = await fetch(`${API_URL}/api/research-sessions`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
+      
+      const data = await response.json();
+      
+      // Store the session ID and version for future updates
+      if (data.success && data.data?.id) {
+        printLog(`[ResearchSession] createResearchSession(): received id=${data.data.id}`);
+        setSessionId(data.data.id);
+        if (typeof data.data.__v === 'number') {
+          setSessionVersion(data.data.__v);
+        }
+      }
+      
+      return data;
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds`);
+      }
+      throw fetchError;
     }
-    
-    return data;
   } catch (error) {
     console.error('Create research session error:', error);
     throw error;

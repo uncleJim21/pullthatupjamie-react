@@ -291,6 +291,9 @@ interface UnifiedSidePanelProps {
   isSessionsOpen: boolean;
   onCloseSessions: () => void;
   onOpenSession?: (sessionId: string, sessionTitle?: string) => void;
+  // Active session tracking (to show "Active" chip in Sessions list)
+  activeSessionId?: string | null;
+  activeSessionItemCount?: number;
   
   // Width callback for layout
   onWidthChange?: (width: number) => void;
@@ -344,6 +347,8 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   isSessionsOpen,
   onCloseSessions,
   onOpenSession,
+  activeSessionId,
+  activeSessionItemCount,
   onWidthChange,
   currentSearchResults,
   researchSessionShareLinks,
@@ -500,10 +505,10 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
 
   // No auto-analyze on open; user triggers analysis explicitly from UI.
 
-  // Fetch sessions when sessions mode opens
+  // Fetch sessions when sessions mode opens (always refresh to show latest)
   useEffect(() => {
     const loadSessions = async () => {
-      if (activeMode === PanelMode.SESSIONS && isPanelOpen && sessions.length === 0 && !isLoadingSessions) {
+      if (activeMode === PanelMode.SESSIONS && isPanelOpen && !isLoadingSessions) {
         setIsLoadingSessions(true);
         setSessionsError(null);
         try {
@@ -1120,7 +1125,11 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                       <div className="space-y-2">
                         {sessions.map((session) => {
                           const metadata = session.lastItemMetadata;
-                          const itemCount = session.pineconeIdsCount || session.pineconeIds?.length || 0;
+                          const isActive = session.id === activeSessionId;
+                          // For active session, use live item count from parent; otherwise use backend count
+                          const itemCount = isActive && activeSessionItemCount !== undefined
+                            ? activeSessionItemCount
+                            : (session.pineconeIdsCount || session.pineconeIds?.length || 0);
                           const createdDate = session.createdAt ? new Date(session.createdAt).toLocaleDateString() : '';
                           const sessionImage = metadata ? extractImageFromAny(metadata) : undefined;
                           const displayTitle =
@@ -1129,7 +1138,11 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                           return (
                             <div
                               key={session.id}
-                              className="flex items-center gap-3 p-3 bg-gray-900/50 hover:bg-gray-800/50 border border-gray-800 rounded-lg transition-all cursor-pointer"
+                              className={`flex items-center gap-3 p-3 rounded-lg transition-all cursor-pointer ${
+                                isActive
+                                  ? 'bg-emerald-900/20 hover:bg-emerald-900/30 border border-emerald-700/50'
+                                  : 'bg-gray-900/50 hover:bg-gray-800/50 border border-gray-800'
+                              }`}
                             >
                               <div className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-gray-800">
                                 {sessionImage ? (
@@ -1155,7 +1168,14 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                                   {metadata?.creator || 'Unknown creator'} • {itemCount} {itemCount === 1 ? 'item' : 'items'}
                                 </p>
                                 {createdDate && (
-                                  <p className="text-xs text-gray-600 mt-0.5">{createdDate}</p>
+                                  <p className="text-xs text-gray-600 mt-0.5 flex items-center gap-2">
+                                    {createdDate}
+                                    {isActive && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/90 text-gray-800 font-medium">
+                                        Active
+                                      </span>
+                                    )}
+                                  </p>
                                 )}
                               </div>
 
@@ -1726,7 +1746,11 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                     <div className="space-y-2">
                       {sessions.map((session) => {
                         const metadata = session.lastItemMetadata;
-                        const itemCount = session.pineconeIdsCount || session.pineconeIds?.length || 0;
+                        const isActive = session.id === activeSessionId;
+                        // For active session, use live item count from parent; otherwise use backend count
+                        const itemCount = isActive && activeSessionItemCount !== undefined
+                          ? activeSessionItemCount
+                          : (session.pineconeIdsCount || session.pineconeIds?.length || 0);
                         const createdDate = session.createdAt ? new Date(session.createdAt).toLocaleDateString() : '';
                         
                         // Use helper to extract image with fallback chain
@@ -1738,7 +1762,11 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                         return (
                           <div
                             key={session.id}
-                            className="flex items-center gap-3 p-3 bg-gray-900/50 hover:bg-gray-800/50 border border-gray-800 rounded-lg transition-all cursor-pointer"
+                            className={`flex items-center gap-3 p-3 rounded-lg transition-all cursor-pointer ${
+                              isActive
+                                ? 'bg-emerald-900/20 hover:bg-emerald-900/30 border border-emerald-700/50'
+                                : 'bg-gray-900/50 hover:bg-gray-800/50 border border-gray-800'
+                            }`}
                           >
                             {/* Episode Image */}
                             <div className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-gray-800">
@@ -1768,8 +1796,13 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                                 {metadata?.creator || 'Unknown creator'} • {itemCount} {itemCount === 1 ? 'item' : 'items'}
                               </p>
                               {createdDate && (
-                                <p className="text-xs text-gray-600 mt-0.5">
+                                <p className="text-xs text-gray-600 mt-0.5 flex items-center gap-2">
                                   {createdDate}
+                                  {isActive && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/90 text-gray-800 font-medium">
+                                      Active
+                                    </span>
+                                  )}
                                 </p>
                               )}
                             </div>

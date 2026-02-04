@@ -15,6 +15,7 @@ import {ClipProgress, ClipStatus, ClipRequest} from '../types/clips.ts'
 import { checkFreeTierEligibility } from '../services/freeTierEligibility.ts';
 import { useJamieAuth } from '../hooks/useJamieAuth.ts';
 import { notifyAuthStateChanged } from '../hooks/useSubscriptionStatus.ts';
+import { useResearchSessionFork } from '../hooks/useResearchSessionFork.ts';
 import {CheckoutModal} from './CheckoutModal.tsx'
 import { ConversationRenderer } from './conversation/ConversationRenderer.tsx';
 import QuickTopicGrid from './QuickTopicGrid.tsx';
@@ -273,6 +274,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [researchSessionItems, setResearchSessionItems] = useState<ResearchSessionItem[]>([]);
   const [showResearchToast, setShowResearchToast] = useState(false);
   const [showResearchLimitToast, setShowResearchLimitToast] = useState(false);
+  // Track whether current session is owned by this user (false = shared/read-only, will fork on edit)
+  const [isCurrentSessionOwned, setIsCurrentSessionOwned] = useState(true);
+  
+  // Research session fork helper (used when editing sessions we don't own)
+  const { forkToNewSession, isOwnershipError } = useResearchSessionFork({
+    onOwnershipChanged: setIsCurrentSessionOwned,
+    onTitleCleared: () => setSharedSessionTitle(null),
+  });
   
   // Debounced auto-save queue
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -677,16 +686,20 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           try {
             await saveResearchSessionWithRetry(items);
             printLog(`[ResearchSession] Auto-saved session with ${items.length} items`);
-          } catch (error) {
-            console.error('[ResearchSession] Save failed after retries:', error);
-            // Could show a toast here for persistent failures
+          } catch (error: any) {
+            // Check if this is a 403 (not authorized) - means we don't own the session
+            if (isOwnershipError(error)) {
+              await forkToNewSession(items);
+            } else {
+              console.error('[ResearchSession] Save failed after retries:', error);
+            }
           }
         })
         .catch(err => {
           console.error('[ResearchSession] Queue error:', err);
         });
     }, SAVE_DEBOUNCE_MS);
-  }, []);
+  }, [forkToNewSession, isOwnershipError]);
 
   // Research session handlers
   const handleAddToResearchSession = async (result: any) => {
@@ -725,10 +738,20 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
     const updatedItems = [...researchSessionItems, newItem];
     setResearchSessionItems(updatedItems);
-    printLog(`[ResearchSession] Added item: ${result.shareLink}`);
+    printLog(`[ResearchSession] Added item: ${result.shareLink}, total items: ${updatedItems.length}`);
 
-    // Debounced auto-save (waits 2s after last change)
-    debouncedQueuedSave(updatedItems);
+    // If we don't own the current session, fork it; otherwise auto-save
+    if (!isCurrentSessionOwned) {
+      printLog(`[ResearchSession] Session not owned, forking with ${updatedItems.length} items...`);
+      try {
+        const forkResult = await forkToNewSession(updatedItems);
+        printLog(`[ResearchSession] Fork result: ${JSON.stringify(forkResult)}`);
+      } catch (forkError) {
+        console.error('[ResearchSession] Fork error:', forkError);
+      }
+    } else {
+      debouncedQueuedSave(updatedItems);
+    }
 
     // Show toast notification
     setShowResearchToast(true);
@@ -748,9 +771,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     // If no items left, clear the session
     if (updatedItems.length === 0) {
       clearLocalSession();
+      setIsCurrentSessionOwned(true);
       printLog(`[ResearchSession] No items left, cleared session`);
+    } else if (!isCurrentSessionOwned) {
+      await forkToNewSession(updatedItems);
     } else {
-      // Debounced auto-save after removal
       debouncedQueuedSave(updatedItems);
     }
   };
@@ -759,7 +784,44 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     setResearchSessionItems([]);
     clearLocalSession(); // Clear the stored session ID
     setSharedSessionTitle(null); // Clear the session title when clearing research
+    setIsCurrentSessionOwned(true); // Reset ownership for next session
     printLog(`[ResearchSession] Cleared all items and session ID`);
+  };
+
+  // Manual save handler - respects ownership and forks if needed
+  const handleSaveResearchSession = async (): Promise<{ success: boolean; error?: string }> => {
+    if (researchSessionItems.length === 0) {
+      return { success: false, error: 'No items to save' };
+    }
+
+    try {
+      // If we don't own the current session, fork it
+      if (!isCurrentSessionOwned) {
+        const forkResult = await forkToNewSession(researchSessionItems);
+        return forkResult.success 
+          ? { success: true } 
+          : { success: false, error: forkResult.error };
+      }
+
+      // Normal save for owned sessions
+      const result = await saveResearchSession(researchSessionItems);
+      if (result.success) {
+        printLog(`[ResearchSession] Manual save successful`);
+        return { success: true };
+      } else {
+        return { success: false, error: result.message || 'Save failed' };
+      }
+    } catch (error: any) {
+      // Check if this is a 403 (not authorized) - fork as fallback
+      if (isOwnershipError(error)) {
+        const forkResult = await forkToNewSession(researchSessionItems);
+        return forkResult.success 
+          ? { success: true } 
+          : { success: false, error: forkResult.error };
+      }
+      console.error('[ResearchSession] Manual save failed:', error);
+      return { success: false, error: error?.message || 'Save failed' };
+    }
   };
 
   // Debug: log research items + sessionId whenever research changes
@@ -1696,9 +1758,23 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const researchSessionId = searchParams.get('researchSessionId');
   
   // Reusable function to load a research session with warp speed animation
-  const loadResearchSessionWithWarpSpeed = async (sessionId: string, sessionTitle: string = 'Research Session') => {
+  // isExplicitlyShared: true when loading via sharedSession URL or carousel (we KNOW it's not ours)
+  const loadResearchSessionWithWarpSpeed = async (sessionId: string, sessionTitle: string = 'Research Session', isExplicitlyShared: boolean = false) => {
         try {
-      printLog(`[SessionLoad] Starting warp speed for session: ${sessionId}`);
+      printLog(`[SessionLoad] Starting warp speed for session: ${sessionId} (explicitlyShared=${isExplicitlyShared})`);
+      
+      // Save current session before switching (if we own it and have items)
+      const currentSessionId = getCurrentSessionId();
+      if (currentSessionId && currentSessionId !== sessionId && isCurrentSessionOwned && researchSessionItems.length > 0) {
+        printLog(`[SessionLoad] Saving current session ${currentSessionId} before switching (${researchSessionItems.length} items)`);
+        try {
+          await saveResearchSession(researchSessionItems);
+          printLog(`[SessionLoad] Current session saved successfully`);
+        } catch (saveError) {
+          console.error('[SessionLoad] Failed to save current session before switching:', saveError);
+          // Continue with loading the new session even if save fails
+        }
+      }
           
           // Hide initial search UI and prepare for warp speed (do this first!)
           setSearchHistory(prev => ({
@@ -1823,6 +1899,39 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       setCurrentSessionId(sessionId);
       printLog(`[SessionLoad] Set session ${sessionId} as current active session`);
       
+      // Determine if we own this session
+      // If explicitly shared (loaded via sharedSession URL or carousel), we definitely don't own it
+      if (isExplicitlyShared) {
+        setIsCurrentSessionOwned(false);
+        printLog(`[SessionLoad] Session ownership: shared/read-only (explicitly shared via URL/carousel)`);
+      } else {
+        // Check by comparing session owner info with current user/client
+        // Be conservative: if we can't verify ownership, assume we don't own it
+        const currentClientId = localStorage.getItem('jamie_clientId');
+        const hasAuthToken = !!localStorage.getItem('auth_token');
+        
+        let isOwned = false;
+        if (sessionData) {
+          if (sessionData.ownerType === 'client' && sessionData.clientId && currentClientId) {
+            // Client-owned session: check clientId match
+            isOwned = sessionData.clientId === currentClientId;
+          } else if (sessionData.ownerType === 'user' && hasAuthToken) {
+            // User-owned session: we can't easily verify userId from token,
+            // so we'll be optimistic if logged in. If save fails with 403, we'll fork.
+            // This could be improved by decoding the JWT or having an endpoint to check.
+            isOwned = true;
+          } else if (!sessionData.ownerType && !sessionData.userId && !sessionData.clientId) {
+            // No ownership info at all (backwards compatibility)
+            isOwned = true;
+          }
+          // If ownerType is 'user' but we don't have auth token, we don't own it
+          // If ownerType is 'client' but clientId doesn't match, we don't own it
+        }
+        
+        setIsCurrentSessionOwned(isOwned);
+        printLog(`[SessionLoad] Session ownership: ${isOwned ? 'owned' : 'shared/read-only'} (ownerType=${sessionData?.ownerType}, hasToken=${hasAuthToken}, clientId=${sessionData?.clientId}, ourClientId=${currentClientId})`);
+      }
+      
       printLog('[SessionLoad] Loaded successfully with warp speed!');
         } catch (error) {
       console.error('Error loading research session:', error);
@@ -1881,7 +1990,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         }
         
         // Load the session using the reusable function
-        await loadResearchSessionWithWarpSpeed(mongoDbId, sessionTitle);
+        // Mark as explicitly shared since it's from a URL parameter
+        await loadResearchSessionWithWarpSpeed(mongoDbId, sessionTitle, true);
       }
     };
 
@@ -3342,7 +3452,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 }
                 
                 // Now load with the proper MongoDB ObjectId
-                await loadResearchSessionWithWarpSpeed(mongoDbId, sessionTitle);
+                // Mark as explicitly shared since it's from the carousel (not our session)
+                await loadResearchSessionWithWarpSpeed(mongoDbId, sessionTitle, true);
               } catch (error) {
                 console.error('Error loading featured session:', error);
                 setSearchState(prev => ({
@@ -3526,6 +3637,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 researchSessionItems={researchSessionItems}
                 onRemoveFromResearch={handleRemoveFromResearchSession}
                 onClearResearch={handleClearResearchSession}
+                onSaveResearch={handleSaveResearchSession}
                 showResearchToast={showResearchToast}
                 isContextPanelOpen={isContextPanelOpen}
                 onCloseContextPanel={() => setIsContextPanelOpen(false)}
@@ -4184,6 +4296,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           isSessionsOpen={isSessionsPanelOpen}
           onCloseSessions={() => setIsSessionsPanelOpen(false)}
           onOpenSession={handleOpenSessionFromHistory}
+          activeSessionId={getCurrentSessionId()}
+          activeSessionItemCount={researchSessionItems.length}
           onWidthChange={isNarrowLayout ? () => setContextPanelWidth(0) : setContextPanelWidth}
           onTimestampClick={(timestamp) => {
             printLog(`Context panel timestamp clicked: ${timestamp}`);
