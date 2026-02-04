@@ -48,7 +48,7 @@ import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from './EmbedMiniPlayer.tsx';
 import PoweredByJamiePill from './PoweredByJamiePill.tsx';
 import FeaturedGalaxiesCarousel from './FeaturedGalaxiesCarousel.tsx';
-import { ResearchSessionItem, clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId, saveResearchSessionWithRetry, getCurrentSessionId } from '../services/researchSessionService.ts';
+import { ResearchSessionItem, clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId, saveResearchSessionWithRetry, getCurrentSessionId, enrichResearchItems } from '../services/researchSessionService.ts';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
 
 
@@ -1865,6 +1865,33 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         
         console.log('[SessionLoad] Final items array:', items);
         console.log('[SessionLoad] Final items count:', items.length);
+        
+        // Enrich items that have placeholder metadata ("Quote unavailable")
+        const itemsNeedingEnrichment = items.filter(
+          (i) => !i.quote || i.quote === 'Quote unavailable'
+        );
+        
+        if (itemsNeedingEnrichment.length > 0) {
+          printLog(`[SessionLoad] Enriching ${itemsNeedingEnrichment.length} items with missing metadata`);
+          const enrichedData = await enrichResearchItems(
+            itemsNeedingEnrichment.map((i) => i.shareLink)
+          );
+          
+          // Merge enriched data back into items
+          items.forEach((item) => {
+            const enriched = enrichedData[item.shareLink];
+            if (enriched) {
+              item.quote = enriched.quote || item.quote;
+              item.headline = enriched.headline || item.headline;
+              item.summary = enriched.summary || item.summary;
+              item.episode = enriched.episode || item.episode;
+              item.creator = enriched.creator || item.creator;
+              item.episodeImage = enriched.episodeImage || item.episodeImage;
+              item.date = enriched.date || item.date;
+            }
+          });
+          printLog(`[SessionLoad] Enrichment complete`);
+        }
         
         setResearchSessionItems(items);
         printLog(`[SessionLoad] Loaded ${items.length} items into research session collector`);

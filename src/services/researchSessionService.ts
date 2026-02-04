@@ -600,3 +600,58 @@ export async function fetchAllResearchSessions(): Promise<ResearchSession[]> {
     return [];
   }
 }
+
+/**
+ * Enriched metadata returned from the enrich endpoint
+ */
+export interface EnrichedMetadata {
+  quote?: string;
+  summary?: string;
+  headline?: string;
+  episode?: string;
+  creator?: string;
+  episodeImage?: string;
+  audioUrl?: string;
+  date?: string;
+  feedId?: number;
+  guid?: string;
+  timeContext?: { start_time: number; end_time: number };
+  hierarchyLevel?: string;
+}
+
+/**
+ * Enrich items with full metadata from the backend.
+ * Used to backfill "Quote unavailable" placeholders.
+ */
+export async function enrichResearchItems(
+  pineconeIds: string[]
+): Promise<Record<string, EnrichedMetadata>> {
+  if (pineconeIds.length === 0) return {};
+  
+  try {
+    printLog(`[ResearchSession] Enriching ${pineconeIds.length} items`);
+    
+    const response = await fetch(`${API_URL}/api/research-sessions/enrich`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ pineconeIds }),
+    });
+    
+    if (!response.ok) {
+      console.error(`Enrich failed with status ${response.status}`);
+      return {};
+    }
+    
+    const data = await response.json();
+    
+    if (data.success && data.data) {
+      printLog(`[ResearchSession] Enriched ${Object.keys(data.data).length} items`);
+      return data.data;
+    }
+    
+    return {};
+  } catch (error) {
+    console.error('Enrich research items error:', error);
+    return {};
+  }
+}

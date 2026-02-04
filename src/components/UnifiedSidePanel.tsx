@@ -1132,8 +1132,10 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                             : (session.pineconeIdsCount || session.pineconeIds?.length || 0);
                           const createdDate = session.createdAt ? new Date(session.createdAt).toLocaleDateString() : '';
                           const sessionImage = metadata ? extractImageFromAny(metadata) : undefined;
+                          // Use lastItemMetadata for all display fields (title/image/creator stay in sync)
+                          // Prioritize episode title over quote text
                           const displayTitle =
-                            session.title || metadata?.title || metadata?.headline || metadata?.episode || 'Research Session';
+                            metadata?.episode || metadata?.title || metadata?.headline || 'Research Session';
 
                           return (
                             <div
@@ -1756,8 +1758,9 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                         // Use helper to extract image with fallback chain
                         const sessionImage = metadata ? extractImageFromAny(metadata) : undefined;
                         
-                        // Use title from API response, fallback to metadata fields
-                        const displayTitle = session.title || metadata?.title || metadata?.headline || metadata?.episode || 'Research Session';
+                        // Use lastItemMetadata for all display fields (title/image/creator stay in sync)
+                        // Prioritize episode title over quote text
+                        const displayTitle = metadata?.episode || metadata?.title || metadata?.headline || 'Research Session';
                         
                         return (
                           <div
