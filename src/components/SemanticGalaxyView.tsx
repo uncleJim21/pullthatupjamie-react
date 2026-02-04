@@ -1901,9 +1901,21 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       showShareToast('loading', 'Creating share link...');
 
       // Build nodes array from research session items with their galaxy coordinates
+      // Priority: use item's stored coordinates, fallback to current search results
       const nodes: ShareNode[] = researchSessionItems
         .map(item => {
-          // Find the result in the galaxy view to get coordinates and color
+          // First try: use coordinates stored on the item itself
+          if (item.coordinates3d) {
+            return {
+              pineconeId: item.shareLink,
+              x: item.coordinates3d.x,
+              y: item.coordinates3d.y,
+              z: item.coordinates3d.z,
+              color: getHierarchyColor(item.hierarchyLevel)
+            };
+          }
+          
+          // Fallback: find the result in current search results
           const result = results.find(r => r.shareLink === item.shareLink);
           if (!result || !result.coordinates3d) {
             return null;
