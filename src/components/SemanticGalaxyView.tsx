@@ -1938,10 +1938,20 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       }
 
       // Use custom title if provided, otherwise use suggested title from last item
+      // Priority: episode name > headline > summary (avoid "Unknown" placeholders)
       let title = customTitle;
       if (!title) {
         const lastItem = researchSessionItems[researchSessionItems.length - 1];
-        title = lastItem.headline || lastItem.summary || undefined;
+        const isPlaceholder = (str?: string) => !str || str.toLowerCase().includes('unknown') || str === 'Quote unavailable';
+        
+        if (!isPlaceholder(lastItem.episode)) {
+          title = lastItem.episode;
+        } else if (!isPlaceholder(lastItem.headline)) {
+          title = lastItem.headline;
+        } else if (!isPlaceholder(lastItem.summary)) {
+          title = lastItem.summary;
+        }
+        // If all are placeholders, leave undefined - backend will handle fallback
       }
 
       const response = await shareCurrentSession(title, nodes);
@@ -2527,9 +2537,14 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         onConfirm={performShare}
         suggestedTitle={
           researchSessionItems.length > 0
-            ? researchSessionItems[researchSessionItems.length - 1].headline ||
-              researchSessionItems[researchSessionItems.length - 1].summary ||
-              ''
+            ? (() => {
+                const lastItem = researchSessionItems[researchSessionItems.length - 1];
+                const isPlaceholder = (str?: string) => !str || str.toLowerCase().includes('unknown') || str === 'Quote unavailable';
+                if (!isPlaceholder(lastItem.episode)) return lastItem.episode;
+                if (!isPlaceholder(lastItem.headline)) return lastItem.headline;
+                if (!isPlaceholder(lastItem.summary)) return lastItem.summary;
+                return '';
+              })()
             : ''
         }
         isSharing={isSharing}

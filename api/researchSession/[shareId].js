@@ -39,41 +39,63 @@ module.exports = async function handler(req, res) {
 
     const data = await response.json();
     
+    // Debug logging
+    console.log('[SharedSession] Raw data.data.title:', data.data?.title);
+    console.log('[SharedSession] Raw lastItemMetadata:', JSON.stringify(data.data?.lastItemMetadata, null, 2));
+    
     // Extract metadata with smart fallbacks
     const lastItem = data.data?.lastItemMetadata || {};
     const nodeCount = data.data?.nodes?.length || 0;
     
-    // Build title with priority: explicit title > episode name > creator + count
+    // Helper to check if a string is a placeholder or contains "Unknown"
+    const isPlaceholder = (str) => {
+      if (!str) return true;
+      const lower = str.toLowerCase();
+      return lower === 'quote unavailable' || 
+             lower === 'unknown episode' || 
+             lower === 'creator not specified' ||
+             lower.includes('unknown') ||
+             lower === 'image unavailable' ||
+             lower === 'url unavailable';
+    };
+    
+    // Build title with priority: explicit title > episode name > creator > Jamie default
     let title = data.data?.title;
-    if (!title || title === 'Shared Research Session' || title === 'Untitled Episode Insights') {
+    if (!title || isPlaceholder(title)) {
       // Try episode name from lastItemMetadata
-      if (lastItem.episode && lastItem.episode !== 'Unknown episode') {
+      if (lastItem.episode && !isPlaceholder(lastItem.episode)) {
         title = lastItem.episode;
-      } else if (lastItem.creator && lastItem.creator !== 'Creator not specified') {
-        title = `${lastItem.creator} - Research Session`;
+      } else if (lastItem.creator && !isPlaceholder(lastItem.creator)) {
+        title = lastItem.creator;
       } else {
-        title = nodeCount > 0 ? `Research Session (${nodeCount} clips)` : 'Shared Research Session';
+        title = 'Jamie Visualization';
       }
     }
     
-    // Build description with priority: quote > summary > generic with item count
+    // Build description with priority: quote > summary > Jamie default
+    // Keep it SHORT (50 chars) to avoid image shrinking in Slack previews
     let description = data.data?.description;
-    const isPlaceholder = (str) => !str || str === 'Quote unavailable' || str === 'Unknown episode' || str === 'Creator not specified';
     
     if (isPlaceholder(description)) {
       if (!isPlaceholder(lastItem.quote)) {
-        // Use the actual quote, truncated if too long
-        description = lastItem.quote.length > 200 
-          ? lastItem.quote.substring(0, 197) + '...'
+        // Use the actual quote, truncated to 50 chars for better preview display
+        description = lastItem.quote.length > 50 
+          ? lastItem.quote.substring(0, 47) + '...'
           : lastItem.quote;
       } else if (!isPlaceholder(lastItem.summary)) {
-        description = lastItem.summary;
-      } else if (lastItem.creator && lastItem.creator !== 'Creator not specified') {
-        description = `A collection of ${nodeCount} podcast clips from ${lastItem.creator} on Pull That Up Jamie`;
+        description = lastItem.summary.length > 50
+          ? lastItem.summary.substring(0, 47) + '...'
+          : lastItem.summary;
       } else {
-        description = `Explore ${nodeCount} curated podcast clips in this research session on Pull That Up Jamie`;
+        description = 'Curated podcast moments';
       }
+    } else if (description.length > 50) {
+      // Even if description was set, truncate it
+      description = description.substring(0, 47) + '...';
     }
+    
+    console.log('[SharedSession] Final title:', title);
+    console.log('[SharedSession] Final description:', description);
     
     const previewImageUrl = data.data?.previewImageUrl || `${frontendUrl}/social-preview.png`;
     const canonicalUrl = `${frontendUrl}/researchSession/${shareId}`;
