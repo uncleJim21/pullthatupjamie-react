@@ -517,6 +517,24 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const searchInputRef = useRef<HTMLTextAreaElement>(null);
   const cleanupIntervalRef = useRef();
   const resultTextRef = useRef('');
+
+  // Native input event listener for Playwright/automation compatibility
+  // React's onChange doesn't always fire from automated DOM events
+  useEffect(() => {
+    const input = searchInputRef.current;
+    if (!input) return;
+    
+    const handleNativeInput = (e: Event) => {
+      const target = e.target as HTMLTextAreaElement | HTMLInputElement;
+      // Only update if value differs (prevents double-firing with onChange)
+      if (target.value !== query) {
+        setQuery(target.value);
+      }
+    };
+    
+    input.addEventListener('input', handleNativeInput);
+    return () => input.removeEventListener('input', handleNativeInput);
+  }, [query]);
   const eventSourceRef = useRef<EventSource | null>(null);
   const nextConversationId = useRef(0);
   const podcastModeLabelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1559,6 +1577,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const handleSearch = async (e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
     
+    // Get query from DOM as fallback for automation tools (Playwright, etc.)
+    // React state may not have updated yet when form submits
+    const queryFromDOM = searchInputRef.current?.value || '';
+    const effectiveQuery = query || queryFromDOM;
+    
     if (searchMode === 'podcast-search') {
       try {
         // New search: collapse context panel and clear any stale audio/UI context
@@ -1584,10 +1607,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         
         // We'll use this function's closure to capture the current selection state
         // Call 3D search if in galaxy mode, otherwise regular search
+        // Pass effectiveQuery to handle automation tool race conditions
         if (resultViewStyle === SearchResultViewStyle.GALAXY) {
-          await performQuoteSearch3D();
+          await performQuoteSearch3D(effectiveQuery);
         } else {
-          await performQuoteSearch();
+          await performQuoteSearch(effectiveQuery);
         }
         return;
       } catch (error) {

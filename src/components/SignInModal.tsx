@@ -54,6 +54,42 @@ export const SignInModal: React.FC<SignInModalProps> = ({
   const modalOpenedAt = useRef<number | null>(null);
   const authCompletedRef = useRef<boolean>(false);
 
+  // Refs for Playwright/automation compatibility
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const confirmPasswordInputRef = useRef<HTMLInputElement>(null);
+
+  // Native input event listeners for Playwright/automation compatibility
+  // React's onChange doesn't always fire from automated DOM events
+  useEffect(() => {
+    const emailInput = emailInputRef.current;
+    const passwordInput = passwordInputRef.current;
+    const confirmPasswordInput = confirmPasswordInputRef.current;
+
+    const handleEmailInput = (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      if (target.value !== email) setEmail(target.value);
+    };
+    const handlePasswordInput = (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      if (target.value !== password) setPassword(target.value);
+    };
+    const handleConfirmPasswordInput = (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      if (target.value !== confirmPassword) setConfirmPassword(target.value);
+    };
+
+    emailInput?.addEventListener('input', handleEmailInput);
+    passwordInput?.addEventListener('input', handlePasswordInput);
+    confirmPasswordInput?.addEventListener('input', handleConfirmPasswordInput);
+
+    return () => {
+      emailInput?.removeEventListener('input', handleEmailInput);
+      passwordInput?.removeEventListener('input', handlePasswordInput);
+      confirmPasswordInput?.removeEventListener('input', handleConfirmPasswordInput);
+    };
+  }, [email, password, confirmPassword]);
+
   // Sync mode with initialMode prop when it changes (e.g., reopening modal)
   useEffect(() => {
     if (initialMode) {
@@ -79,17 +115,27 @@ export const SignInModal: React.FC<SignInModalProps> = ({
     e.preventDefault();
     setError('');
 
-    if (!validateEmail(email)) {
+    // Get values from DOM as fallback for Playwright/automation tools
+    // React state may not be updated yet when form is submitted programmatically
+    const emailFromDOM = emailInputRef.current?.value || '';
+    const passwordFromDOM = passwordInputRef.current?.value || '';
+    const confirmPasswordFromDOM = confirmPasswordInputRef.current?.value || '';
+    
+    const emailToUse = email || emailFromDOM;
+    const passwordToUse = password || passwordFromDOM;
+    const confirmPasswordToUse = confirmPassword || confirmPasswordFromDOM;
+
+    if (!validateEmail(emailToUse)) {
       setError('Please enter a valid email address');
       return;
     }
 
     if (mode === 'signup') {
-      if (password !== confirmPassword) {
+      if (passwordToUse !== confirmPasswordToUse) {
         setError('Passwords do not match');
         return;
       }
-      if (password.length < 8) {
+      if (passwordToUse.length < 8) {
         setError('Password must be at least 8 characters long');
         return;
       }
@@ -99,12 +145,12 @@ export const SignInModal: React.FC<SignInModalProps> = ({
 
     try {
       const authResponse = mode === 'signin'
-        ? await AuthService.signIn(email, password)
-        : await AuthService.signUp(email, password);
+        ? await AuthService.signIn(emailToUse, passwordToUse)
+        : await AuthService.signUp(emailToUse, passwordToUse);
 
       // Store auth token and user identifier
       localStorage.setItem('auth_token', authResponse.token);
-      localStorage.setItem('squareId', email);
+      localStorage.setItem('squareId', emailToUse);
       localStorage.setItem('authProvider', 'email');
 
       // Set subscription status based on new subscriptionType field
@@ -398,6 +444,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({
                 Email
               </label>
               <input
+                ref={emailInputRef}
                 id="email"
                 type="email"
                 value={email}
@@ -413,6 +460,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({
                 Password
               </label>
               <input
+                ref={passwordInputRef}
                 id="password"
                 type="password"
                 value={password}
@@ -429,6 +477,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({
                   Confirm Password
                 </label>
                 <input
+                  ref={confirmPasswordInputRef}
                   id="confirmPassword"
                   type="password"
                   value={confirmPassword}

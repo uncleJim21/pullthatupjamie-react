@@ -1,6 +1,7 @@
 import { API_URL, printLog } from "../constants/constants.ts";
 import { throwIfQuotaExceeded, QuotaExceededError } from "../types/errors.ts";
 import { getOrCreateClientId } from "../utils/clientId.ts";
+import { getAnalyticsHeader } from "./analyticsService.ts";
 
 export interface AnalysisRequest {
   instructions: string;
@@ -20,7 +21,8 @@ export interface AnalysisResponse {
 function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Accept': 'application/json'
+    'Accept': 'application/json',
+    ...getAnalyticsHeader()
   };
   
   const token = localStorage.getItem('auth_token');

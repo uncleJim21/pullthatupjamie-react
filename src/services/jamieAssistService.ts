@@ -1,12 +1,14 @@
 import { API_URL, AuthConfig, printLog, ShareModalContext } from "../constants/constants.ts";
 import { throwIfQuotaExceeded } from "../types/errors.ts";
+import { getAnalyticsHeader } from "./analyticsService.ts";
 
 /**
  * Build authorization headers using JWT Bearer token
  */
 function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    ...getAnalyticsHeader()
   };
   
   const token = localStorage.getItem('auth_token');
