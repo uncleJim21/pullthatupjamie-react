@@ -50,6 +50,8 @@ const ALLOWED_EVENTS = [
   // Journey events
   'wizard_step_reached',
   'processing_completed',
+  // Engagement events
+  'visit_shared_session',
 ] as const;
 
 export type AnalyticsEventType = typeof ALLOWED_EVENTS[number];
@@ -313,6 +315,21 @@ export function trackProcessingCompleted(success: boolean, jobId: string | null)
   });
 }
 
+// --- Engagement Events ---
+
+export type SharedSessionSource = 'carousel' | 'shared_link' | 'embed';
+
+export function trackVisitSharedSession(shareId: string, source: SharedSessionSource, title?: string): void {
+  trackEvent({
+    type: 'visit_shared_session',
+    properties: { 
+      share_id: shareId, 
+      source,
+      title: title || 'unknown',
+    },
+  });
+}
+
 // ============================================================
 // Header Helper for API Requests
 // ============================================================
@@ -343,5 +360,6 @@ export default {
   trackQuotaExceededAction,
   trackWizardStepReached,
   trackProcessingCompleted,
+  trackVisitSharedSession,
   getAnalyticsHeader,
 };

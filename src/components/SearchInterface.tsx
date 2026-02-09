@@ -50,6 +50,7 @@ import PoweredByJamiePill from './PoweredByJamiePill.tsx';
 import FeaturedGalaxiesCarousel from './FeaturedGalaxiesCarousel.tsx';
 import { ResearchSessionItem, clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId, saveResearchSessionWithRetry, getCurrentSessionId, enrichResearchItems } from '../services/researchSessionService.ts';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
+import { trackVisitSharedSession } from '../services/analyticsService.ts';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';
@@ -2017,6 +2018,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             mongoDbId = sharedSession.researchSessionId;
             sessionTitle = sharedSession.title || 'Shared Research Session';
             
+            // Track visit to shared session (from URL parameter)
+            const isEmbed = searchParams.get('embed') === 'true';
+            trackVisitSharedSession(sharedSessionId, isEmbed ? 'embed' : 'shared_link', sessionTitle);
+            
             // Store the shared session title for display
             setSharedSessionTitle(sessionTitle);
             
@@ -3493,6 +3498,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 
                 const mongoDbId = sharedSession.researchSessionId;
                 const sessionTitle = sharedSession.title || fallbackTitle;
+                
+                // Track visit to shared session (from carousel)
+                trackVisitSharedSession(shareId, 'carousel', sessionTitle);
                 
                 // Store brand data if present
                 if (sharedSession.brandImage) {

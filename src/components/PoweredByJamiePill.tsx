@@ -7,7 +7,7 @@ interface PoweredByJamiePillProps {
 
 const PoweredByJamiePill: React.FC<PoweredByJamiePillProps> = ({ sharedSessionId, className }) => {
   const utmValue = `iframe-${encodeURIComponent(sharedSessionId || 'unknown')}`;
-  const href = `https://pullthatupjamie.ai?utm=${utmValue}`;
+  const href = `https://pullthatupjamie.ai/app?utm=${utmValue}`;
 
   return (
     <a
