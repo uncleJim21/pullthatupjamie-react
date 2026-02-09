@@ -1257,6 +1257,37 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                     </div>
                   )}
 
+                  {/* Fallback: Mini player when episode data is missing but we have direct audio props */}
+                  {!hierarchy.hierarchy.episode && effectiveAudioUrl && (
+                    <div className="pb-4">
+                      <div className="flex items-start space-x-3">
+                        {episodeImage && !imageError ? (
+                          <img
+                            src={episodeImage}
+                            alt="Episode"
+                            className="w-12 h-12 rounded object-cover flex-shrink-0"
+                            onError={() => setImageError(true)}
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+                            <Podcast className="w-6 h-6 text-gray-600" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          {episodeTitle && (
+                            <p className="text-sm text-white font-medium line-clamp-2 leading-tight">
+                              {episodeTitle}
+                            </p>
+                          )}
+                          {creator && (
+                            <p className="text-xs text-gray-400 mt-1">{creator}</p>
+                          )}
+                        </div>
+                      </div>
+                      {renderEpisodeMiniPlayer()}
+                    </div>
+                  )}
+
                   {/* Chapter - Now Clickable */}
                   {hierarchy.hierarchy.chapter && (
                     <div 
@@ -1378,6 +1409,37 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+            ) : effectiveAudioUrl ? (
+              // Fallback: No hierarchy data but we have direct audio props (e.g. debug/mock mode)
+              <div className="space-y-4">
+                {/* Episode info from direct props */}
+                <div className="flex items-start space-x-3">
+                  {episodeImage && !imageError ? (
+                    <img
+                      src={episodeImage}
+                      alt="Episode"
+                      className="w-12 h-12 rounded object-cover flex-shrink-0"
+                      onError={() => setImageError(true)}
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+                      <Podcast className="w-6 h-6 text-gray-600" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    {episodeTitle && (
+                      <p className="text-sm text-white font-medium line-clamp-2 leading-tight">
+                        {episodeTitle}
+                      </p>
+                    )}
+                    {creator && (
+                      <p className="text-xs text-gray-400 mt-1">{creator}</p>
+                    )}
+                  </div>
+                </div>
+                {/* Mini player with direct audio props */}
+                {renderEpisodeMiniPlayer()}
               </div>
             ) : (
               <div className="text-center py-12 text-gray-400 text-sm">
