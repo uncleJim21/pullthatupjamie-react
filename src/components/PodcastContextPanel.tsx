@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BookText, ChevronRight, ChevronLeft, Info, Podcast, ChevronDown, ChevronUp, Play, ScanSearch, RotateCcw, RotateCw, Layers, Plus, Minus, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import ContextService, { AdjacentParagraph, HierarchyResponse } from '../services/contextService.ts';
+import HierarchyCache from '../services/hierarchyCache.ts';
 import ChapterService, { Chapter } from '../services/chapterService.ts';
 import { printLog, HIERARCHY_COLORS } from '../constants/constants.ts';
 import { KeywordTooltip } from './KeywordTooltip.tsx';
@@ -297,11 +298,11 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
 
       try {
         if (effectiveParagraphId) {
-          // Paragraph-driven mode: fetch adjacent paragraphs + hierarchy from paragraph
-          printLog(`Calling ContextService.fetchAdjacentParagraphs and fetchHierarchyByParagraph...`);
+          // Paragraph-driven mode: fetch adjacent paragraphs + hierarchy from paragraph (using cache)
+          printLog(`Calling HierarchyCache.getAdjacentParagraphs and getHierarchy...`);
           const [adjacentData, hierarchyData] = await Promise.all([
-            ContextService.fetchAdjacentParagraphs(effectiveParagraphId, 3),
-            ContextService.fetchHierarchyByParagraph(effectiveParagraphId),
+            HierarchyCache.getAdjacentParagraphs(effectiveParagraphId, 3),
+            HierarchyCache.getHierarchy(effectiveParagraphId),
           ]);
 
           printLog(`Received ${adjacentData.paragraphs.length} paragraphs and hierarchy`);
@@ -823,7 +824,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               <div className="text-center py-12">
                 <p className="text-red-400 mb-2 text-sm">{error}</p>
                 <button
-                  onClick={() => paragraphId && ContextService.fetchAdjacentParagraphs(paragraphId, 3)}
+                  onClick={() => paragraphId && HierarchyCache.getAdjacentParagraphs(paragraphId, 3)}
                   className="text-sm text-gray-400 hover:text-white underline"
                 >
                   Try again

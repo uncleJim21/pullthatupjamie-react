@@ -43,6 +43,7 @@ import PodcastContextPanel from './PodcastContextPanel.tsx';
 import UnifiedSidePanel from './UnifiedSidePanel.tsx';
 import SemanticGalaxyView from './SemanticGalaxyView.tsx';
 import ContextService from '../services/contextService.ts';
+import HierarchyCache from '../services/hierarchyCache.ts';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from './EmbedMiniPlayer.tsx';
@@ -270,6 +271,31 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const [galaxyResults, setGalaxyResults] = useState<any[]>([]);
   const [currentResultIndex, setCurrentResultIndex] = useState<number>(0);
   const [axisLabels, setAxisLabels] = useState<any>(null);
+  
+  // Prefetch hierarchy data for galaxy results (makes next/prev navigation instant)
+  useEffect(() => {
+    if (galaxyResults.length === 0) return;
+    
+    // Extract shareLinks (paragraph IDs) from results
+    const paragraphIds = galaxyResults
+      .map(r => r.shareLink)
+      .filter((id): id is string => typeof id === 'string');
+    
+    if (paragraphIds.length > 0) {
+      // Prefetch first 10 results immediately, rest lazily
+      const priorityIds = paragraphIds.slice(0, 10);
+      printLog(`[HierarchyPrefetch] Prefetching ${priorityIds.length} hierarchies for galaxy results`);
+      HierarchyCache.prefetchHierarchies(priorityIds);
+      
+      // Prefetch remaining after a short delay to not block initial render
+      if (paragraphIds.length > 10) {
+        setTimeout(() => {
+          const remainingIds = paragraphIds.slice(10);
+          HierarchyCache.prefetchHierarchies(remainingIds);
+        }, 2000);
+      }
+    }
+  }, [galaxyResults]);
   
   // Research session state
   const [researchSessionItems, setResearchSessionItems] = useState<ResearchSessionItem[]>([]);
@@ -1458,6 +1484,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   const performQuoteSearch3D = async (queryOverride?: string, override?: KeywordSearchOverride) => {
     setSearchHistory(prev => ({...prev, [searchMode]: true}));
+    
+    // Clear hierarchy cache on new search (ensures fresh data and prevents stale cache)
+    HierarchyCache.clearCache();
     
     printLog("Starting 3D quote search...");
     
