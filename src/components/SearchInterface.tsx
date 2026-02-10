@@ -3747,7 +3747,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               />
             </div>
           ) : (
-            <div className={`mx-auto px-4 space-y-8 transition-all duration-300 ${
+            <div className={`mx-auto px-4 space-y-4 sm:space-y-8 transition-all duration-300 ${
               searchMode === 'podcast-search' && conversation.length > 0
                 ? 'mb-1 pb-1'
                 : 'mb-24 pb-24'
@@ -3964,8 +3964,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               (isContextPanelOpen || isAnalysisPanelOpen || isSessionsPanelOpen)
                 ? `${contextPanelWidth}px`
                 : '0',
-            // When the mini player is visible (narrow + not expanded), lift the search bar above it.
-            ...(isNarrowLayout && !isNarrowInfoExpanded && selectedAudioContext
+            // When the mini player is visible (narrow + not expanded + not list view), lift the search bar above it.
+            ...(isNarrowLayout && !isNarrowInfoExpanded && selectedAudioContext && resultViewStyle !== SearchResultViewStyle.LIST
               ? { bottom: 'calc(var(--mini-player-height, 92px) + 8px)' }
               : null),
           }}
@@ -4161,8 +4161,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         </div>
       )}
 
-      {/* Mini Player */}
-      {(isEmbedMode || (isNarrowLayout && !isEmbedMode && selectedAudioContext)) && (
+      {/* Mini Player - hidden in list view on mobile (results have inline players) */}
+      {(isEmbedMode || (isNarrowLayout && !isEmbedMode && selectedAudioContext && resultViewStyle !== SearchResultViewStyle.LIST)) && (
         <EmbedMiniPlayer
           mode={isEmbedMode ? 'embed' : 'app'}
           isHovered={isEmbedMode ? isEmbedHovered : true}

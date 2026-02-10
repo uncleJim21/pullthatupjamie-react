@@ -75,7 +75,7 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
   // Default list view
   return (
     <BaseConversationLayout query={item.query}>
-      <div className="space-y-6 pb-48">
+      <div className="space-y-3 sm:space-y-6 pb-48">
         {item.data.quotes.map((quote, index) => {
           // Use shareLink as fallback if id is undefined
           const quoteId = quote.id || quote.shareLink;
