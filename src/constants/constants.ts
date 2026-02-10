@@ -2,7 +2,7 @@
 import { FRONTEND_URL, API_URL, AUTH_URL, DEBUG_MODE } from '../config/urls.js';
 export const DEBUG_TRANSCRIPTION = false;
 export { DEBUG_MODE, FRONTEND_URL, API_URL, AUTH_URL };
-export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
+export const DISABLE_CLIPPING = false; // Set to true to disable clipping features
 export const DEBUG_AUTH = false;
 
 

@@ -6,7 +6,7 @@ import { ClipProgress } from '../../types/clips.ts';
 import EditTimestampsModal from "./EditTimestampsModal.tsx";
 import SocialShareModal, { SocialPlatform } from "../SocialShareModal.tsx";
 import ShareModal from "../ShareModal.tsx";
-import { AuthConfig, AIClipsViewStyle, DISABLE_CLIPPING,ShareModalContext } from "../../constants/constants.ts";
+import { AuthConfig, AIClipsViewStyle, ShareModalContext } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
 import { useAudioController } from '../../context/AudioControllerContext.tsx';
@@ -862,7 +862,7 @@ export const PodcastSearchResultItem = ({
                   <ExternalLink className="h-4 w-4 mr-2 flex-shrink-0" />
                   <span className="truncate">Listen</span>
                 </button>
-                {!DISABLE_CLIPPING && onClipProgress && (<button
+                {onClipProgress && (<button
                   className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                   onClick={handleClip}
                 >

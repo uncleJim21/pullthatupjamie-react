@@ -1651,7 +1651,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
       const mediaUrl = fileUrl || renderUrl || '';
       const isAdmin = AuthService.isAdmin();
       
-      if (isAdmin && twitterState.authenticated) {
+      if (twitterState.authenticated) {
         const finalContent = buildFinalContent(content, mediaUrl, 'twitter');
         printLog(`Posting tweet with content: "${finalContent}" and mediaUrl: "${mediaUrl}"`);
         
@@ -3520,7 +3520,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                   <div className="flex items-center space-x-3">
                     <Twitter className="w-6 h-6 text-blue-400" />
                     <div className="flex-1">
-                      {isAdmin && isFullyConnected ? (
+                      {isFullyConnected ? (
                         successUrls.twitter ? (
                           <a 
                             href={successUrls.twitter} 
@@ -3542,40 +3542,34 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
                         )
                       ) : isVideoTooLongForTwitter ? (
                         <div className="flex flex-col">
-                          <p className="text-white text-sm">
-                            {isAdmin ? 'Connect to post directly' : 'Web sharing available'}
-                          </p>
+                          <p className="text-white text-sm">Connect to post directly</p>
                           <p className="text-red-400 text-xs mt-1">
                             Video too long ({Math.floor(videoDuration! / 60)}:{Math.floor(videoDuration! % 60).toString().padStart(2, '0')}) - Twitter max is 2:30
                           </p>
                         </div>
                       ) : (
-                        <p className="text-white text-sm">
-                          {isAdmin ? 'Connect to post directly' : 'Web sharing available'}
-                        </p>
+                        <p className="text-white text-sm">Connect to post directly</p>
                       )}
                     </div>
-                    {isAdmin && (
-                      <div className="flex items-center space-x-2">
-                        {isFullyConnected ? (
-                          <button
-                            onClick={disconnectTwitter}
-                            disabled={twitterState.currentOperation === OperationType.CONNECTING || twitterState.currentOperation === OperationType.DISCONNECTING}
-                            className="px-3 py-1 text-xs bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
-                          >
-                            {twitterState.currentOperation === OperationType.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={connectTwitter}
-                            disabled={twitterState.currentOperation === OperationType.CONNECTING}
-                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50"
-                          >
-                            {twitterState.currentOperation === OperationType.CONNECTING ? 'Connecting...' : 'Connect'}
-                          </button>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex items-center space-x-2">
+                      {isFullyConnected ? (
+                        <button
+                          onClick={disconnectTwitter}
+                          disabled={twitterState.currentOperation === OperationType.CONNECTING || twitterState.currentOperation === OperationType.DISCONNECTING}
+                          className="px-3 py-1 text-xs bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+                        >
+                          {twitterState.currentOperation === OperationType.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={connectTwitter}
+                          disabled={twitterState.currentOperation === OperationType.CONNECTING}
+                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50"
+                        >
+                          {twitterState.currentOperation === OperationType.CONNECTING ? 'Connecting...' : 'Connect'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center space-x-2 ml-2">
                     {twitterState.currentOperation === OperationType.CONNECTING && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
