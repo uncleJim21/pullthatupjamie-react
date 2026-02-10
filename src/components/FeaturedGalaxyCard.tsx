@@ -295,10 +295,10 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        // Card is "fully in view" when ≥98% visible within the scroll container
-        setIsFullyInView(entry.intersectionRatio >= 0.98);
+        // Show stars when card is ≥80% visible — keeps both cards lit during scroll
+        setIsFullyInView(entry.intersectionRatio >= 0.8);
       },
-      { root, threshold: [0, 0.5, 0.98, 1.0] },
+      { root, threshold: [0, 0.25, 0.5, 0.8, 1.0] },
     );
 
     observer.observe(el);
@@ -363,12 +363,13 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
     <div
       ref={cardRef}
       onClick={onClick}
-      className="relative flex-shrink-0 w-44 h-44 md:w-52 md:h-52 rounded-lg overflow-hidden cursor-pointer group transition-all duration-300 hover:scale-[1.02] bg-[#0A0A0A] border border-gray-800 hover:border-gray-600"
+      className="relative flex-shrink-0 w-[calc(50vw-64px)] h-[calc(50vw-24px)] sm:w-44 sm:h-44 md:w-52 md:h-52 sm:max-w-none sm:max-h-none rounded-lg overflow-hidden cursor-pointer group transition-all duration-300 hover:scale-[1.02] bg-[#0A0A0A] border border-gray-800 hover:border-gray-600"
     >
       {/* 3D scene — rendered via the shared Canvas using View scissoring.
           The View is only mounted when the card is fully within the scroll
-          container's visible area, preventing stars from bleeding outside. */}
-      <div className="absolute inset-0">
+          container's visible area, preventing stars from bleeding outside.
+          Bottom inset keeps stars clear of the title bar. */}
+      <div className="absolute top-0 left-0 right-0 bottom-[18px] sm:bottom-[40px] md:bottom-[46px]">
         {showStars ? (
           <View className="w-full h-full">
             <PerspectiveCamera
@@ -396,14 +397,14 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
       
       {/* Title bar - solid black tab with title + subtitle */}
       {displayTitle && (
-        <div className="absolute bottom-0 left-0 right-0 bg-black/95 px-3 py-2.5 border-t border-gray-800">
+        <div className="absolute bottom-0 left-0 right-0 bg-black/95 px-2 sm:px-3 sm:py-2.5 border-t border-gray-800 h-[36px] sm:h-auto flex flex-col justify-center sm:block">
           <p 
-            className="text-gray-100 font-medium truncate leading-tight"
-            style={{ fontSize: 'clamp(0.75rem, 2.5vw, 0.875rem)' }}
+            className="text-gray-100 font-medium leading-tight line-clamp-2 sm:truncate sm:line-clamp-none"
+            style={{ fontSize: 'clamp(0.65rem, 2.2vw, 0.875rem)' }}
           >
             {displayTitle}
           </p>
-          <p className="text-gray-400 text-xs truncate mt-0.5">
+          <p className="hidden sm:block text-gray-400 text-xs truncate mt-0.5">
             {points.length} moment{points.length !== 1 ? 's' : ''}
           </p>
         </div>

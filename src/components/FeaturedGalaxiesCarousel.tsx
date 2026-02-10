@@ -129,13 +129,13 @@ export const FEATURED_CATEGORIES: FeaturedCategory[] = [
       { shareId: 'a30ed556220d', fallbackTitle: 'How Great Companies Are Built' },
     ],
   },
-  // --- Health & Wellness (vibrant cyan-teal) ---
+  // --- Health & Wellness (pale icy blue-white) ---
   {
     title: 'Health & Wellness',
-    baseHue: 182,       // Cyan-teal (Modern Wisdom style)
-    hueVariance: 15,
-    saturation: 75,
-    lightness: 55,
+    baseHue: 195,       // Cool blue
+    hueVariance: 10,
+    saturation: 30,
+    lightness: 78,
     sessions: [
       { shareId: '96aa56fbd4db', fallbackTitle: 'Longevity & Healthspan' },
       { shareId: 'bd78489b3661', fallbackTitle: 'Sleep & Recovery' },
@@ -171,13 +171,13 @@ export const FEATURED_CATEGORIES: FeaturedCategory[] = [
       { shareId: '63c71c33c6a3', fallbackTitle: 'Media Manipulation' },
     ],
   },
-  // --- Business (deep green) ---
+  // --- Business (dollar-bill pale green) ---
   {
     title: 'Business',
-    baseHue: 155,       // Deep green
-    hueVariance: 12,
-    saturation: 65,
-    lightness: 40,
+    baseHue: 130,       // Dollar-bill green
+    hueVariance: 10,
+    saturation: 35,
+    lightness: 70,
     sessions: [
       { shareId: 'b3e1120bda76', fallbackTitle: 'How to Build a Business' },
       { shareId: '6bce290093f6', fallbackTitle: 'The Creator Economy' },
@@ -372,7 +372,7 @@ const CategoryRow: React.FC<{
       {/* Scrollable container with drag-to-scroll */}
       <div
         ref={scrollContainerRef}
-        className={`flex gap-5 overflow-x-auto pb-4 px-2 scrollbar-hide select-none ${
+        className={`flex gap-3 sm:gap-5 overflow-x-auto pb-4 px-1 sm:px-2 scrollbar-hide select-none ${
           isDragging ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
