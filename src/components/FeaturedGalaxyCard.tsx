@@ -248,6 +248,10 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
   fallbackColor = '#4ECDC4',
   onClick,
 }) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [hasBeenVisible, setHasBeenVisible] = useState(false);
+
   const [points, setPoints] = useState<StarPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -255,9 +259,33 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
   // Live data from backend
   const [sessionTitle, setSessionTitle] = useState<string | null>(null);
   const [themeColor, setThemeColor] = useState<string>(fallbackColor);
-  
-  // Fetch session data on mount
+
+  // ---------- Visibility tracking ----------
+  // Only mount <Canvas> (WebGL context) when the card is in/near the viewport.
+  // Data is fetched once on first visibility and cached, so scrolling back is instant.
   useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+        if (entry.isIntersecting) {
+          setHasBeenVisible(true);
+        }
+      },
+      { rootMargin: '300px' }, // Pre-load slightly before scrolling into view
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // ---------- Lazy data fetch ----------
+  // Only fires after the card has been visible at least once.
+  useEffect(() => {
+    if (!hasBeenVisible) return;
+
     const fetchData = async () => {
       try {
         setIsLoading(true);
@@ -299,19 +327,20 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
     };
     
     fetchData();
-  }, [shareId]);
+  }, [hasBeenVisible, shareId]);
   
   // Use live title or fallback
   const displayTitle = sessionTitle || fallbackTitle;
   
   return (
     <div
+      ref={cardRef}
       onClick={onClick}
       className="relative flex-shrink-0 w-44 h-44 md:w-52 md:h-52 rounded-lg overflow-hidden cursor-pointer group transition-all duration-300 hover:scale-[1.02] bg-[#0A0A0A] border border-gray-800 hover:border-gray-600"
     >
-      {/* Galaxy Canvas */}
+      {/* Galaxy Canvas — only mounted when visible to stay within WebGL context limits */}
       <div className="absolute inset-0">
-        {isLoading ? (
+        {!hasBeenVisible || isLoading ? (
           <div className="w-full h-full flex items-center justify-center bg-[#0A0A0A]">
             <div className="w-6 h-6 border-2 border-gray-700 border-t-white rounded-full animate-spin" />
           </div>
@@ -319,7 +348,7 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
           <div className="w-full h-full flex items-center justify-center bg-[#0A0A0A] text-gray-600 text-sm">
             {error}
           </div>
-        ) : (
+        ) : isVisible ? (
           <Canvas
             camera={{ 
               position: [0, 0, MINI_GALAXY_CONFIG.CAMERA_DISTANCE], 
@@ -334,6 +363,9 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
           >
             <MiniStarField points={points} themeColor={themeColor} />
           </Canvas>
+        ) : (
+          /* Off-screen: data loaded but Canvas unmounted to free WebGL context */
+          <div className="w-full h-full bg-[#0A0A0A]" />
         )}
       </div>
       
