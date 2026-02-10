@@ -593,7 +593,7 @@ const HeroSegment: React.FC = () => {
               letterSpacing: '-0.03em',
             }}
           >
-            Stop prompting. Start exploring.
+            More signal. Less slop.
           </h1>
 
           {/* Subhead */}
@@ -607,7 +607,7 @@ const HeroSegment: React.FC = () => {
               letterSpacing: '-0.01em',
             }}
           >
-            Jamie turns raw data into a space you can navigate.
+            Jamie surfaces insights visually from real conversations that matter.
           </p>
 
           {/* Body copy */}
@@ -622,8 +622,7 @@ const HeroSegment: React.FC = () => {
               maxWidth: '440px',
             }}
           >
-            Make sense of the data deluge with one of a kind visualizations & insights.
-            Conversations are just the beginning.
+            Explore concepts visually. Cut through the deluge of AI slop & content. Gather insights from real conversations. Save for later and share with friends.
           </p>
 
           {/* CTA — White filled button, right-aligned */}
@@ -1244,7 +1243,7 @@ const Footer: React.FC = () => {
                 maxWidth: '280px',
               }}
             >
-              Turning information into something you can navigate.
+              Filtering out the slop and surfacing the signal.
             </p>
           </div>
 
