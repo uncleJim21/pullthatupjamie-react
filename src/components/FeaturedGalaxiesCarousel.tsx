@@ -1,4 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { View } from '@react-three/drei';
+import * as THREE from 'three';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import FeaturedGalaxyCard from './FeaturedGalaxyCard.tsx';
 
@@ -387,13 +390,14 @@ const CategoryRow: React.FC<{
               shareId={session.shareId}
               fallbackTitle={session.fallbackTitle}
               fallbackColor={session.fallbackColor}
+              scrollContainerRef={scrollContainerRef}
               onClick={() => handleCardClick(session.shareId, session.fallbackTitle || 'Featured Session')}
             />
           </div>
         ))}
       </div>
 
-      {/* Fade edges for scroll indication - hidden on mobile for cleaner look */}
+      {/* Fade edges for scroll indication */}
       {canScrollLeft && (
         <div className="hidden md:block absolute left-0 top-10 bottom-4 w-12 bg-gradient-to-r from-black to-transparent pointer-events-none" />
       )}
@@ -411,11 +415,12 @@ const CategoryRow: React.FC<{
 export const FeaturedGalaxiesCarousel: React.FC<FeaturedGalaxiesCarouselProps> = ({
   onSessionClick,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   // Shuffle categories once on mount so the order varies per page load
   const [shuffledCategories] = useState(() => shuffleArray(FEATURED_CATEGORIES));
 
   return (
-    <div className="flex flex-col gap-10">
+    <div ref={containerRef} className="flex flex-col gap-10 relative">
       {shuffledCategories.map((category) => (
         <CategoryRow
           key={category.title}
@@ -423,6 +428,34 @@ export const FeaturedGalaxiesCarousel: React.FC<FeaturedGalaxiesCarouselProps> =
           onSessionClick={onSessionClick}
         />
       ))}
+
+      {/* Single shared Canvas — ONE WebGL context for ALL galaxy cards.
+          Fixed fullscreen transparent overlay. Views inside cards track their
+          position and the Canvas renders stars at each View's location via
+          scissoring. Cards hide their View when partially offscreen. */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+        }}
+      >
+        <Canvas
+          gl={{
+            antialias: true,
+            alpha: true,
+            toneMapping: THREE.NoToneMapping,
+          }}
+          style={{ pointerEvents: 'none' }}
+          eventSource={containerRef}
+          eventPrefix="client"
+        >
+          <View.Port />
+        </Canvas>
+      </div>
     </div>
   );
 };

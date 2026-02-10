@@ -1,5 +1,6 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
+import { View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { ArrowUpRight } from 'lucide-react';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
@@ -119,6 +120,9 @@ interface FeaturedGalaxyCardProps {
   fallbackTitle?: string;
   fallbackColor?: string;
   onClick?: () => void;
+  /** Ref to the horizontal scroll container — used to detect when the card
+      is partially scrolled offscreen so we can hide the View (prevents star bleed). */
+  scrollContainerRef?: React.RefObject<HTMLDivElement>;
 }
 
 // ============================================================================
@@ -241,16 +245,19 @@ const MiniStarField: React.FC<{
 
 // ============================================================================
 // MAIN CARD COMPONENT
+// Uses <View> from @react-three/drei to render into the shared Canvas via
+// WebGL scissoring. One WebGL context for ALL cards — no context limits.
 // ============================================================================
 export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
   shareId,
   fallbackTitle,
   fallbackColor = '#4ECDC4',
   onClick,
+  scrollContainerRef,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
   const [hasBeenVisible, setHasBeenVisible] = useState(false);
+  const [isFullyInView, setIsFullyInView] = useState(true);
 
   const [points, setPoints] = useState<StarPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -260,26 +267,43 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
   const [sessionTitle, setSessionTitle] = useState<string | null>(null);
   const [themeColor, setThemeColor] = useState<string>(fallbackColor);
 
-  // ---------- Visibility tracking ----------
-  // Only mount <Canvas> (WebGL context) when the card is in/near the viewport.
-  // Data is fetched once on first visibility and cached, so scrolling back is instant.
+  // ---------- Visibility tracking (for lazy data fetching) ----------
   useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsVisible(entry.isIntersecting);
         if (entry.isIntersecting) {
           setHasBeenVisible(true);
         }
       },
-      { rootMargin: '300px' }, // Pre-load slightly before scrolling into view
+      { rootMargin: '300px' },
     );
 
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  // ---------- Scroll-container clipping ----------
+  // Only render the View when the card is fully inside the scroll container's
+  // visible area. This prevents stars from bleeding past partially-offscreen cards.
+  useEffect(() => {
+    const el = cardRef.current;
+    const root = scrollContainerRef?.current;
+    if (!el || !root) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Card is "fully in view" when ≥98% visible within the scroll container
+        setIsFullyInView(entry.intersectionRatio >= 0.98);
+      },
+      { root, threshold: [0, 0.5, 0.98, 1.0] },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [scrollContainerRef]);
 
   // ---------- Lazy data fetch ----------
   // Only fires after the card has been visible at least once.
@@ -332,42 +356,35 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
   // Use live title or fallback
   const displayTitle = sessionTitle || fallbackTitle;
   
+  // Show the 3D View only when data is ready AND card is fully inside the scroll area
+  const showStars = !isLoading && !error && points.length > 0 && isFullyInView;
+
   return (
     <div
       ref={cardRef}
       onClick={onClick}
       className="relative flex-shrink-0 w-44 h-44 md:w-52 md:h-52 rounded-lg overflow-hidden cursor-pointer group transition-all duration-300 hover:scale-[1.02] bg-[#0A0A0A] border border-gray-800 hover:border-gray-600"
     >
-      {/* Galaxy Canvas — only mounted when visible to stay within WebGL context limits */}
+      {/* 3D scene — rendered via the shared Canvas using View scissoring.
+          The View is only mounted when the card is fully within the scroll
+          container's visible area, preventing stars from bleeding outside. */}
       <div className="absolute inset-0">
-        {!hasBeenVisible || isLoading ? (
-          <div className="w-full h-full flex items-center justify-center bg-[#0A0A0A]">
-            <div className="w-6 h-6 border-2 border-gray-700 border-t-white rounded-full animate-spin" />
-          </div>
+        {showStars ? (
+          <View className="w-full h-full">
+            <PerspectiveCamera
+              makeDefault
+              position={[0, 0, MINI_GALAXY_CONFIG.CAMERA_DISTANCE]}
+              fov={50}
+            />
+            <MiniStarField points={points} themeColor={themeColor} />
+          </View>
         ) : error ? (
           <div className="w-full h-full flex items-center justify-center bg-[#0A0A0A] text-gray-600 text-sm">
             {error}
           </div>
-        ) : isVisible ? (
-          <Canvas
-            camera={{ 
-              position: [0, 0, MINI_GALAXY_CONFIG.CAMERA_DISTANCE], 
-              fov: 50 
-            }}
-            gl={{ 
-              antialias: true, 
-              alpha: true,
-              toneMapping: THREE.NoToneMapping, // Preserve color accuracy
-            }}
-            style={{ background: '#0A0A0A' }}
-          >
-            <MiniStarField points={points} themeColor={themeColor} />
-          </Canvas>
-        ) : (
-          /* Off-screen: data loaded but Canvas unmounted to free WebGL context */
-          <div className="w-full h-full bg-[#0A0A0A]" />
-        )}
+        ) : null}
       </div>
+
       
       {/* Hover overlay - subtle white glow */}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/5" />
