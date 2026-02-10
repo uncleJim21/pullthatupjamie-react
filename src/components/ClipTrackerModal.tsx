@@ -345,7 +345,7 @@ export default function ClipTrackerModal({
   }, [clipProgress]);
 
   return (
-    <div className="w-full mb-2 pointer-events-auto">
+    <div className="w-full -mb-4 sm:mb-2 pointer-events-auto">
       {/* Current Clip */}
       <div className="bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow">
       <button

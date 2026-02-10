@@ -225,8 +225,60 @@ const CAMERA_ANIMATION_CONFIG = {
   duration: 0.25,               // seconds (longer to see the zoom effect)
   fromAngle: Math.PI,          // 180 degrees
   toAngle: 0,                  // 0 degrees (forward)
-  fromDistanceFactor: 0.3,    // start closer (easier to see zoom out)
-  toDistanceFactor: 1.35,      // zoom out 50% more (was 0.9, now 1.35)
+  fromDistanceFactor: 0.3,     // start closer (easier to see zoom out)
+  // toDistance is now computed dynamically — see computeFitDistance()
+  PADDING: 1.15,               // Multiplier so stars aren't right at the viewport edge
+  MIN_DISTANCE: 8,             // Floor so single-star / tight clusters don't zoom in too close
+  MAX_DISTANCE: 45,            // Ceiling (stay within OrbitControls maxDistance=50 with room)
+  FALLBACK_DISTANCE: 21,       // Used when results are empty or computation fails
+  FOV: 75,                     // Must match the <PerspectiveCamera fov={...}> value
+};
+
+/**
+ * Compute the camera distance required to fit all stars into the viewport.
+ *
+ * Strategy:
+ *  1. Find the bounding sphere radius of all star positions (already scaled ×10).
+ *  2. Determine the *effective* half-FOV — whichever axis (vertical or horizontal)
+ *     is tighter given the viewport aspect ratio.
+ *  3. distance = radius / sin(effectiveHalfFov)  + padding.
+ *  4. Clamp between MIN_DISTANCE and MAX_DISTANCE.
+ */
+const computeFitDistance = (
+  results: { coordinates3d: { x: number; y: number; z: number } }[],
+  aspect: number, // viewport width / height
+): number => {
+  if (!results || results.length === 0) return CAMERA_ANIMATION_CONFIG.FALLBACK_DISTANCE;
+
+  // 1. Bounding sphere radius (coordinates are multiplied by 10 for scene positioning)
+  let maxRadiusSq = 0;
+  for (const r of results) {
+    const x = r.coordinates3d.x * 10;
+    const y = r.coordinates3d.y * 10;
+    const z = r.coordinates3d.z * 10;
+    const distSq = x * x + y * y + z * z;
+    if (distSq > maxRadiusSq) maxRadiusSq = distSq;
+  }
+  const boundingRadius = Math.sqrt(maxRadiusSq);
+
+  if (boundingRadius <= 0) return CAMERA_ANIMATION_CONFIG.FALLBACK_DISTANCE;
+
+  // 2. Effective half-FOV (radians) — use the tighter of vertical vs horizontal
+  const vFovRad = THREE.MathUtils.degToRad(CAMERA_ANIMATION_CONFIG.FOV);
+  const vHalf = vFovRad / 2;
+  const hHalf = Math.atan(Math.tan(vHalf) * aspect);
+  const effectiveHalf = Math.min(vHalf, hHalf);
+
+  // 3. Required distance so the bounding sphere fits within the frustum
+  //    Using sin() because the sphere can extend perpendicular to the view direction.
+  const rawDistance = boundingRadius / Math.sin(effectiveHalf);
+
+  // 4. Apply padding and clamp
+  const padded = rawDistance * CAMERA_ANIMATION_CONFIG.PADDING;
+  return Math.max(
+    CAMERA_ANIMATION_CONFIG.MIN_DISTANCE,
+    Math.min(CAMERA_ANIMATION_CONFIG.MAX_DISTANCE, padded),
+  );
 };
 
 // Generate random tiny ray properties
@@ -941,7 +993,8 @@ const AnimatedCamera: React.FC<{
   animationRef: React.MutableRefObject<CameraAnimationState | null>;
   isAnimating: boolean;
   setIsAnimating: (value: boolean) => void;
-}> = ({ cameraRef, controlsRef, animationRef, isAnimating, setIsAnimating }) => {
+  targetDistance: number; // Dynamically computed distance to fit all stars
+}> = ({ cameraRef, controlsRef, animationRef, isAnimating, setIsAnimating, targetDistance }) => {
   const hasCompletedRef = useRef(false);
   
   useFrame((state) => {
@@ -967,9 +1020,8 @@ const AnimatedCamera: React.FC<{
         duration: CAMERA_ANIMATION_CONFIG.duration,
         fromAngle: CAMERA_ANIMATION_CONFIG.fromAngle,
         toAngle: CAMERA_ANIMATION_CONFIG.toAngle,
-        fromDistance:
-          baseDistance * CAMERA_ANIMATION_CONFIG.fromDistanceFactor,
-        toDistance: baseDistance * CAMERA_ANIMATION_CONFIG.toDistanceFactor,
+        fromDistance: targetDistance * CAMERA_ANIMATION_CONFIG.fromDistanceFactor,
+        toDistance: targetDistance,
         baseYRatio,
       };
     }
@@ -1805,10 +1857,39 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
     });
   };
 
+  // Dynamically compute the camera distance needed to fit all stars in the viewport.
+  // Re-computes whenever results change or the container resizes.
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setContainerSize({ width, height });
+      }
+    });
+    ro.observe(el);
+
+    // Initial measurement
+    const rect = el.getBoundingClientRect();
+    setContainerSize({ width: rect.width, height: rect.height });
+
+    return () => ro.disconnect();
+  }, []);
+
+  const cameraTargetDistance = useMemo(() => {
+    const aspect = containerSize.width > 0 && containerSize.height > 0
+      ? containerSize.width / containerSize.height
+      : 1; // safe fallback
+    return computeFitDistance(results, aspect);
+  }, [results, containerSize.width, containerSize.height]);
+
   // Prepare camera intro animation whenever a new set of results arrives.
   // We only signal that an animation should start here; the actual parameters
   // are initialized lazily inside the AnimatedCamera when the camera ref is ready.
-  // DISABLED: Camera animation causes visible "frame jump" when results load during warp speed
   useEffect(() => {
     if (!results || results.length === 0) return;
     
@@ -2122,7 +2203,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       )}
 
       {/* Stats overlay with Legend and Research Session - Hidden when hideStats is true */}
-      {!hideStats && (
+      {/* Also hidden in compact mode when sharedSessionTitle is shown (avoids duplicate title on mobile) */}
+      {!hideStats && !(compactStats && sharedSessionTitle) && (
       <div
         className={`absolute top-2 right-4 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 text-sm z-10 ${
           compactStats ? 'px-2 py-1.5 max-w-[220px]' : 'max-w-[200px] max-h-[calc(100vh-8rem)] flex flex-col'
@@ -2442,6 +2524,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           animationRef={cameraAnimationRef}
           isAnimating={isAnimatingCamera}
           setIsAnimating={setIsAnimatingCamera}
+          targetDistance={cameraTargetDistance}
         />
 
         <GalaxyScene
