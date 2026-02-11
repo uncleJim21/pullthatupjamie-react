@@ -553,7 +553,7 @@ const HeroSegment: React.FC = () => {
             }}
           >
             <iframe
-              src={`${window.location.origin}/app?sharedSession=0d1acd2cc1f4&embed=true`}
+              src={`${window.location.origin}/app?sharedSession=08fc784abd3a&embed=true`}
               style={{
                 width: '100%',
                 height: '100%',
