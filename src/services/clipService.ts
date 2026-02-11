@@ -1,7 +1,7 @@
 import { API_URL, AuthConfig } from "../constants/constants.ts";
 import { ClipRequestResponse } from "../types/clips.ts";
 import { throwIfQuotaExceeded } from "../types/errors.ts";
-import { getAnalyticsHeader } from "./analyticsService.ts";
+import { getAnalyticsHeader } from "./pulseService.ts";
 
 /**
  * Build authorization headers using JWT Bearer token

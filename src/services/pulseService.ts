@@ -1,5 +1,5 @@
-// services/analyticsService.ts
-// Analytics service for tracking user journeys and feature usage
+// services/pulseService.ts
+// Pulse service for tracking user journeys and feature usage
 // See docs/specs/ANALYTICS_SPEC.md for full documentation
 
 import { API_URL, printLog } from '../constants/constants.ts';
@@ -11,13 +11,13 @@ import { API_URL, printLog } from '../constants/constants.ts';
 export type Tier = 'anonymous' | 'registered' | 'subscriber' | 'admin';
 export type Environment = 'dev' | 'staging' | 'prod';
 
-interface AnalyticsSession {
+interface PulseSession {
   sessionId: string;
   createdAt: string;
   expiresAt: string;
 }
 
-interface AnalyticsEvent {
+interface PulseEvent {
   type: string;
   session_id: string;
   timestamp: string;
@@ -32,7 +32,7 @@ interface AnalyticsEvent {
 
 const SESSION_KEY = 'jamie_analytics_session';
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const ANALYTICS_ENDPOINT = `${API_URL}/api/analytics`;
+const PULSE_ENDPOINT = `${API_URL}/api/pulse`;
 
 // Allowed event types for validation
 const ALLOWED_EVENTS = [
@@ -61,35 +61,35 @@ export type AnalyticsEventType = typeof ALLOWED_EVENTS[number];
 // ============================================================
 
 /**
- * Get or create an analytics session.
+ * Get or create a pulse session.
  * Sessions persist for 30 days and are NOT rotated on auth changes
  * to preserve the full user journey.
  */
-export function getOrCreateSession(): AnalyticsSession {
+export function getOrCreateSession(): PulseSession {
   const stored = localStorage.getItem(SESSION_KEY);
 
   if (stored) {
     try {
-      const session = JSON.parse(stored) as AnalyticsSession;
+      const session = JSON.parse(stored) as PulseSession;
       if (new Date(session.expiresAt) > new Date()) {
         return session; // Still valid
       }
-      printLog('[Analytics] Session expired, creating new one');
+      printLog('[Pulse] Session expired, creating new one');
     } catch {
-      printLog('[Analytics] Corrupted session data, creating new one');
+      printLog('[Pulse] Corrupted session data, creating new one');
     }
   }
 
   // Create new session
   const now = new Date();
-  const newSession: AnalyticsSession = {
+  const newSession: PulseSession = {
     sessionId: crypto.randomUUID(),
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + SESSION_DURATION_MS).toISOString(),
   };
 
   localStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
-  printLog(`[Analytics] Created new session: ${newSession.sessionId.substring(0, 8)}...`);
+  printLog(`[Pulse] Created new session: ${newSession.sessionId.substring(0, 8)}...`);
   return newSession;
 }
 
@@ -164,18 +164,18 @@ interface TrackEventOptions {
 }
 
 /**
- * Track an analytics event.
+ * Track a pulse event.
  * Uses sendBeacon for reliability on page unload.
- * Never throws - analytics should not break the app.
+ * Never throws - pulse should not break the app.
  */
 export async function trackEvent({ type, properties = {} }: TrackEventOptions): Promise<void> {
   // Validate event type
   if (!ALLOWED_EVENTS.includes(type)) {
-    printLog(`[Analytics] Invalid event type: ${type}`);
+    printLog(`[Pulse] Invalid event type: ${type}`);
     return;
   }
 
-  const payload: AnalyticsEvent = {
+  const payload: PulseEvent = {
     type,
     session_id: getSessionId(),
     timestamp: new Date().toISOString(),
@@ -184,13 +184,13 @@ export async function trackEvent({ type, properties = {} }: TrackEventOptions): 
     properties,
   };
 
-  printLog(`[Analytics] Tracking: ${type} ${JSON.stringify(properties)}`);
+  printLog(`[Pulse] Tracking: ${type} ${JSON.stringify(properties)}`);
 
   try {
     // Use sendBeacon for reliability (works even on page unload)
     if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
       const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-      const success = navigator.sendBeacon(ANALYTICS_ENDPOINT, blob);
+      const success = navigator.sendBeacon(PULSE_ENDPOINT, blob);
       if (!success) {
         // Fallback to fetch if sendBeacon fails
         await fetchFallback(payload);
@@ -199,16 +199,16 @@ export async function trackEvent({ type, properties = {} }: TrackEventOptions): 
       await fetchFallback(payload);
     }
   } catch (error) {
-    // Analytics should never break the app
-    printLog(`[Analytics] Failed to track event: ${error}`);
+    // Pulse should never break the app
+    printLog(`[Pulse] Failed to track event: ${error}`);
   }
 }
 
 /**
  * Fallback fetch for environments without sendBeacon
  */
-async function fetchFallback(payload: AnalyticsEvent): Promise<void> {
-  await fetch(ANALYTICS_ENDPOINT, {
+async function fetchFallback(payload: PulseEvent): Promise<void> {
+  await fetch(PULSE_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -337,7 +337,7 @@ export function trackVisitSharedSession(shareId: string, source: SharedSessionSo
 /**
  * Get the X-Analytics-Session header value for API requests.
  * Include this header on entitlement-gated endpoints so the backend
- * can emit server-side analytics events with session context.
+ * can emit server-side pulse events with session context.
  */
 export function getAnalyticsHeader(): Record<string, string> {
   return {
