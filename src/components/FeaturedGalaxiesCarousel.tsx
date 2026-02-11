@@ -48,11 +48,18 @@ const generateRandomCategoryColor = (
   saturation: number = 70,
   lightness: number = 58,
 ): string => {
-  // Random offset within [-variance, +variance]
-  const offset = (Math.random() * 2 - 1) * variance;
-  const hue = ((baseHue + offset) % 360 + 360) % 360;
+  // Random hue offset within [-variance, +variance]
+  const hueOffset = (Math.random() * 2 - 1) * variance;
+  const hue = ((baseHue + hueOffset) % 360 + 360) % 360;
 
-  return hslToHex(hue, saturation, lightness);
+  // Also vary saturation and lightness by ±15% of the base value
+  // This gives a range from paler/lighter to richer/darker within each category
+  const satOffset = (Math.random() * 2 - 1) * 15;
+  const litOffset = (Math.random() * 2 - 1) * 12;
+  const finalSat = Math.max(10, Math.min(100, saturation + satOffset));
+  const finalLit = Math.max(25, Math.min(85, lightness + litOffset));
+
+  return hslToHex(hue, finalSat, finalLit);
 };
 
 // ============================================================================
@@ -129,13 +136,13 @@ export const FEATURED_CATEGORIES: FeaturedCategory[] = [
       { shareId: 'a30ed556220d', fallbackTitle: 'How Great Companies Are Built' },
     ],
   },
-  // --- Health & Wellness (pale icy blue-white) ---
+  // --- Health & Wellness (range hard: pale icy to clear aqua) ---
   {
     title: 'Health & Wellness',
-    baseHue: 195,       // Cool blue
-    hueVariance: 10,
-    saturation: 30,
-    lightness: 78,
+    baseHue: 190,       // Aqua-blue
+    hueVariance: 20,    // Wide hue range
+    saturation: 60,     // ±15 variance → some cards ~45 (pale), some ~75 (vivid)
+    lightness: 65,      // ±12 variance → some cards ~53 (darker), some ~77 (lighter)
     sessions: [
       { shareId: '96aa56fbd4db', fallbackTitle: 'Longevity & Healthspan' },
       { shareId: 'bd78489b3661', fallbackTitle: 'Sleep & Recovery' },
@@ -158,12 +165,12 @@ export const FEATURED_CATEGORIES: FeaturedCategory[] = [
       { shareId: '589954c05d55', fallbackTitle: 'The Surveillance State' },
     ],
   },
-  // --- Lunatic Fringe (violet / purple) ---
+  // --- Lunatic Fringe (fuschia ↔ deep purple, wide range) ---
   {
     title: 'Lunatic Fringe',
-    baseHue: 275,       // Violet
-    hueVariance: 12,
-    saturation: 60,
+    baseHue: 290,       // Between fuschia (310) and purple (270)
+    hueVariance: 25,    // Wide: ranges from ~265 (deep purple) to ~315 (fuschia)
+    saturation: 70,
     lightness: 55,
     sessions: [
       { shareId: '7eebcf7f3efd', fallbackTitle: 'UFOs & UAPs' },

@@ -383,6 +383,10 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
           <div className="w-full h-full flex items-center justify-center bg-[#0A0A0A] text-gray-600 text-sm">
             {error}
           </div>
+        ) : isLoading ? (
+          <div className="w-full h-full flex items-center justify-center bg-[#0A0A0A]">
+            <div className="w-6 h-6 border-2 border-gray-700 border-t-white rounded-full animate-spin" />
+          </div>
         ) : null}
       </div>
 
