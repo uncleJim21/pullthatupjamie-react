@@ -18,12 +18,9 @@ function getFrontendUrl() {
 
   // Server-side (Node.js / Vercel Functions)
   if (typeof window === 'undefined') {
-    // Vercel automatically sets VERCEL_URL to the deployment URL
-    if (process.env.VERCEL_URL) {
-      return `https://${process.env.VERCEL_URL}`;
-    }
+
     // Fallback to custom env var or production
-    return process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://pullthatupjamie.ai';
+    return 'https://pullthatupjamie.ai';
   }
 
   // Client-side (Browser)
