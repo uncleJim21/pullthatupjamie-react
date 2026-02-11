@@ -10,7 +10,7 @@ import {
   trackAuthAbandoned,
   type AuthSource,
   type AuthIntent,
-} from '../services/analyticsService.ts';
+} from '../services/pulseService.ts';
 
 type AuthMode = 'signin' | 'signup';
 type AuthProvider = 'select' | 'email' | 'nostr' | 'twitter';

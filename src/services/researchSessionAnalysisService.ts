@@ -1,7 +1,7 @@
 import { API_URL, printLog } from "../constants/constants.ts";
 import { throwIfQuotaExceeded, QuotaExceededError } from "../types/errors.ts";
 import { getOrCreateClientId } from "../utils/clientId.ts";
-import { getAnalyticsHeader } from "./analyticsService.ts";
+import { getAnalyticsHeader } from "./pulseService.ts";
 
 export interface AnalysisRequest {
   instructions: string;

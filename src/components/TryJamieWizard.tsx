@@ -15,7 +15,7 @@ import {
   trackProcessingCompleted,
   cacheUserTier,
   type WizardStep,
-} from '../services/analyticsService.ts';
+} from '../services/pulseService.ts';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;

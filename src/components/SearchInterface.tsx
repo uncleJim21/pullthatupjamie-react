@@ -51,7 +51,7 @@ import PoweredByJamiePill from './PoweredByJamiePill.tsx';
 import FeaturedGalaxiesCarousel from './FeaturedGalaxiesCarousel.tsx';
 import { ResearchSessionItem, clearLocalSession, MAX_RESEARCH_ITEMS, loadCurrentSession, saveResearchSession, fetchResearchSession, backendItemsToFrontend, setCurrentSessionId, saveResearchSessionWithRetry, getCurrentSessionId, enrichResearchItems } from '../services/researchSessionService.ts';
 import { fetchSharedResearchSession, fetchResearchSessionWith3D } from '../services/researchSessionShareService.ts';
-import { trackVisitSharedSession } from '../services/analyticsService.ts';
+import { trackVisitSharedSession } from '../services/pulseService.ts';
 
 
 export type SearchMode = 'web-search' | 'podcast-search';

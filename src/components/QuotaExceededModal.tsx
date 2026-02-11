@@ -5,7 +5,7 @@ import {
   trackQuotaExceededShown,
   trackQuotaExceededAction,
   type QuotaAction,
-} from '../services/analyticsService.ts';
+} from '../services/pulseService.ts';
 
 // User tier types from the new auth system
 export type UserTier = 'anonymous' | 'registered' | 'subscriber' | 'admin';

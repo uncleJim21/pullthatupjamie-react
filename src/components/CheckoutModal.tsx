@@ -11,7 +11,7 @@ import {
   trackCheckoutAbandoned,
   getCurrentTier,
   type CheckoutProduct,
-} from '../services/analyticsService.ts';
+} from '../services/pulseService.ts';
 
 const steps = ['Sign In', 'Billing', 'Card'];
 const paymentServerUrl = DEBUG_MODE ? "http://localhost:6111" : "https://cascdr-auth-backend-cw4nk.ondigitalocean.app";

@@ -1,6 +1,6 @@
 import { API_URL } from "../constants/constants.ts";
 import { throwIfQuotaExceeded } from "../types/errors.ts";
-import { getAnalyticsHeader } from "./analyticsService.ts";
+import { getAnalyticsHeader } from "./pulseService.ts";
 
 const BASE_URL = API_URL;
 

@@ -1,6 +1,6 @@
 import { API_URL, AuthConfig, printLog, ShareModalContext } from "../constants/constants.ts";
 import { throwIfQuotaExceeded } from "../types/errors.ts";
-import { getAnalyticsHeader } from "./analyticsService.ts";
+import { getAnalyticsHeader } from "./pulseService.ts";
 
 /**
  * Build authorization headers using JWT Bearer token
