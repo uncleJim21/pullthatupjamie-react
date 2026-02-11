@@ -44,7 +44,7 @@ Nodes are color-coded by hierarchy level (blue for feeds, white for episodes, or
 
 ### Research Sessions
 
-As you explore, you can collect findings into a research session — a curated set of up to 50 podcast moments. Sessions persist for 24 hours and can be:
+As you explore, you can collect findings into a research session — a curated set of up to 20 podcast moments. Sessions persist for indefinitely:
 
 - **Viewed in 3D** — your collected moments rendered as their own galaxy
 - **Shared via link** — with full Open Graph metadata for rich previews on Twitter, Slack, iMessage, etc.
