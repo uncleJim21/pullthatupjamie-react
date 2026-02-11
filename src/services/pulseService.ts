@@ -19,7 +19,7 @@ interface PulseSession {
 
 interface PulseEvent {
   type: string;
-  sid: string;
+  session_id: string;
   timestamp: string;
   tier: Tier;
   environment: Environment;
@@ -185,7 +185,7 @@ export function emit({ type, properties = {} }: EmitOptions): void {
 
   const payload: PulseEvent = {
     type,
-    sid: getSessionId(),
+    session_id: getSessionId(),
     timestamp: new Date().toISOString(),
     tier: getCurrentTier(),
     environment: getEnvironment(),
