@@ -351,13 +351,13 @@ const TryJamieWizard: React.FC = () => {
       image: "https://megaphone.imgix.net/podcasts/8e5bcebc-ca16-11ee-89f0-0fa0b9bdfc7c/image/c2c595e6e3c2a64e6ea18fb6c6da8860.jpg"
     },
     {
-      id: "229239",
-      title: "Modern Wisdom",
-      url: "https://feeds.megaphone.fm/modernwisdom",
-      description: "Conversations with the world's most interesting thinkers about philosophy, psychology, and human optimization.",
-      author: "Chris Williamson",
-      ownerName: "Chris Williamson",
-      image: "https://megaphone.imgix.net/podcasts/a62f84c0-f8b6-11ed-a4fc-fb9e7841d45b/image/76ed638554a4be965517200d1cd5f30d.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress"
+      id: "6443613",
+      title: "THE Bitcoin Podcast",
+      url: "https://feeds.fountain.fm/VV0f6IwusQoi5kOqvNCx",
+      description: "THE Bitcoin Podcast, hosted by Walker America, is the fastest-growing Bitcoin podcast in the world. Bitcoin is scarce, but Bitcoin Podcasts are abundant. Get the Bitcoin signal you need all from one podcast. Whether you're deep down the Bitcoin rabbit hole or just starting your journey, there's some...",
+      author: "Walker America",
+      ownerName: "Walker America",
+      image: "https://feeds.fountain.fm/VV0f6IwusQoi5kOqvNCx/files/COVER_ART---DEFAULT---4eced655-475a-49c7-a222-997498359a53.jpg"
     },
     {
       id: "226249",
@@ -379,13 +379,13 @@ const TryJamieWizard: React.FC = () => {
       image: "https://image.simplecastcdn.com/images/8862bce3-8814-46a6-9b72-a533960bbd50/fc74b5de-5bf7-4b92-8bab-4c8eb0ed805e/3000x3000/wim-podcast-profile-6.jpg?aid=rss_feed"
     },
     {
-      id: "7181269",
-      title: "Early Days",
-      url: "https://anchor.fm/s/100230220/podcast/rss",
+      id: "5015946",
+      title: "State of Bitcoin",
+      url: "https://feeds.fountain.fm/u59Boi42aXChVy0qnxqY",
       description: "Exploring the early days of Bitcoin and the builders creating the future.",
-      author: "Car",
-      ownerName: "PlebLab",
-      image: "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/42872616/42872616-1737246678005-991fe8ccc838e.jpg"
+      author: "Brandon Keys",
+      ownerName: "Green Candle Investments",
+      image: "https://feeds.fountain.fm/u59Boi42aXChVy0qnxqY/files/COVER_ART---DEFAULT---77835b53-562a-498a-b929-67283c640c3a.jpg"
     },
     {
       id: "3498055",

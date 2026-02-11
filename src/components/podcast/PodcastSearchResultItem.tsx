@@ -489,13 +489,18 @@ export const PodcastSearchResultItem = ({
       >
         <div className="p-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <img
-              src={episodeImage}
-              alt={creator}
-              className="w-32 h-32 rounded-md border border-gray-700 object-cover mx-auto sm:mx-0 flex-shrink-0"
-              onLoad={() => setImageLoaded(true)}
-              onError={() => setImageLoaded(false)}
-            />
+            <div className="w-32 h-32 rounded-md mx-auto sm:mx-0 flex-shrink-0 relative overflow-hidden border border-gray-700">
+              {!imageLoaded && (
+                <div className="absolute inset-0 shimmer-loading" />
+              )}
+              <img
+                src={episodeImage}
+                alt={creator}
+                className={`w-full h-full object-cover ${imageLoaded ? 'block' : 'invisible'}`}
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageLoaded(false)}
+              />
+            </div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-center gap-3">
                 <div className="flex-1 min-w-0">
@@ -531,7 +536,7 @@ export const PodcastSearchResultItem = ({
         {/* Episode Image with Better Aspect Ratio */}
         <div className="relative h-32 group cursor-pointer" onClick={handlePlayPause}>
           {!imageLoaded && (
-            <div className="w-full h-full bg-gray-800 animate-pulse" />
+            <div className="w-full h-full shimmer-loading" />
           )}
           <img
             src={episodeImage}
@@ -814,7 +819,7 @@ export const PodcastSearchResultItem = ({
           {/* Episode Artwork */}
           <div className="flex-shrink-0 mb-2 sm:mb-0 sm:mr-4">
             {!imageLoaded && (
-              <div className="w-32 h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 bg-gray-800 animate-pulse" />
+              <div className="w-20 h-20 sm:w-32 sm:h-32 rounded-md mx-auto sm:mx-0 border border-gray-700 shimmer-loading" />
             )}
             <img
               src={episodeImage}

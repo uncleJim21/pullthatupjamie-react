@@ -90,6 +90,7 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
   const [highlightedParagraphId, setHighlightedParagraphId] = useState<string | null>(null);
   const [highlightedChunkIndex, setHighlightedChunkIndex] = useState<number>(0);
   const [imageError, setImageError] = useState(false);
+  const [episodeImageLoaded, setEpisodeImageLoaded] = useState(false);
   const [episodeChapters, setEpisodeChapters] = useState<Chapter[]>([]);
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
   const [isLoadingChapters, setIsLoadingChapters] = useState(false);
@@ -283,8 +284,9 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
       return;
     }
 
-    // Reset image error state when fetching new data
+    // Reset image states when fetching new data
     setImageError(false);
+    setEpisodeImageLoaded(false);
 
     const fetchData = async () => {
       setIsLoading(true);
@@ -817,8 +819,14 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
             onTouchMove={() => logTouch('ContextPane')}
           >
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
+              <div className="space-y-4 py-4 px-1">
+                {/* Shimmer skeleton: simulates transcript lines */}
+                <div className="h-4 w-3/4 rounded shimmer-loading" />
+                <div className="h-4 w-full rounded shimmer-loading" />
+                <div className="h-4 w-5/6 rounded shimmer-loading" />
+                <div className="h-4 w-2/3 rounded shimmer-loading" />
+                <div className="h-4 w-full rounded shimmer-loading" />
+                <div className="h-4 w-4/5 rounded shimmer-loading" />
               </div>
             ) : error ? (
               <div className="text-center py-12">
@@ -925,8 +933,27 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
             onTouchMove={() => logTouch('DetailsPane')}
           >
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
+              <div className="space-y-5 py-4 px-1">
+                {/* Shimmer skeleton: simulates episode details hierarchy */}
+                <div className="flex items-start space-x-3">
+                  <div className="w-12 h-12 rounded shimmer-loading flex-shrink-0" />
+                  <div className="flex-1 space-y-2 pt-1">
+                    <div className="h-4 w-3/4 rounded shimmer-loading" />
+                    <div className="h-3 w-1/2 rounded shimmer-loading" />
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-12 h-12 rounded shimmer-loading flex-shrink-0" />
+                  <div className="flex-1 space-y-2 pt-1">
+                    <div className="h-4 w-2/3 rounded shimmer-loading" />
+                    <div className="h-3 w-1/3 rounded shimmer-loading" />
+                  </div>
+                </div>
+                <div className="space-y-2 pt-2">
+                  <div className="h-3 w-full rounded shimmer-loading" />
+                  <div className="h-3 w-5/6 rounded shimmer-loading" />
+                  <div className="h-3 w-4/5 rounded shimmer-loading" />
+                </div>
               </div>
             ) : viewMode === ViewMode.CHAPTER && selectedChapter ? (
               /* Chapter View Mode */
@@ -973,24 +1000,30 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                     <div className="flex-1 pb-2">
                       <p className="text-xs text-gray-500 mb-1">EPISODE</p>
                       <div className="flex items-start space-x-2">
-                          {hierarchy.hierarchy.episode.metadata.imageUrl ? (
-                            !imageError ? (
-                              <img
-                                src={hierarchy.hierarchy.episode.metadata.imageUrl}
-                                alt="Episode"
-                                className="w-12 h-12 rounded object-cover flex-shrink-0"
-                                onError={() => setImageError(true)}
-                              />
+                          <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 relative">
+                            {hierarchy.hierarchy.episode.metadata.imageUrl && !imageError && !episodeImageLoaded && (
+                              <div className="absolute inset-0 shimmer-loading rounded" />
+                            )}
+                            {hierarchy.hierarchy.episode.metadata.imageUrl ? (
+                              !imageError ? (
+                                <img
+                                  src={hierarchy.hierarchy.episode.metadata.imageUrl}
+                                  alt="Episode"
+                                  className={`w-full h-full object-cover ${episodeImageLoaded ? 'block' : 'invisible'}`}
+                                  onLoad={() => setEpisodeImageLoaded(true)}
+                                  onError={() => setImageError(true)}
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                                  <Podcast className="w-6 h-6 text-gray-600" />
+                                </div>
+                              )
                             ) : (
-                              <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+                              <div className="w-full h-full bg-gray-800 flex items-center justify-center">
                                 <Podcast className="w-6 h-6 text-gray-600" />
                               </div>
-                            )
-                          ) : (
-                            <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
-                              <Podcast className="w-6 h-6 text-gray-600" />
-                            </div>
-                          )}
+                            )}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-white font-medium leading-tight line-clamp-2">
                               {hierarchy.hierarchy.episode.metadata.title}
@@ -1222,24 +1255,30 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                         <div className="flex-1">
                           <p className="text-xs text-gray-500 mb-1">EPISODE</p>
                           <div className="flex items-start space-x-2">
-                            {hierarchy.hierarchy.episode.metadata.imageUrl ? (
-                              !imageError ? (
-                                <img
-                                  src={hierarchy.hierarchy.episode.metadata.imageUrl}
-                                  alt="Episode"
-                                  className="w-12 h-12 rounded object-cover flex-shrink-0"
-                                  onError={() => setImageError(true)}
-                                />
+                            <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 relative">
+                              {hierarchy.hierarchy.episode.metadata.imageUrl && !imageError && !episodeImageLoaded && (
+                                <div className="absolute inset-0 shimmer-loading rounded" />
+                              )}
+                              {hierarchy.hierarchy.episode.metadata.imageUrl ? (
+                                !imageError ? (
+                                  <img
+                                    src={hierarchy.hierarchy.episode.metadata.imageUrl}
+                                    alt="Episode"
+                                    className={`w-full h-full object-cover ${episodeImageLoaded ? 'block' : 'invisible'}`}
+                                    onLoad={() => setEpisodeImageLoaded(true)}
+                                    onError={() => setImageError(true)}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                                    <Podcast className="w-6 h-6 text-gray-600" />
+                                  </div>
+                                )
                               ) : (
-                                <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+                                <div className="w-full h-full bg-gray-800 flex items-center justify-center">
                                   <Podcast className="w-6 h-6 text-gray-600" />
                                 </div>
-                              )
-                            ) : (
-                              <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
-                                <Podcast className="w-6 h-6 text-gray-600" />
-                              </div>
-                            )}
+                              )}
+                            </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm text-white font-medium line-clamp-2 leading-tight">
                                 {hierarchy.hierarchy.episode.metadata.title}
@@ -1262,18 +1301,24 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                   {!hierarchy.hierarchy.episode && effectiveAudioUrl && (
                     <div className="pb-4">
                       <div className="flex items-start space-x-3">
-                        {episodeImage && !imageError ? (
-                          <img
-                            src={episodeImage}
-                            alt="Episode"
-                            className="w-12 h-12 rounded object-cover flex-shrink-0"
-                            onError={() => setImageError(true)}
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
-                            <Podcast className="w-6 h-6 text-gray-600" />
-                          </div>
-                        )}
+                        <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 relative">
+                          {episodeImage && !imageError && !episodeImageLoaded && (
+                            <div className="absolute inset-0 shimmer-loading rounded" />
+                          )}
+                          {episodeImage && !imageError ? (
+                            <img
+                              src={episodeImage}
+                              alt="Episode"
+                              className={`w-full h-full object-cover ${episodeImageLoaded ? 'block' : 'invisible'}`}
+                              onLoad={() => setEpisodeImageLoaded(true)}
+                              onError={() => setImageError(true)}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                              <Podcast className="w-6 h-6 text-gray-600" />
+                            </div>
+                          )}
+                        </div>
                         <div className="flex-1 min-w-0">
                           {episodeTitle && (
                             <p className="text-sm text-white font-medium line-clamp-2 leading-tight">
@@ -1416,18 +1461,24 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
               <div className="space-y-4">
                 {/* Episode info from direct props */}
                 <div className="flex items-start space-x-3">
-                  {episodeImage && !imageError ? (
-                    <img
-                      src={episodeImage}
-                      alt="Episode"
-                      className="w-12 h-12 rounded object-cover flex-shrink-0"
-                      onError={() => setImageError(true)}
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
-                      <Podcast className="w-6 h-6 text-gray-600" />
-                    </div>
-                  )}
+                  <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 relative">
+                    {episodeImage && !imageError && !episodeImageLoaded && (
+                      <div className="absolute inset-0 shimmer-loading rounded" />
+                    )}
+                    {episodeImage && !imageError ? (
+                      <img
+                        src={episodeImage}
+                        alt="Episode"
+                        className={`w-full h-full object-cover ${episodeImageLoaded ? 'block' : 'invisible'}`}
+                        onLoad={() => setEpisodeImageLoaded(true)}
+                        onError={() => setImageError(true)}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                        <Podcast className="w-6 h-6 text-gray-600" />
+                      </div>
+                    )}
+                  </div>
                   <div className="flex-1 min-w-0">
                     {episodeTitle && (
                       <p className="text-sm text-white font-medium line-clamp-2 leading-tight">

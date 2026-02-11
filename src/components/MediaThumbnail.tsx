@@ -44,13 +44,8 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
       {/* Shimmer while loading */}
       {!previewLoaded && !thumbnailFailed && (
         <div
-          className="absolute inset-0"
-          style={{
-            background: 'linear-gradient(90deg, #374151 25%, #4B5563 50%, #374151 75%)',
-            backgroundSize: '200% 100%',
-            animation: 'shimmer 1.5s infinite',
-            zIndex: 1,
-          }}
+          className="absolute inset-0 shimmer-loading"
+          style={{ zIndex: 1 }}
         />
       )}
 
@@ -148,17 +143,6 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
         </div>
       )}
 
-      {/* Add shimmer animation styles */}
-      <style>{`
-        @keyframes shimmer {
-          0% {
-            background-position: -200% 0;
-          }
-          100% {
-            background-position: 200% 0;
-          }
-        }
-      `}</style>
     </div>
   );
 };

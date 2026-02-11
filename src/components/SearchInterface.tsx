@@ -1449,7 +1449,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         ['chapter', 'paragraph'], // Include both chapters and paragraphs
         effectiveGuid
       );
-      setConversation(prev => [...prev, {
+      setConversation(prev => [...prev.filter(item => item.type !== 'podcast-search'), {
         id: searchState.activeConversationId as number,
         type: 'podcast-search' as const,
         query: queryToUse,
@@ -1572,7 +1572,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       }
       
       // Also update conversation with regular results for list view
-      setConversation(prev => [...prev, {
+      setConversation(prev => [...prev.filter(item => item.type !== 'podcast-search'), {
         id: searchState.activeConversationId as number,
         type: 'podcast-search' as const,
         query: queryToUse,
@@ -1964,7 +1964,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       // for deeplinked sessions. The conversation item below will show the title.
           
           // Also update conversation for consistency
-          setConversation(prev => [...prev, {
+          setConversation(prev => [...prev.filter(item => item.type !== 'podcast-search'), {
             id: nextConversationId.current++,
             type: 'podcast-search' as const,
             query: sessionTitle,
@@ -2183,7 +2183,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               }
               
               // Also update conversation for list view compatibility
-              setConversation(prev => [...prev, {
+              setConversation(prev => [...prev.filter(item => item.type !== 'podcast-search'), {
                 id: nextConversationId.current++,
                 type: 'podcast-search' as const,
                 query: queryParam,
@@ -3845,7 +3845,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     setIsRegisterModalOpen(true);
                     return;
                   }
-                  setConversation(prev => [...prev, {
+                  setConversation(prev => [...prev.filter(item => item.type !== 'podcast-search'), {
                     id: nextConversationId.current++,
                     type: 'podcast-search' as const,
                     query: topicQuery,
