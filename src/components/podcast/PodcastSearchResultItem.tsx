@@ -8,6 +8,7 @@ import SocialShareModal, { SocialPlatform } from "../SocialShareModal.tsx";
 import ShareModal from "../ShareModal.tsx";
 import { AuthConfig, AIClipsViewStyle, ShareModalContext } from "../../constants/constants.ts";
 import { printLog } from '../../constants/constants.ts';
+import { QuotaExceededError } from '../../types/errors.ts';
 import { useNavigate } from 'react-router-dom';
 import { useAudioController } from '../../context/AudioControllerContext.tsx';
 
@@ -277,7 +278,21 @@ export const PodcastSearchResultItem = ({
         });
       }
     } catch (error) {
-      console.error("Failed to create clip:", error);
+      if (error instanceof QuotaExceededError) {
+        // Reset the clip spinner and surface the quota modal via event
+        onClipProgress({
+          isProcessing: false,
+          creator,
+          episode,
+          timestamps: [startTime, endTime],
+          clipId: shareLink,
+          episodeImage,
+          lookupHash: id
+        });
+        window.dispatchEvent(new CustomEvent('clipQuotaExceeded', { detail: error.data }));
+      } else {
+        console.error("Failed to create clip:", error);
+      }
     }
   };
   
@@ -356,8 +371,13 @@ export const PodcastSearchResultItem = ({
         await pollForClipCompletion(response.lookupHash);
       }
     } catch (error) {
-      console.error("Failed to create clip for sharing:", error);
-      setIsShareProcessing(false);
+      if (error instanceof QuotaExceededError) {
+        setIsShareProcessing(false);
+        window.dispatchEvent(new CustomEvent('clipQuotaExceeded', { detail: error.data }));
+      } else {
+        console.error("Failed to create clip for sharing:", error);
+        setIsShareProcessing(false);
+      }
     }
   };
 

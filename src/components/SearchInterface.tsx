@@ -1011,6 +1011,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     window.addEventListener('analysisCardClick', onAnalysisCardClick);
     return () => window.removeEventListener('analysisCardClick', onAnalysisCardClick);
   }, [galaxyResults, searchParams]);
+
+  // Listen for quota exceeded errors from clip creation in PodcastSearchResultItem
+  useEffect(() => {
+    const onClipQuotaExceeded = (event: CustomEvent) => {
+      printLog(`[Clip] Quota exceeded: ${JSON.stringify(event.detail)}`);
+      setQuotaExceededData(event.detail);
+    };
+
+    window.addEventListener('clipQuotaExceeded', onClipQuotaExceeded as EventListener);
+    return () => window.removeEventListener('clipQuotaExceeded', onClipQuotaExceeded as EventListener);
+  }, []);
   
   // Handler for opening a session from the Sessions history tab
   const handleOpenSessionFromHistory = async (sessionId: string, sessionTitle?: string) => {
