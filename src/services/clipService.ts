@@ -1,5 +1,24 @@
-import { API_URL, AuthConfig, RequestAuthMethod } from "../constants/constants.ts";
+import { API_URL, AuthConfig } from "../constants/constants.ts";
 import { ClipRequestResponse } from "../types/clips.ts";
+import { throwIfQuotaExceeded } from "../types/errors.ts";
+import { getAnalyticsHeader } from "./analyticsService.ts";
+
+/**
+ * Build authorization headers using JWT Bearer token
+ */
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...getAnalyticsHeader()
+  };
+  
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+}
 
 export async function fetchClipById(clipId: string) {
   try {
@@ -18,23 +37,12 @@ export async function fetchClipById(clipId: string) {
 }
 
 export async function makeClip(clipId: string, 
-  auth:AuthConfig, 
+  auth: AuthConfig,  // Kept for backward compatibility, but auth now uses JWT from localStorage
   startTime:number|null,
   endTime:number|null
 ): Promise<ClipRequestResponse> {
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    // Only add Authorization header for LIGHTNING and SQUARE auth
-    if (auth.type === RequestAuthMethod.LIGHTNING && auth.credentials) {
-      const { preimage, paymentHash } = auth.credentials;
-      headers.Authorization = `${preimage}:${paymentHash}`;
-    } else if (auth.type === RequestAuthMethod.SQUARE) {
-      const { username } = auth.credentials;
-      headers.Authorization = `Basic ${btoa(`${username}:`)}`;
-    }
+    const headers = getAuthHeaders();
 
     let body = JSON.stringify({
       clipId: clipId
@@ -52,6 +60,9 @@ export async function makeClip(clipId: string,
       body: body
     });
   
+    // Check for quota exceeded (429) - throws QuotaExceededError
+    await throwIfQuotaExceeded(response, 'make-clip');
+  
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -59,7 +70,7 @@ export async function makeClip(clipId: string,
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('quote search error:', error);
+    console.error('make clip error:', error);
     throw error;
   }
 }

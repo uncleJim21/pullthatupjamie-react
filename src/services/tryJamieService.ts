@@ -1,6 +1,39 @@
 import { API_URL } from "../constants/constants.ts";
+import { throwIfQuotaExceeded } from "../types/errors.ts";
+import { getAnalyticsHeader } from "./analyticsService.ts";
 
 const BASE_URL = API_URL;
+
+// Entitlement quota info for a single entitlement type
+export interface EntitlementQuota {
+  eligible: boolean;
+  used: number;
+  max: number;
+  remaining: number;
+  isUnlimited: boolean;
+  periodLengthDays: number;
+  periodStart: string;
+  nextResetDate: string;
+  daysUntilReset: number;
+}
+
+// Response from /api/on-demand/checkEligibility
+export interface CheckEligibilityResponse {
+  success: boolean;
+  tier: 'anonymous' | 'registered' | 'subscriber' | 'admin';
+  identifier?: string;
+  identifierType?: string;
+  hasUser: boolean;
+  entitlements: {
+    'search-quotes': EntitlementQuota;
+    'search-quotes-3d': EntitlementQuota;
+    'make-clip': EntitlementQuota;
+    'jamie-assist': EntitlementQuota;
+    'ai-analyze': EntitlementQuota;
+    'submit-on-demand-run': EntitlementQuota;
+    [key: string]: EntitlementQuota;
+  };
+}
 
 export interface OnDemandRunRequest {
   message: string;
@@ -46,7 +79,10 @@ export interface OnDemandJobStatus {
 class TryJamieService {
   static async submitOnDemandRun(request: OnDemandRunRequest): Promise<OnDemandRunResponse> {
     const token = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = { 
+      'Content-Type': 'application/json',
+      ...getAnalyticsHeader(),
+    };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -56,6 +92,9 @@ class TryJamieService {
       headers,
       body: JSON.stringify(request),
     });
+    
+    // Check for quota exceeded (429) - throws QuotaExceededError with structured data
+    await throwIfQuotaExceeded(res, 'submit-on-demand-run');
     
     if (!res.ok) {
       // Handle different error cases
@@ -75,16 +114,9 @@ class TryJamieService {
         } else if (errorData.error) {
           errorMessage = errorData.error;
         }
-        
-        // Handle quota exceeded specifically
-        if (res.status === 429 || errorMessage.toLowerCase().includes('limit exceeded') || errorMessage.toLowerCase().includes('quota')) {
-          throw new Error('On-demand run limit exceeded. Please upgrade your plan to continue.');
-        }
       } catch (parseError) {
         // If we can't parse the error response, use status-based messages
-        if (res.status === 429) {
-          errorMessage = 'Too many requests. Please try again later.';
-        } else if (res.status >= 500) {
+        if (res.status >= 500) {
           errorMessage = 'Server error. Please try again later.';
         } else if (res.status === 403) {
           errorMessage = 'Access denied. You may not have permission to perform this action.';
@@ -99,7 +131,9 @@ class TryJamieService {
 
   static async getOnDemandJobStatus(jobId: string): Promise<OnDemandJobStatus> {
     const token = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+      ...getAnalyticsHeader(),
+    };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -143,55 +177,33 @@ class TryJamieService {
     return res.json();
   }
 
-  static async updateOnDemandQuota(): Promise<{ success: boolean; message?: string }> {
+  /**
+   * Check eligibility for on-demand features.
+   * Returns quota info for all entitlements including 'submit-on-demand-run'.
+   */
+  static async checkEligibility(): Promise<CheckEligibilityResponse | null> {
     const token = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = {
+      ...getAnalyticsHeader(),
+    };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
     try {
-      const res = await fetch(`${BASE_URL}/api/on-demand/update-ondemand-quota`, {
-        method: 'POST',
+      const res = await fetch(`${BASE_URL}/api/on-demand/checkEligibility`, {
         headers,
       });
       
       if (!res.ok) {
-        // Handle different error cases
-        if (res.status === 401) {
-          // Clear invalid token but don't throw - this is optional
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('squareId');
-          return { success: false, message: 'Authentication failed during quota update' };
-        }
-        
-        // Try to get error details from response
-        let errorMessage = 'Failed to update quota';
-        try {
-          const errorData = await res.json();
-          if (errorData.message) {
-            errorMessage = errorData.message;
-          } else if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch (parseError) {
-          // If we can't parse the error response, use status-based messages
-          if (res.status >= 500) {
-            errorMessage = 'Server error during quota update';
-          } else if (res.status === 403) {
-            errorMessage = 'Access denied during quota update';
-          }
-        }
-        
-        return { success: false, message: errorMessage };
+        console.error(`checkEligibility failed with status ${res.status}`);
+        return null;
       }
       
-      const responseData = await res.json();
-      return { success: true, message: responseData.message };
-      
+      return await res.json();
     } catch (error) {
-      // Network errors or other unexpected errors
-      return { success: false, message: `Network error during quota update: ${error}` };
+      console.error('Error checking eligibility:', error);
+      return null;
     }
   }
 }

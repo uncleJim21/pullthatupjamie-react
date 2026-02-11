@@ -1,0 +1,20 @@
+{
+  "buildCommand": "CI=false npm run build",
+  "rewrites": [
+    {
+      "source": "/researchSession/:shareId",
+      "destination": "/api/researchSession/[shareId]"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/researchSession/:shareId",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, s-maxage=3600, stale-while-revalidate=86400"
+        }
+      ]
+    }
+  ]
+}

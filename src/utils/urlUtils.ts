@@ -1,4 +1,4 @@
-import { DEBUG_MODE } from '../constants/constants.ts';
+import { FRONTEND_URL } from '../constants/constants.ts';
 
 /**
  * DIRECT OVERRIDE: Creates a properly formatted share URL for the application
@@ -7,9 +7,8 @@ import { DEBUG_MODE } from '../constants/constants.ts';
  * @returns Fully formatted URL using the correct frontend URL base
  */
 export const createShareUrl = (path: string, params: Record<string, string> = {}) => {
-  // HARD OVERRIDE - Force localhost in dev mode
-  // Skip all the FRONTEND_URL logic and enforce localhost during development
-  const baseUrlOverride = DEBUG_MODE ? 'http://localhost:3000' : 'https://pullthatupjamie.ai';
+  // Use shared FRONTEND_URL from config
+  const baseUrlOverride = FRONTEND_URL;
   
   // Ensure path starts with a slash
   let normalizedPath = path.startsWith('/') ? path : `/${path}`;

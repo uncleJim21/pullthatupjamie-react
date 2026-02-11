@@ -22,6 +22,7 @@ import CheckoutModal from '../CheckoutModal.tsx';
 import UploadService, { UploadItem, PaginationData } from '../../services/uploadService.ts';
 import { createFeedShareUrl } from '../../utils/urlUtils.ts';
 import PageBanner from '../PageBanner.tsx';
+import { clearUserData } from '../../utils/signOut.ts';
 import SocialShareModal from '../SocialShareModal.tsx';
 import TutorialModal from '../TutorialModal.tsx';
 import WelcomeModal from '../WelcomeModal.tsx';
@@ -32,6 +33,7 @@ import ScheduledPostSlots from '../ScheduledPostSlots.tsx';
 import ImageWithLoader from '../ImageWithLoader.tsx';
 import MediaRenderingComponent from '../MediaRenderingComponent.tsx';
 import MediaThumbnail from '../MediaThumbnail.tsx';
+import { AudioControllerProvider } from '../../context/AudioControllerContext.tsx';
 import RssService, { RssVideoItem } from '../../services/rssService.ts';
 import { getFountainLink } from '../../services/fountainService.ts';
 
@@ -123,7 +125,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const [activeTab, setActiveTab] = useState<TabType>('Episodes');
     const [isLoading, setIsLoading] = useState(true);
     const [copied,setCopied] = useState(false);
-    const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
     const [qrModalOpen, setQrModalOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
     const [adminFeedUrl, setAdminFeedUrl] = useState<string | null>(null);
@@ -233,19 +234,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
     const handleCancelAutomation = () => {
         // Keep the setting disabled and close modal
         setIsConfigureAutomationModalOpen(false);
-    };
-
-    // Add these handlers:
-    const handlePlayPause = (id: string) => {
-    if (currentlyPlayingId === id) {
-        setCurrentlyPlayingId(null);
-    } else {
-        setCurrentlyPlayingId(id);
-    }
-    };
-
-    const handleEnded = (id: string) => {
-    setCurrentlyPlayingId(null);
     };
 
   const copyToClipboard = () => {
@@ -708,9 +696,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
   
   // Handle sign out
   const handleSignOut = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('squareId');
-    localStorage.removeItem('isSubscribed');
+    clearUserData();
     setIsUserSignedIn(false);
     setIsAdmin(false);
     
@@ -908,6 +894,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
 }
 
   return (
+    <AudioControllerProvider>
     <div className="min-h-screen pb-12 bg-black text-white">
       {/* Page Banner */}
       <PageBanner 
@@ -1091,15 +1078,12 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                   similarity={{ combined: 1, vector: 1 }}
                   episodeImage={feedData?.logoUrl || ''}
                   listenLink={featuredEpisode.listenLink || featuredEpisode.audioUrl}
-                  isPlaying={currentlyPlayingId === featuredEpisode.id}
-                  onPlayPause={handlePlayPause}
-                  onEnded={handleEnded}
                   shareUrl={createFeedShareUrl(feedId || '')}
                   shareLink=""
                 />
               </div>
             )}
-            <div className="py-8">
+              <div className="py-8">
               <h2 className="text-xl font-bold mb-6">All Episodes</h2>
               <div className="space-y-6">
                 {feedData.episodes.map(episode => (
@@ -1117,10 +1101,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                     }}
                     similarity={{ combined: 1, vector: 1 }}
                     episodeImage={feedData?.logoUrl || ''}
-                      listenLink={episode.listenLink || episode.audioUrl}
-                    isPlaying={currentlyPlayingId === episode.id}
-                    onPlayPause={handlePlayPause}
-                    onEnded={handleEnded}
+                    listenLink={episode.audioUrl || episode.listenLink}
                     shareUrl={createFeedShareUrl(feedId || '')}
                     shareLink=""
                   />
@@ -1149,9 +1130,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                       similarity={{ combined: 1, vector: 1 }}
                       episodeImage={feedData?.logoUrl || ''}
                       listenLink={featuredEpisode.listenLink || featuredEpisode.audioUrl}
-                      isPlaying={currentlyPlayingId === featuredEpisode.id}
-                      onPlayPause={handlePlayPause}
-                      onEnded={handleEnded}
                       shareUrl={createFeedShareUrl(feedId || '')}
                       shareLink=""
                     />
@@ -1159,7 +1137,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                 )}
                 <div className="py-8">
                   <h2 className="text-xl font-bold mb-6">All Episodes</h2>
-                  <div className="space-y-6">
+                    <div className="space-y-6">
                     {feedData.episodes.map(episode => (
                       <PodcastSearchResultItem
                         key={episode.id}
@@ -1175,10 +1153,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                         }}
                         similarity={{ combined: 1, vector: 1 }}
                         episodeImage={feedData?.logoUrl || ''}
-                      listenLink={episode.listenLink || episode.audioUrl}
-                        isPlaying={currentlyPlayingId === episode.id}
-                        onPlayPause={handlePlayPause}
-                        onEnded={handleEnded}
+                        listenLink={episode.audioUrl || episode.listenLink}
                         shareUrl={createFeedShareUrl(feedId || '')}
                         shareLink=""
                       />
@@ -1690,9 +1665,6 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
                             }}
                             similarity={{ combined: run.recommendations[0].relevance_score / 100, vector: run.recommendations[0].relevance_score / 100 }}
                             episodeImage={run.recommendations[0].episode_image}
-                            isPlaying={currentlyPlayingId === run.recommendations[0].paragraph_ids[0]}
-                            onPlayPause={handlePlayPause}
-                            onEnded={handleEnded}
                             shareUrl={createFeedShareUrl(feedId || '')}
                             shareLink={run.recommendations[0].paragraph_ids[0]}
                             authConfig={null}
@@ -1850,6 +1822,7 @@ const PodcastFeedPage: React.FC<{ initialView?: string; defaultTab?: string }> =
         />
       )}
     </div>
+    </AudioControllerProvider>
   );
 };
 

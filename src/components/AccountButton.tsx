@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, LayoutDashboard, BookOpen, Headphones, Search } from 'lucide-react';
+import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, LayoutDashboard, Headphones, PlusCircle } from 'lucide-react';
 import BitcoinConnectButton from './BitcoinConnectButton.tsx';
 import { useNavigate } from 'react-router-dom';
 import AuthService from '../services/authService.ts';
 import { NavigationMode } from '../constants/constants.ts';
+import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus.ts';
 
 interface AccountButtonProps {
   onConnect: () => void;
@@ -11,7 +12,10 @@ interface AccountButtonProps {
   onUpgradeClick: () => void;
   onSignOut: () => void;
   onTutorialClick: () => void;
+  onProDashboardClick?: () => void;
+  onAddEpisodeClick?: () => void;
   isSignedIn: boolean;
+  isOnAppPage?: boolean; // Whether we're on /app (affects what shows in dropdown vs header)
   isInMobileMenu?: boolean; // New prop to detect if we're in mobile menu
   navigationMode?: NavigationMode;
 }
@@ -27,17 +31,23 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
   onSignOut,
   onUpgradeClick,
   onTutorialClick,
+  onProDashboardClick,
+  onAddEpisodeClick,
   isSignedIn,
+  isOnAppPage = false,
   isInMobileMenu = false,
   navigationMode = NavigationMode.STANDARD,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
   const [showNickname, setShowNickname] = useState(false);
-  const [showUpgrade, setShowUpgrade] = useState(false);
   const [adminFeed, setAdminFeed] = useState<AdminFeed | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
+  
+  // Use centralized subscription status hook
+  // (automatically refreshes when auth-state-changed event fires)
+  const subscriptionStatus = useSubscriptionStatus();
 
   // Check for mobile screen size
   useEffect(() => {
@@ -74,11 +84,6 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
       };
       
       checkAdmin();
-      
-      // Check if user is subscribed
-      setTimeout(() => {
-        setShowUpgrade(localStorage.getItem('isSubscribed') !== 'true');
-      }, 1000);
 
       // Add small delay before showing nickname to ensure smooth transition
       setTimeout(() => {
@@ -87,6 +92,7 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
     } else {
       setAdminFeed(null);
       setShowNickname(false);
+      setNickname(null);
     }
   }, [isSignedIn]);
 
@@ -173,22 +179,17 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
           }}
         >
           <div className="p-2 space-y-1">
-            {/* Bitcoin Connect */}
-            <div className="p-2">
+            {/* Bitcoin Connect - Hidden for now (Lightning auth deprecated) */}
+            {/* <div className="p-2">
               <BitcoinConnectButton onConnect={onConnect} />
-            </div>
+            </div> */}
 
-            {/* Navigation Items (only in CLEAN mode) */}
-            {navigationMode === NavigationMode.CLEAN && (
+            {/* Navigation Items - Show "Search Podcasts" only when NOT on /app */}
+            {navigationMode === NavigationMode.CLEAN && !window.location.pathname.startsWith('/app') && (
               <>
                 <button
                   onClick={() => {
-                    // Check if we need to reload by comparing URLs
-                    if (window.location.pathname === '/app' && !window.location.search.includes('mode=web-search')) {
-                      window.location.reload();
-                    } else {
                       window.location.href = '/app';
-                    }
                     setIsOpen(false);
                   }}
                   className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
@@ -196,29 +197,20 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
                   <Headphones size={20} />
                   <span>Search Podcasts</span>
                 </button>
-                <button
-                  onClick={() => {
-                    // Check if we need to reload by comparing URLs
-                    if (window.location.pathname === '/app' && window.location.search.includes('mode=web-search')) {
-                      window.location.reload();
-                    } else {
-                      window.location.href = '/app/?mode=web-search';
-                    }
-                    setIsOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
-                >
-                  <Search size={20} />
-                  <span>Search Web</span>
-                </button>
               </>
             )}
 
-            {/* Pro Dashboard Button (for admins) */}
-            {adminFeed?.access === 'admin' && (
+            {/* Pro Dashboard Button - show in dropdown when on /app (header shows Add Episode there) */}
+            {isOnAppPage && (
               <button
                 onClick={() => {
-                  navigate(`/app/feed/${adminFeed.feedId}`);
+                  if (adminFeed?.access === 'admin') {
+                    // If admin, navigate directly to their feed
+                    navigate(`/app/feed/${adminFeed.feedId}`);
+                  } else if (onProDashboardClick) {
+                    // Otherwise, use the handler (shows upgrade modal)
+                    onProDashboardClick();
+                  }
                   setIsOpen(false);
                 }}
                 className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
@@ -228,8 +220,26 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
               </button>
             )}
 
-            {/* Upgrade Button */}
-            {showUpgrade && isSignedIn && (
+            {/* Add Episode Button - show in dropdown when NOT on /app (header shows it there) */}
+            {!isOnAppPage && (
+              <button
+                onClick={() => {
+                  if (onAddEpisodeClick) {
+                    onAddEpisodeClick();
+                  } else {
+                    navigate('/try-jamie');
+                  }
+                  setIsOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <PlusCircle size={20} />
+                <span>Add Episode</span>
+              </button>
+            )}
+
+            {/* Upgrade Button - only show if not already Pro */}
+            {subscriptionStatus.shouldShowUpgrade() && isSignedIn && (
               <button
                 onClick={() => {
                   onUpgradeClick();
@@ -241,18 +251,6 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
                 <span>Upgrade</span>
               </button>
             )}
-
-            {/* Tutorial Button */}
-            <button
-              onClick={() => {
-                onTutorialClick();
-                setIsOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
-            >
-              <BookOpen size={20} />
-              <span>Tutorial</span>
-            </button>
 
             {/* Sign In/Out */}
             <button

@@ -1,33 +1,19 @@
-export const DEBUG_MODE = false;
+// Import shared URL configuration
+import { FRONTEND_URL, API_URL, AUTH_URL, DEBUG_MODE } from '../config/urls.js';
 export const DEBUG_TRANSCRIPTION = false;
-
-export const DISABLE_CLIPPING = true; // Set to false to re-enable clipping features
+export { DEBUG_MODE, FRONTEND_URL, API_URL, AUTH_URL };
+export const DISABLE_CLIPPING = false; // Set to true to disable clipping features
 export const DEBUG_AUTH = false;
 
-// More explicit approach to determine FRONTEND_URL
-export const FRONTEND_URL = (() => {
-  // Force localhost in development mode regardless of actual origin
-  if (DEBUG_MODE) {
-    return 'http://localhost:3000';
-  }
-  
-  // In production, use the actual origin or default to the production URL
-  const result = typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-    ? 'https://pullthatupjamie.ai' 
-    : 'http://localhost:3000';
-  
-  return result;
-})();
 
 // Debug output to verify the configuration
 console.log('Constants loaded:', { 
   DEBUG_MODE, 
   FRONTEND_URL,
+  API_URL,
   currentOrigin: typeof window !== 'undefined' ? window.location.origin : 'not in browser',
   hostname: typeof window !== 'undefined' ? window.location.hostname : 'not in browser'
 });
-
-export const API_URL = DEBUG_MODE ? "http://localhost:4132" : "https://pullthatupjamie-nsh57.ondigitalocean.app";
 export const MONTHLY_PRICE_STRING = "$9.99"
 
 export const printLog = (log:string) =>{
@@ -57,6 +43,35 @@ export enum AIClipsViewStyle {
   LIST = 'list'
 }
 
+export enum SearchViewStyle {
+  CLASSIC = 'classic',
+  SPLIT_SCREEN = 'split-screen'
+}
+
+export enum SearchResultViewStyle {
+  LIST = 'list',
+  GALAXY = 'galaxy'
+}
+
+// Numerical hierarchy levels (higher = broader scope)
+export const HIERARCHY_LEVEL_FEED = 3;
+export const HIERARCHY_LEVEL_EPISODE = 2;
+export const HIERARCHY_LEVEL_CHAPTER = 1;
+export const HIERARCHY_LEVEL_PARAGRAPH = 0;
+
+export const HIERARCHY_COLORS = {
+  ALL_PODS: '#3366ff',  // deeper blue (more saturated, visible)
+  FEED: '#b8cbff',      // medium blue-white (interpolated between ALL_PODS and EPISODE)
+  EPISODE: '#ffffff',   // pure white (center anchor)
+  CHAPTER: '#f08b47',   // distinct peachy-orange (30% closer to paragraph)
+  PARAGRAPH: '#cc4400'  // deep reddish-orange (deepest nebula tone)
+};
+
+// Search result limits
+export const SEARCH_LIMITS = {
+  LIST_VIEW: 20,      // List view limit (2D search)
+  GALAXY_VIEW: 100,   // Galaxy view limit (3D search)
+};
 // Share modal context - defines the source/type of content being shared
 export enum ShareModalContext {
   AUDIO_CLIP = 'audio_clip',              // Generated audio clip from podcast search

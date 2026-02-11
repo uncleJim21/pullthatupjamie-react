@@ -2,11 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
-body,
-#root {
-  background-color: #000;
+/* Ensure full-viewport black background to avoid white overscroll on macOS */
+html, body, #root {
+  height: 100%;
+  background-color: #000000;
 }
+
 
 @keyframes fadeIn {
   from {
@@ -21,5 +22,20 @@ body,
 
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-loading {
+  background: linear-gradient(90deg, #374151 25%, #4B5563 50%, #374151 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
 

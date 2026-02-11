@@ -1,5 +1,5 @@
 // PodcastSearchConversation.tsx
-import React, { useState, useRef } from 'react';
+import React from 'react';
 import type { PodcastSearchItem } from '../../types/conversation';
 import { PodcastSearchResultItem, PresentationContext } from '../podcast/PodcastSearchResultItem.tsx';
 import { BaseConversationLayout } from './BaseConversationLayout.tsx';
@@ -15,6 +15,19 @@ interface PodcastSearchConversationProps {
   onSocialShareModalOpen?: (isOpen: boolean) => void;
   isClipBatchPage?: boolean;
   clipBatchViewMode?: AIClipsViewStyle;
+  selectedParagraphId?: string | null;
+  onResultClick?: (
+    paragraphId: string,
+    audioContext?: {
+      audioUrl: string;
+      timeContext: { start_time: number; end_time: number };
+      episode: string;
+      episodeImage: string;
+      creator: string;
+      listenLink?: string;
+      date?: string;
+    }
+  ) => void;
 }
 
 // PodcastSearchConversation.tsx
@@ -26,46 +39,34 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
   onShareModalOpen,
   onSocialShareModalOpen,
   isClipBatchPage,
-  clipBatchViewMode
+  clipBatchViewMode,
+  selectedParagraphId,
+  onResultClick
 }) => {
-  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
-
-  const handlePlayPause = (id: string) => {
-    if (currentlyPlayingId === id) {
-      // If clicking the same audio, just toggle it
-      setCurrentlyPlayingId(null);
-    } else {
-      // If clicking a different audio, update the playing id
-      setCurrentlyPlayingId(id);
-    }
-  };
-
-  const handleEnded = (id: string) => {
-    // When a podcast ends, always ensure it goes to pause state
-    setCurrentlyPlayingId(null);
-  };
-
   // For clipBatch pages, render based on view mode
   if (isClipBatchPage && clipBatchViewMode === AIClipsViewStyle.GRID) {
     return (
       <BaseConversationLayout query={item.query}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-48">
-          {item.data.quotes.map((quote, index) => (
-            <PodcastSearchResultItem
-              key={index}
-              {...quote}
-              id={`${item.id}-${index}`}
-              isPlaying={currentlyPlayingId === `${item.id}-${index}`}
-              onPlayPause={handlePlayPause}
-              onEnded={handleEnded}
-              onClipProgress={onClipProgress}
-              authConfig={authConfig}
-              onShareModalOpen={onShareModalOpen}
-              onSocialShareModalOpen={onSocialShareModalOpen}
-              presentationContext={PresentationContext.clipBatch}
-              viewMode={AIClipsViewStyle.GRID}
-            />
-          ))}
+          {item.data.quotes.map((quote, index) => {
+            // Use shareLink as fallback if id is undefined
+            const quoteId = quote.id || quote.shareLink;
+            return (
+              <PodcastSearchResultItem
+                key={index}
+                {...quote}
+                id={quoteId}
+                onClipProgress={onClipProgress}
+                authConfig={authConfig}
+                onShareModalOpen={onShareModalOpen}
+                onSocialShareModalOpen={onSocialShareModalOpen}
+                presentationContext={PresentationContext.clipBatch}
+                viewMode={AIClipsViewStyle.GRID}
+                isHighlighted={false}
+                onResultClick={onResultClick}
+              />
+            );
+          })}
         </div>
       </BaseConversationLayout>
     );
@@ -74,22 +75,25 @@ export const PodcastSearchConversation: React.FC<PodcastSearchConversationProps>
   // Default list view
   return (
     <BaseConversationLayout query={item.query}>
-      <div className="space-y-6 pb-48">
-        {item.data.quotes.map((quote, index) => (
-          <PodcastSearchResultItem
-            key={index}
-            {...quote}
-            id={`${item.id}-${index}`}
-            isPlaying={currentlyPlayingId === `${item.id}-${index}`}
-            onPlayPause={handlePlayPause}
-            onEnded={handleEnded}
-            onClipProgress={onClipProgress}
-            authConfig={authConfig}
-            onShareModalOpen={onShareModalOpen}
-            onSocialShareModalOpen={onSocialShareModalOpen}
-            presentationContext={isClipBatchPage ? PresentationContext.clipBatch : PresentationContext.search}
-          />
-        ))}
+      <div className="space-y-3 sm:space-y-6 pb-48">
+        {item.data.quotes.map((quote, index) => {
+          // Use shareLink as fallback if id is undefined
+          const quoteId = quote.id || quote.shareLink;
+          return (
+            <PodcastSearchResultItem
+              key={index}
+              {...quote}
+              id={quoteId}
+              onClipProgress={onClipProgress}
+              authConfig={authConfig}
+              onShareModalOpen={onShareModalOpen}
+              onSocialShareModalOpen={onSocialShareModalOpen}
+              presentationContext={isClipBatchPage ? PresentationContext.clipBatch : PresentationContext.search}
+              isHighlighted={isClipBatchPage ? false : selectedParagraphId === quoteId}
+              onResultClick={onResultClick}
+            />
+          );
+        })}
       </div>
     </BaseConversationLayout>
   );

@@ -3,11 +3,19 @@ import { API_URL, printLog } from '../constants/constants.ts';
 import { useNavigate } from 'react-router-dom';
 import PageBanner from './PageBanner.tsx';
 import rssService, { PodcastFeed, PodcastEpisode, FeedInfo } from '../services/rssService.ts';
-import TryJamieService, { OnDemandRunRequest } from '../services/tryJamieService.ts';
+import TryJamieService, { OnDemandRunRequest, EntitlementQuota } from '../services/tryJamieService.ts';
 import SignInModal from './SignInModal.tsx';
 import CheckoutModal from './CheckoutModal.tsx';
 import JamieLoadingScreen from './JamieLoadingScreen.tsx';
 import TutorialModal from './TutorialModal.tsx';
+import { QuotaExceededModal, QuotaExceededData } from './QuotaExceededModal.tsx';
+import { QuotaExceededError } from '../types/errors.ts';
+import {
+  trackWizardStepReached,
+  trackProcessingCompleted,
+  cacheUserTier,
+  type WizardStep,
+} from '../services/analyticsService.ts';
 
 interface SubscriptionSuccessPopupProps {
   onClose: () => void;
@@ -123,10 +131,9 @@ export interface SelectedPodcast {
   podcastImage: string;
 }
 
-// Define the onboarding state type
+// Define the onboarding state type (quota_exceeded now handled via quotaExceededData state)
 type OnboardingState =
   | { status: 'idle' }
-  | { status: 'quota_exceeded' }
   | { status: 'sign_in'; upgradeIntent: boolean }
   | { status: 'checkout' }
   | { status: 'processing' }
@@ -154,18 +161,8 @@ const TryJamieWizard: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [processingFailed, setProcessingFailed] = useState(false);
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
-  const [quotaInfo, setQuotaInfo] = useState<{
-    eligible: boolean;
-    remainingRuns: number;
-    totalLimit: number;
-    usedThisPeriod: number;
-    periodStart: string;
-    nextResetDate: string;
-    daysUntilReset: number;
-    authType?: 'ip' | 'user';
-    userEmail?: string;
-    clientIp?: string;
-  } | null>(null);
+  // Quota info for the submit-on-demand-run entitlement
+  const [quotaInfo, setQuotaInfo] = useState<EntitlementQuota | null>(null);
   const [imageLoadedStates, setImageLoadedStates] = useState<Record<string, boolean>>({});
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const navigate = useNavigate();
@@ -174,6 +171,11 @@ const TryJamieWizard: React.FC = () => {
   const [onboardingState, setOnboardingState] = useState<OnboardingState>({ status: 'idle' });
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const isInSuccessFlow = useRef(false);
+  
+  // Quota exceeded modal state (unified for both proactive checks and 429 errors)
+  const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
+  const [checkoutProductName, setCheckoutProductName] = useState<'jamie-plus' | 'jamie-pro' | undefined>(undefined);
+  const [userTier, setUserTier] = useState<'anonymous' | 'registered' | 'subscriber' | 'admin'>('anonymous');
   
   // Debug state changes
   useEffect(() => {
@@ -187,6 +189,13 @@ const TryJamieWizard: React.FC = () => {
       })}`);
     }
   }, [onboardingState]);
+
+  // Analytics: track wizard step changes
+  useEffect(() => {
+    if (currentStep >= 1 && currentStep <= 5) {
+      trackWizardStepReached(currentStep as WizardStep);
+    }
+  }, [currentStep]);
 
   const handleTutorialClick = () => {
     setIsTutorialOpen(true);
@@ -216,7 +225,8 @@ const TryJamieWizard: React.FC = () => {
       eligible: quotaInfo?.eligible, 
       onboardingState: onboardingState.status,
       isInitialLoad,
-      currentStep
+      currentStep,
+      userTier
     })}`);
     
     // Don't interfere with active flows - only show quota exceeded on initial load
@@ -228,51 +238,41 @@ const TryJamieWizard: React.FC = () => {
       isInitialLoad &&
       currentStep <= 3 // Don't interrupt processing or completion steps
     ) {
-      printLog('Setting state to quota_exceeded');
-      setOnboardingState({ status: 'quota_exceeded' });
+      printLog('Setting quotaExceededData for modal');
+      // Use the new QuotaExceededModal by setting quotaExceededData
+      setQuotaExceededData({
+        tier: userTier,
+        used: quotaInfo.used,
+        max: quotaInfo.max,
+        daysUntilReset: quotaInfo.daysUntilReset,
+        resetDate: quotaInfo.nextResetDate,
+        entitlementType: 'submit-on-demand-run'
+      });
       setIsInitialLoad(false);
     }
-  }, [quotaInfo]); // Only watch quotaInfo to avoid interference
+  }, [quotaInfo, userTier]); // Watch both quotaInfo and userTier
 
-  // Function to check on-demand run eligibility
+  // Function to check on-demand run eligibility using the new response schema
   const checkQuotaEligibility = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      
-      // Add JWT token if available
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+      const eligibilityData = await TryJamieService.checkEligibility();
 
-      const response = await fetch(`${API_URL}/api/on-demand/checkEligibility`, {
-        method: 'GET',
-        headers: headers
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          // Handle both new and old API response formats
-          const quotaData = data.quotaInfo || data.eligibility || data;
-          setQuotaInfo({
-            eligible: data.eligible !== undefined ? data.eligible : (typeof quotaData?.eligible === 'boolean' ? quotaData.eligible : true),
-            remainingRuns: quotaData?.remainingRuns || 0,
-            totalLimit: quotaData?.totalLimit || 0,
-            usedThisPeriod: quotaData?.usedThisPeriod || 0,
-            periodStart: quotaData?.periodStart || '',
-            nextResetDate: quotaData?.nextResetDate || '',
-            daysUntilReset: parseInt(quotaData?.daysUntilReset, 10) || 0,
-            authType: data.authType || 'user',
-            userEmail: data.userEmail,
-            clientIp: data.clientIp
-          });
+      if (eligibilityData?.success) {
+        // Store the user's tier
+        if (eligibilityData.tier) {
+          setUserTier(eligibilityData.tier);
+          // Analytics: cache the tier for accurate event tracking
+          cacheUserTier(eligibilityData.tier);
+          printLog(`[checkQuotaEligibility] User tier: ${eligibilityData.tier}`);
+        }
+        
+        if (eligibilityData.entitlements?.['submit-on-demand-run']) {
+          setQuotaInfo(eligibilityData.entitlements['submit-on-demand-run']);
+          printLog(`[checkQuotaEligibility] Quota info set: ${JSON.stringify(eligibilityData.entitlements['submit-on-demand-run'])}`);
         }
       }
     } catch (error) {
-      printLog(`Error checking quota eligibility: ${error}`);
+      printLog(`[checkQuotaEligibility] Error: ${error}`);
     }
   };
 
@@ -351,13 +351,13 @@ const TryJamieWizard: React.FC = () => {
       image: "https://megaphone.imgix.net/podcasts/8e5bcebc-ca16-11ee-89f0-0fa0b9bdfc7c/image/c2c595e6e3c2a64e6ea18fb6c6da8860.jpg"
     },
     {
-      id: "229239",
-      title: "Modern Wisdom",
-      url: "https://feeds.megaphone.fm/modernwisdom",
-      description: "Conversations with the world's most interesting thinkers about philosophy, psychology, and human optimization.",
-      author: "Chris Williamson",
-      ownerName: "Chris Williamson",
-      image: "https://megaphone.imgix.net/podcasts/a62f84c0-f8b6-11ed-a4fc-fb9e7841d45b/image/76ed638554a4be965517200d1cd5f30d.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress"
+      id: "6443613",
+      title: "THE Bitcoin Podcast",
+      url: "https://feeds.fountain.fm/VV0f6IwusQoi5kOqvNCx",
+      description: "THE Bitcoin Podcast, hosted by Walker America, is the fastest-growing Bitcoin podcast in the world. Bitcoin is scarce, but Bitcoin Podcasts are abundant. Get the Bitcoin signal you need all from one podcast. Whether you're deep down the Bitcoin rabbit hole or just starting your journey, there's some...",
+      author: "Walker America",
+      ownerName: "Walker America",
+      image: "https://feeds.fountain.fm/VV0f6IwusQoi5kOqvNCx/files/COVER_ART---DEFAULT---4eced655-475a-49c7-a222-997498359a53.jpg"
     },
     {
       id: "226249",
@@ -379,13 +379,13 @@ const TryJamieWizard: React.FC = () => {
       image: "https://image.simplecastcdn.com/images/8862bce3-8814-46a6-9b72-a533960bbd50/fc74b5de-5bf7-4b92-8bab-4c8eb0ed805e/3000x3000/wim-podcast-profile-6.jpg?aid=rss_feed"
     },
     {
-      id: "7181269",
-      title: "Early Days",
-      url: "https://anchor.fm/s/100230220/podcast/rss",
+      id: "5015946",
+      title: "State of Bitcoin",
+      url: "https://feeds.fountain.fm/u59Boi42aXChVy0qnxqY",
       description: "Exploring the early days of Bitcoin and the builders creating the future.",
-      author: "Car",
-      ownerName: "PlebLab",
-      image: "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/42872616/42872616-1737246678005-991fe8ccc838e.jpg"
+      author: "Brandon Keys",
+      ownerName: "Green Candle Investments",
+      image: "https://feeds.fountain.fm/u59Boi42aXChVy0qnxqY/files/COVER_ART---DEFAULT---77835b53-562a-498a-b929-67283c640c3a.jpg"
     },
     {
       id: "3498055",
@@ -543,6 +543,10 @@ const TryJamieWizard: React.FC = () => {
                 status.stats.episodesProcessed === 0 && 
                 status.stats.episodesFailed > 0;
               
+              // Analytics: track processing completed
+              const processingSuccess = status.status === 'complete' && !allEpisodesFailed;
+              trackProcessingCompleted(processingSuccess, res.jobId);
+              
               if (allEpisodesFailed) {
                 setProcessingFailed(true);
                 setTimeout(() => setCurrentStep(5), 500); // Move to step 5 but show failure UI
@@ -558,11 +562,27 @@ const TryJamieWizard: React.FC = () => {
         printLog(`Job submission error: ${e}`);
         setProcessing(false);
         
-        // Check if the error is due to quota exceeded or authentication
+        // Check if the error is due to quota exceeded (new 429 handler)
+        if (e instanceof QuotaExceededError) {
+          printLog(`Quota exceeded for submit-on-demand-run: ${JSON.stringify(e.data)}`);
+          setQuotaExceededData(e.data);
+          // Go back to step 3 so user can try again after upgrade
+          setCurrentStep(3);
+          return;
+        }
+        
+        // Check if the error is due to quota exceeded or authentication (legacy string-based check)
         if (e instanceof Error) {
           if (e.message.includes('limit exceeded') || e.message.includes('quota')) {
-            // Show quota exceeded modal
-            setOnboardingState({ status: 'quota_exceeded' });
+            // Show quota exceeded modal using the unified modal
+            setQuotaExceededData({
+              tier: userTier,
+              used: quotaInfo?.used || 0,
+              max: quotaInfo?.max || 0,
+              daysUntilReset: quotaInfo?.daysUntilReset,
+              resetDate: quotaInfo?.nextResetDate,
+              entitlementType: 'submit-on-demand-run'
+            });
             // Go back to step 3 so user can try again after upgrade
             setCurrentStep(3);
           } else if (e.message.includes('Authentication failed')) {
@@ -1003,8 +1023,15 @@ const TryJamieWizard: React.FC = () => {
             <button 
               onClick={() => {
                 if (quotaInfo && !quotaInfo.eligible) {
-                  // User is out of runs, show quota exceeded modal
-                  setOnboardingState({ status: 'quota_exceeded' });
+                  // User is out of runs, show quota exceeded modal (using new unified modal)
+                  setQuotaExceededData({
+                    tier: userTier,
+                    used: quotaInfo.used,
+                    max: quotaInfo.max,
+                    daysUntilReset: quotaInfo.daysUntilReset,
+                    resetDate: quotaInfo.nextResetDate,
+                    entitlementType: 'submit-on-demand-run'
+                  });
                   setIsInitialLoad(false); // Not initial load anymore
                 } else {
                   // User has quota, proceed to processing
@@ -1036,30 +1063,32 @@ const TryJamieWizard: React.FC = () => {
       {quotaInfo && (
         <div className="absolute top-24 left-1/2 transform -translate-x-1/2 sm:left-auto sm:right-6 sm:transform-none flex flex-col items-center sm:items-end space-y-2 mb-8">
           <div className="text-white text-sm bg-black/50 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-700 shadow-lg">
-            <div className="flex items-center space-x-2">
-              <span>{quotaInfo.remainingRuns}/{quotaInfo.totalLimit} Free Runs left</span>
-              <span className="text-gray-400">•</span>
-              <span>{quotaInfo.daysUntilReset} Days Until Reset</span>
-              {quotaInfo.authType === 'ip' && (
-                <>
-                  <span className="text-gray-400">•</span>
-                  <span className="text-gray-400 text-xs">IP-based</span>
-                </>
-              )}
-              {quotaInfo.authType === 'user' && quotaInfo.userEmail && (
-                <>
-                  <span className="text-gray-400">•</span>
-                  <span className="text-gray-400 text-xs">Account</span>
-                </>
-              )}
-            </div>
+            {quotaInfo.isUnlimited ? (
+              <div className="flex items-center space-x-2">
+                <span><strong>Pro</strong>: Unlimited Runs</span>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <span>{quotaInfo.remaining}/{quotaInfo.max} Free Runs left</span>
+                <span className="text-gray-400">•</span>
+                <span>{quotaInfo.daysUntilReset} Day{quotaInfo.daysUntilReset !== 1 ? 's' : ''} Until Reset</span>
+                {isUserSignedIn && (
+                  <>
+                    <span className="text-gray-400">•</span>
+                    <span className="text-gray-400 text-xs">Account</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
-          <button
-            onClick={handleUpgrade}
-            className="bg-white text-black hover:bg-gray-200 px-2 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg"
-          >
-            {isUserSignedIn ? 'Upgrade for Full Pro Experience' : 'Sign Up for More Runs'}
+          {!quotaInfo.isUnlimited && (
+            <button
+              onClick={handleUpgrade}
+              className="bg-white text-black hover:bg-gray-200 px-2 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg"
+            >
+              {isUserSignedIn ? 'Upgrade for Full Pro Experience' : 'Sign Up for More Runs'}
             </button>
+          )}
         </div>
       )}
       
@@ -1085,61 +1114,52 @@ const TryJamieWizard: React.FC = () => {
         }}
         onSignInSuccess={handleSignInSuccess}
         onSignUpSuccess={handleSignUpSuccess}
-        customTitle="Let's get a good email for ya"
         initialMode="signup"
+        analyticsSource="wizard"
+        analyticsIntent={onboardingState.status === 'sign_in' && onboardingState.upgradeIntent ? 'upgrade' : 'signup'}
       />
 
       {/* Checkout Modal */}
       <CheckoutModal 
         isOpen={onboardingState.status === 'checkout'} 
-        onClose={() => setOnboardingState({ status: 'idle' })} 
+        onClose={() => {
+          setOnboardingState({ status: 'idle' });
+          setCheckoutProductName(undefined);
+        }} 
         onSuccess={handleUpgradeSuccess}
-        productName="jamie-pro"
+        productName={checkoutProductName || "jamie-pro"}
       />
 
-      {/* Quota Exceeded Modal */}
-      {onboardingState.status === 'quota_exceeded' && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-          <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
-            <h2 className="text-white text-xl font-bold mb-4">
-              You've Used Your Free Episodes!
-            </h2>
-            <p className="text-gray-400 mb-6">
-              {isUserSignedIn ? (
-                `You've processed ${quotaInfo?.usedThisPeriod || 0} out of ${quotaInfo?.totalLimit || 0} free episodes this month. Upgrade to Jamie Pro for unlimited episode processing and instant access to all your favorite podcasts.`
-              ) : (
-                `You've processed ${quotaInfo?.usedThisPeriod || 0} out of ${quotaInfo?.totalLimit || 0} free episodes this week. Sign up for an account to get more free episodes or upgrade to Jamie Pro for unlimited processing.`
-              )}
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              {!isUserSignedIn && (
-                <button
-                  onClick={() => setOnboardingState({ status: 'sign_in', upgradeIntent: false })}
-                  className="px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors font-medium"
-                >
-                  Sign Up for More Runs
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  if (isUserSignedIn) {
-                    setOnboardingState({ status: 'checkout' });
-                  } else {
-                    setOnboardingState({ status: 'sign_in', upgradeIntent: true });
-                  }
-                }}
-                className={`px-6 py-2 rounded-lg transition-colors font-medium ${
-                  isUserSignedIn 
-                    ? 'bg-white text-black hover:bg-gray-100' 
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                {isUserSignedIn ? 'Upgrade Now' : 'Upgrade to Pro'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Quota Exceeded Modal (unified for both proactive checks and 429 errors) */}
+      <QuotaExceededModal
+        isOpen={!!quotaExceededData}
+        onClose={() => setQuotaExceededData(null)}
+        data={quotaExceededData || { tier: 'anonymous', used: 0, max: 0 }}
+        icon="radio-tower"
+        onSignUp={() => {
+          setQuotaExceededData(null);
+          setOnboardingState({ status: 'sign_in', upgradeIntent: false });
+        }}
+        onUpgrade={() => {
+          setQuotaExceededData(null);
+          setCheckoutProductName('jamie-plus');
+          if (isUserSignedIn) {
+            setOnboardingState({ status: 'checkout' });
+          } else {
+            setOnboardingState({ status: 'sign_in', upgradeIntent: true });
+          }
+        }}
+        onUpgradePro={() => {
+          setQuotaExceededData(null);
+          setCheckoutProductName('jamie-pro');
+          if (isUserSignedIn) {
+            setOnboardingState({ status: 'checkout' });
+          } else {
+            setOnboardingState({ status: 'sign_in', upgradeIntent: true });
+          }
+        }}
+      />
+
 
       {/* Success Modals */}
       {onboardingState.status === 'done' && onboardingState.justUpgraded && (

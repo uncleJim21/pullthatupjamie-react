@@ -43,6 +43,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
               </div>
             </button>
 
+          {/* Lightning Wallet Button - Hidden for now (Lightning auth deprecated)
           <button 
             onClick={onLightningSelect}
             className="w-full bg-[#FFA500] text-black rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 font-medium hover:bg-[#FFB52E] transition-colors"
@@ -57,6 +58,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, o
               </div>
             </div>
           </button>
+          */}
 
           <button 
             onClick={onClose}

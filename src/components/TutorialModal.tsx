@@ -31,13 +31,6 @@ const SIDEBAR_SECTIONS = [
     ],
   },
   {
-    title: 'Web Search',
-    items: [
-        'Private Web Search',
-      'How It Works',
-    ],
-  },
-  {
     title: 'Jamie Pro (Premium)',
     items: [
       'Dashboard',
@@ -115,27 +108,6 @@ const TUTORIAL_SLIDES: TutorialSlide[] = [
     5. Click post and your clip will crosspost. Click the links to view your crossposted content.`,
     imagePath: '/tutorial/jamie-pod-cross-post-clip.gif',
     section: 'Podcast Search',
-  },
-  {
-    menuTitle: 'Private Web Search',
-    slideTitle: 'Search Privately and Efficiently',
-    subtitle: `Jamie gives the convenience of AI web search with robust privacy guarantees.
-
-
-  **Steps:**
-    1. Type a search query.
-    2. Click the "Search" button or press enter.
-    3. Jamie will compile and summarize the search results with inline reference links.
-    `,
-    imagePath: '/tutorial/jamie-web-search.gif',
-    section: 'Web Search',
-  },
-  {
-    menuTitle: 'How It Works',
-    slideTitle: 'Search Privately and Efficiently',
-    subtitle: `Jamie Web Search is open source and shields you from big tech surveillance. By cloaking your identity from LLM providers and search engines, you get the benefits of high tech without giving up your privacy.`,
-    imagePath: '/tutorial/jamie-web-explainer.png',
-    section: 'Web Search',
   },
   {
     menuTitle: 'Dashboard',

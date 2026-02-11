@@ -6,7 +6,7 @@ import { CheckoutModal } from './CheckoutModal.tsx';
 import { printLog } from '../constants/constants.ts';
 
 export interface PodcastSearchFilters {
-  episodeName: string;
+  episodeGuid: string;
   minDate: string;
   maxDate: string;
 }
@@ -53,7 +53,7 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
   // Advanced filters state
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<PodcastSearchFilters>({
-    episodeName: '',
+    episodeGuid: '',
     minDate: '',
     maxDate: ''
   });
@@ -82,9 +82,15 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
     if (savedFilters) {
       try {
         const parsed = JSON.parse(savedFilters);
-        setLocalFilters(parsed);
+        // Backwards-compat: older saved filters used `episodeName`; we now use `episodeGuid`.
+        const normalized: PodcastSearchFilters = {
+          episodeGuid: parsed.episodeGuid || '',
+          minDate: parsed.minDate || '',
+          maxDate: parsed.maxDate || ''
+        };
+        setLocalFilters(normalized);
         if (setFilters) {
-          setFilters(parsed);
+          setFilters(normalized);
         }
       } catch (e) {
         console.error('Error parsing saved filters:', e);
@@ -249,7 +255,7 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
 
   const resetFilters = () => {
     const emptyFilters = {
-      episodeName: '',
+      episodeGuid: '',
       minDate: '',
       maxDate: ''
     };
@@ -262,7 +268,7 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
   };
 
   const hasActiveFilters = () => {
-    return localFilters.episodeName !== '' || localFilters.minDate !== '' || localFilters.maxDate !== '';
+    return localFilters.episodeGuid !== '' || localFilters.minDate !== '' || localFilters.maxDate !== '';
   };
 
   // Helper function to set date ranges
@@ -689,16 +695,16 @@ const PodcastSourceFilterModal: React.FC<PodcastSourceFilterModalProps> = ({
 
               {isAdvancedOpen && (
                 <div className="p-4 border-t border-gray-700 space-y-3">
-                  {/* Episode Name Filter */}
+                  {/* Episode GUID Filter */}
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">
-                      Episode Name (Exact Match)
+                      Episode GUID (Exact Match)
                     </label>
                     <input
                       type="text"
-                      value={localFilters.episodeName}
-                      onChange={(e) => handleFilterChange('episodeName', e.target.value)}
-                      placeholder="Enter exact episode title..."
+                      value={localFilters.episodeGuid}
+                      onChange={(e) => handleFilterChange('episodeGuid', e.target.value)}
+                      placeholder="Enter exact episode GUID..."
                       className="w-full px-3 py-2 bg-black border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 text-sm"
                     />
                   </div>

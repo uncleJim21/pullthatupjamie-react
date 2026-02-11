@@ -1,14 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BeatLoader } from 'react-spinners';
 import { Stepper, Step, StepLabel, Button, Typography, Box, Paper, FormControlLabel, Checkbox, Grid } from '@mui/material';
 import PricingCard from './PricingCard.tsx';
 import AddressForm from './AddressForm.tsx';
 import PaymentFormComponent from './PaymentFormComponent.tsx';
-import TryJamieService from '../services/tryJamieService.ts';
 import { MONTHLY_PRICE_STRING, DEBUG_MODE, printLog } from '../constants/constants.ts';
+import {
+  trackCheckoutOpened,
+  trackCheckoutCompleted,
+  trackCheckoutAbandoned,
+  getCurrentTier,
+  type CheckoutProduct,
+} from '../services/analyticsService.ts';
 
 const steps = ['Sign In', 'Billing', 'Card'];
-const paymentServerUrl = DEBUG_MODE ? "http://localhost:4020" : "https://cascdr-auth-backend-cw4nk.ondigitalocean.app";
+const paymentServerUrl = DEBUG_MODE ? "http://localhost:6111" : "https://cascdr-auth-backend-cw4nk.ondigitalocean.app";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -39,7 +45,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   const [activeStep, setActiveStep] = useState(1);
   const [consent, setConsent] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro'>(productName === 'jamie-pro' ? 'pro' : 'basic');
+  const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro'>('basic');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -54,24 +60,58 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paymentFailed, setPaymentFailed] = useState(false);
   const [card, setCard] = useState<SquareCard | null>(null);
 
+  // Analytics: track modal open time for abandonment calculation
+  const modalOpenedAt = useRef<number | null>(null);
+  const checkoutCompletedRef = useRef<boolean>(false);
+  const tierAtOpenRef = useRef(getCurrentTier());
+
+  // Sync selectedPlan with productName prop - always derive from prop when it changes
+  useEffect(() => {
+    const newPlan = productName === 'jamie-pro' ? 'pro' : 'basic';
+    console.log('[CheckoutModal] productName changed:', productName, '-> selectedPlan:', newPlan);
+    setSelectedPlan(newPlan);
+  }, [productName]);
+
+  // Analytics: track checkout opened
+  useEffect(() => {
+    if (isOpen) {
+      modalOpenedAt.current = Date.now();
+      checkoutCompletedRef.current = false;
+      tierAtOpenRef.current = getCurrentTier();
+      const analyticsProduct: CheckoutProduct = productName === 'jamie-pro' ? 'jamie-pro' : 'jamie-plus';
+      trackCheckoutOpened(analyticsProduct, tierAtOpenRef.current);
+    }
+  }, [isOpen, productName]);
+
   // Determine the plan display information
   const displayPrice = selectedPlan === 'basic' ? (customPrice || MONTHLY_PRICE_STRING.replace('$', '')) : "49.99";
-  const displayDescription = selectedPlan === 'basic' ? (customDescription || "Productivity and Privacy at your fingertips with Jamie & other CASCDR apps.") : "Unlock unlimited podcast processing and access to all Jamie features";
+  const displayDescription = selectedPlan === 'basic' ? (customDescription || "Do more with the podcasts you love.") : "Full automation. Unlimited usage.";
   const displayFeatures = selectedPlan === 'basic' ? (customFeatures || [
-    "Unlimited web & podcast searches",
-    "Access 20+ CASCDR Apps",
-    "Early previews of new features"
+    "More searches, clips, and AI assists each month",
+    "Visual concept exploration with 3D maps",
+    "AI summaries and key point analysis",
+    "Add any podcast to Jamie's searchable library"
   ]) : [
-    "Your Pod Feed Auto Transcribed & Searchable",
-    "AI Curated Clips & Email Alerts",
-    "AI Assist for Social Media",
-    "Easy Nostr/Twitter Crossposting"
+    "Auto transcribe & search every episode from your feed",
+    "Curated clips + automation pipeline",
+    "Video editing from browser",
+    "Crosspost in seconds"
   ];
-  const displayPlan = selectedPlan === 'basic' ? "Basic Plan" : "Jamie Pro Plan";
+  const displayPlan = selectedPlan === 'basic' ? "Jamie Plus" : "Jamie Pro";
   const currentProductName = selectedPlan === 'basic' ? "amber" : "jamie-pro";
 
   const handleNext = () => setActiveStep(activeStep + 1);
   const handleBack = () => setActiveStep(activeStep - 1);
+  
+  // Analytics: track abandonment when closing without completing
+  const handleClose = () => {
+    if (!checkoutCompletedRef.current && modalOpenedAt.current) {
+      const timeOpenMs = Date.now() - modalOpenedAt.current;
+      const analyticsProduct: CheckoutProduct = selectedPlan === 'pro' ? 'jamie-pro' : 'jamie-plus';
+      trackCheckoutAbandoned(analyticsProduct, timeOpenMs);
+    }
+    onClose();
+  };
 
   const handlePayment = async () => {
     setIsPaymentProcessing(true);
@@ -107,13 +147,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 "country":formData.country
             }
             }
+            const authToken = localStorage.getItem('auth_token');
             const response = await fetch(`${paymentServerUrl}/purchase-subscription`, {
                 method: 'POST',
                 headers: {
-                  'Content-Type': 'application/json'
+                  'Content-Type': 'application/json',
+                  ...(authToken && { 'Authorization': `Bearer ${authToken}` })
                 },
                 body: JSON.stringify({
-                  email: userEmail,
                   paymentToken,
                   productName: currentProductName,
                   cardholderName,
@@ -125,21 +166,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             throw new Error('Payment request failed');
             }
 
-            await response.json();
+            const data = await response.json();
             
-            localStorage.setItem("isSubscribed", "true")
+            localStorage.setItem("isSubscribed", "true");
+            // Use subscriptionType from backend response, or optimistic update with client-side product name
+            const subscriptionType = data.subscriptionType || currentProductName;
+            localStorage.setItem("subscriptionType", subscriptionType);
+            
             if(statusContainer) {
             statusContainer.innerHTML = "Payment Successful";
             }
             
-            // Update quota after successful payment (non-blocking)
-            try {
-              await TryJamieService.updateOnDemandQuota();
-              printLog('Quota updated successfully after payment');
-            } catch (error) {
-              printLog(`Quota update failed after payment: ${error}`);
-              // Continue with success flow even if quota update fails
-            }
+            // Analytics: track checkout completed
+            checkoutCompletedRef.current = true;
+            const analyticsProduct: CheckoutProduct = currentProductName === 'jamie-pro' ? 'jamie-pro' : 'jamie-plus';
+            trackCheckoutCompleted(analyticsProduct, tierAtOpenRef.current);
+            
             setIsPaymentProcessing(false);
             onSuccess();
         } else {
@@ -185,36 +227,38 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+    <div className="fixed inset-0 flex items-center justify-center z-[110] bg-black bg-opacity-50">
       <div className="bg-black w-[95%] sm:w-[90%] max-h-[90vh] overflow-auto shadow-[0_0_15px_rgba(255,255,255,0.4)] rounded-lg">
         <div className="flex flex-col lg:flex-row h-full">
           {/* Desktop benefits section */}
           <div className="w-full lg:w-1/3 p-4 hidden lg:flex flex-col items-center justify-center">
-            {/* Plan Selector */}
-            <div className="w-full max-w-sm mb-4">
-              <div className="flex rounded-lg border border-gray-800 p-1 bg-black">
-                <button
-                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                    selectedPlan === 'basic'
-                      ? 'bg-white text-black'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                  onClick={() => setSelectedPlan('basic')}
-                >
-                  Basic
-                </button>
-                <button
-                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                    selectedPlan === 'pro'
-                      ? 'bg-white text-black'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                  onClick={() => setSelectedPlan('pro')}
-                >
-                  Pro
-                </button>
+            {/* Plan Selector - hide if only one option available */}
+            {productName !== 'jamie-pro' && (
+              <div className="w-full max-w-sm mb-4">
+                <div className="flex rounded-lg border border-gray-800 p-1 bg-black">
+                  <button
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                      selectedPlan === 'basic'
+                        ? 'bg-white text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                    onClick={() => setSelectedPlan('basic')}
+                  >
+                    Plus
+                  </button>
+                  <button
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                      selectedPlan === 'pro'
+                        ? 'bg-white text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                    onClick={() => setSelectedPlan('pro')}
+                  >
+                    Pro
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
             
             <PricingCard 
               plan={displayPlan}
@@ -225,8 +269,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
 
           <div className="w-full lg:w-2/3">
-            {/* Mobile plan selector - only on step 1 */}
-            {activeStep === 1 && (
+            {/* Mobile plan selector - only on step 1, hide if only Pro option */}
+            {activeStep === 1 && productName !== 'jamie-pro' && (
               <div className="lg:hidden p-3 border-b border-gray-700">
                 <div className="flex rounded-lg border border-gray-800 p-1 bg-black mb-3 max-w-xs mx-auto">
                   <button
@@ -237,7 +281,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     }`}
                     onClick={() => setSelectedPlan('basic')}
                   >
-                    Basic
+                    Plus
                   </button>
                   <button
                     className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
@@ -285,7 +329,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               }}
             >
               <div className="flex justify-end">
-                <button className="text-white text-xl px-3 py-1 absolute top-1 right-1" onClick={onClose}>
+                <button className="text-white text-xl px-3 py-1 absolute top-1 right-1" onClick={handleClose}>
                   X
                 </button>
               </div>

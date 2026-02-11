@@ -7,6 +7,18 @@ export interface UserPreferences {
   scheduledPostSlots?: ScheduledSlot[];
   randomizePostTime?: boolean;
   jamieAssistDefaults?: string; // Jamie Assist preferences (tone, style, hashtags, etc.)
+  
+  // UI View Preferences
+  searchViewStyle?: 'classic' | 'split_screen';
+  searchResultViewStyle?: 'list' | 'galaxy';
+  preferredAIClipsViewStyle?: 'list' | 'grid';
+  showAxisLabels?: boolean; // Display axis labels in galaxy view (default: true for new users)
+  autoPlayOnStarClick?: boolean; // Auto-play audio when clicking a star in galaxy view (default: true for new users)
+  
+  // Admin Settings
+  adminFeedId?: string;
+  isFirstVisit?: boolean;
+  
   // Add other user preferences as needed
   [key: string]: any;
 }

@@ -5,10 +5,15 @@ import './index.css';
 import SearchInterface from './components/SearchInterface.tsx';
 import PodcastFeedPage from './components/podcast/PodcastFeedPage.tsx';
 import DashboardPage from './components/podcast/DashboardPage.tsx';
-import HomePage from './components/HomePage.tsx';
+import LandingPage from './components/LandingPage.tsx';
+import ForPodcastersPage from './components/ForPodcastersPage.tsx';
+import PrivacyPage from './components/PrivacyPage.tsx';
+import TermsPage from './components/TermsPage.tsx';
 import TryJamieWizard from './components/TryJamieWizard.tsx';
 import AutomationSettingsPage from './components/AutomationSettingsPage.tsx';
 import TwitterTest from './pages/TwitterTest.tsx';
+import TwitterAuthCallback from './pages/TwitterAuthCallback.tsx';
+import BrowserTestInput from './components/BrowserTestInput.tsx';
 import { DEBUG_MODE } from './constants/constants.ts';
 import { inject } from "@vercel/analytics"
 
@@ -117,7 +122,10 @@ const NotFound = () => {
 const App = () => (
   <BrowserRouter>
     <Routes>
-      <Route path="/" element={<HomePage />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/for-podcasters" element={<ForPodcastersPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       <Route path="/app" element={<SearchInterface />} />
       <Route path="/app/share" element={<SearchInterface isSharePage={true} />} />
       <Route path="/app/feed/:feedId" element={<PodcastFeedPage />} />
@@ -128,7 +136,9 @@ const App = () => (
       <Route path="/app/feed/:feedId/myRssVideos" element={<PodcastFeedPage initialView="uploads" defaultTab="rss-feed" />} />
       <Route path="/app/automation-settings" element={<AutomationSettingsPage />} />
       <Route path="/try-jamie" element={<TryJamieWizard />} />
+      <Route path="/auth/twitter/complete" element={<TwitterAuthCallback />} />
       {DEBUG_MODE && <Route path="/twitter-test" element={<TwitterTest />} />}
+      {DEBUG_MODE && <Route path="/browser-test" element={<BrowserTestInput />} />}
       
       {/* Redirect old URLs to new structure */}
       <Route path="/feed/:feedId" element={<OldFeedRedirect />} />

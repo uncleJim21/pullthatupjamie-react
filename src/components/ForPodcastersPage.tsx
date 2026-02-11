@@ -5,53 +5,13 @@ import Button from './Button.tsx';
 import SymbolTile from './SymbolTile.tsx';
 import { SearchIcon, ShareIcon, ClipIcon } from './Icons.tsx';
 import TutorialModal from './TutorialModal.tsx';
-import CheckoutModal from './CheckoutModal.tsx';
 import BrandsCarousel from './BrandsCarousel.tsx';
 
-interface SubscriptionSuccessPopupProps {
-  onClose: () => void;
-  isJamiePro?: boolean;
-}
+// SubscriptionSuccessPopup has been moved to PageBanner for DRY upgrade handling
 
-const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionSuccessPopupProps) => (
-  <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
-    <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
-      <h2 className="text-white text-lg font-bold mb-4">
-        {isJamiePro ? 'Welcome to Jamie Pro!' : 'Your subscription was successful!'}
-      </h2>
-      <p className="text-gray-400 mb-4">
-        {isJamiePro ? (
-          'A team member will be in contact with you within 1 business day to complete your onboarding. \nIn the meantime enjoy additional on demand episode runs.'
-        ) : (
-          <>
-            Enjoy unlimited access to Jamie and other{' '}
-            <a
-              href="https://cascdr.xyz"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300 underline"
-            >
-              CASCDR apps
-            </a>
-            .
-          </>
-        )}
-      </p>
-      <button
-        onClick={onClose}
-        className="mt-4 px-6 py-2 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors"
-      >
-        Close
-      </button>
-    </div>
-  </div>
-);
-
-const HomePage: React.FC = () => {
+const ForPodcastersPage: React.FC = () => {
   const navigate = useNavigate();
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
-  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
-  const [isUpgradeSuccessPopUpOpen, setIsUpgradeSuccessPopUpOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [fadeOut, setFadeOut] = useState(false);
   const [dots, setDots] = useState('.');
@@ -64,14 +24,7 @@ const HomePage: React.FC = () => {
     setIsTutorialOpen(false);
   };
 
-  const handleUpgrade = () => {
-    setIsCheckoutModalOpen(true);
-  };
-
-  const handleUpgradeSuccess = () => {
-    setIsCheckoutModalOpen(false);
-    setIsUpgradeSuccessPopUpOpen(true);
-  };
+  // Note: Upgrade is now handled internally by PageBanner
 
   // Animate dots
   React.useEffect(() => {
@@ -277,7 +230,7 @@ const HomePage: React.FC = () => {
         />
         
         <div style={{ position: 'relative', zIndex: 2 }}>
-          <PageBanner onTutorialClick={handleTutorialClick} onUpgrade={handleUpgrade} />
+          <PageBanner onTutorialClick={handleTutorialClick} />
           
           {/* Tutorial Modal */}
           <TutorialModal
@@ -286,12 +239,7 @@ const HomePage: React.FC = () => {
             defaultSection={0} // Start with Podcast Search section
           />
 
-          {/* Checkout Modal */}
-          <CheckoutModal 
-            isOpen={isCheckoutModalOpen} 
-            onClose={() => setIsCheckoutModalOpen(false)} 
-            onSuccess={handleUpgradeSuccess}
-          />
+          {/* Checkout Modal is now handled by PageBanner */}
           
           <main>
             {/* Hero Section */}
@@ -446,14 +394,9 @@ const HomePage: React.FC = () => {
           </main>
         </div>
       </div>
-             {isUpgradeSuccessPopUpOpen && (
-         <SubscriptionSuccessPopup onClose={() => {
-           setIsUpgradeSuccessPopUpOpen(false);
-           setIsCheckoutModalOpen(false);
-         }} />
-       )}
+      {/* Success popup is now handled by PageBanner */}
     </>
   );
 };
 
-export default HomePage; 
+export default ForPodcastersPage; 
