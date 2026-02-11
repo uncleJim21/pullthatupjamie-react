@@ -5,9 +5,9 @@ import AuthService from '../services/authService.ts';
 import '../types/nostr.ts'; // Import for window.nostr types
 import { notifyAuthStateChanged } from '../hooks/useSubscriptionStatus.ts';
 import { 
-  trackAuthModalOpened, 
-  trackAuthCompleted, 
-  trackAuthAbandoned,
+  emitAuthModalOpened, 
+  emitAuthCompleted, 
+  emitAuthAbandoned,
   type AuthSource,
   type AuthIntent,
 } from '../services/pulseService.ts';
@@ -22,8 +22,8 @@ interface SignInModalProps {
   onSignUpSuccess: () => void;
   customTitle?: string;
   initialMode?: AuthMode;
-  analyticsSource?: AuthSource;      // Source that triggered the modal
-  analyticsIntent?: AuthIntent;      // Intent: 'signup' for free, 'upgrade' for paid
+  pulseSource?: AuthSource;      // Source that triggered the modal
+  pulseIntent?: AuthIntent;      // Intent: 'signup' for free, 'upgrade' for paid
 }
 
 // Check if Nostr extension is available
@@ -38,8 +38,8 @@ export const SignInModal: React.FC<SignInModalProps> = ({
   onSignUpSuccess, 
   customTitle, 
   initialMode,
-  analyticsSource = 'account_button',
-  analyticsIntent = 'signup',
+  pulseSource = 'account_button',
+  pulseIntent = 'signup',
 }) => {
   const [mode, setMode] = useState<AuthMode>(initialMode || 'signin');
   const [provider, setProvider] = useState<AuthProvider>('select');
@@ -50,7 +50,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [nostrSuccessNpub, setNostrSuccessNpub] = useState<string | null>(null);
   
-  // Analytics: track modal open time for abandonment calculation
+  // Pulse: record modal open time for abandonment calculation
   const modalOpenedAt = useRef<number | null>(null);
   const authCompletedRef = useRef<boolean>(false);
 
@@ -97,14 +97,14 @@ export const SignInModal: React.FC<SignInModalProps> = ({
     }
   }, [initialMode]);
 
-  // Analytics: track modal opened
+  // Pulse: record modal opened
   useEffect(() => {
     if (isOpen) {
       modalOpenedAt.current = Date.now();
       authCompletedRef.current = false;
-      trackAuthModalOpened(analyticsIntent, analyticsSource);
+      emitAuthModalOpened(pulseIntent, pulseSource);
     }
-  }, [isOpen, analyticsIntent, analyticsSource]);
+  }, [isOpen, pulseIntent, pulseSource]);
 
   const validateEmail = (email: string) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -167,9 +167,9 @@ export const SignInModal: React.FC<SignInModalProps> = ({
       // Notify all subscription status hooks to refresh
       notifyAuthStateChanged();
 
-      // Analytics: track auth completed
+      // Pulse: record auth completed
       authCompletedRef.current = true;
-      trackAuthCompleted('email', analyticsIntent === 'upgrade');
+      emitAuthCompleted('email', pulseIntent === 'upgrade');
 
       resetForm();
       // Note: Don't call onClose() here - the success handlers already close the modal
@@ -219,9 +219,9 @@ export const SignInModal: React.FC<SignInModalProps> = ({
       // Notify all subscription status hooks to refresh
       notifyAuthStateChanged();
 
-      // Analytics: track auth completed
+      // Pulse: record auth completed
       authCompletedRef.current = true;
-      trackAuthCompleted('nostr', analyticsIntent === 'upgrade');
+      emitAuthCompleted('nostr', pulseIntent === 'upgrade');
 
       // Show success state with npub before closing
       setNostrSuccessNpub(npub);
@@ -260,10 +260,10 @@ export const SignInModal: React.FC<SignInModalProps> = ({
   };
 
   const handleClose = () => {
-    // Analytics: track abandonment if auth wasn't completed
+    // Pulse: record abandonment if auth wasn't completed
     if (!authCompletedRef.current && modalOpenedAt.current) {
       const timeOpenMs = Date.now() - modalOpenedAt.current;
-      trackAuthAbandoned(analyticsIntent, timeOpenMs);
+      emitAuthAbandoned(pulseIntent, timeOpenMs);
     }
     
     setProvider('select');

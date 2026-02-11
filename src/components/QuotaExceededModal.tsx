@@ -2,8 +2,8 @@
 import React, { useEffect, useRef } from 'react';
 import { Orbit, RadioTower } from 'lucide-react';
 import {
-  trackQuotaExceededShown,
-  trackQuotaExceededAction,
+  emitQuotaExceededShown,
+  emitQuotaExceededAction,
   type QuotaAction,
 } from '../services/pulseService.ts';
 
@@ -127,11 +127,11 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
   // Track if we've already tracked the "shown" event for this open
   const hasTrackedShown = useRef(false);
 
-  // Analytics: track when modal is shown
+  // Pulse: record when modal is shown
   useEffect(() => {
     if (isOpen && !hasTrackedShown.current) {
       hasTrackedShown.current = true;
-      trackQuotaExceededShown(
+      emitQuotaExceededShown(
         data.entitlementType || 'unknown',
         data.used,
         data.max
@@ -146,22 +146,22 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
 
   // Wrapper functions to track actions
   const handleClose = () => {
-    trackQuotaExceededAction('dismissed');
+    emitQuotaExceededAction('dismissed');
     onClose();
   };
 
   const handleSignUp = () => {
-    trackQuotaExceededAction('signup');
+    emitQuotaExceededAction('signup');
     onSignUp?.();
   };
 
   const handleUpgrade = () => {
-    trackQuotaExceededAction('upgrade_plus');
+    emitQuotaExceededAction('upgrade_plus');
     onUpgrade?.();
   };
 
   const handleUpgradePro = () => {
-    trackQuotaExceededAction('upgrade_pro');
+    emitQuotaExceededAction('upgrade_pro');
     onUpgradePro?.();
   };
 

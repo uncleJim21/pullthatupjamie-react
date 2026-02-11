@@ -11,8 +11,8 @@ import TutorialModal from './TutorialModal.tsx';
 import { QuotaExceededModal, QuotaExceededData } from './QuotaExceededModal.tsx';
 import { QuotaExceededError } from '../types/errors.ts';
 import {
-  trackWizardStepReached,
-  trackProcessingCompleted,
+  emitWizardStepReached,
+  emitProcessingCompleted,
   cacheUserTier,
   type WizardStep,
 } from '../services/pulseService.ts';
@@ -190,10 +190,10 @@ const TryJamieWizard: React.FC = () => {
     }
   }, [onboardingState]);
 
-  // Analytics: track wizard step changes
+  // Pulse: record wizard step changes
   useEffect(() => {
     if (currentStep >= 1 && currentStep <= 5) {
-      trackWizardStepReached(currentStep as WizardStep);
+      emitWizardStepReached(currentStep as WizardStep);
     }
   }, [currentStep]);
 
@@ -261,7 +261,7 @@ const TryJamieWizard: React.FC = () => {
         // Store the user's tier
         if (eligibilityData.tier) {
           setUserTier(eligibilityData.tier);
-          // Analytics: cache the tier for accurate event tracking
+          // Pulse: cache the tier for accurate event recording
           cacheUserTier(eligibilityData.tier);
           printLog(`[checkQuotaEligibility] User tier: ${eligibilityData.tier}`);
         }
@@ -543,9 +543,9 @@ const TryJamieWizard: React.FC = () => {
                 status.stats.episodesProcessed === 0 && 
                 status.stats.episodesFailed > 0;
               
-              // Analytics: track processing completed
+              // Pulse: record processing completed
               const processingSuccess = status.status === 'complete' && !allEpisodesFailed;
-              trackProcessingCompleted(processingSuccess, res.jobId);
+              emitProcessingCompleted(processingSuccess, res.jobId);
               
               if (allEpisodesFailed) {
                 setProcessingFailed(true);
@@ -1115,8 +1115,8 @@ const TryJamieWizard: React.FC = () => {
         onSignInSuccess={handleSignInSuccess}
         onSignUpSuccess={handleSignUpSuccess}
         initialMode="signup"
-        analyticsSource="wizard"
-        analyticsIntent={onboardingState.status === 'sign_in' && onboardingState.upgradeIntent ? 'upgrade' : 'signup'}
+        pulseSource="wizard"
+        pulseIntent={onboardingState.status === 'sign_in' && onboardingState.upgradeIntent ? 'upgrade' : 'signup'}
       />
 
       {/* Checkout Modal */}

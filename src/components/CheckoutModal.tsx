@@ -6,9 +6,9 @@ import AddressForm from './AddressForm.tsx';
 import PaymentFormComponent from './PaymentFormComponent.tsx';
 import { MONTHLY_PRICE_STRING, DEBUG_MODE, printLog } from '../constants/constants.ts';
 import {
-  trackCheckoutOpened,
-  trackCheckoutCompleted,
-  trackCheckoutAbandoned,
+  emitCheckoutOpened,
+  emitCheckoutCompleted,
+  emitCheckoutAbandoned,
   getCurrentTier,
   type CheckoutProduct,
 } from '../services/pulseService.ts';
@@ -60,7 +60,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paymentFailed, setPaymentFailed] = useState(false);
   const [card, setCard] = useState<SquareCard | null>(null);
 
-  // Analytics: track modal open time for abandonment calculation
+  // Pulse: record modal open time for abandonment calculation
   const modalOpenedAt = useRef<number | null>(null);
   const checkoutCompletedRef = useRef<boolean>(false);
   const tierAtOpenRef = useRef(getCurrentTier());
@@ -72,14 +72,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setSelectedPlan(newPlan);
   }, [productName]);
 
-  // Analytics: track checkout opened
+  // Pulse: record checkout opened
   useEffect(() => {
     if (isOpen) {
       modalOpenedAt.current = Date.now();
       checkoutCompletedRef.current = false;
       tierAtOpenRef.current = getCurrentTier();
-      const analyticsProduct: CheckoutProduct = productName === 'jamie-pro' ? 'jamie-pro' : 'jamie-plus';
-      trackCheckoutOpened(analyticsProduct, tierAtOpenRef.current);
+      const pulseProduct: CheckoutProduct = productName === 'jamie-pro' ? 'jamie-pro' : 'jamie-plus';
+      emitCheckoutOpened(pulseProduct, tierAtOpenRef.current);
     }
   }, [isOpen, productName]);
 
@@ -103,12 +103,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleNext = () => setActiveStep(activeStep + 1);
   const handleBack = () => setActiveStep(activeStep - 1);
   
-  // Analytics: track abandonment when closing without completing
+  // Pulse: record abandonment when closing without completing
   const handleClose = () => {
     if (!checkoutCompletedRef.current && modalOpenedAt.current) {
       const timeOpenMs = Date.now() - modalOpenedAt.current;
-      const analyticsProduct: CheckoutProduct = selectedPlan === 'pro' ? 'jamie-pro' : 'jamie-plus';
-      trackCheckoutAbandoned(analyticsProduct, timeOpenMs);
+      const pulseProduct: CheckoutProduct = selectedPlan === 'pro' ? 'jamie-pro' : 'jamie-plus';
+      emitCheckoutAbandoned(pulseProduct, timeOpenMs);
     }
     onClose();
   };
@@ -177,10 +177,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             statusContainer.innerHTML = "Payment Successful";
             }
             
-            // Analytics: track checkout completed
+            // Pulse: record checkout completed
             checkoutCompletedRef.current = true;
-            const analyticsProduct: CheckoutProduct = currentProductName === 'jamie-pro' ? 'jamie-pro' : 'jamie-plus';
-            trackCheckoutCompleted(analyticsProduct, tierAtOpenRef.current);
+            const pulseProduct: CheckoutProduct = currentProductName === 'jamie-pro' ? 'jamie-pro' : 'jamie-plus';
+            emitCheckoutCompleted(pulseProduct, tierAtOpenRef.current);
             
             setIsPaymentProcessing(false);
             onSuccess();

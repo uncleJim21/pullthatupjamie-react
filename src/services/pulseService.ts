@@ -1,5 +1,5 @@
 // services/pulseService.ts
-// Pulse service for tracking user journeys and feature usage
+// Pulse service for recording user journeys and feature usage
 // See docs/specs/ANALYTICS_SPEC.md for full documentation
 
 import { API_URL, printLog } from '../constants/constants.ts';
@@ -19,7 +19,7 @@ interface PulseSession {
 
 interface PulseEvent {
   type: string;
-  session_id: string;
+  sid: string;
   timestamp: string;
   tier: Tier;
   environment: Environment;
@@ -30,7 +30,7 @@ interface PulseEvent {
 // Constants
 // ============================================================
 
-const SESSION_KEY = 'jamie_analytics_session';
+const SESSION_KEY = 'jamie_pulse_session';
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const PULSE_ENDPOINT = `${API_URL}/api/pulse`;
 
@@ -54,7 +54,7 @@ const ALLOWED_EVENTS = [
   'visit_shared_session',
 ] as const;
 
-export type AnalyticsEventType = typeof ALLOWED_EVENTS[number];
+export type PulseEventType = typeof ALLOWED_EVENTS[number];
 
 // ============================================================
 // Session Management
@@ -66,6 +66,14 @@ export type AnalyticsEventType = typeof ALLOWED_EVENTS[number];
  * to preserve the full user journey.
  */
 export function getOrCreateSession(): PulseSession {
+  // Migrate from legacy key if present
+  const legacyKey = 'jamie_analytics_session';
+  const legacy = localStorage.getItem(legacyKey);
+  if (legacy) {
+    localStorage.setItem(SESSION_KEY, legacy);
+    localStorage.removeItem(legacyKey);
+  }
+
   const stored = localStorage.getItem(SESSION_KEY);
 
   if (stored) {
@@ -155,20 +163,20 @@ export function cacheUserTier(tier: Tier): void {
 }
 
 // ============================================================
-// Event Tracking
+// Event Recording
 // ============================================================
 
-interface TrackEventOptions {
-  type: AnalyticsEventType;
+interface EmitOptions {
+  type: PulseEventType;
   properties?: Record<string, unknown>;
 }
 
 /**
- * Track a pulse event.
- * Uses sendBeacon for reliability on page unload.
+ * Record a pulse event.
+ * Uses fetch with keepalive for reliability on page unload.
  * Never throws - pulse should not break the app.
  */
-export async function trackEvent({ type, properties = {} }: TrackEventOptions): Promise<void> {
+export function emit({ type, properties = {} }: EmitOptions): void {
   // Validate event type
   if (!ALLOWED_EVENTS.includes(type)) {
     printLog(`[Pulse] Invalid event type: ${type}`);
@@ -177,42 +185,26 @@ export async function trackEvent({ type, properties = {} }: TrackEventOptions): 
 
   const payload: PulseEvent = {
     type,
-    session_id: getSessionId(),
+    sid: getSessionId(),
     timestamp: new Date().toISOString(),
     tier: getCurrentTier(),
     environment: getEnvironment(),
     properties,
   };
 
-  printLog(`[Pulse] Tracking: ${type} ${JSON.stringify(properties)}`);
+  printLog(`[Pulse] Recording: ${type} ${JSON.stringify(properties)}`);
 
-  try {
-    // Use sendBeacon for reliability (works even on page unload)
-    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-      const success = navigator.sendBeacon(PULSE_ENDPOINT, blob);
-      if (!success) {
-        // Fallback to fetch if sendBeacon fails
-        await fetchFallback(payload);
-      }
-    } else {
-      await fetchFallback(payload);
-    }
-  } catch (error) {
-    // Pulse should never break the app
-    printLog(`[Pulse] Failed to track event: ${error}`);
-  }
-}
-
-/**
- * Fallback fetch for environments without sendBeacon
- */
-async function fetchFallback(payload: PulseEvent): Promise<void> {
-  await fetch(PULSE_ENDPOINT, {
+  fetch(PULSE_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     keepalive: true,
+  }).then(res => {
+    if (!res.ok && import.meta.env.DEV) {
+      console.debug('[Pulse] Signal failed:', res.status);
+    }
+  }).catch(() => {
+    if (import.meta.env.DEV) console.debug('[Pulse] Signal unavailable');
   });
 }
 
@@ -226,22 +218,22 @@ export type AuthSource = 'wizard' | 'banner' | 'quota_exceeded' | 'account_butto
 export type AuthIntent = 'signup' | 'upgrade';
 export type AuthMethod = 'email' | 'nostr' | 'twitter';
 
-export function trackAuthModalOpened(intent: AuthIntent, source: AuthSource): void {
-  trackEvent({
+export function emitAuthModalOpened(intent: AuthIntent, source: AuthSource): void {
+  emit({
     type: 'auth_modal_opened',
     properties: { intent, source },
   });
 }
 
-export function trackAuthCompleted(method: AuthMethod, hadUpgradeIntent: boolean): void {
-  trackEvent({
+export function emitAuthCompleted(method: AuthMethod, hadUpgradeIntent: boolean): void {
+  emit({
     type: 'auth_completed',
     properties: { method, had_upgrade_intent: hadUpgradeIntent },
   });
 }
 
-export function trackAuthAbandoned(intent: AuthIntent, timeOpenMs: number): void {
-  trackEvent({
+export function emitAuthAbandoned(intent: AuthIntent, timeOpenMs: number): void {
+  emit({
     type: 'auth_abandoned',
     properties: { intent, time_open_ms: timeOpenMs },
   });
@@ -251,22 +243,22 @@ export function trackAuthAbandoned(intent: AuthIntent, timeOpenMs: number): void
 
 export type CheckoutProduct = 'jamie-plus' | 'jamie-pro';
 
-export function trackCheckoutOpened(product: CheckoutProduct, fromTier: Tier): void {
-  trackEvent({
+export function emitCheckoutOpened(product: CheckoutProduct, fromTier: Tier): void {
+  emit({
     type: 'checkout_opened',
     properties: { product, from_tier: fromTier },
   });
 }
 
-export function trackCheckoutCompleted(product: CheckoutProduct, fromTier: Tier): void {
-  trackEvent({
+export function emitCheckoutCompleted(product: CheckoutProduct, fromTier: Tier): void {
+  emit({
     type: 'checkout_completed',
     properties: { product, from_tier: fromTier },
   });
 }
 
-export function trackCheckoutAbandoned(product: CheckoutProduct, timeOpenMs: number): void {
-  trackEvent({
+export function emitCheckoutAbandoned(product: CheckoutProduct, timeOpenMs: number): void {
+  emit({
     type: 'checkout_abandoned',
     properties: { product, time_open_ms: timeOpenMs },
   });
@@ -276,15 +268,15 @@ export function trackCheckoutAbandoned(product: CheckoutProduct, timeOpenMs: num
 
 export type QuotaAction = 'signup' | 'upgrade_plus' | 'upgrade_pro' | 'dismissed';
 
-export function trackQuotaExceededShown(entitlementType: string, used: number, max: number): void {
-  trackEvent({
+export function emitQuotaExceededShown(entitlementType: string, used: number, max: number): void {
+  emit({
     type: 'quota_exceeded_shown',
     properties: { entitlement_type: entitlementType, used, max },
   });
 }
 
-export function trackQuotaExceededAction(action: QuotaAction): void {
-  trackEvent({
+export function emitQuotaExceededAction(action: QuotaAction): void {
+  emit({
     type: 'quota_exceeded_action',
     properties: { action },
   });
@@ -301,15 +293,15 @@ const WIZARD_STEP_NAMES: Record<WizardStep, string> = {
   5: 'Enjoy',
 };
 
-export function trackWizardStepReached(step: WizardStep): void {
-  trackEvent({
+export function emitWizardStepReached(step: WizardStep): void {
+  emit({
     type: 'wizard_step_reached',
     properties: { step, step_name: WIZARD_STEP_NAMES[step] },
   });
 }
 
-export function trackProcessingCompleted(success: boolean, jobId: string | null): void {
-  trackEvent({
+export function emitProcessingCompleted(success: boolean, jobId: string | null): void {
+  emit({
     type: 'processing_completed',
     properties: { success, job_id: jobId || 'unknown' },
   });
@@ -319,8 +311,8 @@ export function trackProcessingCompleted(success: boolean, jobId: string | null)
 
 export type SharedSessionSource = 'carousel' | 'shared_link' | 'embed';
 
-export function trackVisitSharedSession(shareId: string, source: SharedSessionSource, title?: string): void {
-  trackEvent({
+export function emitVisitSharedSession(shareId: string, source: SharedSessionSource, title?: string): void {
+  emit({
     type: 'visit_shared_session',
     properties: { 
       share_id: shareId, 
@@ -335,13 +327,13 @@ export function trackVisitSharedSession(shareId: string, source: SharedSessionSo
 // ============================================================
 
 /**
- * Get the X-Analytics-Session header value for API requests.
+ * Get the X-Pulse-Session header value for API requests.
  * Include this header on entitlement-gated endpoints so the backend
  * can emit server-side pulse events with session context.
  */
-export function getAnalyticsHeader(): Record<string, string> {
+export function getPulseHeader(): Record<string, string> {
   return {
-    'X-Analytics-Session': getSessionId(),
+    'X-Pulse-Session': getSessionId(),
   };
 }
 
@@ -349,17 +341,17 @@ export default {
   getSessionId,
   getCurrentTier,
   cacheUserTier,
-  trackEvent,
-  trackAuthModalOpened,
-  trackAuthCompleted,
-  trackAuthAbandoned,
-  trackCheckoutOpened,
-  trackCheckoutCompleted,
-  trackCheckoutAbandoned,
-  trackQuotaExceededShown,
-  trackQuotaExceededAction,
-  trackWizardStepReached,
-  trackProcessingCompleted,
-  trackVisitSharedSession,
-  getAnalyticsHeader,
+  emit,
+  emitAuthModalOpened,
+  emitAuthCompleted,
+  emitAuthAbandoned,
+  emitCheckoutOpened,
+  emitCheckoutCompleted,
+  emitCheckoutAbandoned,
+  emitQuotaExceededShown,
+  emitQuotaExceededAction,
+  emitWizardStepReached,
+  emitProcessingCompleted,
+  emitVisitSharedSession,
+  getPulseHeader,
 };

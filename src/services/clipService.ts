@@ -1,7 +1,7 @@
 import { API_URL, AuthConfig } from "../constants/constants.ts";
 import { ClipRequestResponse } from "../types/clips.ts";
 import { throwIfQuotaExceeded } from "../types/errors.ts";
-import { getAnalyticsHeader } from "./pulseService.ts";
+import { getPulseHeader } from "./pulseService.ts";
 
 /**
  * Build authorization headers using JWT Bearer token
@@ -9,7 +9,7 @@ import { getAnalyticsHeader } from "./pulseService.ts";
 function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...getAnalyticsHeader()
+    ...getPulseHeader()
   };
   
   const token = localStorage.getItem('auth_token');

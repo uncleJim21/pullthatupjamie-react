@@ -1,6 +1,6 @@
 import { API_URL } from "../constants/constants.ts";
 import { throwIfQuotaExceeded } from "../types/errors.ts";
-import { getAnalyticsHeader } from "./pulseService.ts";
+import { getPulseHeader } from "./pulseService.ts";
 
 const BASE_URL = API_URL;
 
@@ -81,7 +81,7 @@ class TryJamieService {
     const token = localStorage.getItem('auth_token');
     const headers: Record<string, string> = { 
       'Content-Type': 'application/json',
-      ...getAnalyticsHeader(),
+      ...getPulseHeader(),
     };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -132,7 +132,7 @@ class TryJamieService {
   static async getOnDemandJobStatus(jobId: string): Promise<OnDemandJobStatus> {
     const token = localStorage.getItem('auth_token');
     const headers: Record<string, string> = {
-      ...getAnalyticsHeader(),
+      ...getPulseHeader(),
     };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -184,7 +184,7 @@ class TryJamieService {
   static async checkEligibility(): Promise<CheckEligibilityResponse | null> {
     const token = localStorage.getItem('auth_token');
     const headers: Record<string, string> = {
-      ...getAnalyticsHeader(),
+      ...getPulseHeader(),
     };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
