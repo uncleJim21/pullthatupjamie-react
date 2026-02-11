@@ -44,7 +44,7 @@ function getBackendUrl() {
     return 'http://localhost:4132';
   }
   
-  return 'https://pullthatupjamie-explore-alpha-xns9k.ondigitalocean.app';
+  return 'https://pullthatupjamie-nsh57.ondigitalocean.app';
 }
 
 /**
