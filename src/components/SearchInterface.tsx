@@ -259,9 +259,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   
   // Result view style state (List vs Galaxy)
   // In embed mode, always use GALAXY view
-  // In clip batch page, always use LIST view
+  // In clip batch page or clip share deeplink, always use LIST view
   const [resultViewStyle, setResultViewStyle] = useState<SearchResultViewStyle>(() => {
     if (isClipBatchPage) return SearchResultViewStyle.LIST;
+    if (isSharePage && new URLSearchParams(window.location.search).has('clip')) return SearchResultViewStyle.LIST;
     if (isEmbedMode) return SearchResultViewStyle.GALAXY;
     const saved = localStorage.getItem('searchResultViewStyle');
     return saved === SearchResultViewStyle.LIST ? SearchResultViewStyle.LIST : SearchResultViewStyle.GALAXY;
