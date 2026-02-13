@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Headphones, Search, LayoutDashboard, PlusCircle } from 'lucide-react';
+import { Headphones, Search, LayoutDashboard, PlusCircle, Newspaper } from 'lucide-react';
 import AuthService from '../services/authService.ts';
 import AccountButton from './AccountButton.tsx';
 import SignInModal from './SignInModal.tsx';
@@ -406,6 +406,14 @@ const PageBanner: React.FC<PageBannerProps> = ({
                 </a>
               </>
             )}
+            <Link
+              to="/blog"
+              style={navLinkStyle}
+              className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+            >
+              <Newspaper size={24} style={iconStyle} />
+              <span>Blog</span>
+            </Link>
             {/* Show "Add Episode" on /app, "Pro Dashboard" on landing pages */}
             {isOnAppPage ? (
               <a 
@@ -486,6 +494,15 @@ const PageBanner: React.FC<PageBannerProps> = ({
                   </a>
                 </>
               )}
+              <Link
+                to="/blog"
+                style={{ ...navLinkStyle, padding: '8px 12px' }}
+                className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Newspaper size={24} style={iconStyle} />
+                <span>Blog</span>
+              </Link>
               {/* Show "Add Episode" on /app, "Pro Dashboard" on landing pages */}
               {isOnAppPage ? (
                 <a 

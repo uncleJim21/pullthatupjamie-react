@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import './index.css';
 import SearchInterface from './components/SearchInterface.tsx';
 import PodcastFeedPage from './components/podcast/PodcastFeedPage.tsx';
@@ -14,6 +15,8 @@ import AutomationSettingsPage from './components/AutomationSettingsPage.tsx';
 import TwitterTest from './pages/TwitterTest.tsx';
 import TwitterAuthCallback from './pages/TwitterAuthCallback.tsx';
 import BrowserTestInput from './components/BrowserTestInput.tsx';
+import BlogIndex from './components/blog/BlogIndex.tsx';
+import BlogPost from './components/blog/BlogPost.tsx';
 import { DEBUG_MODE } from './constants/constants.ts';
 import { inject } from "@vercel/analytics"
 
@@ -120,6 +123,7 @@ const NotFound = () => {
 };
 
 const App = () => (
+  <HelmetProvider>
   <BrowserRouter>
     <Routes>
       <Route path="/" element={<LandingPage />} />
@@ -139,6 +143,10 @@ const App = () => (
       <Route path="/auth/twitter/complete" element={<TwitterAuthCallback />} />
       {DEBUG_MODE && <Route path="/twitter-test" element={<TwitterTest />} />}
       {DEBUG_MODE && <Route path="/browser-test" element={<BrowserTestInput />} />}
+
+      {/* Blog routes */}
+      <Route path="/blog" element={<BlogIndex />} />
+      <Route path="/app/blog/:slug" element={<BlogPost />} />
       
       {/* Redirect old URLs to new structure */}
       <Route path="/feed/:feedId" element={<OldFeedRedirect />} />
@@ -150,6 +158,7 @@ const App = () => (
       <Route path="*" element={<NotFound />} />
     </Routes>
   </BrowserRouter>
+  </HelmetProvider>
 );
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

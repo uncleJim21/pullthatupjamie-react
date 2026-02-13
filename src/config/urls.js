@@ -4,7 +4,7 @@
  */
 
 // Debug mode - set this to false for production
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 
 /**
  * Get the frontend URL based on environment
