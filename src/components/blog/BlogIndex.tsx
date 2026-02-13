@@ -60,7 +60,7 @@ const BlogIndex: React.FC = () => {
         <title>Blog: Pulling Up the Future - Pull That Up Jamie</title>
         <meta name="description" content="Thoughts on AI, Bitcoin, Startups and the trajectory of society. And PullThatUpJamie.ai product updates." />
         <meta property="og:title" content="Blog: Pulling Up the Future - Pull That Up Jamie" />
-        <meta property="og:description" content="Thoughts on AI, Bitcoin, the trajectory of science technology and society. And Jamie product updates." />
+        <meta property="og:description" content="Thoughts on AI, Bitcoin, the trajectory of science technology and society. And Jamie podcast intellgience product updates." />
         <meta property="og:type" content="website" />
       </Helmet>
 
