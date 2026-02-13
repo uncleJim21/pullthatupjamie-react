@@ -57,10 +57,10 @@ const BlogIndex: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>Blog - Pull That Up Jamie</title>
-        <meta name="description" content="Articles on podcasting, AI, Bitcoin, and the open web from Pull That Up Jamie." />
-        <meta property="og:title" content="Blog - Pull That Up Jamie" />
-        <meta property="og:description" content="Articles on podcasting, AI, Bitcoin, and the open web." />
+        <title>Blog: Pulling Up the Future - Pull That Up Jamie</title>
+        <meta name="description" content="Thoughts on AI, Bitcoin, Startups and the trajectory of society. And PullThatUpJamie.ai product updates." />
+        <meta property="og:title" content="Blog: Pulling Up the Future - Pull That Up Jamie" />
+        <meta property="og:description" content="Thoughts on AI, Bitcoin, the trajectory of science technology and society. And Jamie product updates." />
         <meta property="og:type" content="website" />
       </Helmet>
 
@@ -71,9 +71,9 @@ const BlogIndex: React.FC = () => {
             <ArrowLeft size={18} />
             <span>Home</span>
           </Link>
-          <h1 style={styles.title}>Blog</h1>
+          <h1 style={styles.title}>Pulling Up the Future</h1>
           <p style={styles.subtitle}>
-            Thoughts on podcasting, AI, Bitcoin, and the open web
+            Thoughts on AI, Bitcoin, the trajectory of science technology and society. And Jamie product updates.
           </p>
         </header>
 
