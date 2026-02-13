@@ -54,6 +54,9 @@ const PageBanner: React.FC<PageBannerProps> = ({
   // Determine if we're on the /app page (for conditional header buttons)
   const isOnAppPage = location.pathname === '/app' || location.pathname.startsWith('/app/');
   
+  // Show Blog link only on the landing page
+  const isOnLandingPage = location.pathname === '/';
+  
   // Use centralized subscription status hook
   const subscriptionStatus = useSubscriptionStatus();
 
@@ -406,14 +409,16 @@ const PageBanner: React.FC<PageBannerProps> = ({
                 </a>
               </>
             )}
-            <Link
-              to="/blog"
-              style={navLinkStyle}
-              className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
-            >
-              <Newspaper size={24} style={iconStyle} />
-              <span>Blog</span>
-            </Link>
+            {isOnLandingPage && (
+              <Link
+                to="/blog"
+                style={navLinkStyle}
+                className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+              >
+                <Newspaper size={24} style={iconStyle} />
+                <span>Blog</span>
+              </Link>
+            )}
             {/* Show "Add Episode" on /app, "Pro Dashboard" on landing pages */}
             {isOnAppPage ? (
               <a 
@@ -494,15 +499,17 @@ const PageBanner: React.FC<PageBannerProps> = ({
                   </a>
                 </>
               )}
-              <Link
-                to="/blog"
-                style={{ ...navLinkStyle, padding: '8px 12px' }}
-                className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <Newspaper size={24} style={iconStyle} />
-                <span>Blog</span>
-              </Link>
+              {isOnLandingPage && (
+                <Link
+                  to="/blog"
+                  style={{ ...navLinkStyle, padding: '8px 12px' }}
+                  className="text-gray-300 hover:text-white transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] font-bold"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Newspaper size={24} style={iconStyle} />
+                  <span>Blog</span>
+                </Link>
+              )}
               {/* Show "Add Episode" on /app, "Pro Dashboard" on landing pages */}
               {isOnAppPage ? (
                 <a 
