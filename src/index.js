@@ -17,6 +17,7 @@ import TwitterAuthCallback from './pages/TwitterAuthCallback.tsx';
 import BrowserTestInput from './components/BrowserTestInput.tsx';
 import BlogIndex from './components/blog/BlogIndex.tsx';
 import BlogPost from './components/blog/BlogPost.tsx';
+import UpgradePage from './components/UpgradePage.tsx';
 import { DEBUG_MODE } from './constants/constants.ts';
 import { inject } from "@vercel/analytics"
 
@@ -143,6 +144,9 @@ const App = () => (
       <Route path="/auth/twitter/complete" element={<TwitterAuthCallback />} />
       {DEBUG_MODE && <Route path="/twitter-test" element={<TwitterTest />} />}
       {DEBUG_MODE && <Route path="/browser-test" element={<BrowserTestInput />} />}
+
+      {/* Upgrade page */}
+      <Route path="/upgrade" element={<UpgradePage />} />
 
       {/* Blog routes */}
       <Route path="/blog" element={<BlogIndex />} />
