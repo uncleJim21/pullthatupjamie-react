@@ -216,7 +216,7 @@ const STAR_VISUAL_CONFIG = {
 
 // Interaction configuration for stars (hit area, etc.)
 const STAR_INTERACTION_CONFIG = {
-  CORE_HIT_RADIUS_MULTIPLIER: 10, // Multiplier for invisible interaction sphere vs visual core
+  CORE_HIT_RADIUS_MULTIPLIER: 20, // Multiplier for invisible interaction sphere vs visual core
 };
 
 // Camera intro animation configuration
