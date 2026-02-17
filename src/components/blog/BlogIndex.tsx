@@ -152,8 +152,8 @@ const BlogIndex: React.FC = () => {
             <ArrowLeft size={18} />
             <span>Home</span>
           </Link>
-          <h1 style={styles.title}>Pulling Up the Future</h1>
-          <p style={styles.subtitle}>
+          <h1 style={styles.title} className="blog-idx-title">Pulling Up the Future</h1>
+          <p style={styles.subtitle} className="blog-idx-subtitle">
             Thoughts on AI, Bitcoin, the trajectory of science technology and society. And Jamie product updates.
           </p>
         </header>
@@ -192,11 +192,11 @@ const BlogIndex: React.FC = () => {
                     <li key={post.slug} style={styles.postItem}>
                       <article style={styles.postCard}>
                         <Link to={`/app/blog/${post.slug}`} style={styles.postLink}>
-                          <div style={styles.postCardInner}>
+                          <div style={styles.postCardInner} className="blog-idx-card-inner">
                             <div style={styles.postTextCol}>
-                              <h2 style={styles.postTitle}>{post.title}</h2>
+                              <h2 style={styles.postTitle} className="blog-idx-post-title">{post.title}</h2>
 
-                              <div style={styles.postMeta}>
+                              <div style={styles.postMeta} className="blog-idx-post-meta">
                                 <span style={styles.metaItem}>
                                   <Calendar size={14} />
                                   {formatDate(post.created_at)}
@@ -210,12 +210,12 @@ const BlogIndex: React.FC = () => {
                               </div>
 
                               {post.summary && (
-                                <p style={styles.postSummary}>{post.summary}</p>
+                                <p style={styles.postSummary} className="blog-idx-post-summary">{post.summary}</p>
                               )}
                             </div>
 
                             {imageUrl && (
-                              <div style={styles.postImageCol}>
+                              <div style={styles.postImageCol} className="blog-idx-image-col">
                                 <img
                                   src={imageUrl}
                                   alt=""
@@ -273,6 +273,46 @@ const BlogIndex: React.FC = () => {
           )}
         </main>
       </div>
+
+      {/* Responsive overrides */}
+      <style>{`
+        @media (max-width: 600px) {
+          .blog-idx-title {
+            font-size: 28px !important;
+            margin-bottom: 8px !important;
+          }
+          .blog-idx-subtitle {
+            font-size: 15px !important;
+          }
+          .blog-idx-card-inner {
+            flex-direction: column-reverse !important;
+            gap: 16px !important;
+          }
+          .blog-idx-image-col {
+            width: 100% !important;
+            height: 180px !important;
+            border-radius: 8px !important;
+          }
+          .blog-idx-post-title {
+            font-size: 18px !important;
+            margin-bottom: 8px !important;
+          }
+          .blog-idx-post-meta {
+            font-size: 12px !important;
+            gap: 10px !important;
+            margin-bottom: 8px !important;
+          }
+          .blog-idx-post-summary {
+            font-size: 13px !important;
+            margin-bottom: 8px !important;
+          }
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </>
   );
 };
