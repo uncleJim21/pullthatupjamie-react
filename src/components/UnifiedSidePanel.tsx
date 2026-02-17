@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -7,6 +7,8 @@ import { analyzeAdHocResearch, analyzeResearchSession } from '../services/resear
 import { getCurrentSessionId, fetchAllResearchSessions, ResearchSession } from '../services/researchSessionService.ts';
 import PodcastContextPanel from './PodcastContextPanel.tsx';
 import { AuthConfig, printLog } from '../constants/constants.ts';
+import { copyToClipboard } from '../services/researchSessionShareService.ts';
+import { FRONTEND_URL } from '../config/urls.js';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
 import { QuotaExceededError } from '../types/errors.ts';
 import QuotaExceededModal, { QuotaExceededData } from './QuotaExceededModal.tsx';
@@ -409,6 +411,18 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   
+  // Copy-to-clipboard feedback: stores the session ID that was just copied, cleared after 2s
+  const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
+
+  const handleCopySessionLink = async (sessionId: string) => {
+    const url = `${FRONTEND_URL}/app?researchSessionId=${encodeURIComponent(sessionId)}`;
+    const ok = await copyToClipboard(url);
+    if (ok) {
+      setCopiedSessionId(sessionId);
+      setTimeout(() => setCopiedSessionId(null), 2000);
+    }
+  };
+
   // Quota exceeded state
   const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
   
@@ -505,24 +519,52 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
 
   // No auto-analyze on open; user triggers analysis explicitly from UI.
 
-  // Fetch sessions when sessions mode opens (always refresh to show latest)
+  // Fetch sessions when sessions mode opens, or when the active session changes.
+  // Uses a cancelled flag so stale fetches don't clobber newer results, and retries
+  // once if the active session isn't in the list yet (save may still be in-flight).
   useEffect(() => {
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
     const loadSessions = async () => {
-      if (activeMode === PanelMode.SESSIONS && isPanelOpen && !isLoadingSessions) {
-        setIsLoadingSessions(true);
-        setSessionsError(null);
-        try {
-          const allSessions = await fetchAllResearchSessions();
-          setSessions(allSessions);
-        } catch (err) {
+      if (activeMode !== PanelMode.SESSIONS || !isPanelOpen) return;
+
+      setIsLoadingSessions(true);
+      setSessionsError(null);
+      try {
+        const allSessions = await fetchAllResearchSessions();
+        if (cancelled) return;
+        setSessions(allSessions);
+
+        // If the active session isn't in the fetched list it may still be saving
+        // to the backend (race between optimistic local state and async save).
+        // Retry once after a short delay so the user sees it appear.
+        if (activeSessionId && !allSessions.some(s => s.id === activeSessionId)) {
+          retryTimer = setTimeout(async () => {
+            if (cancelled) return;
+            try {
+              const retried = await fetchAllResearchSessions();
+              if (!cancelled) setSessions(retried);
+            } catch { /* silent retry */ }
+          }, 2000);
+        }
+      } catch (err) {
+        if (!cancelled) {
           setSessionsError(err instanceof Error ? err.message : 'Failed to load sessions');
-        } finally {
+        }
+      } finally {
+        if (!cancelled) {
           setIsLoadingSessions(false);
         }
       }
     };
+
     void loadSessions();
-  }, [activeMode, isPanelOpen]);
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [activeMode, isPanelOpen, activeSessionId]);
 
   // Parse the analysis into title and content
   const lines = analysis.split('\n');
@@ -1181,17 +1223,36 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                                 )}
                               </div>
 
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (onOpenSession && session.id) {
-                                    onOpenSession(session.id, displayTitle);
-                                  }
-                                }}
-                                className="px-3 py-1.5 bg-white text-black rounded text-xs font-medium hover:bg-gray-200 transition-colors flex-shrink-0"
-                              >
-                                Open
-                              </button>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                {session.id && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void handleCopySessionLink(session.id!);
+                                    }}
+                                    className="p-1.5 text-gray-500 hover:text-white border border-gray-700 rounded-md hover:bg-gray-800 transition-colors"
+                                    aria-label="Copy session link"
+                                    title={copiedSessionId === session.id ? 'Copied!' : 'Copy link'}
+                                  >
+                                    {copiedSessionId === session.id ? (
+                                      <Check className="w-3.5 h-3.5 text-green-400" />
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onOpenSession && session.id) {
+                                      onOpenSession(session.id, displayTitle);
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 bg-white text-black rounded text-xs font-medium hover:bg-gray-200 transition-colors"
+                                >
+                                  Open
+                                </button>
+                              </div>
                             </div>
                           );
                         })}
@@ -1810,18 +1871,37 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
                               )}
                             </div>
 
-                            {/* Open Button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onOpenSession && session.id) {
-                                  onOpenSession(session.id, displayTitle);
-                                }
-                              }}
-                              className="px-3 py-1.5 bg-white text-black rounded text-xs font-medium hover:bg-gray-200 transition-colors flex-shrink-0"
-                            >
-                              Open
-                            </button>
+                            {/* Copy Link + Open Buttons */}
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              {session.id && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleCopySessionLink(session.id!);
+                                  }}
+                                  className="p-1.5 text-gray-500 hover:text-white border border-gray-700 rounded-md hover:bg-gray-800 transition-colors"
+                                  aria-label="Copy session link"
+                                  title={copiedSessionId === session.id ? 'Copied!' : 'Copy link'}
+                                >
+                                  {copiedSessionId === session.id ? (
+                                    <Check className="w-3.5 h-3.5 text-green-400" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onOpenSession && session.id) {
+                                    onOpenSession(session.id, displayTitle);
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-white text-black rounded text-xs font-medium hover:bg-gray-200 transition-colors"
+                              >
+                                Open
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
