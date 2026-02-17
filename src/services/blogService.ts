@@ -14,6 +14,11 @@ export interface BlogPostSummary {
   source: string;
   source_url: string;
   tags: string[];
+  seo?: {
+    og_image?: string;
+    canonical_url?: string;
+    meta_description?: string;
+  };
 }
 
 export interface BlogPostSeo {

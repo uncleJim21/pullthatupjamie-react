@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { ArrowLeft, Calendar, ExternalLink, User } from 'lucide-react';
+import { ArrowLeft, Calendar, ExternalLink, User, Share2, Link as LinkIcon, Mail, Check } from 'lucide-react';
 import {
   fetchBlogPost,
   BlogPostFull,
@@ -84,6 +84,118 @@ const MediaEmbed: React.FC<{ src?: string; alt?: string }> = ({ src, alt }) => {
       onError={() => setIsVideo(true)}
     />
   );
+};
+
+// ============================================================
+// SHARE BAR
+// ============================================================
+
+const XIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+interface ShareBarProps {
+  title: string;
+  url: string;
+  summary?: string;
+}
+
+const ShareBar: React.FC<ShareBarProps> = ({ title, url, summary }) => {
+  const [copied, setCopied] = useState(false);
+
+  const shareOnX = () => {
+    const text = `${title}\n\n${url}`;
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+    window.open(twitterUrl, '_blank');
+  };
+
+  const shareViaEmail = () => {
+    const subject = encodeURIComponent(title);
+    const body = encodeURIComponent(`${summary ? summary + '\n\n' : ''}${url}`);
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_self');
+  };
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const el = document.createElement('textarea');
+      el.value = url;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div style={shareStyles.bar}>
+      <span style={shareStyles.label}>
+        <Share2 size={14} />
+        Share
+      </span>
+      <div style={shareStyles.buttons}>
+        <button onClick={shareOnX} style={shareStyles.btn} title="Share on X">
+          <XIcon size={15} />
+          <span>Post</span>
+        </button>
+        <button onClick={shareViaEmail} style={shareStyles.btn} title="Share via email">
+          <Mail size={15} />
+          <span>Email</span>
+        </button>
+        <button onClick={copyLink} style={shareStyles.btn} title="Copy link">
+          {copied ? <Check size={15} /> : <LinkIcon size={15} />}
+          <span>{copied ? 'Copied!' : 'Copy link'}</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const shareStyles: Record<string, React.CSSProperties> = {
+  bar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    padding: '16px 0',
+    borderTop: '1px solid #1a1a1a',
+    marginTop: 8,
+  },
+  label: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    color: '#666',
+    fontSize: 13,
+    fontWeight: 500,
+    whiteSpace: 'nowrap',
+  },
+  buttons: {
+    display: 'flex',
+    gap: 8,
+  },
+  btn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    background: '#111',
+    color: '#ccc',
+    border: '1px solid #2a2a2a',
+    padding: '7px 14px',
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'background 0.15s, border-color 0.15s',
+    whiteSpace: 'nowrap',
+  },
 };
 
 // ============================================================
@@ -267,6 +379,12 @@ const BlogPost: React.FC = () => {
                 ))}
               </div>
             )}
+
+            <ShareBar
+              title={post.title}
+              url={seo.canonical_url || window.location.href}
+              summary={post.summary}
+            />
           </header>
 
           {/* Article body */}
@@ -278,6 +396,13 @@ const BlogPost: React.FC = () => {
               {post.content_md}
             </ReactMarkdown>
           </article>
+
+          {/* Share */}
+          <ShareBar
+            title={post.title}
+            url={seo.canonical_url || window.location.href}
+            summary={post.summary}
+          />
 
           {/* Footer */}
           <footer style={styles.articleFooter}>

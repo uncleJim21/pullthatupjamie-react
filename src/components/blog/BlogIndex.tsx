@@ -104,34 +104,52 @@ const BlogIndex: React.FC = () => {
           {!loading && !error && posts.length > 0 && (
             <>
               <ul style={styles.postList}>
-                {posts.map((post) => (
-                  <li key={post.slug} style={styles.postItem}>
-                    <Link to={`/app/blog/${post.slug}`} style={styles.postLink}>
-                      <article style={styles.postCard}>
-                        <h2 style={styles.postTitle}>{post.title}</h2>
+                {posts.map((post) => {
+                  const imageUrl = post.seo?.og_image;
+                  return (
+                    <li key={post.slug} style={styles.postItem}>
+                      <Link to={`/app/blog/${post.slug}`} style={styles.postLink}>
+                        <article style={styles.postCard}>
+                          <div style={styles.postCardInner}>
+                            <div style={styles.postTextCol}>
+                              <h2 style={styles.postTitle}>{post.title}</h2>
 
-                        <div style={styles.postMeta}>
-                          <span style={styles.metaItem}>
-                            <Calendar size={14} />
-                            {formatDate(post.created_at)}
-                          </span>
-                          {post.tags && post.tags.length > 0 && (
-                            <span style={styles.metaItem}>
-                              <Tag size={14} />
-                              {post.tags.slice(0, 3).join(', ')}
-                            </span>
-                          )}
-                        </div>
+                              <div style={styles.postMeta}>
+                                <span style={styles.metaItem}>
+                                  <Calendar size={14} />
+                                  {formatDate(post.created_at)}
+                                </span>
+                                {post.tags && post.tags.length > 0 && (
+                                  <span style={styles.metaItem}>
+                                    <Tag size={14} />
+                                    {post.tags.slice(0, 3).join(', ')}
+                                  </span>
+                                )}
+                              </div>
 
-                        {post.summary && (
-                          <p style={styles.postSummary}>{post.summary}</p>
-                        )}
+                              {post.summary && (
+                                <p style={styles.postSummary}>{post.summary}</p>
+                              )}
 
-                        <span style={styles.readMore}>Read more &rarr;</span>
-                      </article>
-                    </Link>
-                  </li>
-                ))}
+                              <span style={styles.readMore}>Read more &rarr;</span>
+                            </div>
+
+                            {imageUrl && (
+                              <div style={styles.postImageCol}>
+                                <img
+                                  src={imageUrl}
+                                  alt=""
+                                  style={styles.postImage}
+                                  loading="lazy"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </article>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
 
               {/* Pagination */}
@@ -286,6 +304,29 @@ const styles: Record<string, React.CSSProperties> = {
   postCard: {
     padding: '32px 0',
     transition: 'opacity 0.2s',
+  },
+  postCardInner: {
+    display: 'flex',
+    gap: 24,
+    alignItems: 'flex-start',
+  },
+  postTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  postImageCol: {
+    flexShrink: 0,
+    width: 160,
+    height: 120,
+    borderRadius: 10,
+    overflow: 'hidden',
+    background: '#111',
+  },
+  postImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    display: 'block',
   },
   postTitle: {
     fontSize: 24,
