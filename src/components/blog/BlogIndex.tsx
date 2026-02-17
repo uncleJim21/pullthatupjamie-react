@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ArrowLeft, Calendar, Tag, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Calendar, Tag, ChevronLeft, ChevronRight, Mail, Link as LinkIcon, Check } from 'lucide-react';
 import { fetchBlogPosts, BlogPostSummary } from '../../services/blogService.ts';
 
 // ============================================================
@@ -15,6 +15,87 @@ function formatDate(unixSeconds: number): string {
     day: 'numeric',
   });
 }
+
+// ============================================================
+// INLINE SHARE HELPERS
+// ============================================================
+
+const XIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+function shareOnX(title: string, url: string) {
+  const text = `${title}\n\n${url}`;
+  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
+}
+
+function shareViaEmail(title: string, url: string, summary?: string) {
+  const subject = encodeURIComponent(title);
+  const body = encodeURIComponent(`${summary ? summary + '\n\n' : ''}${url}`);
+  window.open(`mailto:?subject=${subject}&body=${body}`, '_self');
+}
+
+// ============================================================
+// CARD FOOTER (share + read now)
+// ============================================================
+
+const CardFooter: React.FC<{
+  title: string;
+  url: string;
+  summary?: string;
+  slug: string;
+}> = ({ title, url, summary, slug }) => {
+  const [copied, setCopied] = useState(false);
+
+  const copyLink = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const el = document.createElement('textarea');
+      el.value = url;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={styles.cardFooter}>
+      <div style={styles.shareRow}>
+        <button
+          onClick={(e) => { e.preventDefault(); shareOnX(title, url); }}
+          style={styles.shareBtn}
+          title="Share on X"
+        >
+          <XIcon size={13} />
+        </button>
+        <button
+          onClick={(e) => { e.preventDefault(); shareViaEmail(title, url, summary); }}
+          style={styles.shareBtn}
+          title="Share via email"
+        >
+          <Mail size={13} />
+        </button>
+        <button
+          onClick={copyLink}
+          style={styles.shareBtn}
+          title="Copy link"
+        >
+          {copied ? <Check size={13} /> : <LinkIcon size={13} />}
+        </button>
+      </div>
+      <Link to={`/app/blog/${slug}`} style={styles.readNowLink}>
+        Read now &rarr;
+      </Link>
+    </div>
+  );
+};
 
 // ============================================================
 // BLOG INDEX PAGE
@@ -106,10 +187,11 @@ const BlogIndex: React.FC = () => {
               <ul style={styles.postList}>
                 {posts.map((post) => {
                   const imageUrl = post.seo?.og_image;
+                  const canonicalUrl = post.seo?.canonical_url || `${window.location.origin}/app/blog/${post.slug}`;
                   return (
                     <li key={post.slug} style={styles.postItem}>
-                      <Link to={`/app/blog/${post.slug}`} style={styles.postLink}>
-                        <article style={styles.postCard}>
+                      <article style={styles.postCard}>
+                        <Link to={`/app/blog/${post.slug}`} style={styles.postLink}>
                           <div style={styles.postCardInner}>
                             <div style={styles.postTextCol}>
                               <h2 style={styles.postTitle}>{post.title}</h2>
@@ -130,8 +212,6 @@ const BlogIndex: React.FC = () => {
                               {post.summary && (
                                 <p style={styles.postSummary}>{post.summary}</p>
                               )}
-
-                              <span style={styles.readMore}>Read more &rarr;</span>
                             </div>
 
                             {imageUrl && (
@@ -145,8 +225,15 @@ const BlogIndex: React.FC = () => {
                               </div>
                             )}
                           </div>
-                        </article>
-                      </Link>
+                        </Link>
+
+                        <CardFooter
+                          title={post.title}
+                          url={canonicalUrl}
+                          summary={post.summary}
+                          slug={post.slug}
+                        />
+                      </article>
                     </li>
                   );
                 })}
@@ -354,10 +441,38 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#aaa',
     margin: '0 0 12px',
   },
-  readMore: {
+  cardFooter: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    marginTop: 4,
+  },
+  shareRow: {
+    display: 'flex',
+    gap: 4,
+  },
+  shareBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+    background: '#111',
+    color: '#888',
+    border: '1px solid #222',
+    borderRadius: 6,
+    cursor: 'pointer',
+    transition: 'background 0.15s, color 0.15s',
+  },
+  readNowLink: {
+    display: 'inline-flex',
+    alignItems: 'center',
     fontSize: 14,
-    color: '#6b8afd',
     fontWeight: 500,
+    color: '#6b8afd',
+    textDecoration: 'none',
+    paddingRight: 16,
   },
 
   // Pagination
