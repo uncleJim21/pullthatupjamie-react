@@ -17,6 +17,7 @@ import TwitterAuthCallback from './pages/TwitterAuthCallback.tsx';
 import BrowserTestInput from './components/BrowserTestInput.tsx';
 import BlogIndex from './components/blog/BlogIndex.tsx';
 import BlogPost from './components/blog/BlogPost.tsx';
+import PoastPage from './components/PoastPage.tsx';
 import { DEBUG_MODE } from './constants/constants.ts';
 import { inject } from "@vercel/analytics"
 
@@ -139,6 +140,7 @@ const App = () => (
       <Route path="/app/feed/:feedId/jamieProHistory" element={<PodcastFeedPage initialView="jamiePro" defaultTab="history" />} />
       <Route path="/app/feed/:feedId/myRssVideos" element={<PodcastFeedPage initialView="uploads" defaultTab="rss-feed" />} />
       <Route path="/app/automation-settings" element={<AutomationSettingsPage />} />
+      <Route path="/poast" element={<PoastPage />} />
       <Route path="/try-jamie" element={<TryJamieWizard />} />
       <Route path="/auth/twitter/complete" element={<TwitterAuthCallback />} />
       {DEBUG_MODE && <Route path="/twitter-test" element={<TwitterTest />} />}
