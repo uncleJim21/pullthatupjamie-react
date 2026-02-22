@@ -55,12 +55,8 @@ const PoastPage: React.FC = () => {
   // Check auth on mount
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
-    if (!token) {
-      navigate('/');
-      return;
-    }
-    setIsAuthenticated(true);
-  }, [navigate]);
+    setIsAuthenticated(!!token);
+  }, []);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -193,8 +189,6 @@ const PoastPage: React.FC = () => {
   const charCount = state.text.length;
   const isOverLimit = state.platforms.includes('twitter') && charCount > TWITTER_CHAR_LIMIT;
 
-  if (!isAuthenticated) return null;
-
   return (
     <div style={styles.page}>
       <style>{neonAnimations}</style>
@@ -206,6 +200,27 @@ const PoastPage: React.FC = () => {
           <h1 style={styles.title}>X-POAST</h1>
           <p style={styles.subtitle}>by Jamie</p>
         </div>
+
+        {!isAuthenticated ? (
+          <div style={styles.authPrompt}>
+            <AlertCircle size={48} color="#fff" style={{ filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.6))' }} />
+            <h2 style={styles.authTitle}>Sign In Required</h2>
+            <p style={styles.authText}>
+              Please sign in to use X-POAST
+            </p>
+            <button
+              style={{
+                ...styles.poastButton,
+                ...(hoveredButton === 'signin' ? styles.poastButtonHover : {}),
+              }}
+              onMouseEnter={() => setHoveredButton('signin')}
+              onMouseLeave={() => setHoveredButton(null)}
+              onClick={() => navigate('/app')}
+            >
+              SIGN IN
+            </button>
+          </div>
+        ) : (
 
         {submitStatus === 'success' ? (
           <div style={styles.successCard}>
@@ -382,6 +397,7 @@ const PoastPage: React.FC = () => {
               )}
             </button>
           </div>
+        )}
         )}
       </div>
     </div>
@@ -691,6 +707,27 @@ const styles: Record<string, React.CSSProperties> = {
     textShadow: '0 0 10px rgba(255,255,255,0.6)',
   },
   successText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: '1rem',
+    margin: 0,
+  },
+
+  /* Auth Prompt */
+  authPrompt: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 16,
+    padding: '48px 24px',
+    textAlign: 'center',
+  },
+  authTitle: {
+    fontSize: '2rem',
+    fontWeight: 'bold',
+    margin: 0,
+    textShadow: '0 0 10px rgba(255,255,255,0.6)',
+  },
+  authText: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: '1rem',
     margin: 0,
