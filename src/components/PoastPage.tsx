@@ -1,275 +1,110 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Twitter, Clock, Check, X, Loader2, AlertCircle, 
-  Upload, Calendar, Send 
-} from 'lucide-react';
-import PageBanner from './PageBanner.tsx';
-import { API_URL } from '../constants/constants.ts';
-import UploadService from '../services/uploadService.ts';
-import PlatformIntegrationService from '../services/platformIntegrationService.ts';
+import PageBanner from './PageBanner';
+import { Upload, Clock, Check, X, Twitter, Loader2, AlertCircle } from 'lucide-react';
+import UploadService from '../services/uploadService';
+import PlatformIntegrationService from '../services/platformIntegrationService';
+import { API_URL } from '../constants/constants';
 
-type Platform = 'twitter' | 'nostr';
+declare global {
+  interface Window {
+    nostr?: any;
+  }
+}
 
 interface ScheduledPost {
   _id: string;
-  platform: Platform;
+  platform: 'twitter' | 'nostr';
   scheduledFor: string;
-  status: string;
+  status: 'scheduled' | 'processing' | 'posted' | 'failed' | 'unsigned';
   content: {
-    text: string;
+    text?: string;
     mediaUrl?: string;
   };
+  text?: string;
+  platformData?: any;
 }
 
-const PLATFORM_STYLES = {
-  twitter: {
-    color: '#1d9bf0',
-    bg: 'bg-[#1d9bf0]/10',
-    border: 'border-[#1d9bf0]',
-    borderSubtle: 'border-[#1d9bf0]/30',
-    glow: '0 0 30px rgba(29, 155, 240, 0.3)',
-    topBorder: 'before:from-[#1d9bf0] before:to-[#0d7bbf]'
-  },
-  nostr: {
-    color: '#8b5cf6',
-    bg: 'bg-[#8b5cf6]/10',
-    border: 'border-[#8b5cf6]',
-    borderSubtle: 'border-[#8b5cf6]/30',
-    glow: '0 0 30px rgba(139, 92, 246, 0.3)',
-    topBorder: 'before:from-[#8b5cf6] before:to-[#6d28d9]'
-  }
+const StatusBadge = ({ status }: { status: string }) => {
+  const styles: Record<string, { bg: string; border: string; text: string; icon: any }> = {
+    scheduled: { bg: 'bg-[#82828c]/10', border: 'border-[#82828c]/20', text: 'text-[#82828c]', icon: Clock },
+    processing: { bg: 'bg-[#f59e0b]/10', border: 'border-[#f59e0b]/20', text: 'text-[#f59e0b]', icon: Loader2 },
+    posted: { bg: 'bg-[#10b981]/10', border: 'border-[#10b981]/20', text: 'text-[#10b981]', icon: Check },
+    failed: { bg: 'bg-[#ef4444]/10', border: 'border-[#ef4444]/20', text: 'text-[#ef4444]', icon: AlertCircle }
+  };
+  const s = styles[status] || styles.scheduled;
+  const Icon = s.icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1 ${s.bg} border ${s.border} rounded-lg text-xs font-mono font-medium ${s.text}`}>
+      <Icon className={`w-3 h-3 ${status === 'processing' ? 'animate-spin' : ''}`} />
+      {status}
+    </span>
+  );
 };
 
 const PoastPage: React.FC = () => {
   const navigate = useNavigate();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auth
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  // Compose form state
   const [text, setText] = useState('');
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [platforms, setPlatforms] = useState<Platform[]>(['twitter', 'nostr']);
-  const [scheduleMode, setScheduleMode] = useState<'now' | 'later'>('now');
-  const [scheduledFor, setScheduledFor] = useState<string>('');
-
-  // Platform connection state
-  const [twitterConnected, setTwitterConnected] = useState(false);
-  const [nostrAvailable, setNostrAvailable] = useState(false);
-
-  // UI state
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [platforms, setPlatforms] = useState<('twitter' | 'nostr')[]>([]);
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  // Scheduled posts
+  const [twitterConnected, setTwitterConnected] = useState(false);
+  const [nostrConnected, setNostrConnected] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
-  const [filter, setFilter] = useState<'all' | Platform>('all');
-  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
+  const [postsFilter, setPostsFilter] = useState<'all' | 'twitter' | 'nostr'>('all');
+  const [loadingPosts, setLoadingPosts] = useState(false);
 
-  // Check auth on mount
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    if (!token) {
+    const authToken = localStorage.getItem('auth_token');
+    if (!authToken) {
       navigate('/app');
-      return;
     }
-    setIsAuthenticated(true);
   }, [navigate]);
 
-  // Check platform connections
   useEffect(() => {
     const checkConnections = async () => {
-      // Twitter connection
-      const twitterStatus = await PlatformIntegrationService.checkTwitterAuth();
-      setTwitterConnected(twitterStatus.authenticated);
+      try {
+        const twitterAuth = await PlatformIntegrationService.checkTwitterAuth();
+        setTwitterConnected(twitterAuth);
+      } catch {
+        setTwitterConnected(false);
+      }
 
-      // Nostr extension
-      setNostrAvailable(typeof window !== 'undefined' && !!window.nostr);
+      setNostrConnected(!!window.nostr);
     };
 
-    if (isAuthenticated) {
-      checkConnections();
-      loadScheduledPosts();
-    }
-  }, [isAuthenticated]);
+    checkConnections();
+  }, []);
 
-  // Auto-resize textarea
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = 'auto';
-      textarea.style.height = `${Math.max(120, textarea.scrollHeight)}px`;
-    }
-  }, [text]);
-
-  const loadScheduledPosts = async () => {
-    setIsLoadingPosts(true);
+  const fetchPosts = async () => {
+    setLoadingPosts(true);
     try {
       const token = localStorage.getItem('auth_token');
-      const params = filter !== 'all' ? `?platform=${filter}` : '';
-      const response = await fetch(`${API_URL}/api/user/social/posts${params}`, {
+      const params = new URLSearchParams();
+      if (postsFilter !== 'all') params.append('platform', postsFilter);
+      
+      const response = await fetch(`${API_URL}/api/user/social/posts?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setScheduledPosts(data.posts);
-      }
+      
+      if (!response.ok) throw new Error('Failed to fetch posts');
+      const data = await response.json();
+      setScheduledPosts(data.posts || []);
     } catch (err) {
-      console.error('Failed to load posts:', err);
+      console.error('Fetch posts error:', err);
     } finally {
-      setIsLoadingPosts(false);
+      setLoadingPosts(false);
     }
   };
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadScheduledPosts();
-    }
-  }, [filter, isAuthenticated]);
-
-  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setMediaFile(file);
-    const previewUrl = URL.createObjectURL(file);
-    setMediaPreview(previewUrl);
-  };
-
-  const handleMediaRemove = () => {
-    if (mediaPreview) {
-      URL.revokeObjectURL(mediaPreview);
-    }
-    setMediaFile(null);
-    setMediaPreview(null);
-    setMediaUrl(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const togglePlatform = (platform: Platform) => {
-    if (platforms.includes(platform)) {
-      setPlatforms(platforms.filter(p => p !== platform));
-    } else {
-      setPlatforms([...platforms, platform]);
-    }
-  };
-
-  const handleConnectTwitter = async () => {
-    const result = await PlatformIntegrationService.connectTwitter();
-    if (result.success) {
-      // Poll for connection completion
-      const pollInterval = setInterval(async () => {
-        const status = await PlatformIntegrationService.checkTwitterAuth();
-        if (status.authenticated) {
-          clearInterval(pollInterval);
-          setTwitterConnected(true);
-        }
-      }, 2000);
-      setTimeout(() => clearInterval(pollInterval), 300000); // 5 min timeout
-    }
-  };
-
-  const handleSubmit = async () => {
-    setError('');
-    setSuccess('');
-
-    // Validation
-    if (!text.trim() && !mediaFile) {
-      setError('Please enter some text or upload media');
-      return;
-    }
-
-    if (platforms.length === 0) {
-      setError('Please select at least one platform');
-      return;
-    }
-
-    // Check platform connections
-    if (platforms.includes('twitter') && !twitterConnected) {
-      setError('Please connect your Twitter account first');
-      return;
-    }
-
-    if (platforms.includes('nostr') && !nostrAvailable) {
-      setError('Please install a Nostr browser extension');
-      return;
-    }
-
-    // Check Twitter character limit
-    if (platforms.includes('twitter') && text.length > 280) {
-      setError('Tweet text exceeds 280 characters');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const token = localStorage.getItem('auth_token');
-      
-      // Upload media if present
-      let uploadedMediaUrl = mediaUrl;
-      if (mediaFile && !mediaUrl) {
-        const result = await UploadService.processFileUpload(mediaFile, token!, true);
-        uploadedMediaUrl = result.fileUrl;
-        setMediaUrl(result.fileUrl);
-      }
-
-      // Create post
-      const body: any = {
-        text: text.trim(),
-        platforms,
-        timezone: 'America/Chicago'
-      };
-
-      if (uploadedMediaUrl) {
-        body.mediaUrl = uploadedMediaUrl;
-      }
-
-      if (scheduleMode === 'later' && scheduledFor) {
-        body.scheduledFor = new Date(scheduledFor).toISOString();
-      }
-
-      const response = await fetch(`${API_URL}/api/user/social/posts`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || 'Failed to create post');
-      }
-
-      setSuccess(scheduleMode === 'later' ? 'Post scheduled successfully!' : 'Post created successfully!');
-      
-      // Reset form
-      setText('');
-      handleMediaRemove();
-      setScheduleMode('now');
-      setScheduledFor('');
-      
-      // Reload posts
-      loadScheduledPosts();
-
-      // Clear success message after 3s
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create post');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  useEffect(() => { 
+    fetchPosts(); 
+  }, [postsFilter]);
 
   const handleDelete = async (postId: string) => {
     try {
@@ -278,61 +113,144 @@ const PoastPage: React.FC = () => {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
-      if (response.ok) {
-        loadScheduledPosts();
-      }
+      
+      if (!response.ok) throw new Error('Failed to delete');
+      await fetchPosts();
     } catch (err) {
-      console.error('Failed to delete post:', err);
+      console.error('Delete error:', err);
     }
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = date.getTime() - now.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    
-    if (hours < 24 && hours >= 0) {
-      return `in ${hours}h`;
-    }
-    
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    });
   };
 
   const charCount = text.length;
   const isTwitterSelected = platforms.includes('twitter');
   const isOverLimit = isTwitterSelected && charCount > 280;
-  const isWarning = isTwitterSelected && charCount > 250;
+  const isDisabled = (!text.trim() && !mediaUrl) || isOverLimit || platforms.length === 0;
 
-  if (!isAuthenticated) return null;
+  const getCharCountStyle = () => {
+    if (!isTwitterSelected) return {};
+    if (charCount > 280) {
+      return {
+        color: '#ef4444',
+        textShadow: '0 0 10px rgba(239,68,68,0.4)'
+      };
+    }
+    if (charCount >= 250) {
+      return {
+        color: '#f59e0b',
+        textShadow: '0 0 10px rgba(245,158,11,0.3)'
+      };
+    }
+    return { color: '#82828c' };
+  };
 
-  const filteredPosts = filter === 'all' 
-    ? scheduledPosts 
-    : scheduledPosts.filter(p => p.platform === filter);
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingMedia(true);
+    setError('');
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) throw new Error('Not authenticated');
+
+      const uploadedUrl = await UploadService.processFileUpload(file, token, true);
+      setMediaUrl(uploadedUrl);
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload media');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const togglePlatform = (platform: 'twitter' | 'nostr') => {
+    if (platform === 'twitter' && !twitterConnected) return;
+    if (platform === 'nostr' && !nostrConnected) return;
+
+    setPlatforms(prev =>
+      prev.includes(platform)
+        ? prev.filter(p => p !== platform)
+        : [...prev, platform]
+    );
+  };
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setError('');
+
+    if (isScheduled && scheduledFor) {
+      const scheduledDate = new Date(scheduledFor);
+      if (scheduledDate <= new Date()) {
+        setError('Scheduled time must be in the future');
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_URL}/api/user/social/posts`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          text,
+          mediaUrl: mediaUrl || undefined,
+          platforms,
+          scheduledFor: isScheduled ? scheduledFor : undefined,
+          timezone: 'America/Chicago'
+        })
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem('auth_token');
+        navigate('/app');
+        return;
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create post');
+      }
+
+      setText('');
+      setMediaUrl('');
+      setPlatforms([]);
+      setIsScheduled(false);
+      setScheduledFor('');
+      await fetchPosts();
+    } catch (err: any) {
+      if (err.message?.includes('401') || err.status === 401) {
+        localStorage.removeItem('auth_token');
+        navigate('/app');
+        return;
+      }
+      setError(err.message || 'Failed to create post');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredPosts = scheduledPosts.filter(p => postsFilter === 'all' || p.platform === postsFilter);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#0a0a0a' }}>
+    <div className="min-h-screen bg-[#0e0e0f]">
       <PageBanner />
 
       {/* Hero Section */}
       <section className="py-20 lg:py-32">
         <div className="max-w-3xl mx-auto px-4 text-center">
-          <h1 
-            className="font-display text-6xl lg:text-7xl font-bold tracking-tight mb-6"
+          <h1
+            className="font-display text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6"
             style={{
-              color: '#f5f5f5',
               textShadow: '0 0 40px rgba(255, 255, 255, 0.3), 0 0 80px rgba(255, 255, 255, 0.15)'
             }}
           >
             X-POAST
           </h1>
-          <p className="font-sans text-xl" style={{ color: '#c4c4c4' }}>
+          <p className="font-sans text-xl text-[#c4c4c4]">
             Cross-post to Twitter and Nostr with style
           </p>
         </div>
@@ -341,290 +259,231 @@ const PoastPage: React.FC = () => {
       {/* Compose Section */}
       <section className="pb-12">
         <div className="max-w-3xl mx-auto px-4">
-          <div 
-            className="rounded-2xl p-6 lg:p-8 transition-all duration-300"
-            style={{
-              backgroundColor: '#1a1a1b',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)'
-            }}
-          >
-            {/* Textarea */}
-            <div className="relative mb-6">
-              <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="What's happening?"
-                className="w-full px-4 py-3 rounded-xl font-sans resize-none transition-all duration-300 focus:outline-none"
-                style={{
-                  backgroundColor: '#161617',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: '#e5e5e5',
-                  minHeight: '120px'
-                }}
-                onFocus={(e) => {
-                  e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
-                  e.target.style.backgroundColor = '#1a1a1b';
-                  e.target.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-                  e.target.style.backgroundColor = '#161617';
-                  e.target.style.boxShadow = 'none';
-                }}
-              />
-              {isTwitterSelected && (
-                <div 
-                  className="absolute bottom-3 right-4 text-sm font-mono transition-all duration-300"
+          <div className="bg-[#1a1a1b] border border-white/10 rounded-2xl p-6 lg:p-8">
+            <div className="space-y-6">
+              {/* Textarea + Character Counter */}
+              <div className="relative">
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="What's happening?"
+                  className="w-full bg-[#161617] border border-white/10 rounded-xl min-h-[120px] px-4 py-3 text-white placeholder-[#82828c] resize-none focus:outline-none focus:border-white/30 focus:bg-[#1a1a1b] transition-all duration-300"
                   style={{
-                    color: isOverLimit ? '#ef4444' : isWarning ? '#f59e0b' : '#82828c',
-                    textShadow: isOverLimit 
-                      ? '0 0 10px rgba(239, 68, 68, 0.4)'
-                      : isWarning
-                      ? '0 0 10px rgba(245, 158, 11, 0.3)'
-                      : 'none'
+                    boxShadow: 'none'
                   }}
-                >
-                  {charCount}/280
-                </div>
-              )}
-            </div>
-
-            {/* Media Upload */}
-            <div className="mb-6">
-              {mediaPreview ? (
-                <div className="relative inline-block">
-                  <img 
-                    src={mediaPreview} 
-                    alt="Upload preview" 
-                    className="max-w-[200px] max-h-[160px] rounded-xl object-cover"
-                    style={{ border: '1px solid rgba(255, 255, 255, 0.15)' }}
-                  />
-                  <button
-                    onClick={handleMediaRemove}
-                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200"
-                    style={{ 
-                      backgroundColor: '#333',
-                      border: '1px solid rgba(255, 255, 255, 0.3)'
-                    }}
-                  >
-                    <X size={14} style={{ color: '#fff' }} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200"
-                  style={{
-                    border: '1px dashed rgba(255, 255, 255, 0.25)',
-                    color: 'rgba(255, 255, 255, 0.6)'
+                  onFocus={(e) => {
+                    e.target.style.boxShadow = '0 0 20px rgba(255,255,255,0.1)';
                   }}
-                >
-                  <Upload size={16} />
-                  <span className="text-sm">Upload Media (optional)</span>
-                </button>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/*"
-                onChange={handleMediaSelect}
-                style={{ display: 'none' }}
-              />
-            </div>
-
-            {/* Platform Selection */}
-            <div className="mb-6">
-              <label className="block text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#82828c' }}>
-                Platforms
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                {(['twitter', 'nostr'] as Platform[]).map(platform => {
-                  const isSelected = platforms.includes(platform);
-                  const isConnected = platform === 'twitter' ? twitterConnected : nostrAvailable;
-                  const styles = PLATFORM_STYLES[platform];
-                  const needsConnection = isSelected && !isConnected;
-
-                  return (
-                    <div key={platform} className="relative">
-                      <button
-                        onClick={() => !needsConnection && togglePlatform(platform)}
-                        disabled={needsConnection}
-                        className={`
-                          relative w-full px-6 py-4 rounded-xl border-2 transition-all duration-300
-                          ${isSelected ? `${styles.bg} ${styles.border}` : 'bg-[#1a1a1b]'}
-                          ${!isConnected && 'opacity-50'}
-                        `}
-                        style={isSelected && isConnected ? { boxShadow: styles.glow } : {}}
-                      >
-                        <div className="flex items-center gap-3">
-                          {platform === 'twitter' ? (
-                            <Twitter 
-                              className="w-5 h-5" 
-                              style={{ 
-                                color: styles.color,
-                                filter: isSelected ? `drop-shadow(0 0 10px ${styles.color}40)` : 'none'
-                              }} 
-                            />
-                          ) : (
-                            <img 
-                              src="/nostr-logo-square.png"
-                              className="w-5 h-5"
-                              style={{
-                                filter: isSelected 
-                                  ? `brightness(1.2) drop-shadow(0 0 10px ${styles.color}40)`
-                                  : 'brightness(0.5)'
-                              }}
-                            />
-                          )}
-                          <span className={`font-display font-semibold ${isSelected ? 'text-[#f5f5f5]' : 'text-[#82828c]'}`}>
-                            {platform === 'twitter' ? 'Twitter' : 'Nostr'}
-                          </span>
-                          {!isConnected && (
-                            <span className="text-xs" style={{ color: '#4a4a4f' }}>(not connected)</span>
-                          )}
-                        </div>
-
-                        {isSelected && isConnected && (
-                          <div 
-                            className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center"
-                            style={{
-                              backgroundColor: '#10b981',
-                              boxShadow: '0 0 20px rgba(16, 185, 129, 0.4)'
-                            }}
-                          >
-                            <Check className="w-4 h-4 text-white" />
-                          </div>
-                        )}
-                      </button>
-
-                      {needsConnection && (
-                        <div 
-                          className="absolute inset-0 backdrop-blur-sm rounded-xl flex items-center justify-center"
-                          style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}
-                        >
-                          <button
-                            onClick={platform === 'twitter' ? handleConnectTwitter : undefined}
-                            className={`px-4 py-2 rounded-lg font-display font-semibold transition-all duration-300 ${styles.bg} ${styles.border}`}
-                            style={{ color: '#f5f5f5' }}
-                          >
-                            Connect {platform === 'twitter' ? 'Twitter' : 'Nostr'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Schedule */}
-            <div className="mb-6">
-              <label className="block text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#82828c' }}>
-                Schedule
-              </label>
-              <div className="flex gap-4 mb-4">
-                <button
-                  onClick={() => setScheduleMode('now')}
-                  className={`
-                    flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300
-                    ${scheduleMode === 'now' ? 'bg-white/10 border-white/30' : 'border-white/10'}
-                  `}
-                  style={{ 
-                    border: `2px solid ${scheduleMode === 'now' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-                    color: scheduleMode === 'now' ? '#f5f5f5' : '#82828c'
-                  }}
-                >
-                  <Send size={14} />
-                  <span className="font-display">Post Now</span>
-                </button>
-                <button
-                  onClick={() => setScheduleMode('later')}
-                  className={`
-                    flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300
-                    ${scheduleMode === 'later' ? 'bg-white/10 border-white/30' : 'border-white/10'}
-                  `}
-                  style={{ 
-                    border: `2px solid ${scheduleMode === 'later' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-                    color: scheduleMode === 'later' ? '#f5f5f5' : '#82828c'
-                  }}
-                >
-                  <Calendar size={14} />
-                  <span className="font-display">Schedule</span>
-                </button>
-              </div>
-              {scheduleMode === 'later' && (
-                <input
-                  type="datetime-local"
-                  value={scheduledFor}
-                  onChange={(e) => setScheduledFor(e.target.value)}
-                  min={new Date().toISOString().slice(0, 16)}
-                  className="w-full px-4 py-3 rounded-xl font-sans transition-all duration-300"
-                  style={{
-                    backgroundColor: '#161617',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    color: '#e5e5e5',
-                    colorScheme: 'dark'
+                  onBlur={(e) => {
+                    e.target.style.boxShadow = 'none';
                   }}
                 />
-              )}
-            </div>
-
-            {/* Error/Success Messages */}
-            {error && (
-              <div 
-                className="mb-6 flex items-center gap-2 px-4 py-3 rounded-xl"
-                style={{
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: '#ef4444'
-                }}
-              >
-                <AlertCircle size={16} />
-                <span className="text-sm">{error}</span>
-              </div>
-            )}
-
-            {success && (
-              <div 
-                className="mb-6 flex items-center gap-2 px-4 py-3 rounded-xl"
-                style={{
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  color: '#10b981'
-                }}
-              >
-                <Check size={16} />
-                <span className="text-sm">{success}</span>
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting || isOverLimit || (!text.trim() && !mediaFile) || platforms.length === 0}
-              className="relative overflow-hidden group w-full px-8 py-4 rounded-xl font-display font-semibold text-lg transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: '#ffffff',
-                color: '#0a0a0a',
-                boxShadow: !isSubmitting && !isOverLimit ? '0 0 40px rgba(255, 255, 255, 0.3)' : 'none'
-              }}
-            >
-              <span className="relative z-10">
-                {isSubmitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    POASTING...
-                  </span>
-                ) : (
-                  'POAST'
+                {isTwitterSelected && (
+                  <div
+                    className="absolute bottom-3 right-3 text-sm font-mono font-medium"
+                    style={getCharCountStyle()}
+                  >
+                    {charCount}/280
+                  </div>
                 )}
-              </span>
-              <div 
-                className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:translate-x-full transition-transform duration-700"
-              />
-            </button>
+              </div>
+
+              {/* Media Upload */}
+              <div className="space-y-3">
+                <label className="inline-flex items-center gap-2 px-4 py-2 border-2 border-white/20 rounded-xl text-white hover:border-white/40 transition-all duration-300 cursor-pointer">
+                  <Upload className="w-5 h-5" />
+                  <span>{uploadingMedia ? 'Uploading...' : 'Add Media'}</span>
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={handleMediaUpload}
+                    disabled={uploadingMedia}
+                    className="hidden"
+                  />
+                </label>
+
+                {mediaUrl && (
+                  <div className="relative inline-block">
+                    <img
+                      src={mediaUrl}
+                      alt="Upload preview"
+                      className="max-h-48 rounded-xl border border-white/10"
+                    />
+                    <button
+                      onClick={() => setMediaUrl('')}
+                      className="absolute -top-2 -right-2 bg-[#ef4444] hover:bg-[#dc2626] rounded-full p-1.5 transition-colors duration-300"
+                    >
+                      <X className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Platform Chips */}
+              <div className="space-y-3">
+                <div className="text-sm text-[#82828c] font-medium">Select Platforms</div>
+                <div className="flex gap-3">
+                  {/* Twitter Chip */}
+                  <button
+                    onClick={() => togglePlatform('twitter')}
+                    disabled={!twitterConnected}
+                    className={`relative px-6 py-3 rounded-xl border-2 flex items-center gap-2 transition-all duration-300 ${
+                      platforms.includes('twitter')
+                        ? 'bg-[#1d9bf0]/10 border-[#1d9bf0]'
+                        : 'bg-[#1a1a1b] border-white/10 opacity-50'
+                    } ${!twitterConnected ? 'cursor-not-allowed' : 'hover:opacity-100'}`}
+                    style={platforms.includes('twitter') ? { boxShadow: '0 0 30px rgba(29, 155, 240, 0.3)' } : {}}
+                  >
+                    <Twitter className="w-5 h-5" style={{ color: '#1d9bf0' }} />
+                    <span className="text-white font-medium">
+                      Twitter {!twitterConnected && '(not connected)'}
+                    </span>
+                    {platforms.includes('twitter') && (
+                      <div
+                        className="absolute -top-2 -right-2 bg-[#10b981] rounded-full p-1"
+                        style={{
+                          boxShadow: '0 0 10px rgba(16,185,129,0.5)'
+                        }}
+                      >
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Nostr Chip */}
+                  <button
+                    onClick={() => togglePlatform('nostr')}
+                    disabled={!nostrConnected}
+                    className={`relative px-6 py-3 rounded-xl border-2 flex items-center gap-2 transition-all duration-300 ${
+                      platforms.includes('nostr')
+                        ? 'bg-[#8b5cf6]/10 border-[#8b5cf6]'
+                        : 'bg-[#1a1a1b] border-white/10 opacity-50'
+                    } ${!nostrConnected ? 'cursor-not-allowed' : 'hover:opacity-100'}`}
+                    style={platforms.includes('nostr') ? { boxShadow: '0 0 30px rgba(139, 92, 246, 0.3)' } : {}}
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#a855f7" />
+                      <path d="M2 17L12 22L22 17L12 12L2 17Z" fill="#a855f7" />
+                    </svg>
+                    <span className="text-white font-medium">
+                      Nostr {!nostrConnected && '(not connected)'}
+                    </span>
+                    {platforms.includes('nostr') && (
+                      <div
+                        className="absolute -top-2 -right-2 bg-[#10b981] rounded-full p-1"
+                        style={{
+                          boxShadow: '0 0 10px rgba(16,185,129,0.5)'
+                        }}
+                      >
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                    )}
+                  </button>
+                </div>
+
+                {(!twitterConnected || !nostrConnected) && (
+                  <div className="text-sm text-[#f59e0b] flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>
+                      Connect platforms in settings to enable cross-posting
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Schedule Toggle */}
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setIsScheduled(false)}
+                    className={`px-6 py-2 rounded-xl border-2 transition-all duration-300 ${
+                      !isScheduled
+                        ? 'bg-white/10 border-white/30 text-white'
+                        : 'bg-transparent border-white/10 text-[#82828c]'
+                    }`}
+                  >
+                    Post now
+                  </button>
+                  <button
+                    onClick={() => setIsScheduled(true)}
+                    className={`px-6 py-2 rounded-xl border-2 flex items-center gap-2 transition-all duration-300 ${
+                      isScheduled
+                        ? 'bg-white/10 border-white/30 text-white'
+                        : 'bg-transparent border-white/10 text-[#82828c]'
+                    }`}
+                  >
+                    <Clock className="w-4 h-4" />
+                    Schedule
+                  </button>
+                </div>
+
+                {isScheduled && (
+                  <input
+                    type="datetime-local"
+                    value={scheduledFor}
+                    onChange={(e) => setScheduledFor(e.target.value)}
+                    className="w-full bg-[#161617] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-white/30 focus:bg-[#1a1a1b] transition-all duration-300"
+                    style={{
+                      colorScheme: 'dark',
+                      boxShadow: 'none'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.boxShadow = '0 0 20px rgba(255,255,255,0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="bg-[#ef4444]/10 border border-[#ef4444]/50 rounded-xl px-4 py-3 text-[#ef4444] flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* POAST Button */}
+              <button
+                onClick={handleSubmit}
+                disabled={isDisabled || isLoading}
+                className="relative w-full bg-white text-[#0e0e0f] font-display font-semibold text-lg rounded-xl px-8 py-4 transition-all duration-300 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed group"
+                style={{
+                  boxShadow: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isDisabled && !isLoading) {
+                    e.currentTarget.style.boxShadow = '0 0 40px rgba(255,255,255,0.3)';
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                {/* Shine Effect */}
+                <div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
+                  style={{
+                    pointerEvents: 'none'
+                  }}
+                />
+
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      POASTING...
+                    </>
+                  ) : (
+                    'POAST'
+                  )}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -632,137 +491,148 @@ const PoastPage: React.FC = () => {
       {/* Scheduled Posts Section */}
       <section className="pb-20">
         <div className="max-w-5xl mx-auto px-4">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-display text-3xl font-bold" style={{ color: '#f5f5f5', textShadow: '0 0 20px rgba(255, 255, 255, 0.2)' }}>
-              Scheduled Posts
-            </h2>
+          <h2 className="font-display text-3xl font-bold text-white mb-8">
+            Scheduled Posts
+          </h2>
 
-            {/* Platform Filter */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFilter('all')}
-                className={`px-3 py-1 rounded-lg text-sm font-display transition-all duration-200 ${
-                  filter === 'all' ? 'bg-[#1a1a1b] text-[#f5f5f5]' : 'text-[#82828c]'
-                }`}
-              >
-                All
-              </button>
-              {(['twitter', 'nostr'] as Platform[]).map(platform => {
-                const styles = PLATFORM_STYLES[platform];
-                return (
-                  <button
-                    key={platform}
-                    onClick={() => setFilter(platform)}
-                    className={`
-                      flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-display transition-all duration-200
-                      ${filter === platform ? `${styles.bg} ${styles.borderSubtle} border` : 'text-[#82828c]'}
-                    `}
-                    style={filter === platform ? { color: styles.color } : {}}
-                  >
-                    {platform === 'twitter' ? <Twitter size={14} /> : '⚡'}
-                    {platform === 'twitter' ? 'Twitter' : 'Nostr'}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Filter Pills */}
+          <div className="flex gap-3 mb-6">
+            <button
+              onClick={() => setPostsFilter('all')}
+              className={`px-6 py-2 rounded-xl border-2 transition-all duration-300 ${
+                postsFilter === 'all'
+                  ? 'bg-white/10 border-white/30 text-white'
+                  : 'bg-[#1a1a1b] border-white/10 opacity-70 text-[#82828c]'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setPostsFilter('twitter')}
+              className={`px-6 py-2 rounded-xl border-2 transition-all duration-300 flex items-center gap-2 ${
+                postsFilter === 'twitter'
+                  ? 'bg-[#1d9bf0]/10 border-[#1d9bf0] text-white'
+                  : 'bg-[#1a1a1b] border-white/10 opacity-70 text-[#82828c]'
+              }`}
+            >
+              <Twitter className="w-4 h-4" style={{ color: postsFilter === 'twitter' ? '#1d9bf0' : '#82828c' }} />
+              Twitter
+            </button>
+            <button
+              onClick={() => setPostsFilter('nostr')}
+              className={`px-6 py-2 rounded-xl border-2 transition-all duration-300 flex items-center gap-2 ${
+                postsFilter === 'nostr'
+                  ? 'bg-[#8b5cf6]/10 border-[#8b5cf6] text-white'
+                  : 'bg-[#1a1a1b] border-white/10 opacity-70 text-[#82828c]'
+              }`}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill={postsFilter === 'nostr' ? '#8b5cf6' : '#82828c'} />
+                <path d="M2 17L12 22L22 17L12 12L2 17Z" fill={postsFilter === 'nostr' ? '#8b5cf6' : '#82828c'} />
+              </svg>
+              Nostr
+            </button>
           </div>
 
-          {isLoadingPosts ? (
-            <div className="text-center py-12" style={{ color: '#82828c' }}>
-              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-              <p>Loading posts...</p>
+          {/* Loading State */}
+          {loadingPosts && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 text-white animate-spin" />
             </div>
-          ) : filteredPosts.length === 0 ? (
-            <div className="text-center py-20">
-              <div 
-                className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center"
-                style={{ 
-                  backgroundColor: '#1a1a1b',
-                  border: '2px dashed rgba(255, 255, 255, 0.1)'
-                }}
-              >
-                <Clock className="w-10 h-10" style={{ color: '#4a4a4f' }} />
+          )}
+
+          {/* Empty State */}
+          {!loadingPosts && filteredPosts.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-20 h-20 border-2 border-dashed border-white/10 rounded-full flex items-center justify-center mb-6">
+                <Clock className="w-10 h-10 text-[#4a4a4f]" />
               </div>
-              <h3 className="font-display text-xl font-semibold mb-2" style={{ color: '#f5f5f5' }}>
+              <h3 className="font-display text-xl font-semibold text-white mb-2">
                 No scheduled posts yet
               </h3>
-              <p style={{ color: '#82828c' }}>
+              <p className="text-[#82828c]">
                 Create your first post above to get started
               </p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredPosts.map(post => {
-                const styles = PLATFORM_STYLES[post.platform];
+          )}
+
+          {/* Posts Grid */}
+          {!loadingPosts && filteredPosts.length > 0 && (
+            <div className="grid grid-cols-1 gap-4">
+              {filteredPosts.map((post) => {
+                const isTwitter = post.platform === 'twitter';
+                const isNostr = post.platform === 'nostr';
+                const platformColor = isTwitter ? '#1d9bf0' : '#8b5cf6';
+                const platformColorLight = isTwitter ? 'border-[#1d9bf0]/30' : 'border-[#8b5cf6]/30';
+                const platformBg = isTwitter ? 'bg-[#1d9bf0]/10' : 'bg-[#8b5cf6]/10';
+                const topBorderGradient = isTwitter
+                  ? 'before:bg-gradient-to-r before:from-[#1d9bf0] before:to-[#0d7bbf]'
+                  : 'before:bg-gradient-to-r before:from-[#8b5cf6] before:to-[#6d28d9]';
+
                 return (
                   <div
                     key={post._id}
-                    className={`
-                      relative overflow-hidden rounded-2xl p-6 transition-all duration-300
-                      ${styles.bg} ${styles.borderSubtle} border
-                      hover:-translate-y-1
-                      before:absolute before:top-0 before:left-0 before:right-0 before:h-1
-                      before:bg-gradient-to-r ${styles.topBorder}
-                    `}
-                    style={{
-                      boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)'
-                    }}
+                    className={`relative ${platformBg} border ${platformColorLight} rounded-xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(255,255,255,0.05)] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:rounded-t-xl ${topBorderGradient}`}
                   >
                     <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0 mt-1">
-                        {post.platform === 'twitter' ? (
-                          <Twitter 
-                            className="w-5 h-5" 
-                            style={{ 
-                              color: styles.color,
-                              filter: `drop-shadow(0 0 10px ${styles.color}40)`
-                            }} 
-                          />
-                        ) : (
-                          <img 
-                            src="/nostr-logo-square.png"
-                            className="w-5 h-5"
+                      {/* Platform Icon */}
+                      <div className="flex-shrink-0">
+                        {isTwitter ? (
+                          <div
+                            className="w-10 h-10 rounded-lg flex items-center justify-center"
                             style={{
-                              filter: `brightness(1.2) drop-shadow(0 0 10px ${styles.color}40)`
+                              backgroundColor: `${platformColor}20`,
+                              boxShadow: `0 0 20px ${platformColor}40`
                             }}
-                          />
+                          >
+                            <Twitter className="w-5 h-5" style={{ color: platformColor }} />
+                          </div>
+                        ) : (
+                          <div
+                            className="w-10 h-10 rounded-lg flex items-center justify-center"
+                            style={{
+                              backgroundColor: `${platformColor}20`,
+                              boxShadow: `0 0 20px ${platformColor}40`
+                            }}
+                          >
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill={platformColor} />
+                              <path d="M2 17L12 22L22 17L12 12L2 17Z" fill={platformColor} />
+                            </svg>
+                          </div>
                         )}
                       </div>
 
+                      {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm mb-3 line-clamp-2" style={{ color: '#c4c4c4' }}>
-                          {post.content.text || '(Media only)'}
+                        <p className="text-[#c4c4c4] text-sm mb-3 line-clamp-2">
+                          {post.text}
                         </p>
 
-                        <div className="flex items-center gap-3 text-xs">
-                          <div className="flex items-center gap-1.5" style={{ color: '#82828c' }}>
+                        <div className="flex items-center gap-4 flex-wrap">
+                          {/* Scheduled Time */}
+                          <div className="flex items-center gap-2 text-xs text-[#82828c] font-mono">
                             <Clock className="w-3 h-3" />
-                            <span className="font-mono">{formatDate(post.scheduledFor)}</span>
+                            {new Date(post.scheduledFor).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
                           </div>
 
-                          <span 
-                            className="px-2 py-0.5 rounded font-mono"
-                            style={{
-                              backgroundColor: post.status === 'scheduled' ? 'rgba(130, 130, 140, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                              border: `1px solid ${post.status === 'scheduled' ? 'rgba(130, 130, 140, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
-                              color: post.status === 'scheduled' ? '#82828c' : '#10b981'
-                            }}
-                          >
-                            {post.status}
-                          </span>
+                          {/* Status Badge */}
+                          <StatusBadge status={post.status} />
                         </div>
                       </div>
 
+                      {/* Delete Button */}
                       <button
                         onClick={() => handleDelete(post._id)}
-                        className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300"
-                        style={{
-                          backgroundColor: '#1a1a1b',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          color: '#82828c'
-                        }}
+                        className="flex-shrink-0 p-2 rounded-lg text-[#82828c] hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-all duration-300"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
