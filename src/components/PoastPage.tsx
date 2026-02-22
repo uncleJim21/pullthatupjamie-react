@@ -220,9 +220,7 @@ const PoastPage: React.FC = () => {
               SIGN IN
             </button>
           </div>
-        ) : (
-
-        {submitStatus === 'success' ? (
+        ) : submitStatus === 'success' ? (
           <div style={styles.successCard}>
             <Check size={48} color="#fff" style={{ filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.8))' }} />
             <h2 style={styles.successTitle}>Poasted!</h2>
@@ -397,7 +395,6 @@ const PoastPage: React.FC = () => {
               )}
             </button>
           </div>
-        )}
         )}
       </div>
     </div>
