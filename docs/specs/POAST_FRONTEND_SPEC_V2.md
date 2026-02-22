@@ -433,3 +433,188 @@ useEffect(() => {
 - ❌ Don't use `/api/social/posts` (use `/api/user/social/posts`)
 - ❌ Don't break sign-in flow (just redirect if no token)
 - ❌ Don't make it look cheap (follow Jamie's design language)
+
+## Twitter OAuth Connection
+
+### Platform Connection Service
+
+**FROM: `src/services/platformIntegrationService.ts`**
+
+```typescript
+import PlatformIntegrationService from '../services/platformIntegrationService.ts';
+
+// Check if Twitter is connected
+const checkTwitterStatus = async () => {
+  const status = await PlatformIntegrationService.checkTwitterAuth();
+  return status.authenticated;
+};
+
+// Connect Twitter (opens OAuth popup)
+const connectTwitter = async () => {
+  const result = await PlatformIntegrationService.connectTwitter();
+  if (result.success) {
+    // OAuth popup opened, poll for completion
+    pollTwitterConnection();
+  }
+};
+
+// Poll for connection completion (user finishes OAuth in popup)
+const pollTwitterConnection = () => {
+  const interval = setInterval(async () => {
+    const status = await PlatformIntegrationService.checkTwitterAuth();
+    if (status.authenticated) {
+      clearInterval(interval);
+      setTwitterConnected(true);
+      // Refresh platform selection UI
+    }
+  }, 2000); // Poll every 2 seconds
+  
+  // Stop polling after 5 minutes
+  setTimeout(() => clearInterval(interval), 300000);
+};
+```
+
+### Platform Selection UI Update
+
+When Twitter is selected but not connected, show connection prompt:
+
+```tsx
+const [twitterConnected, setTwitterConnected] = useState(false);
+const [nostrAvailable, setNostrAvailable] = useState(false);
+
+// Check connection status on mount
+useEffect(() => {
+  const checkConnections = async () => {
+    const twitterStatus = await PlatformIntegrationService.checkTwitterAuth();
+    setTwitterConnected(twitterStatus.authenticated);
+    
+    // Nostr: check for browser extension
+    setNostrAvailable(typeof window !== 'undefined' && !!window.nostr);
+  };
+  
+  checkConnections();
+}, []);
+
+// Platform chip rendering
+{(['twitter', 'nostr'] as const).map(platform => {
+  const isSelected = platforms.includes(platform);
+  const styles = PLATFORM_STYLES[platform];
+  
+  // Connection state
+  const isConnected = platform === 'twitter' ? twitterConnected : nostrAvailable;
+  const needsConnection = isSelected && !isConnected;
+  
+  return (
+    <div key={platform} className="relative">
+      <button
+        onClick={() => {
+          if (platform === 'twitter' && !twitterConnected) {
+            // Don't toggle, show connect prompt instead
+            return;
+          }
+          togglePlatform(platform);
+        }}
+        className={`relative flex items-center gap-3 px-4 py-3 rounded-lg border transition-all ${
+          isSelected 
+            ? `${styles.selectedBg} ${styles.selectedBorder}` 
+            : `${styles.bg} ${styles.border} opacity-60`
+        } ${styles.hoverBg}`}
+      >
+        {/* Icon */}
+        {platform === 'twitter' ? (
+          <Twitter size={20} className={styles.color} />
+        ) : (
+          <img 
+            src="/nostr-logo-square.png" 
+            alt="Nostr" 
+            className="w-5 h-5"
+            style={{ filter: 'brightness(1.3) saturate(0.8)' }}
+          />
+        )}
+        
+        {/* Label */}
+        <span className={`font-medium ${isSelected ? 'text-white' : 'text-gray-400'}`}>
+          {platform === 'twitter' ? 'Twitter' : 'Nostr'}
+        </span>
+        
+        {/* Connection status badge */}
+        {!isConnected && (
+          <span className="text-xs text-gray-500">
+            (not connected)
+          </span>
+        )}
+        
+        {/* Checkmark (top-right corner when selected AND connected) */}
+        {isSelected && isConnected && (
+          <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+            <Check size={14} className="text-white" />
+          </div>
+        )}
+      </button>
+      
+      {/* Connection prompt overlay */}
+      {needsConnection && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
+          <button
+            onClick={async () => {
+              if (platform === 'twitter') {
+                await PlatformIntegrationService.connectTwitter();
+                // Start polling for completion
+                const interval = setInterval(async () => {
+                  const status = await PlatformIntegrationService.checkTwitterAuth();
+                  if (status.authenticated) {
+                    clearInterval(interval);
+                    setTwitterConnected(true);
+                  }
+                }, 2000);
+                setTimeout(() => clearInterval(interval), 300000);
+              }
+            }}
+            className={`px-4 py-2 rounded-lg ${styles.selectedBg} ${styles.selectedBorder} text-white font-medium hover:opacity-80 transition-opacity`}
+          >
+            Connect {platform === 'twitter' ? 'Twitter' : 'Nostr'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+})}
+```
+
+### Validation Before Posting
+
+```typescript
+const handleSubmit = async () => {
+  // Check platform connections before posting
+  if (platforms.includes('twitter')) {
+    const status = await PlatformIntegrationService.checkTwitterAuth();
+    if (!status.authenticated) {
+      setError('Please connect your Twitter account before posting');
+      return;
+    }
+  }
+  
+  if (platforms.includes('nostr')) {
+    if (!window.nostr) {
+      setError('Please install a Nostr browser extension (nos2x or Alby)');
+      return;
+    }
+  }
+  
+  // Proceed with post creation...
+};
+```
+
+### Testing Checklist Updates
+
+Add to existing checklist:
+
+- [ ] Shows "Connect Twitter" prompt when Twitter selected but not connected
+- [ ] Twitter OAuth popup opens correctly
+- [ ] Polling detects successful Twitter connection
+- [ ] Platform selection updates after successful connection
+- [ ] Shows "not connected" badge for disconnected platforms
+- [ ] Prevents posting to Twitter if not connected
+- [ ] Nostr extension detection works correctly
+- [ ] Connection state persists across page refreshes
+
