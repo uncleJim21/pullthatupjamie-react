@@ -901,7 +901,6 @@ className="
 - [ ] Platform colors ONLY on platform elements
 
 **Medium Priority (Enhances Experience):**
-- [ ] Stats bar showing social proof
 - [ ] Live activity indicators (processing, posted)
 - [ ] Dark shadows with opacity (not just glows)
 - [ ] Colored containers for platform icons
