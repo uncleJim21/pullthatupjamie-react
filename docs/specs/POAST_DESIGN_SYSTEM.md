@@ -633,3 +633,284 @@ className="
 - [ ] Platform colors ONLY on platform-specific elements
 - [ ] Character counter with glow when warning/error
 - [ ] Subtle shine effects on primary buttons
+
+## Additional Lightning Faucet Principles
+
+### Dark UI Best Practices
+
+**Critical Rules:**
+1. **Never use pure black** (`#000`) - Use `#0a0a0a` to `#121212`
+2. **Never use pure white text** (`#fff`) - Use `#e5e5e5` to `#f5f5f5`
+3. **Shadows still work** - Use darker shadows with low opacity
+4. **Colored elements pop more** - Use this strategically
+5. **Reduce contrast for less important text** - Improves visual hierarchy
+
+#### Updated Color Values
+
+```css
+/* Backgrounds (never pure black) */
+--bg-true-black: #0a0a0a;        /* Darkest (instead of #000) */
+--bg-primary: #0e0e0f;           /* Main background */
+--bg-elevated: #1a1a1b;          /* Cards, elevated surfaces */
+
+/* Text (never pure white) */
+--text-primary: #f5f5f5;         /* Headlines (instead of #fff) */
+--text-body: #e5e5e5;            /* Body text */
+--text-secondary: #c4c4c4;       /* Less emphasis */
+--text-muted: #82828c;           /* Descriptions */
+
+/* Shadows DO work in dark mode */
+--shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+--shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+--shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
+--shadow-xl: 0 12px 24px rgba(0, 0, 0, 0.6);
+```
+
+### CTA Hierarchy (Critical!)
+
+**Rule: Never have competing CTAs in the same section**
+
+```tsx
+// ✅ CORRECT: One primary, others secondary
+<div className="flex gap-4">
+  {/* Primary CTA - White button with glow */}
+  <button className="
+    px-8 py-4
+    bg-white text-[#0a0a0a]
+    font-display font-semibold text-lg
+    rounded-xl
+    shadow-[0_0_40px_rgba(255,255,255,0.3)]
+  ">
+    POAST
+  </button>
+  
+  {/* Secondary CTA - Outlined/ghost */}
+  <button className="
+    px-6 py-3
+    bg-transparent border-2 border-white/20
+    text-[#e5e5e5]
+    font-display font-medium
+    rounded-xl
+  ">
+    Save Draft
+  </button>
+</div>
+
+// ❌ WRONG: Multiple primary CTAs competing
+<div>
+  <button className="bg-white ...">POAST</button>
+  <button className="bg-white ...">Schedule</button>  // Don't do this
+</div>
+```
+
+### Trust & Credibility Elements
+
+**Show activity and build confidence:**
+
+#### 1. Stats Bar (Social Proof)
+```tsx
+<div className="
+  flex items-center gap-8
+  px-6 py-4
+  bg-[#1a1a1b]/50
+  border-y border-white/5
+">
+  <div className="flex items-center gap-2">
+    <div className="w-2 h-2 bg-[#10b981] rounded-full animate-pulse" />
+    <span className="text-sm text-[#82828c]">
+      <span className="text-[#e5e5e5] font-mono">127</span> posts scheduled
+    </span>
+  </div>
+  
+  <div className="flex items-center gap-2">
+    <CheckCircle className="w-4 h-4 text-[#10b981]" />
+    <span className="text-sm text-[#82828c]">
+      <span className="text-[#e5e5e5] font-mono">98.5%</span> success rate
+    </span>
+  </div>
+</div>
+```
+
+#### 2. Live Activity Indicators
+```tsx
+// Processing indicator (like Lightning Faucet's live games)
+{posts.some(p => p.status === 'processing') && (
+  <div className="flex items-center gap-2 text-sm text-[#f59e0b]">
+    <Loader2 className="w-4 h-4 animate-spin" />
+    <span className="font-mono">Publishing now...</span>
+  </div>
+)}
+```
+
+#### 3. Instant Feedback (Reduces Anxiety)
+```tsx
+// Success toast (bottom-left, Lightning Faucet style)
+<div className="
+  fixed bottom-6 left-6
+  px-6 py-4
+  bg-[#10b981]/10
+  border border-[#10b981]/30
+  rounded-xl
+  backdrop-blur-sm
+  animate-in slide-in-from-left-5
+">
+  <div className="flex items-center gap-3">
+    <Check className="w-5 h-5 text-[#10b981]" />
+    <div>
+      <p className="font-display font-semibold text-[#f5f5f5]">
+        Posted successfully
+      </p>
+      <p className="text-sm text-[#82828c]">
+        Your post is now live on Twitter
+      </p>
+    </div>
+  </div>
+</div>
+```
+
+#### 4. Trust Badges
+```tsx
+// Near scheduled time (shows reliability)
+<div className="flex items-center gap-2 text-xs text-[#82828c]">
+  <Clock className="w-3 h-3" />
+  <span className="font-mono">Posts at exactly scheduled time</span>
+  <div className="px-2 py-0.5 bg-[#10b981]/10 border border-[#10b981]/20 rounded text-[#10b981] font-mono">
+    ±30s
+  </div>
+</div>
+```
+
+### Shadows in Dark Mode
+
+**Shadows DO work - just use darker colors with opacity**
+
+```tsx
+// Card with shadow
+<div className="
+  bg-[#1a1a1b]
+  border border-white/10
+  rounded-2xl
+  shadow-[0_8px_16px_rgba(0,0,0,0.4)]    // Dark shadow, 40% opacity
+  hover:shadow-[0_12px_24px_rgba(0,0,0,0.6)]
+">
+  {/* Card content */}
+</div>
+
+// Button with shadow
+<button className="
+  bg-white
+  rounded-xl
+  shadow-[0_4px_8px_rgba(0,0,0,0.3)]
+  hover:shadow-[0_8px_16px_rgba(0,0,0,0.5)]
+">
+  Button
+</button>
+
+// Colored glow + dark shadow combo
+<div className="
+  shadow-[0_8px_16px_rgba(0,0,0,0.4),0_0_30px_rgba(29,155,240,0.2)]
+">
+  {/* Blue glow + dark shadow */}
+</div>
+```
+
+### Strategic Use of Colored Elements
+
+**Colored elements pop more in dark mode - use sparingly for impact**
+
+```tsx
+// Platform icon with colored container (POPS)
+<div className="
+  w-12 h-12
+  bg-[#1d9bf0]/20                         // Subtle Twitter blue tint
+  border border-[#1d9bf0]/30
+  rounded-xl
+  flex items-center justify-center
+">
+  <Twitter className="w-6 h-6 text-[#1d9bf0]" />
+</div>
+
+// Status badge (POPS because it's colored)
+<span className="
+  px-3 py-1
+  bg-[#10b981]/10                         // Subtle green tint
+  border border-[#10b981]/30
+  rounded-lg
+  text-[#10b981]
+">
+  posted
+</span>
+```
+
+### Visual Hierarchy Through Contrast Reduction
+
+**Less important = less contrast**
+
+```tsx
+// Primary headline (highest contrast)
+<h1 className="text-[#f5f5f5] font-display text-6xl">
+  X-POAST
+</h1>
+
+// Body text (medium contrast)
+<p className="text-[#e5e5e5] font-sans text-base">
+  Cross-post to Twitter and Nostr
+</p>
+
+// Supporting text (lower contrast)
+<p className="text-[#c4c4c4] text-sm">
+  Schedule posts or publish immediately
+</p>
+
+// Muted text (lowest contrast)
+<span className="text-[#82828c] text-xs">
+  Last updated 2 hours ago
+</span>
+
+// Disabled state (very low contrast)
+<button disabled className="text-[#4a4a4f]">
+  Connect Twitter
+</button>
+```
+
+## Design Principles Summary
+
+| Principle | Application | Constraint |
+|-----------|-------------|------------|
+| **Color Constraint** | 2-3 accent colors max, use sparingly | Twitter blue + Nostr purple + success green ONLY |
+| **Font Constraint** | 2-3 fonts max | Space Grotesk (display) + Inter (body) + IBM Plex Mono (code) |
+| **Hierarchy** | Size + weight + color + contrast | Most important = largest + boldest + highest contrast |
+| **Breathing Room** | Generous padding = premium | Minimum py-20, never cramped |
+| **Consistency** | Same border radius, shadows, spacing | rounded-xl everywhere, 24px/32px padding standard |
+| **Trust Signals** | Stats, badges, transparency, live data | Show success rates, processing status, timestamps |
+| **Activity** | Animations, live indicators, toasts | Pulse on processing, slide-in toasts, hover lifts |
+| **Clarity** | One primary CTA per section | Never competing buttons, clear hierarchy |
+| **Dark Mode Rules** | Never pure black/white, shadows work | #0a0a0a instead of #000, #f5f5f5 instead of #fff |
+| **Colored Elements** | Pop more in dark mode, use strategically | Platform badges, status indicators, not backgrounds |
+
+## Implementation Priority Checklist
+
+**High Priority (Required for Premium Feel):**
+- [ ] Use #0a0a0a to #121212 (never #000)
+- [ ] Use #e5e5e5 to #f5f5f5 for text (never #fff)
+- [ ] One primary CTA per section (white button)
+- [ ] All secondary CTAs outlined/ghost
+- [ ] Generous vertical padding (py-20 minimum)
+- [ ] Space Grotesk for all headings
+- [ ] Hover states with lift + glow
+- [ ] Platform colors ONLY on platform elements
+
+**Medium Priority (Enhances Experience):**
+- [ ] Stats bar showing social proof
+- [ ] Live activity indicators (processing, posted)
+- [ ] Dark shadows with opacity (not just glows)
+- [ ] Colored containers for platform icons
+- [ ] Contrast reduction for text hierarchy
+- [ ] Trust badges (success rate, timing accuracy)
+
+**Nice to Have (Polish):**
+- [ ] Toast notifications (bottom-left)
+- [ ] Shine effects on primary buttons
+- [ ] Pulse animations on live indicators
+- [ ] Empty state with dashed border icon
+- [ ] Loading skeletons with subtle animation
