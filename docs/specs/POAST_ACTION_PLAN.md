@@ -157,3 +157,31 @@ After both PRs merged:
 3. **Test requirements** - Document auth patterns, API contracts
 4. **Design references** - Screenshot existing UI, extract actual styles
 5. **Use sub-agents for execution** - Main session for planning/review only
+
+## Update: Twitter OAuth Connection (2026-02-22)
+
+### Issue Identified
+Original spec missed Twitter OAuth connection flow for users who haven't connected Twitter yet.
+
+### Solution Added
+- Platform selection now checks connection status
+- Shows "(not connected)" badge for disconnected platforms
+- Displays "Connect Twitter" prompt when Twitter selected but not connected
+- Opens OAuth popup via `PlatformIntegrationService.connectTwitter()`
+- Polls for connection completion (user finishes OAuth in popup)
+- Validates connections before allowing post submission
+
+### Implementation Notes
+- Reuse existing `PlatformIntegrationService` (already has `connectTwitter()` and `checkTwitterAuth()`)
+- Nostr connection = browser extension detection (no OAuth needed)
+- Twitter connection = OAuth 2.0 flow with popup + polling pattern
+- Connection state checked on component mount and after OAuth completion
+
+### Updated Acceptance Criteria
+Add to frontend checklist:
+- [ ] Twitter connection status checked on load
+- [ ] "Connect Twitter" prompt shows when needed
+- [ ] OAuth popup opens correctly
+- [ ] Polling detects successful connection
+- [ ] Prevents posting to disconnected platforms
+- [ ] Connection badges update in real-time

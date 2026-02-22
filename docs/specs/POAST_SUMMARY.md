@@ -113,3 +113,32 @@ All specs include:
 - ✅ Acceptance criteria
 - ✅ Clear dependencies
 - ✅ Design references
+
+## Update: Twitter OAuth Connection Added (2026-02-22)
+
+### Issue
+Original spec didn't account for users who haven't connected Twitter yet. Platform selection allowed selecting Twitter without checking if OAuth was complete.
+
+### Solution
+Added comprehensive Twitter OAuth connection flow:
+- Check connection status on component mount
+- Show "(not connected)" badge for disconnected platforms
+- Display "Connect Twitter" overlay when Twitter selected but not connected
+- OAuth popup via existing `PlatformIntegrationService.connectTwitter()`
+- Poll for completion (2s intervals, 5min timeout)
+- Validate connections before allowing submission
+
+### Code Reused
+- `PlatformIntegrationService.connectTwitter()` - Opens OAuth popup
+- `PlatformIntegrationService.checkTwitterAuth()` - Check connection status
+- Existing OAuth callback handling (already in place)
+- Polling pattern from `SocialShareModal.tsx`
+
+This brings total new features to **7**:
+1. Scheduled Posts Review
+2. Platform Filters
+3. Color Coding
+4. iOS-style Selection
+5. Status Badges
+6. Delete Posts
+7. **Twitter OAuth Connection** (NEW)
