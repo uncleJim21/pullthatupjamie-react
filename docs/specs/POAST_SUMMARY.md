@@ -142,3 +142,37 @@ This brings total new features to **7**:
 5. Status Badges
 6. Delete Posts
 7. **Twitter OAuth Connection** (NEW)
+
+## Update: Comprehensive Design System Added (2026-02-22)
+
+### Issue
+Original spec had weak, generic design guidance. Didn't capture the Lightning Faucet aesthetic with glowing text on near-black.
+
+### Solution
+Created **POAST_DESIGN_SYSTEM.md** (15KB comprehensive guide):
+
+**Key Principles Captured:**
+1. Near-black backgrounds (#0e0e0f) - not pure black
+2. White text with glow effects - premium feel
+3. Generous whitespace (py-20+ minimum)
+4. Space Grotesk (display) + Inter (body)
+5. Subtle borders (border-white/10)
+6. Accent colors used sparingly (Twitter/Nostr only)
+7. Hover states with lift + glow
+8. No dark shadows, only glows
+
+**Includes:**
+- Complete color palette
+- Typography scale
+- Card patterns
+- Button styles
+- Input designs
+- Badge styles
+- Icon treatment
+- Motion patterns
+- Page layouts
+- Implementation checklist
+
+**This is what makes it premium instead of cheap.**
+
+Frontend spec rewritten to reference design system and remove generic guidance.
