@@ -10,18 +10,23 @@ Current implementation has multiple issues:
 5. Poor platform selection indicators
 6. Uses `validatePrivs` backend endpoints (requires podcast)
 
-## Design Language Reference
+## Design System
 
-Jamie uses:
-- **Background:** `#0a0a0a` to `#000000` (very dark gray to black)
-- **Borders:** `border-gray-800` (Tailwind) = `rgba(31, 41, 55, 1)`
-- **Text primary:** `text-white` / `text-gray-100`
-- **Text secondary:** `text-gray-300` / `text-gray-400`
-- **Text muted:** `text-gray-500` / `text-gray-600`
-- **Buttons:** Gradient backgrounds, rounded-lg, hover states
-- **Inputs:** `bg-gray-900` / `bg-[#0a0a0a]` with `border-gray-700`
-- **Modals:** `bg-[#0a0a0a] border border-gray-800 rounded-2xl shadow-2xl`
-- **Icons:** Lucide React (already imported)
+**🎨 CRITICAL: Read the complete design system first**
+
+**[POAST_DESIGN_SYSTEM.md](./POAST_DESIGN_SYSTEM.md)** - Lightning Faucet-inspired aesthetic
+
+Key principles:
+- Near-black backgrounds (`#0e0e0f`, not pure black)
+- White text with subtle glows
+- Extremely generous whitespace (py-20+)
+- Space Grotesk for headings, Inter for body
+- Subtle borders (`border-white/10`)
+- Twitter blue and Nostr purple used ONLY on their elements
+- Hover states with lift + glow
+- No shadows, only glows
+
+**Do not deviate from the design system.** This is what makes it premium vs. cheap.
 
 ## Components to Reuse
 
@@ -32,7 +37,6 @@ Jamie uses:
 ```typescript
 import UploadService from '../services/uploadService.ts';
 
-// Usage in component:
 const handleMediaUpload = async (file: File) => {
   const token = localStorage.getItem('auth_token');
   if (!token) return;
@@ -47,103 +51,29 @@ const handleMediaUpload = async (file: File) => {
 };
 ```
 
-**DO NOT create new upload logic. Use `UploadService.processFileUpload`.**
+### 2. Platform Integration Service
 
-### 2. Modal Structure
+**FROM: `src/services/platformIntegrationService.ts`**
 
-**FROM: `src/components/SignInModal.tsx`** (lines 680-700)
+```typescript
+import PlatformIntegrationService from '../services/platformIntegrationService.ts';
 
-```tsx
-return (
-  <div className="fixed inset-0 z-50 overflow-y-auto">
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-    <div className="min-h-full flex items-center justify-center p-4">
-      <div className="bg-[#0a0a0a] border border-gray-800 rounded-2xl p-6 shadow-2xl relative w-full max-w-md max-h-[90vh] overflow-y-auto">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
-        >
-          <X size={20} />
-        </button>
-        
-        {/* Content here */}
-      </div>
-    </div>
-  </div>
-);
+// Check Twitter connection
+const checkTwitterStatus = async () => {
+  const status = await PlatformIntegrationService.checkTwitterAuth();
+  return status.authenticated;
+};
+
+// Connect Twitter (opens OAuth popup)
+const connectTwitter = async () => {
+  const result = await PlatformIntegrationService.connectTwitter();
+  if (result.success) {
+    pollTwitterConnection();
+  }
+};
 ```
 
-### 3. Button Styles
-
-**FROM: `src/components/SignInModal.tsx`** (line 619)
-
-```tsx
-// Primary button
-<button
-  className="w-full bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-lg px-4 py-3 font-medium hover:from-purple-500 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
->
-  Button Text
-</button>
-
-// Secondary button (outlined)
-<button
-  className="w-full border border-gray-700 text-gray-300 rounded-lg px-4 py-3 font-medium hover:bg-gray-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-600/50 transition-all"
->
-  Button Text
-</button>
-```
-
-### 4. Input Styles
-
-```tsx
-<input
-  type="text"
-  className="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
-  placeholder="Placeholder text"
-/>
-
-<textarea
-  className="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all resize-none"
-  rows={4}
-  placeholder="What's happening?"
-/>
-```
-
-## New Component Structure
-
-### File: `src/components/PoastPage.tsx` (COMPLETE REWRITE)
-
-#### Required Features
-
-1. **Auth Check** - Redirect to `/app` if not signed in (don't show content)
-2. **Post Composition**
-   - Text input (multiline)
-   - Character counter for Twitter (280 limit, show warning at 250+)
-   - Media upload button
-   - Media preview with remove button
-3. **Platform Selection**
-   - Twitter and Nostr chips
-   - Visual indicators:
-     - **Twitter**: Blue theme, Twitter logo (from `lucide-react`)
-     - **Nostr**: Purple theme, Nostr logo (from `/nostr-logo-square.png`)
-   - Selected state: Checkmark on top-right corner (like iOS)
-   - Unselected: Faded opacity
-4. **Scheduling**
-   - "Post Now" vs "Schedule" toggle
-   - DateTime picker (reuse DateTimePicker if exists, or native datetime-local)
-5. **Scheduled Posts List**
-   - Separate section below compose form
-   - List format with:
-     - Platform icon + color code
-     - Post text preview (first 100 chars)
-     - Scheduled time (formatted)
-     - Status badge (scheduled/processing/posted/failed)
-     - Edit/Delete buttons
-   - Filter by platform (All / Twitter / Nostr)
-   - Empty state when no posts
-
-#### API Integration
+## API Integration
 
 ```typescript
 import { API_URL } from '../constants/constants.ts';
@@ -182,9 +112,7 @@ const listPosts = async (filters?: { status?: string; platform?: string }) => {
   const params = new URLSearchParams(filters);
   const response = await fetch(`${API_BASE}/posts?${params}`, {
     method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
+    headers: { 'Authorization': `Bearer ${token}` }
   });
   
   if (!response.ok) throw new Error('Failed to fetch posts');
@@ -196,9 +124,7 @@ const deletePost = async (postId: string) => {
   const token = localStorage.getItem('auth_token');
   const response = await fetch(`${API_BASE}/posts/${postId}`, {
     method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
+    headers: { 'Authorization': `Bearer ${token}` }
   });
   
   if (!response.ok) throw new Error('Failed to delete post');
@@ -206,371 +132,209 @@ const deletePost = async (postId: string) => {
 };
 ```
 
-## Platform Color Coding
+## Page Structure
 
-```typescript
-const PLATFORM_STYLES = {
-  twitter: {
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/30',
-    hoverBg: 'hover:bg-blue-500/20',
-    selectedBg: 'bg-blue-500/20',
-    selectedBorder: 'border-blue-500',
-  },
-  nostr: {
-    color: 'text-purple-400',
-    bg: 'bg-purple-500/10',
-    border: 'border-purple-500/30',
-    hoverBg: 'hover:bg-purple-500/20',
-    selectedBg: 'bg-purple-500/20',
-    selectedBorder: 'border-purple-500',
-  }
-};
+### Layout Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ PageBanner (existing component)                        │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  [Generous vertical padding - py-20 lg:py-32]          │
+│                                                         │
+│  ┌────────────────────────────────────────────────┐    │
+│  │        X-POAST (glowing headline)               │    │
+│  │     Cross-post to Twitter and Nostr with style  │    │
+│  └────────────────────────────────────────────────┘    │
+│                                                         │
+│  ┌────────────────────────────────────────────────┐    │
+│  │ COMPOSE CARD (elevated bg, subtle border)      │    │
+│  │                                                  │    │
+│  │  • Textarea (character counter for Twitter)     │    │
+│  │  • Media upload button + preview                │    │
+│  │  • Platform chips (Twitter/Nostr)               │    │
+│  │  • Schedule toggle + datetime picker            │    │
+│  │  • [POAST] button (white with glow)             │    │
+│  └────────────────────────────────────────────────┘    │
+│                                                         │
+│  ┌────────────────────────────────────────────────┐    │
+│  │ SCHEDULED POSTS (list)                          │    │
+│  │                                                  │    │
+│  │  Platform filter pills                          │    │
+│  │                                                  │    │
+│  │  [Post cards with platform color coding]        │    │
+│  └────────────────────────────────────────────────┘    │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## Platform Selection UI (iOS-style)
+### Component Hierarchy
 
 ```tsx
-{(['twitter', 'nostr'] as const).map(platform => {
-  const isSelected = platforms.includes(platform);
-  const styles = PLATFORM_STYLES[platform];
-  
-  return (
-    <button
-      key={platform}
-      onClick={() => togglePlatform(platform)}
-      className={`relative flex items-center gap-3 px-4 py-3 rounded-lg border transition-all ${
-        isSelected 
-          ? `${styles.selectedBg} ${styles.selectedBorder}` 
-          : `${styles.bg} ${styles.border} opacity-60`
-      } ${styles.hoverBg}`}
-    >
-      {/* Icon */}
-      {platform === 'twitter' ? (
-        <Twitter size={20} className={styles.color} />
-      ) : (
-        <img 
-          src="/nostr-logo-square.png" 
-          alt="Nostr" 
-          className="w-5 h-5"
-          style={{ filter: 'brightness(1.3) saturate(0.8)' }}
-        />
-      )}
-      
-      {/* Label */}
-      <span className={`font-medium ${isSelected ? 'text-white' : 'text-gray-400'}`}>
-        {platform === 'twitter' ? 'Twitter' : 'Nostr'}
-      </span>
-      
-      {/* Checkmark (top-right corner when selected) */}
-      {isSelected && (
-        <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-          <Check size={14} className="text-white" />
-        </div>
-      )}
-    </button>
-  );
-})}
-```
-
-## Scheduled Posts List UI
-
-```tsx
-<div className="mt-8 border-t border-gray-800 pt-6">
-  <div className="flex items-center justify-between mb-4">
-    <h2 className="text-xl font-bold text-white">Scheduled Posts</h2>
+<PoastPage>
+  <div className="min-h-screen bg-[#0e0e0f]">
+    <PageBanner />
     
-    {/* Platform filter */}
-    <div className="flex gap-2">
-      <button
-        onClick={() => setFilter('all')}
-        className={`px-3 py-1 rounded-lg text-sm ${
-          filter === 'all' 
-            ? 'bg-gray-700 text-white' 
-            : 'text-gray-400 hover:text-white'
-        }`}
-      >
-        All
-      </button>
-      <button
-        onClick={() => setFilter('twitter')}
-        className={`px-3 py-1 rounded-lg text-sm flex items-center gap-1 ${
-          filter === 'twitter' 
-            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
-            : 'text-gray-400 hover:text-blue-400'
-        }`}
-      >
-        <Twitter size={14} />
-        Twitter
-      </button>
-      <button
-        onClick={() => setFilter('nostr')}
-        className={`px-3 py-1 rounded-lg text-sm flex items-center gap-1 ${
-          filter === 'nostr' 
-            ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' 
-            : 'text-gray-400 hover:text-purple-400'
-        }`}
-      >
-        <img src="/nostr-logo-square.png" className="w-3.5 h-3.5" />
-        Nostr
-      </button>
-    </div>
+    {/* Hero Section */}
+    <section className="py-20 lg:py-32">
+      <div className="max-w-3xl mx-auto px-4">
+        <h1 className="[design-system headline style]">X-POAST</h1>
+        <p className="[design-system subtitle style]">Tagline</p>
+      </div>
+    </section>
+    
+    {/* Compose Section */}
+    <section className="pb-12">
+      <div className="max-w-3xl mx-auto px-4">
+        <div className="[design-system card style]">
+          <ComposeForm />
+        </div>
+      </div>
+    </section>
+    
+    {/* Scheduled Posts Section */}
+    <section className="pb-20">
+      <div className="max-w-5xl mx-auto px-4">
+        <ScheduledPostsList />
+      </div>
+    </section>
   </div>
-
-  {scheduledPosts.length === 0 ? (
-    <div className="text-center py-12 text-gray-500">
-      <Clock size={48} className="mx-auto mb-4 opacity-50" />
-      <p>No scheduled posts yet</p>
-    </div>
-  ) : (
-    <div className="space-y-3">
-      {scheduledPosts.map(post => (
-        <div 
-          key={post._id}
-          className={`border rounded-lg p-4 ${
-            PLATFORM_STYLES[post.platform].border
-          } ${PLATFORM_STYLES[post.platform].bg}`}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1">
-              {/* Platform icon */}
-              {post.platform === 'twitter' ? (
-                <Twitter size={16} className="text-blue-400 mt-1 flex-shrink-0" />
-              ) : (
-                <img src="/nostr-logo-square.png" className="w-4 h-4 mt-1 flex-shrink-0" />
-              )}
-              
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <p className="text-gray-200 text-sm line-clamp-2 mb-2">
-                  {post.content.text || '(Media only)'}
-                </p>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <Clock size={12} />
-                  <span>{formatDate(post.scheduledFor)}</span>
-                  <span className={`px-2 py-0.5 rounded ${getStatusBadgeClass(post.status)}`}>
-                    {post.status}
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Actions */}
-            <button
-              onClick={() => deletePost(post._id)}
-              className="text-gray-500 hover:text-red-400 transition-colors"
-              title="Delete"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  )}
-</div>
+</PoastPage>
 ```
 
-## Route Fix
+## Critical Implementation Details
 
-**In: `src/index.js`**
-
-Current route is fine, but ensure auth redirect happens in component:
+### 1. Character Counter with Glowing States
 
 ```tsx
-// At top of PoastPage component
-useEffect(() => {
-  const token = localStorage.getItem('auth_token');
-  if (!token) {
-    navigate('/app');
-  }
-}, [navigate]);
+const [charCount, setCharCount] = useState(0);
+const isTwitterSelected = platforms.includes('twitter');
+const isOverLimit = isTwitterSelected && charCount > 280;
+const isWarning = isTwitterSelected && charCount > 250;
+
+// Character counter display
+{isTwitterSelected && (
+  <div 
+    className="text-sm font-mono transition-all duration-300"
+    style={{
+      color: isOverLimit ? '#ef4444' : isWarning ? '#f59e0b' : '#82828c',
+      textShadow: isOverLimit 
+        ? '0 0 10px rgba(239, 68, 68, 0.4)'
+        : isWarning
+        ? '0 0 10px rgba(245, 158, 11, 0.3)'
+        : 'none'
+    }}
+  >
+    {charCount}/280
+  </div>
+)}
 ```
 
-## Testing Checklist
+### 2. Platform Chips with Connection State
 
-- [ ] Page loads at `/poast`
-- [ ] Redirects to `/app` when not signed in
-- [ ] Can type text (no character limit for Nostr, 280 for Twitter)
-- [ ] Character counter shows for Twitter selection
-- [ ] Character counter turns yellow at 250, red at 280+
-- [ ] Can upload media via `UploadService.processFileUpload`
-- [ ] Media preview displays with remove button
-- [ ] Platform selection shows checkmarks correctly
-- [ ] Twitter selection shows blue theme
-- [ ] Nostr selection shows purple theme
-- [ ] Can schedule for later with datetime picker
-- [ ] Can post immediately
-- [ ] Posts appear in scheduled list
-- [ ] Platform filter works (All/Twitter/Nostr)
-- [ ] Can delete scheduled posts
-- [ ] Status badges show correctly
-- [ ] Error messages display properly
-- [ ] Mobile responsive
-
-## Files to Create/Modify
-
-1. **REWRITE:** `src/components/PoastPage.tsx`
-2. **NO CHANGES:** `src/index.js` (route already exists)
-
-## Design Assets Needed
-
-- `/nostr-logo-square.png` (should already exist based on SignInModal usage)
-- Lucide icons: `Twitter`, `Clock`, `Check`, `X`, `Loader2`, `Upload`, `Image`
-
-## Dependencies
-
-- `src/services/uploadService.ts` (already exists - USE THIS)
-- `src/constants/constants.ts` (already exists - import API_URL)
-- `lucide-react` (already installed)
-- `react-router-dom` (already installed)
-
-## Critical Don'ts
-
-- ❌ Don't create new upload logic
-- ❌ Don't use inline styles (use Tailwind classes)
-- ❌ Don't use `/api/social/posts` (use `/api/user/social/posts`)
-- ❌ Don't break sign-in flow (just redirect if no token)
-- ❌ Don't make it look cheap (follow Jamie's design language)
-
-## Twitter OAuth Connection
-
-### Platform Connection Service
-
-**FROM: `src/services/platformIntegrationService.ts`**
-
-```typescript
-import PlatformIntegrationService from '../services/platformIntegrationService.ts';
-
-// Check if Twitter is connected
-const checkTwitterStatus = async () => {
-  const status = await PlatformIntegrationService.checkTwitterAuth();
-  return status.authenticated;
-};
-
-// Connect Twitter (opens OAuth popup)
-const connectTwitter = async () => {
-  const result = await PlatformIntegrationService.connectTwitter();
-  if (result.success) {
-    // OAuth popup opened, poll for completion
-    pollTwitterConnection();
-  }
-};
-
-// Poll for connection completion (user finishes OAuth in popup)
-const pollTwitterConnection = () => {
-  const interval = setInterval(async () => {
-    const status = await PlatformIntegrationService.checkTwitterAuth();
-    if (status.authenticated) {
-      clearInterval(interval);
-      setTwitterConnected(true);
-      // Refresh platform selection UI
-    }
-  }, 2000); // Poll every 2 seconds
+```tsx
+const PlatformChip = ({ platform }: { platform: 'twitter' | 'nostr' }) => {
+  const [connected, setConnected] = useState(false);
+  const isSelected = platforms.includes(platform);
   
-  // Stop polling after 5 minutes
-  setTimeout(() => clearInterval(interval), 300000);
-};
-```
-
-### Platform Selection UI Update
-
-When Twitter is selected but not connected, show connection prompt:
-
-```tsx
-const [twitterConnected, setTwitterConnected] = useState(false);
-const [nostrAvailable, setNostrAvailable] = useState(false);
-
-// Check connection status on mount
-useEffect(() => {
-  const checkConnections = async () => {
-    const twitterStatus = await PlatformIntegrationService.checkTwitterAuth();
-    setTwitterConnected(twitterStatus.authenticated);
-    
-    // Nostr: check for browser extension
-    setNostrAvailable(typeof window !== 'undefined' && !!window.nostr);
+  useEffect(() => {
+    if (platform === 'twitter') {
+      PlatformIntegrationService.checkTwitterAuth()
+        .then(status => setConnected(status.authenticated));
+    } else {
+      setConnected(!!window.nostr);
+    }
+  }, [platform]);
+  
+  const styles = {
+    twitter: {
+      color: '#1d9bf0',
+      bg: 'bg-[#1d9bf0]/10',
+      border: 'border-[#1d9bf0]',
+      glow: '0 0 30px rgba(29, 155, 240, 0.3)'
+    },
+    nostr: {
+      color: '#8b5cf6',
+      bg: 'bg-[#8b5cf6]/10',
+      border: 'border-[#8b5cf6]',
+      glow: '0 0 30px rgba(139, 92, 246, 0.3)'
+    }
   };
   
-  checkConnections();
-}, []);
-
-// Platform chip rendering
-{(['twitter', 'nostr'] as const).map(platform => {
-  const isSelected = platforms.includes(platform);
-  const styles = PLATFORM_STYLES[platform];
-  
-  // Connection state
-  const isConnected = platform === 'twitter' ? twitterConnected : nostrAvailable;
-  const needsConnection = isSelected && !isConnected;
+  const s = styles[platform];
   
   return (
-    <div key={platform} className="relative">
+    <div className="relative">
       <button
-        onClick={() => {
-          if (platform === 'twitter' && !twitterConnected) {
-            // Don't toggle, show connect prompt instead
-            return;
-          }
-          togglePlatform(platform);
-        }}
-        className={`relative flex items-center gap-3 px-4 py-3 rounded-lg border transition-all ${
-          isSelected 
-            ? `${styles.selectedBg} ${styles.selectedBorder}` 
-            : `${styles.bg} ${styles.border} opacity-60`
-        } ${styles.hoverBg}`}
+        onClick={() => togglePlatform(platform)}
+        disabled={!connected}
+        className={`
+          relative px-6 py-4 rounded-xl
+          border-2 transition-all duration-300
+          ${isSelected ? `${s.bg} ${s.border}` : 'bg-[#1a1a1b] border-white/10'}
+          ${!connected && 'opacity-50 cursor-not-allowed'}
+          ${connected && 'hover:-translate-y-0.5'}
+        `}
+        style={isSelected ? { boxShadow: s.glow } : {}}
       >
-        {/* Icon */}
-        {platform === 'twitter' ? (
-          <Twitter size={20} className={styles.color} />
-        ) : (
-          <img 
-            src="/nostr-logo-square.png" 
-            alt="Nostr" 
-            className="w-5 h-5"
-            style={{ filter: 'brightness(1.3) saturate(0.8)' }}
-          />
-        )}
-        
-        {/* Label */}
-        <span className={`font-medium ${isSelected ? 'text-white' : 'text-gray-400'}`}>
-          {platform === 'twitter' ? 'Twitter' : 'Nostr'}
-        </span>
-        
-        {/* Connection status badge */}
-        {!isConnected && (
-          <span className="text-xs text-gray-500">
-            (not connected)
+        <div className="flex items-center gap-3">
+          {platform === 'twitter' ? (
+            <Twitter 
+              className="w-5 h-5" 
+              style={{ 
+                color: s.color,
+                filter: isSelected ? `drop-shadow(0 0 10px ${s.color}40)` : 'none'
+              }} 
+            />
+          ) : (
+            <img 
+              src="/nostr-logo-square.png"
+              className="w-5 h-5"
+              style={{
+                filter: isSelected 
+                  ? `brightness(1.2) drop-shadow(0 0 10px ${s.color}40)`
+                  : 'brightness(0.5)'
+              }}
+            />
+          )}
+          
+          <span className={`font-display font-semibold ${isSelected ? 'text-white' : 'text-[#82828c]'}`}>
+            {platform === 'twitter' ? 'Twitter' : 'Nostr'}
           </span>
-        )}
+          
+          {!connected && (
+            <span className="text-xs text-[#4a4a4f]">(not connected)</span>
+          )}
+        </div>
         
-        {/* Checkmark (top-right corner when selected AND connected) */}
-        {isSelected && isConnected && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-            <Check size={14} className="text-white" />
+        {/* Checkmark badge */}
+        {isSelected && connected && (
+          <div className="
+            absolute -top-2 -right-2 w-6 h-6
+            bg-[#10b981] rounded-full
+            flex items-center justify-center
+            shadow-[0_0_20px_rgba(16,185,129,0.4)]
+          ">
+            <Check className="w-4 h-4 text-white" />
           </div>
         )}
       </button>
       
-      {/* Connection prompt overlay */}
-      {needsConnection && (
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
+      {/* Connection overlay */}
+      {isSelected && !connected && (
+        <div className="
+          absolute inset-0 bg-black/80 backdrop-blur-sm
+          rounded-xl flex items-center justify-center
+        ">
           <button
-            onClick={async () => {
-              if (platform === 'twitter') {
-                await PlatformIntegrationService.connectTwitter();
-                // Start polling for completion
-                const interval = setInterval(async () => {
-                  const status = await PlatformIntegrationService.checkTwitterAuth();
-                  if (status.authenticated) {
-                    clearInterval(interval);
-                    setTwitterConnected(true);
-                  }
-                }, 2000);
-                setTimeout(() => clearInterval(interval), 300000);
-              }
-            }}
-            className={`px-4 py-2 rounded-lg ${styles.selectedBg} ${styles.selectedBorder} text-white font-medium hover:opacity-80 transition-opacity`}
+            onClick={() => handleConnect(platform)}
+            className={`
+              px-4 py-2 rounded-lg font-display font-semibold
+              ${s.bg} ${s.border} text-white
+              transition-all duration-300
+              hover:opacity-80
+            `}
           >
             Connect {platform === 'twitter' ? 'Twitter' : 'Nostr'}
           </button>
@@ -578,43 +342,200 @@ useEffect(() => {
       )}
     </div>
   );
-})}
-```
-
-### Validation Before Posting
-
-```typescript
-const handleSubmit = async () => {
-  // Check platform connections before posting
-  if (platforms.includes('twitter')) {
-    const status = await PlatformIntegrationService.checkTwitterAuth();
-    if (!status.authenticated) {
-      setError('Please connect your Twitter account before posting');
-      return;
-    }
-  }
-  
-  if (platforms.includes('nostr')) {
-    if (!window.nostr) {
-      setError('Please install a Nostr browser extension (nos2x or Alby)');
-      return;
-    }
-  }
-  
-  // Proceed with post creation...
 };
 ```
 
-### Testing Checklist Updates
+### 3. Scheduled Post Card
 
-Add to existing checklist:
+```tsx
+const ScheduledPostCard = ({ post }: { post: ScheduledPost }) => {
+  const platformStyle = {
+    twitter: {
+      color: '#1d9bf0',
+      bg: 'bg-[#1d9bf0]/10',
+      border: 'border-[#1d9bf0]/30',
+      topBorder: 'before:bg-gradient-to-r before:from-[#1d9bf0] before:to-[#0d7bbf]'
+    },
+    nostr: {
+      color: '#8b5cf6',
+      bg: 'bg-[#8b5cf6]/10',
+      border: 'border-[#8b5cf6]/30',
+      topBorder: 'before:bg-gradient-to-r before:from-[#8b5cf6] before:to-[#6d28d9]'
+    }
+  };
+  
+  const s = platformStyle[post.platform];
+  
+  return (
+    <div className={`
+      relative overflow-hidden
+      ${s.bg} border ${s.border} rounded-2xl p-6
+      transition-all duration-300
+      hover:-translate-y-1
+      hover:border-opacity-50
+      hover:shadow-[0_0_30px_rgba(255,255,255,0.05)]
+      before:absolute before:top-0 before:left-0 before:right-0 before:h-1
+      ${s.topBorder}
+    `}>
+      <div className="flex items-start gap-4">
+        {/* Platform icon */}
+        <div className="flex-shrink-0 mt-1">
+          {post.platform === 'twitter' ? (
+            <Twitter 
+              className="w-5 h-5" 
+              style={{ 
+                color: s.color,
+                filter: `drop-shadow(0 0 10px ${s.color}40)`
+              }} 
+            />
+          ) : (
+            <img 
+              src="/nostr-logo-square.png"
+              className="w-5 h-5"
+              style={{
+                filter: `brightness(1.2) drop-shadow(0 0 10px ${s.color}40)`
+              }}
+            />
+          )}
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <p className="text-[#c4c4c4] text-sm mb-3 line-clamp-2">
+            {post.content.text || '(Media only)'}
+          </p>
+          
+          <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-1.5 text-[#82828c]">
+              <Clock className="w-3 h-3" />
+              <span className="font-mono">{formatDate(post.scheduledFor)}</span>
+            </div>
+            
+            <StatusBadge status={post.status} />
+          </div>
+        </div>
+        
+        {/* Delete button */}
+        <button
+          onClick={() => handleDelete(post._id)}
+          className="
+            flex-shrink-0
+            w-8 h-8
+            bg-[#1a1a1b] border border-white/10 rounded-lg
+            flex items-center justify-center
+            text-[#82828c]
+            transition-all duration-300
+            hover:bg-[#ef4444]/10
+            hover:border-[#ef4444]/30
+            hover:text-[#ef4444]
+          "
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+```
 
-- [ ] Shows "Connect Twitter" prompt when Twitter selected but not connected
-- [ ] Twitter OAuth popup opens correctly
-- [ ] Polling detects successful Twitter connection
-- [ ] Platform selection updates after successful connection
-- [ ] Shows "not connected" badge for disconnected platforms
-- [ ] Prevents posting to Twitter if not connected
-- [ ] Nostr extension detection works correctly
-- [ ] Connection state persists across page refreshes
+### 4. Primary POAST Button
 
+```tsx
+<button
+  onClick={handleSubmit}
+  disabled={isDisabled || isLoading}
+  className="
+    relative overflow-hidden group
+    w-full px-8 py-4
+    bg-white text-[#0e0e0f]
+    font-display font-semibold text-lg
+    rounded-xl
+    transition-all duration-300
+    hover:shadow-[0_0_40px_rgba(255,255,255,0.3)]
+    hover:scale-105
+    disabled:opacity-40
+    disabled:cursor-not-allowed
+    disabled:hover:scale-100
+  "
+>
+  <span className="relative z-10">
+    {isLoading ? (
+      <span className="flex items-center justify-center gap-2">
+        <Loader2 className="w-5 h-5 animate-spin" />
+        POASTING...
+      </span>
+    ) : (
+      'POAST'
+    )}
+  </span>
+  
+  {/* Shine effect */}
+  <div className="
+    absolute inset-0 -translate-x-full
+    bg-gradient-to-r from-transparent via-white/20 to-transparent
+    group-hover:translate-x-full
+    transition-transform duration-700
+  " />
+</button>
+```
+
+## Testing Checklist
+
+### Design System Compliance
+- [ ] Background is `#0e0e0f` (not black or gray-900)
+- [ ] Card backgrounds are `#1a1a1b`
+- [ ] All borders use `border-white/10` or `border-white/20`
+- [ ] Headlines use Space Grotesk (`font-display`)
+- [ ] Body text uses Inter (`font-sans`)
+- [ ] Main headline has text glow effect
+- [ ] Vertical padding is generous (py-20 minimum)
+- [ ] Twitter elements use blue ONLY
+- [ ] Nostr elements use purple ONLY
+- [ ] Hover states have lift (-translate-y-1)
+- [ ] Hover states have glow (box-shadow)
+
+### Functionality
+- [ ] Redirects to `/app` when not signed in
+- [ ] Text input works (no char limit for Nostr)
+- [ ] Character counter shows for Twitter selection
+- [ ] Counter glows amber at 250+, red at 280+
+- [ ] Media upload uses `UploadService.processFileUpload`
+- [ ] Media preview with remove button
+- [ ] Platform connection status checked on mount
+- [ ] Twitter OAuth popup opens
+- [ ] Nostr extension detection works
+- [ ] Connection overlay shows when needed
+- [ ] Platforms can be toggled
+- [ ] Schedule toggle works
+- [ ] Can post immediately or schedule
+- [ ] Posts appear in scheduled list
+- [ ] Platform filter works (All/Twitter/Nostr)
+- [ ] Can delete scheduled posts
+- [ ] Status badges display correctly
+- [ ] Error states show with glowing text
+- [ ] Mobile responsive
+
+## Files to Create/Modify
+
+1. **COMPLETE REWRITE:** `src/components/PoastPage.tsx`
+2. **NO CHANGES:** `src/index.js` (route exists)
+
+## Dependencies
+
+- `src/services/uploadService.ts` ✅
+- `src/services/platformIntegrationService.ts` ✅
+- `src/constants/constants.ts` ✅
+- `lucide-react` ✅
+- `react-router-dom` ✅
+
+## Critical Don'ts
+
+- ❌ Don't use pure black (#000)
+- ❌ Don't use generic Tailwind colors (gray-900, blue-500, etc.)
+- ❌ Don't skip text glows on headlines
+- ❌ Don't use small padding (minimum py-20)
+- ❌ Don't add platform colors everywhere (only on their elements)
+- ❌ Don't use dark shadows (only white/colored glows)
+- ❌ Don't skip hover states (all interactive elements need lift + glow)
+- ❌ Don't create new upload logic
+- ❌ Don't use wrong API endpoints
