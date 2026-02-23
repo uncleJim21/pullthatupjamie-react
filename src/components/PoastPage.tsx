@@ -94,7 +94,7 @@ const PoastPage: React.FC = () => {
 
   const connectTwitter = async () => {
     try {
-      const authUrl = await AuthService.startTwitterAuth();
+      const authUrl = await AuthService.startUserTwitterAuth();
       window.open(authUrl, '_blank');
       startTokenPolling();
     } catch (error: any) {
