@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import PageBanner from './PageBanner';
+import PageBanner from './PageBanner.tsx';
 import { Upload, Clock, Check, X, Twitter, Loader2, AlertCircle } from 'lucide-react';
-import UploadService from '../services/uploadService';
-import PlatformIntegrationService from '../services/platformIntegrationService';
-import AuthService from '../services/authService';
+import UploadService from '../services/uploadService.ts';
+import PlatformIntegrationService from '../services/platformIntegrationService.ts';
+import AuthService from '../services/authService.ts';
 import { userTwitterService } from '../services/userTwitterService.ts';
-import { API_URL } from '../constants/constants';
+import { API_URL } from '../constants/constants.ts';
 
 declare global {
   interface Window {
