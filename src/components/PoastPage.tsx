@@ -213,13 +213,25 @@ const PoastPage: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    if (isScheduled && scheduledFor) {
+    // Determine scheduledFor: either user-selected time or "now"
+    let finalScheduledFor;
+    if (isScheduled) {
+      // Validate future date when scheduling
+      if (!scheduledFor) {
+        setError('Please select a date and time');
+        setIsLoading(false);
+        return;
+      }
       const scheduledDate = new Date(scheduledFor);
       if (scheduledDate <= new Date()) {
         setError('Scheduled time must be in the future');
         setIsLoading(false);
         return;
       }
+      finalScheduledFor = scheduledFor;
+    } else {
+      // "Post now" - schedule for current time (posts immediately)
+      finalScheduledFor = new Date().toISOString();
     }
 
     try {
@@ -234,7 +246,7 @@ const PoastPage: React.FC = () => {
           text,
           mediaUrl: mediaUrl || undefined,
           platforms,
-          scheduledFor: isScheduled && scheduledFor ? scheduledFor : undefined,
+          scheduledFor: finalScheduledFor,
           timezone: 'America/Chicago'
         })
       });
