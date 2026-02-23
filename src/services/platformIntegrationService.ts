@@ -318,6 +318,7 @@ export class PlatformIntegrationService {
 
   /**
    * Initiate Twitter OAuth connection (matches SocialShareModal workflow)
+   * For podcast admins only - requires podcast ownership
    */
   static async connectTwitter(): Promise<{ success: boolean; error?: string; redirectUrl?: string }> {
     try {
@@ -355,6 +356,52 @@ export class PlatformIntegrationService {
       }
     } catch (error) {
       printLog('Twitter connect failed:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Connection failed' 
+      };
+    }
+  }
+
+  /**
+   * Initiate Twitter OAuth connection for regular users (no podcast required)
+   */
+  static async connectUserTwitter(): Promise<{ success: boolean; error?: string; redirectUrl?: string }> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
+
+      printLog(`Starting user Twitter auth at ${API_URL}/api/user/twitter/oauth/start`);
+      const response = await fetch(`${API_URL}/api/user/twitter/oauth/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin
+        },
+        body: JSON.stringify({ token }),
+        credentials: 'include',
+        mode: 'cors'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || `Failed to start Twitter auth: ${response.status}`);
+      }
+
+      const data = await response.json();
+      printLog(`User Twitter auth response: ${JSON.stringify(data)}`);
+      
+      if (data.authUrl) {
+        // Open Twitter OAuth in new window
+        window.open(data.authUrl, '_blank');
+        return { success: true, redirectUrl: data.authUrl };
+      } else {
+        return { success: false, error: 'No auth URL received' };
+      }
+    } catch (error) {
+      printLog('User Twitter connect failed:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Connection failed' 
