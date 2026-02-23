@@ -5,6 +5,7 @@ import { Upload, Clock, Check, X, Twitter, Loader2, AlertCircle } from 'lucide-r
 import UploadService from '../services/uploadService';
 import PlatformIntegrationService from '../services/platformIntegrationService';
 import AuthService from '../services/authService';
+import { userTwitterService } from '../services/userTwitterService.ts';
 import { API_URL } from '../constants/constants';
 
 declare global {
@@ -209,29 +210,100 @@ const PoastPage: React.FC = () => {
     );
   };
 
-  const handleSubmit = async () => {
-    setIsLoading(true);
-    setError('');
+  const publishToTwitter = async (): Promise<boolean> => {
+    try {
+      const response = await userTwitterService.postTweet(text, mediaUrl || '');
+      
+      if (response.success && response.tweet?.id) {
+        return true;
+      }
+      
+      if (response.error === 'TWITTER_AUTH_EXPIRED' || response.requiresReauth) {
+        setTwitterConnected(false);
+        setError('Twitter authentication expired. Please reconnect.');
+        return false;
+      }
+      
+      setError(response.message || response.error || 'Failed to post to Twitter');
+      return false;
+    } catch (err: any) {
+      setError(err.message || 'Failed to post to Twitter');
+      return false;
+    }
+  };
 
-    // Determine scheduledFor: either user-selected time or "now"
-    let finalScheduledFor;
-    if (isScheduled) {
-      // Validate future date when scheduling
-      if (!scheduledFor) {
-        setError('Please select a date and time');
-        setIsLoading(false);
-        return;
+  const publishToNostr = async (): Promise<boolean> => {
+    if (!window.nostr) {
+      setError('Nostr extension not found');
+      return false;
+    }
+    
+    try {
+      const event = {
+        kind: 1,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [],
+        content: text
+      };
+      
+      const signedEvent = await window.nostr.signEvent(event);
+      console.log('Nostr event signed:', signedEvent.id);
+      
+      return true;
+    } catch (err: any) {
+      setError(err.message || 'Failed to post to Nostr');
+      return false;
+    }
+  };
+
+  const handleImmediatePost = async () => {
+    const promises: Promise<boolean>[] = [];
+    
+    if (platforms.includes('twitter') && twitterConnected) {
+      promises.push(publishToTwitter());
+    }
+    
+    if (platforms.includes('nostr') && nostrConnected) {
+      promises.push(publishToNostr());
+    }
+    
+    if (promises.length === 0) {
+      setError('Please connect at least one platform');
+      setIsLoading(false);
+      return;
+    }
+    
+    try {
+      const results = await Promise.allSettled(promises);
+      const anySuccess = results.some(r => r.status === 'fulfilled' && r.value === true);
+      
+      if (anySuccess) {
+        setText('');
+        setMediaUrl('');
+        setPlatforms(['twitter', 'nostr']);
+        await fetchPosts();
+      } else {
+        setError('Failed to post to any platform');
       }
-      const scheduledDate = new Date(scheduledFor);
-      if (scheduledDate <= new Date()) {
-        setError('Scheduled time must be in the future');
-        setIsLoading(false);
-        return;
-      }
-      finalScheduledFor = scheduledFor;
-    } else {
-      // "Post now" - schedule for current time (posts immediately)
-      finalScheduledFor = new Date().toISOString();
+    } catch (err) {
+      setError('Failed to post');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleScheduledPost = async () => {
+    if (!scheduledFor) {
+      setError('Please select a date and time');
+      setIsLoading(false);
+      return;
+    }
+    
+    const scheduledDate = new Date(scheduledFor);
+    if (scheduledDate <= new Date()) {
+      setError('Scheduled time must be in the future');
+      setIsLoading(false);
+      return;
     }
 
     try {
@@ -246,7 +318,7 @@ const PoastPage: React.FC = () => {
           text,
           mediaUrl: mediaUrl || undefined,
           platforms,
-          scheduledFor: finalScheduledFor,
+          scheduledFor,
           timezone: 'America/Chicago'
         })
       });
@@ -259,7 +331,7 @@ const PoastPage: React.FC = () => {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to create post');
+        throw new Error(error.message || 'Failed to schedule post');
       }
 
       setText('');
@@ -274,9 +346,20 @@ const PoastPage: React.FC = () => {
         navigate('/app');
         return;
       }
-      setError(err.message || 'Failed to create post');
+      setError(err.message || 'Failed to schedule post');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setError('');
+
+    if (isScheduled) {
+      await handleScheduledPost();
+    } else {
+      await handleImmediatePost();
     }
   };
 
@@ -287,7 +370,7 @@ const PoastPage: React.FC = () => {
       <PageBanner />
 
       {/* Hero Section */}
-      <section className="py-20 lg:py-32 pb-6">
+      <section className="pt-20 lg:pt-32 pb-6">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <h1
             className="font-display text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6"
