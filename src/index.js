@@ -18,7 +18,7 @@ import BrowserTestInput from './components/BrowserTestInput.tsx';
 import BlogIndex from './components/blog/BlogIndex.tsx';
 import BlogPost from './components/blog/BlogPost.tsx';
 import UpgradePage from './components/UpgradePage.tsx';
-import PoastPage from './components/PoastPage';
+import PoastPage from './components/PoastPage.tsx';
 import { DEBUG_MODE } from './constants/constants.ts';
 import { inject } from "@vercel/analytics"
 
