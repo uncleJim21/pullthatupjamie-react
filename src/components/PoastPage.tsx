@@ -7,12 +7,8 @@ import PlatformIntegrationService from '../services/platformIntegrationService.t
 import AuthService from '../services/authService.ts';
 import { userTwitterService } from '../services/userTwitterService.ts';
 import { API_URL } from '../constants/constants.ts';
-
-declare global {
-  interface Window {
-    nostr?: any;
-  }
-}
+import { relayPool, buildRelayHintTags, publishToRelays, generatePrimalUrl } from '../utils/nostrUtils.ts';
+import '../types/nostr.ts';
 
 interface ScheduledPost {
   _id: string;
@@ -242,12 +238,20 @@ const PoastPage: React.FC = () => {
       const event = {
         kind: 1,
         created_at: Math.floor(Date.now() / 1000),
-        tags: [],
+        tags: buildRelayHintTags(relayPool, 5),
         content: text
       };
       
       const signedEvent = await window.nostr.signEvent(event);
       console.log('Nostr event signed:', signedEvent.id);
+      
+      const result = await publishToRelays(signedEvent);
+      console.log(`Nostr publish: ${result.successCount}/${result.totalRelays} relays accepted`);
+      
+      if (!result.success) {
+        setError(`Only ${result.successCount} relays accepted the event (need 3+)`);
+        return false;
+      }
       
       return true;
     } catch (err: any) {
