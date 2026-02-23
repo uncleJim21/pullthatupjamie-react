@@ -72,8 +72,8 @@ const PoastPage: React.FC = () => {
   useEffect(() => {
     const checkConnections = async () => {
       try {
-        const twitterAuth = await PlatformIntegrationService.checkTwitterAuth();
-        setTwitterConnected(twitterAuth);
+        const twitterAuth = await PlatformIntegrationService.checkUserTwitterAuth();
+        setTwitterConnected(twitterAuth.authenticated);
       } catch {
         setTwitterConnected(false);
       }
@@ -105,7 +105,7 @@ const PoastPage: React.FC = () => {
   const startTokenPolling = () => {
     const interval = setInterval(async () => {
       try {
-        const status = await PlatformIntegrationService.checkTwitterAuth();
+        const status = await PlatformIntegrationService.checkUserTwitterAuth();
         if (status.authenticated) {
           setTwitterConnected(true);
           clearInterval(interval);
@@ -190,7 +190,7 @@ const PoastPage: React.FC = () => {
       const token = localStorage.getItem('auth_token');
       if (!token) throw new Error('Not authenticated');
 
-      const uploadedUrl = await UploadService.processFileUpload(file, token, true);
+      const uploadedUrl = await UploadService.processFileUpload(file, token, true, true);
       setMediaUrl(uploadedUrl);
     } catch (err: any) {
       setError(err.message || 'Failed to upload media');
