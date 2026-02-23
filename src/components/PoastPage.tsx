@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import PageBanner from './PageBanner.tsx';
+import PageBanner from './PageBanner';
 import { Upload, Clock, Check, X, Twitter, Loader2, AlertCircle } from 'lucide-react';
-import UploadService from '../services/uploadService.ts';
-import PlatformIntegrationService from '../services/platformIntegrationService.ts';
-import { API_URL } from '../constants/constants.ts';
+import UploadService from '../services/uploadService';
+import PlatformIntegrationService from '../services/platformIntegrationService';
+import AuthService from '../services/authService';
+import { API_URL } from '../constants/constants';
 
 declare global {
   interface Window {
@@ -47,7 +48,7 @@ const PoastPage: React.FC = () => {
 
   const [text, setText] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
-  const [platforms, setPlatforms] = useState<('twitter' | 'nostr')[]>([]);
+  const [platforms, setPlatforms] = useState<('twitter' | 'nostr')[]>(['twitter', 'nostr']);
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -58,6 +59,7 @@ const PoastPage: React.FC = () => {
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [postsFilter, setPostsFilter] = useState<'all' | 'twitter' | 'nostr'>('all');
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const authToken = localStorage.getItem('auth_token');
@@ -80,6 +82,39 @@ const PoastPage: React.FC = () => {
 
     checkConnections();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [pollingInterval]);
+
+  const connectTwitter = async () => {
+    try {
+      const authUrl = await AuthService.startTwitterAuth();
+      window.open(authUrl, '_blank');
+      startTokenPolling();
+    } catch (error: any) {
+      setError(error.message || 'Failed to start Twitter auth');
+    }
+  };
+
+  const startTokenPolling = () => {
+    const interval = setInterval(async () => {
+      try {
+        const status = await PlatformIntegrationService.checkTwitterAuth();
+        if (status.authenticated) {
+          setTwitterConnected(true);
+          clearInterval(interval);
+        }
+      } catch (err) {
+        // Continue polling
+      }
+    }, 2000);
+    setPollingInterval(interval);
+  };
 
   const fetchPosts = async () => {
     setLoadingPosts(true);
@@ -199,7 +234,7 @@ const PoastPage: React.FC = () => {
           text,
           mediaUrl: mediaUrl || undefined,
           platforms,
-          scheduledFor: isScheduled ? scheduledFor : undefined,
+          scheduledFor: isScheduled && scheduledFor ? scheduledFor : undefined,
           timezone: 'America/Chicago'
         })
       });
@@ -217,7 +252,7 @@ const PoastPage: React.FC = () => {
 
       setText('');
       setMediaUrl('');
-      setPlatforms([]);
+      setPlatforms(['twitter', 'nostr']);
       setIsScheduled(false);
       setScheduledFor('');
       await fetchPosts();
@@ -240,7 +275,7 @@ const PoastPage: React.FC = () => {
       <PageBanner />
 
       {/* Hero Section */}
-      <section className="py-20 lg:py-32">
+      <section className="py-20 lg:py-32 pb-6">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <h1
             className="font-display text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6"
@@ -361,10 +396,14 @@ const PoastPage: React.FC = () => {
                     } ${!nostrConnected ? 'cursor-not-allowed' : 'hover:opacity-100'}`}
                     style={platforms.includes('nostr') ? { boxShadow: '0 0 30px rgba(139, 92, 246, 0.3)' } : {}}
                   >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#a855f7" />
-                      <path d="M2 17L12 22L22 17L12 12L2 17Z" fill="#a855f7" />
-                    </svg>
+                    <div
+                      className="w-5 h-5"
+                      style={{
+                        backgroundColor: platforms.includes('nostr') ? '#8b5cf6' : '#82828c',
+                        mask: 'url(/nostr-logo-square.png) center/contain no-repeat',
+                        WebkitMask: 'url(/nostr-logo-square.png) center/contain no-repeat'
+                      }}
+                    />
                     <span className="text-white font-medium">
                       Nostr {!nostrConnected && '(not connected)'}
                     </span>
@@ -380,6 +419,17 @@ const PoastPage: React.FC = () => {
                     )}
                   </button>
                 </div>
+
+                {platforms.includes('twitter') && !twitterConnected && (
+                  <div className="mt-2">
+                    <button
+                      onClick={connectTwitter}
+                      className="text-sm px-4 py-2 bg-[#1d9bf0] text-white rounded-lg hover:bg-[#1a8cd8]"
+                    >
+                      Connect Twitter
+                    </button>
+                  </div>
+                )}
 
                 {(!twitterConnected || !nostrConnected) && (
                   <div className="text-sm text-[#f59e0b] flex items-center gap-2">
@@ -526,10 +576,14 @@ const PoastPage: React.FC = () => {
                   : 'bg-[#1a1a1b] border-white/10 opacity-70 text-[#82828c]'
               }`}
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill={postsFilter === 'nostr' ? '#8b5cf6' : '#82828c'} />
-                <path d="M2 17L12 22L22 17L12 12L2 17Z" fill={postsFilter === 'nostr' ? '#8b5cf6' : '#82828c'} />
-              </svg>
+              <div
+                className="w-4 h-4"
+                style={{
+                  backgroundColor: postsFilter === 'nostr' ? '#8b5cf6' : '#82828c',
+                  mask: 'url(/nostr-logo-square.png) center/contain no-repeat',
+                  WebkitMask: 'url(/nostr-logo-square.png) center/contain no-repeat'
+                }}
+              />
               Nostr
             </button>
           </div>
@@ -595,10 +649,14 @@ const PoastPage: React.FC = () => {
                               boxShadow: `0 0 20px ${platformColor}40`
                             }}
                           >
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill={platformColor} />
-                              <path d="M2 17L12 22L22 17L12 12L2 17Z" fill={platformColor} />
-                            </svg>
+                            <div
+                              className="w-5 h-5"
+                              style={{
+                                backgroundColor: platformColor,
+                                mask: 'url(/nostr-logo-square.png) center/contain no-repeat',
+                                WebkitMask: 'url(/nostr-logo-square.png) center/contain no-repeat'
+                              }}
+                            />
                           </div>
                         )}
                       </div>
