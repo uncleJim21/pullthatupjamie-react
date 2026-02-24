@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, LayoutDashboard, Headphones, PlusCircle } from 'lucide-react';
+import { ChevronUp, ChevronDown, User, LogIn, LogOut, CircleFadingArrowUp, LayoutDashboard, Headphones, PlusCircle, Send } from 'lucide-react';
 import BitcoinConnectButton from './BitcoinConnectButton.tsx';
 import { useNavigate } from 'react-router-dom';
 import AuthService from '../services/authService.ts';
@@ -235,6 +235,20 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
               >
                 <PlusCircle size={20} />
                 <span>Add Episode</span>
+              </button>
+            )}
+
+            {/* POAST - Cross-posting tool */}
+            {isSignedIn && (
+              <button
+                onClick={() => {
+                  navigate('/app/poast');
+                  setIsOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Send size={20} />
+                <span>POAST</span>
               </button>
             )}
 
