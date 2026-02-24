@@ -77,7 +77,7 @@ const PoastPage: React.FC = () => {
     if (base > new Date()) setScheduledFor(toLocalDatetimeStr(base));
   };
 
-  const setSchedulePreset = (preset: 'noon' | '3pm' | '6pm' | '9pm' | 'tmw9' | 'tmw_noon') => {
+  const setSchedulePreset = (preset: 'noon' | '3pm' | '6pm' | '9pm' | 'tmw9' | 'tmw6pm') => {
     const d = new Date();
     const presets: Record<string, () => void> = {
       noon:     () => { d.setHours(12, 0, 0, 0); if (d <= new Date()) d.setDate(d.getDate() + 1); },
@@ -85,7 +85,7 @@ const PoastPage: React.FC = () => {
       '6pm':    () => { d.setHours(18, 0, 0, 0); if (d <= new Date()) d.setDate(d.getDate() + 1); },
       '9pm':    () => { d.setHours(21, 0, 0, 0); if (d <= new Date()) d.setDate(d.getDate() + 1); },
       tmw9:     () => { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); },
-      tmw_noon: () => { d.setDate(d.getDate() + 1); d.setHours(12, 0, 0, 0); },
+      tmw6pm:   () => { d.setDate(d.getDate() + 1); d.setHours(18, 0, 0, 0); },
     };
     presets[preset]();
     setScheduledFor(toLocalDatetimeStr(d));
@@ -310,11 +310,12 @@ const PoastPage: React.FC = () => {
     }
     
     try {
+      const nostrContent = mediaUrl ? `${text}\n\n${mediaUrl}` : text;
       const event = {
         kind: 1,
         created_at: Math.floor(Date.now() / 1000),
         tags: buildRelayHintTags(relayPool, 5),
-        content: text
+        content: nostrContent
       };
       
       const signedEvent = await window.nostr.signEvent(event);
@@ -391,34 +392,77 @@ const PoastPage: React.FC = () => {
     try {
       const token = localStorage.getItem('auth_token');
       const isUpdate = !!editingPostId;
-      const url = isUpdate
-        ? `${API_URL}/api/user/social/posts/${editingPostId}`
-        : `${API_URL}/api/user/social/posts`;
-      
-      const response = await fetch(url, {
-        method: isUpdate ? 'PUT' : 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          text,
-          mediaUrl: mediaUrl || undefined,
-          platforms,
-          scheduledFor,
-          timezone: userTimezone
-        })
-      });
+      const scheduledISO = new Date(scheduledFor).toISOString();
+      const nostrEnabled = platforms.includes('nostr') && nostrConnected;
+      const twitterEnabled = platforms.includes('twitter') && twitterConnected;
 
-      if (response.status === 401) {
-        localStorage.removeItem('auth_token');
-        navigate('/app');
-        return;
+      const sendRequest = async (body: any, postId?: string) => {
+        const url = postId
+          ? `${API_URL}/api/user/social/posts/${postId}`
+          : `${API_URL}/api/user/social/posts`;
+        const response = await fetch(url, {
+          method: postId ? 'PUT' : 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        if (response.status === 401) {
+          localStorage.removeItem('auth_token');
+          navigate('/app');
+          throw new Error('Authentication expired');
+        }
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.message || 'Request failed');
+        }
+        return response.json();
+      };
+
+      if (nostrEnabled) {
+        if (!window.nostr) {
+          setError('Nostr extension not found. Please install a NIP-07 extension.');
+          setIsLoading(false);
+          return;
+        }
+
+        const nostrContent = mediaUrl ? `${text}\n\n${mediaUrl}` : text;
+        const eventToSign = {
+          kind: 1,
+          created_at: Math.floor(Date.now() / 1000),
+          tags: [],
+          content: nostrContent
+        };
+        const signedEvent = await window.nostr.signEvent(eventToSign);
+        const primalUrl = generatePrimalUrl(signedEvent.id);
+
+        await sendRequest({
+          text: nostrContent,
+          mediaUrl: mediaUrl || undefined,
+          platforms: ['nostr'],
+          scheduledFor: scheduledISO,
+          timezone: userTimezone,
+          platformData: {
+            nostrEventId: signedEvent.id,
+            nostrSignature: signedEvent.sig,
+            nostrPubkey: signedEvent.pubkey,
+            nostrCreatedAt: signedEvent.created_at ?? eventToSign.created_at,
+            nostrRelays: relayPool,
+            nostrPostUrl: primalUrl,
+            signedEvent
+          }
+        }, isUpdate ? editingPostId! : undefined);
       }
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Failed to ${isUpdate ? 'update' : 'schedule'} post`);
+      if (twitterEnabled) {
+        await sendRequest({
+          text,
+          mediaUrl: mediaUrl || undefined,
+          platforms: ['twitter'],
+          scheduledFor: scheduledISO,
+          timezone: userTimezone
+        }, isUpdate ? editingPostId! : undefined);
       }
 
       setText('');
@@ -431,7 +475,7 @@ const PoastPage: React.FC = () => {
       setShowSuccess(true);
       await fetchPosts();
     } catch (err: any) {
-      if (err.message?.includes('401') || err.status === 401) {
+      if (err.message?.includes('401') || err.message === 'Authentication expired') {
         localStorage.removeItem('auth_token');
         navigate('/app');
         return;
@@ -743,23 +787,27 @@ const PoastPage: React.FC = () => {
                       <span>{tzAbbrev} ({userTimezone})</span>
                     </div>
 
-                    {/* Quick adjust buttons */}
-                    <div className="flex flex-wrap gap-2">
+                    {/* Quick adjust buttons — 2 rows (+ top, − bottom) */}
+                    <div className="grid grid-cols-4 gap-1.5">
                       {[
-                        { label: '−1d', delta: -1440 },
-                        { label: '−1h', delta: -60 },
-                        { label: '−15m', delta: -15 },
-                        { label: '−5m', delta: -5 },
                         { label: '+5m', delta: 5 },
                         { label: '+15m', delta: 15 },
                         { label: '+1h', delta: 60 },
                         { label: '+1d', delta: 1440 },
+                        { label: '−5m', delta: -5 },
+                        { label: '−15m', delta: -15 },
+                        { label: '−1h', delta: -60 },
+                        { label: '−1d', delta: -1440 },
                       ].map(({ label, delta }) => (
                         <button
                           key={label}
                           type="button"
                           onClick={() => adjustScheduleTime(delta)}
-                          className="px-3 py-1.5 text-xs font-mono rounded-lg border border-white/10 text-[#c4c4c4] hover:bg-white/10 hover:border-white/20 hover:text-white transition-all duration-200"
+                          className={`px-3 py-1.5 text-xs font-mono rounded-lg border transition-all duration-200 ${
+                            delta > 0
+                              ? 'border-emerald-500/20 text-emerald-400/80 hover:bg-emerald-500/10 hover:border-emerald-500/40 hover:text-emerald-400'
+                              : 'border-red-500/20 text-red-400/80 hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-400'
+                          }`}
                         >
                           {label}
                         </button>
@@ -774,7 +822,7 @@ const PoastPage: React.FC = () => {
                         { label: '6 PM', preset: '6pm' as const },
                         { label: '9 PM', preset: '9pm' as const },
                         { label: 'Tmw 9 AM', preset: 'tmw9' as const },
-                        { label: 'Tmw Noon', preset: 'tmw_noon' as const },
+                        { label: 'Tmw 6 PM', preset: 'tmw6pm' as const },
                       ].map(({ label, preset }) => (
                         <button
                           key={preset}
