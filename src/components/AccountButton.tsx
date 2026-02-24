@@ -239,18 +239,16 @@ export const AccountButton: React.FC<AccountButtonProps> = ({
             )}
 
             {/* POAST - Cross-posting tool */}
-            {isSignedIn && (
-              <button
-                onClick={() => {
-                  navigate('/app/poast');
-                  setIsOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
-              >
-                <Send size={20} />
-                <span>POAST</span>
-              </button>
-            )}
+            <button
+              onClick={() => {
+                navigate('/app/poast');
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <Send size={20} />
+              <span>POAST</span>
+            </button>
 
             {/* Upgrade Button - only show if not already Pro */}
             {subscriptionStatus.shouldShowUpgrade() && isSignedIn && (

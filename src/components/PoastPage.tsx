@@ -8,6 +8,7 @@ import AuthService from '../services/authService.ts';
 import { userTwitterService } from '../services/userTwitterService.ts';
 import { API_URL } from '../constants/constants.ts';
 import { relayPool, buildRelayHintTags, publishToRelays, generatePrimalUrl } from '../utils/nostrUtils.ts';
+import SignInModal from './SignInModal.tsx';
 import '../types/nostr.ts';
 
 interface ScheduledPost {
@@ -61,6 +62,8 @@ const PoastPage: React.FC = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [isSignedIn, setIsSignedIn] = useState(!!localStorage.getItem('auth_token'));
+  const [isSignInModalOpen, setIsSignInModalOpen] = useState(!localStorage.getItem('auth_token'));
   const composeRef = React.useRef<HTMLDivElement>(null);
 
   const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -91,12 +94,10 @@ const PoastPage: React.FC = () => {
     setScheduledFor(toLocalDatetimeStr(d));
   };
 
-  useEffect(() => {
-    const authToken = localStorage.getItem('auth_token');
-    if (!authToken) {
-      navigate('/app');
-    }
-  }, [navigate]);
+  const handleSignInSuccess = () => {
+    setIsSignInModalOpen(false);
+    setIsSignedIn(true);
+  };
 
   useEffect(() => {
     const checkConnections = async () => {
@@ -1157,6 +1158,13 @@ const PoastPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <SignInModal
+        isOpen={isSignInModalOpen}
+        onClose={() => setIsSignInModalOpen(false)}
+        onSignInSuccess={handleSignInSuccess}
+        onSignUpSuccess={handleSignInSuccess}
+      />
     </div>
   );
 };
