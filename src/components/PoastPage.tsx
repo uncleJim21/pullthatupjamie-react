@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageBanner from './PageBanner.tsx';
-import { Upload, Clock, Check, X, Twitter, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, Clock, Check, X, Twitter, Loader2, AlertCircle, ExternalLink, CheckCircle, Play, Pencil, Image } from 'lucide-react';
 import UploadService from '../services/uploadService.ts';
 import PlatformIntegrationService from '../services/platformIntegrationService.ts';
 import AuthService from '../services/authService.ts';
@@ -57,6 +57,11 @@ const PoastPage: React.FC = () => {
   const [postsFilter, setPostsFilter] = useState<'all' | 'twitter' | 'nostr'>('all');
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [successUrls, setSuccessUrls] = useState<{ twitter?: string; nostr?: string; scheduled?: string }>({});
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const composeRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const authToken = localStorage.getItem('auth_token');
@@ -175,24 +180,64 @@ const PoastPage: React.FC = () => {
     return { color: '#82828c' };
   };
 
-  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processFile = async (file: File) => {
     setUploadingMedia(true);
     setError('');
-
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) throw new Error('Not authenticated');
-
-      const uploadedUrl = await UploadService.processFileUpload(file, token, true, true);
-      setMediaUrl(uploadedUrl);
+      const result = await UploadService.processFileUpload(file, token, true, true);
+      setMediaUrl(result.fileUrl);
     } catch (err: any) {
       setError(err.message || 'Failed to upload media');
     } finally {
       setUploadingMedia(false);
     }
+  };
+
+  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
+      processFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleEditPost = (post: ScheduledPost) => {
+    setText(post.content?.text || post.text || '');
+    setMediaUrl(post.content?.mediaUrl || '');
+    setPlatforms([post.platform]);
+    setIsScheduled(true);
+    setScheduledFor(new Date(post.scheduledFor).toISOString().slice(0, 16));
+    setEditingPostId(post._id);
+    setError('');
+    composeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const cancelEdit = () => {
+    setEditingPostId(null);
+    setText('');
+    setMediaUrl('');
+    setPlatforms(['twitter', 'nostr']);
+    setIsScheduled(false);
+    setScheduledFor('');
+    setError('');
   };
 
   const togglePlatform = (platform: 'twitter' | 'nostr') => {
@@ -211,6 +256,8 @@ const PoastPage: React.FC = () => {
       const response = await userTwitterService.postTweet(text, mediaUrl || '');
       
       if (response.success && response.tweet?.id) {
+        const tweetUrl = `https://x.com/i/status/${response.tweet.id}`;
+        setSuccessUrls(prev => ({ ...prev, twitter: tweetUrl }));
         return true;
       }
       
@@ -253,6 +300,7 @@ const PoastPage: React.FC = () => {
         return false;
       }
       
+      setSuccessUrls(prev => ({ ...prev, nostr: result.primalUrl }));
       return true;
     } catch (err: any) {
       setError(err.message || 'Failed to post to Nostr');
@@ -261,6 +309,7 @@ const PoastPage: React.FC = () => {
   };
 
   const handleImmediatePost = async () => {
+    setSuccessUrls({});
     const promises: Promise<boolean>[] = [];
     
     if (platforms.includes('twitter') && twitterConnected) {
@@ -285,6 +334,7 @@ const PoastPage: React.FC = () => {
         setText('');
         setMediaUrl('');
         setPlatforms(['twitter', 'nostr']);
+        setShowSuccess(true);
         await fetchPosts();
       } else {
         setError('Failed to post to any platform');
@@ -312,8 +362,13 @@ const PoastPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_URL}/api/user/social/posts`, {
-        method: 'POST',
+      const isUpdate = !!editingPostId;
+      const url = isUpdate
+        ? `${API_URL}/api/user/social/posts/${editingPostId}`
+        : `${API_URL}/api/user/social/posts`;
+      
+      const response = await fetch(url, {
+        method: isUpdate ? 'PUT' : 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -335,7 +390,7 @@ const PoastPage: React.FC = () => {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to schedule post');
+        throw new Error(error.message || `Failed to ${isUpdate ? 'update' : 'schedule'} post`);
       }
 
       setText('');
@@ -343,6 +398,9 @@ const PoastPage: React.FC = () => {
       setPlatforms(['twitter', 'nostr']);
       setIsScheduled(false);
       setScheduledFor('');
+      setEditingPostId(null);
+      setSuccessUrls({ scheduled: 'true' });
+      setShowSuccess(true);
       await fetchPosts();
     } catch (err: any) {
       if (err.message?.includes('401') || err.status === 401) {
@@ -391,9 +449,23 @@ const PoastPage: React.FC = () => {
       </section>
 
       {/* Compose Section */}
-      <section className="pb-12">
+      <section className="pb-12" ref={composeRef}>
         <div className="max-w-3xl mx-auto px-4">
-          <div className="bg-[#1a1a1b] border border-white/10 rounded-2xl p-6 lg:p-8">
+          <div className={`bg-[#1a1a1b] border rounded-2xl p-6 lg:p-8 ${editingPostId ? 'border-[#f59e0b]/40' : 'border-white/10'}`}>
+            {editingPostId && (
+              <div className="flex items-center justify-between mb-4 px-3 py-2 bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-xl">
+                <div className="flex items-center gap-2 text-[#f59e0b] text-sm font-medium">
+                  <Pencil className="w-4 h-4" />
+                  Editing scheduled post
+                </div>
+                <button
+                  onClick={cancelEdit}
+                  className="text-xs text-[#82828c] hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
             <div className="space-y-6">
               {/* Textarea + Character Counter */}
               <div className="relative">
@@ -424,33 +496,76 @@ const PoastPage: React.FC = () => {
 
               {/* Media Upload */}
               <div className="space-y-3">
-                <label className="inline-flex items-center gap-2 px-4 py-2 border-2 border-white/20 rounded-xl text-white hover:border-white/40 transition-all duration-300 cursor-pointer">
-                  <Upload className="w-5 h-5" />
-                  <span>{uploadingMedia ? 'Uploading...' : 'Add Media'}</span>
-                  <input
-                    type="file"
-                    accept="image/*,video/*"
-                    onChange={handleMediaUpload}
-                    disabled={uploadingMedia}
-                    className="hidden"
-                  />
-                </label>
-
-                {mediaUrl && (
-                  <div className="relative inline-block">
-                    <img
-                      src={mediaUrl}
-                      alt="Upload preview"
-                      className="max-h-48 rounded-xl border border-white/10"
-                    />
-                    <button
-                      onClick={() => setMediaUrl('')}
-                      className="absolute -top-2 -right-2 bg-[#ef4444] hover:bg-[#dc2626] rounded-full p-1.5 transition-colors duration-300"
-                    >
-                      <X className="w-4 h-4 text-white" />
-                    </button>
+                {!mediaUrl && (
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    className={`relative flex flex-col items-center justify-center gap-2 py-6 px-4 border-2 border-dashed rounded-xl transition-all duration-300 cursor-pointer ${
+                      isDragging
+                        ? 'border-white/40 bg-white/5'
+                        : 'border-white/15 hover:border-white/30'
+                    }`}
+                  >
+                    <Upload className={`w-6 h-6 transition-colors ${isDragging ? 'text-white' : 'text-[#82828c]'}`} />
+                    <p className="text-sm text-[#82828c]">
+                      {uploadingMedia ? 'Uploading...' : 'Drag & drop an image or video'}
+                    </p>
+                    <label className="text-xs text-white/60 hover:text-white transition-colors cursor-pointer underline underline-offset-2">
+                      or browse files
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        onChange={handleMediaUpload}
+                        disabled={uploadingMedia}
+                        className="hidden"
+                      />
+                    </label>
                   </div>
                 )}
+
+                {mediaUrl && (() => {
+                  const isVideo = /\.(mp4|webm|mov)$/i.test(mediaUrl);
+                  return (
+                    <div className="relative inline-block rounded-xl border border-white/10 overflow-hidden">
+                      {isVideo ? (
+                        <div className="relative max-h-32 w-48">
+                          <video
+                            src={mediaUrl}
+                            className="max-h-32 w-full object-contain rounded-t-xl bg-black"
+                            muted
+                            preload="metadata"
+                            onLoadedData={(e) => { (e.target as HTMLVideoElement).currentTime = 0.5; }}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
+                              <Play className="w-4 h-4 text-white ml-0.5" />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <img
+                          src={mediaUrl}
+                          alt="Upload preview"
+                          className="max-h-32 w-auto object-contain"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      )}
+                      <div className="flex items-center gap-2 px-3 py-2 bg-[#161617]">
+                        <Check className="w-4 h-4 text-[#10b981]" />
+                        <span className="text-xs text-[#82828c] font-mono truncate max-w-[200px]">
+                          {mediaUrl.split('/').pop()?.split('?')[0] || 'media attached'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setMediaUrl('')}
+                        className="absolute top-2 right-2 bg-black/70 hover:bg-[#ef4444] rounded-full p-1.5 transition-colors duration-300"
+                      >
+                        <X className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Platform Chips */}
@@ -625,10 +740,10 @@ const PoastPage: React.FC = () => {
                   {isLoading ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      POASTING...
+                      {editingPostId ? 'UPDATING...' : 'POASTING...'}
                     </>
                   ) : (
-                    'POAST'
+                    editingPostId ? 'UPDATE' : 'POAST'
                   )}
                 </span>
               </button>
@@ -714,18 +829,21 @@ const PoastPage: React.FC = () => {
             <div className="grid grid-cols-1 gap-4">
               {filteredPosts.map((post) => {
                 const isTwitter = post.platform === 'twitter';
-                const isNostr = post.platform === 'nostr';
                 const platformColor = isTwitter ? '#1d9bf0' : '#8b5cf6';
                 const platformColorLight = isTwitter ? 'border-[#1d9bf0]/30' : 'border-[#8b5cf6]/30';
                 const platformBg = isTwitter ? 'bg-[#1d9bf0]/10' : 'bg-[#8b5cf6]/10';
                 const topBorderGradient = isTwitter
                   ? 'before:bg-gradient-to-r before:from-[#1d9bf0] before:to-[#0d7bbf]'
                   : 'before:bg-gradient-to-r before:from-[#8b5cf6] before:to-[#6d28d9]';
+                const postText = post.content?.text || post.text || '';
+                const postMedia = post.content?.mediaUrl || '';
+                const isEditing = editingPostId === post._id;
+                const canEdit = post.status === 'scheduled';
 
                 return (
                   <div
                     key={post._id}
-                    className={`relative ${platformBg} border ${platformColorLight} rounded-xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(255,255,255,0.05)] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:rounded-t-xl ${topBorderGradient}`}
+                    className={`relative ${platformBg} border ${isEditing ? 'border-[#f59e0b]/50' : platformColorLight} rounded-xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(255,255,255,0.05)] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:rounded-t-xl ${topBorderGradient}`}
                   >
                     <div className="flex items-start gap-4">
                       {/* Platform Icon */}
@@ -762,12 +880,22 @@ const PoastPage: React.FC = () => {
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-[#c4c4c4] text-sm mb-3 line-clamp-2">
-                          {post.text}
-                        </p>
+                        {postText ? (
+                          <p className="text-[#c4c4c4] text-sm mb-2 line-clamp-3">
+                            {postText}
+                          </p>
+                        ) : (
+                          <p className="text-[#82828c] text-sm italic mb-2">No text content</p>
+                        )}
+
+                        {postMedia && (
+                          <div className="flex items-center gap-1.5 text-xs text-[#82828c] mb-2">
+                            <Image className="w-3 h-3" />
+                            <span>Media attached</span>
+                          </div>
+                        )}
 
                         <div className="flex items-center gap-4 flex-wrap">
-                          {/* Scheduled Time */}
                           <div className="flex items-center gap-2 text-xs text-[#82828c] font-mono">
                             <Clock className="w-3 h-3" />
                             {new Date(post.scheduledFor).toLocaleString('en-US', {
@@ -778,19 +906,29 @@ const PoastPage: React.FC = () => {
                               hour12: true
                             })}
                           </div>
-
-                          {/* Status Badge */}
                           <StatusBadge status={post.status} />
                         </div>
                       </div>
 
-                      {/* Delete Button */}
-                      <button
-                        onClick={() => handleDelete(post._id)}
-                        className="flex-shrink-0 p-2 rounded-lg text-[#82828c] hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-all duration-300"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                      {/* Actions */}
+                      <div className="flex-shrink-0 flex items-center gap-2">
+                        {canEdit && (
+                          <button
+                            onClick={() => handleEditPost(post)}
+                            className="p-2 rounded-lg text-[#82828c] hover:text-white hover:bg-white/10 transition-all duration-300"
+                            title="Edit post"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(post._id)}
+                          className="p-2 rounded-lg text-[#82828c] hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-all duration-300"
+                          title="Delete post"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -799,6 +937,89 @@ const PoastPage: React.FC = () => {
           )}
         </div>
       </section>
+
+      {/* Success Modal */}
+      {showSuccess && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a1b] border border-white/10 rounded-2xl p-8 w-full max-w-md relative">
+            <button
+              onClick={() => setShowSuccess(false)}
+              className="absolute top-4 right-4 text-[#82828c] hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div
+                className="w-16 h-16 rounded-full bg-[#10b981]/10 border border-[#10b981]/30 flex items-center justify-center mx-auto mb-4"
+                style={{ boxShadow: '0 0 30px rgba(16,185,129,0.2)' }}
+              >
+                <CheckCircle className="w-8 h-8 text-[#10b981]" />
+              </div>
+              <h2 className="font-display text-2xl font-bold text-white">
+                {successUrls.scheduled ? 'Post Scheduled!' : 'Posted Successfully!'}
+              </h2>
+              <p className="text-[#82828c] text-sm mt-2">
+                {successUrls.scheduled
+                  ? 'Your post has been queued and will go out at the scheduled time.'
+                  : 'Your cross-post is live on the platforms below.'}
+              </p>
+            </div>
+
+            {!successUrls.scheduled && (
+              <div className="space-y-3 mb-6">
+                {successUrls.twitter && (
+                  <a
+                    href={successUrls.twitter}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-4 bg-[#1d9bf0]/10 border border-[#1d9bf0]/30 rounded-xl hover:border-[#1d9bf0]/60 transition-all duration-300 group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Twitter className="w-5 h-5 text-[#1d9bf0]" />
+                      <span className="text-white text-sm font-medium group-hover:text-[#1d9bf0] transition-colors">
+                        View on Twitter
+                      </span>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-[#82828c] group-hover:text-[#1d9bf0] transition-colors" />
+                  </a>
+                )}
+
+                {successUrls.nostr && (
+                  <a
+                    href={successUrls.nostr}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-4 bg-[#8b5cf6]/10 border border-[#8b5cf6]/30 rounded-xl hover:border-[#8b5cf6]/60 transition-all duration-300 group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-5 h-5"
+                        style={{
+                          backgroundColor: '#8b5cf6',
+                          mask: 'url(/nostr-logo-square.png) center/contain no-repeat',
+                          WebkitMask: 'url(/nostr-logo-square.png) center/contain no-repeat'
+                        }}
+                      />
+                      <span className="text-white text-sm font-medium group-hover:text-[#8b5cf6] transition-colors">
+                        View on Primal
+                      </span>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-[#82828c] group-hover:text-[#8b5cf6] transition-colors" />
+                  </a>
+                )}
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowSuccess(false)}
+              className="w-full bg-white text-[#0e0e0f] font-display font-semibold rounded-xl px-6 py-3 transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
