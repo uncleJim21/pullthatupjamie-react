@@ -63,6 +63,34 @@ const PoastPage: React.FC = () => {
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const composeRef = React.useRef<HTMLDivElement>(null);
 
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tzAbbrev = new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop() || '';
+
+  const toLocalDatetimeStr = (d: Date): string => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const adjustScheduleTime = (minutes: number) => {
+    const base = scheduledFor ? new Date(scheduledFor) : new Date();
+    base.setMinutes(base.getMinutes() + minutes);
+    if (base > new Date()) setScheduledFor(toLocalDatetimeStr(base));
+  };
+
+  const setSchedulePreset = (preset: 'noon' | '3pm' | '6pm' | '9pm' | 'tmw9' | 'tmw_noon') => {
+    const d = new Date();
+    const presets: Record<string, () => void> = {
+      noon:     () => { d.setHours(12, 0, 0, 0); if (d <= new Date()) d.setDate(d.getDate() + 1); },
+      '3pm':    () => { d.setHours(15, 0, 0, 0); if (d <= new Date()) d.setDate(d.getDate() + 1); },
+      '6pm':    () => { d.setHours(18, 0, 0, 0); if (d <= new Date()) d.setDate(d.getDate() + 1); },
+      '9pm':    () => { d.setHours(21, 0, 0, 0); if (d <= new Date()) d.setDate(d.getDate() + 1); },
+      tmw9:     () => { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); },
+      tmw_noon: () => { d.setDate(d.getDate() + 1); d.setHours(12, 0, 0, 0); },
+    };
+    presets[preset]();
+    setScheduledFor(toLocalDatetimeStr(d));
+  };
+
   useEffect(() => {
     const authToken = localStorage.getItem('auth_token');
     if (!authToken) {
@@ -378,7 +406,7 @@ const PoastPage: React.FC = () => {
           mediaUrl: mediaUrl || undefined,
           platforms,
           scheduledFor,
-          timezone: 'America/Chicago'
+          timezone: userTimezone
         })
       });
 
@@ -425,7 +453,11 @@ const PoastPage: React.FC = () => {
     }
   };
 
-  const filteredPosts = scheduledPosts.filter(p => postsFilter === 'all' || p.platform === postsFilter);
+  const filteredPosts = scheduledPosts.filter(p => {
+    const platformMatch = postsFilter === 'all' || p.platform === postsFilter;
+    const isPending = p.status === 'scheduled' || p.status === 'processing' || p.status === 'unsigned';
+    return platformMatch && isPending;
+  });
 
   return (
     <div className="min-h-screen bg-[#0e0e0f]">
@@ -669,7 +701,15 @@ const PoastPage: React.FC = () => {
                     Post now
                   </button>
                   <button
-                    onClick={() => setIsScheduled(true)}
+                    onClick={() => {
+                      setIsScheduled(true);
+                      if (!scheduledFor) {
+                        const oneHour = new Date();
+                        oneHour.setHours(oneHour.getHours() + 1);
+                        oneHour.setSeconds(0, 0);
+                        setScheduledFor(toLocalDatetimeStr(oneHour));
+                      }
+                    }}
                     className={`px-6 py-2 rounded-xl border-2 flex items-center gap-2 transition-all duration-300 ${
                       isScheduled
                         ? 'bg-white/10 border-white/30 text-white'
@@ -682,22 +722,71 @@ const PoastPage: React.FC = () => {
                 </div>
 
                 {isScheduled && (
-                  <input
-                    type="datetime-local"
-                    value={scheduledFor}
-                    onChange={(e) => setScheduledFor(e.target.value)}
-                    className="w-full bg-[#161617] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-white/30 focus:bg-[#1a1a1b] transition-all duration-300"
-                    style={{
-                      colorScheme: 'dark',
-                      boxShadow: 'none'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.boxShadow = '0 0 20px rgba(255,255,255,0.1)';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.boxShadow = 'none';
-                    }}
-                  />
+                  <div className="space-y-3">
+                    <input
+                      type="datetime-local"
+                      value={scheduledFor}
+                      onChange={(e) => setScheduledFor(e.target.value)}
+                      className="w-full bg-[#161617] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-white/30 focus:bg-[#1a1a1b] transition-all duration-300"
+                      style={{ colorScheme: 'dark', boxShadow: 'none' }}
+                      onFocus={(e) => { e.target.style.boxShadow = '0 0 20px rgba(255,255,255,0.1)'; }}
+                      onBlur={(e) => { e.target.style.boxShadow = 'none'; }}
+                    />
+
+                    <div className="flex items-center justify-between text-xs text-[#82828c]">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" />
+                        {scheduledFor
+                          ? new Date(scheduledFor).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+                          : 'No date selected'}
+                      </span>
+                      <span>{tzAbbrev} ({userTimezone})</span>
+                    </div>
+
+                    {/* Quick adjust buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: '−1d', delta: -1440 },
+                        { label: '−1h', delta: -60 },
+                        { label: '−15m', delta: -15 },
+                        { label: '−5m', delta: -5 },
+                        { label: '+5m', delta: 5 },
+                        { label: '+15m', delta: 15 },
+                        { label: '+1h', delta: 60 },
+                        { label: '+1d', delta: 1440 },
+                      ].map(({ label, delta }) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => adjustScheduleTime(delta)}
+                          className="px-3 py-1.5 text-xs font-mono rounded-lg border border-white/10 text-[#c4c4c4] hover:bg-white/10 hover:border-white/20 hover:text-white transition-all duration-200"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Preset buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: 'Noon', preset: 'noon' as const },
+                        { label: '3 PM', preset: '3pm' as const },
+                        { label: '6 PM', preset: '6pm' as const },
+                        { label: '9 PM', preset: '9pm' as const },
+                        { label: 'Tmw 9 AM', preset: 'tmw9' as const },
+                        { label: 'Tmw Noon', preset: 'tmw_noon' as const },
+                      ].map(({ label, preset }) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setSchedulePreset(preset)}
+                          className="px-3 py-1.5 text-xs rounded-lg border border-[#f59e0b]/20 text-[#f59e0b]/80 hover:bg-[#f59e0b]/10 hover:border-[#f59e0b]/40 hover:text-[#f59e0b] transition-all duration-200"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -743,7 +832,7 @@ const PoastPage: React.FC = () => {
                       {editingPostId ? 'UPDATING...' : 'POASTING...'}
                     </>
                   ) : (
-                    editingPostId ? 'UPDATE' : 'POAST'
+                    editingPostId ? 'UPDATE' : isScheduled ? 'POAST (Later)' : 'POAST'
                   )}
                 </span>
               </button>
