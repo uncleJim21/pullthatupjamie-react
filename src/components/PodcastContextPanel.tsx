@@ -1186,7 +1186,6 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                         key={chapter.id}
                         onClick={() => {
                           setSelectedChapter(chapter);
-                          playSelectedChapter(chapter);
                         }}
                         className={`p-2 rounded cursor-pointer transition-colors ${
                           selectedChapter.id === chapter.id
@@ -1339,14 +1338,12 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                     <div 
                       className="flex items-start space-x-3 cursor-pointer hover:bg-gray-800/30 rounded p-2 -m-2 transition-colors"
                       onClick={() => {
-                        // Find and set the current chapter from the loaded chapters
                         const currentChapter = episodeChapters.find(
                           ch => ch.metadata.chapterNumber === hierarchy.hierarchy.chapter?.metadata.chapterNumber
                         );
                         if (currentChapter) {
                           setSelectedChapter(currentChapter);
                           pushView(ViewMode.CHAPTER, currentChapter);
-                          playSelectedChapter(currentChapter);
                         }
                       }}
                     >
