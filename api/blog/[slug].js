@@ -34,7 +34,8 @@ module.exports = async function handler(req, res) {
       return res.status(500).send(generateErrorHTML(frontendUrl));
     }
 
-    const post = await response.json();
+    const data = await response.json();
+    const post = data.post || data;
     const seo = post.seo || {};
 
     // Build metadata with fallbacks

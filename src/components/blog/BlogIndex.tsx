@@ -187,7 +187,7 @@ const BlogIndex: React.FC = () => {
               <ul style={styles.postList}>
                 {posts.map((post) => {
                   const imageUrl = post.seo?.og_image;
-                  const canonicalUrl = post.seo?.canonical_url || `${window.location.origin}/app/blog/${post.slug}`;
+                  const canonicalUrl = post.seo?.canonical_url || `${window.location.origin}/blog/${post.slug}`;
                   return (
                     <li key={post.slug} style={styles.postItem}>
                       <article style={styles.postCard}>
