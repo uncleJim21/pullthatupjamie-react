@@ -983,9 +983,18 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                   </div>
                 )}
 
-                {/* Episode */}
+                {/* Episode - Clickable to show chapter list */}
                 {hierarchy?.hierarchy.episode && (
-                  <div className="flex items-start space-x-3">
+                  <div 
+                    className="flex items-start space-x-3 cursor-pointer hover:bg-gray-800/30 rounded p-2 -m-2 transition-colors"
+                    onClick={() => {
+                      const first = episodeChapters[0] || selectedChapter;
+                      if (first) {
+                        setSelectedChapter(first);
+                        pushView(ViewMode.CHAPTER, first);
+                      }
+                    }}
+                  >
                     <div className="flex flex-col items-center pt-1">
                       <div
                         className="w-3 h-3 rounded-full flex-shrink-0"
@@ -1234,10 +1243,19 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                     </div>
                   )}
 
-                  {/* Episode with small thumbnail */}
+                  {/* Episode with small thumbnail - Clickable to show chapter list */}
                   {hierarchy.hierarchy.episode && (
                     <div className="pb-2">
-                      <div className="flex items-start space-x-3">
+                      <div 
+                        className="flex items-start space-x-3 cursor-pointer hover:bg-gray-800/30 rounded p-2 -m-2 transition-colors"
+                        onClick={() => {
+                          const first = episodeChapters[0] || selectedChapter;
+                          if (first) {
+                            setSelectedChapter(first);
+                            pushView(ViewMode.CHAPTER, first);
+                          }
+                        }}
+                      >
                         <div className="flex flex-col items-center pt-1">
                           <div
                             className="w-3 h-3 rounded-full flex-shrink-0"
