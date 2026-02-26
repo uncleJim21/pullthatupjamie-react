@@ -90,7 +90,7 @@ const CardFooter: React.FC<{
           {copied ? <Check size={13} /> : <LinkIcon size={13} />}
         </button>
       </div>
-      <Link to={`/app/blog/${slug}`} style={styles.readNowLink}>
+      <Link to={`/blog/${slug}`} style={styles.readNowLink}>
         Read now &rarr;
       </Link>
     </div>
@@ -191,7 +191,7 @@ const BlogIndex: React.FC = () => {
                   return (
                     <li key={post.slug} style={styles.postItem}>
                       <article style={styles.postCard}>
-                        <Link to={`/app/blog/${post.slug}`} style={styles.postLink}>
+                        <Link to={`/blog/${post.slug}`} style={styles.postLink}>
                           <div style={styles.postCardInner} className="blog-idx-card-inner">
                             <div style={styles.postTextCol}>
                               <h2 style={styles.postTitle} className="blog-idx-post-title">{post.title}</h2>

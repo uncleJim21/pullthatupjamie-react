@@ -150,6 +150,7 @@ const App = () => (
 
       {/* Blog routes */}
       <Route path="/blog" element={<BlogIndex />} />
+      <Route path="/blog/:slug" element={<BlogPost />} />
       <Route path="/app/blog/:slug" element={<BlogPost />} />
       
       {/* Redirect old URLs to new structure */}
