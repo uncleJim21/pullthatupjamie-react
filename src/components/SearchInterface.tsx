@@ -2761,6 +2761,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Using the galaxy viewport as the measurement target makes the breakpoint feel much more intuitive.
   const galaxyViewportRef = useRef<HTMLDivElement | null>(null);
   const [isNarrowLayout, setIsNarrowLayout] = useState(false);
+  const isNarrowCommittedRef = useRef(false);
+  const narrowDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Narrow layout: show a compact mini player by default; user can expand to see UnifiedSidePanel.
   const [isNarrowInfoExpanded, setIsNarrowInfoExpanded] = useState(false);
   
@@ -2805,39 +2807,49 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     const el = mainContentRef.current;
     if (!el) return;
 
-    // Keep aligned with PageBanner's MOBILE_BREAKPOINT (900px), but:
-    // - Avoid feedback loops: opening the side panel reduces `el` width, which can cause
-    //   bottom↔side oscillation if we key off `el` alone.
-    // - Use a *wide* hysteresis band so the mode doesn't flap while resizing.
+    // Approximate "true available width" as mainContentWidth + contextPanelWidth
+    // to avoid feedback loops when the side panel opens/closes.
     //
-    // We approximate the "true available width" as:
-    //   effectiveWidth = mainContentWidth + contextPanelWidth
-    // This removes the panel-open feedback because (main shrinks) + (panel grows) ≈ constant.
-    //
-    // Thresholds (tuned per observed behavior in split-screen):
-    // - Collapse sooner (user preference): enter narrow around ~65% of a typical wide layout.
-    // - Expand later: allow it to take close to full width to return to side layout.
-    //
-    // NOTE: These are absolute px values because we don't have a reliable "percent of full"
-    // baseline across different layouts; but we measure the galaxy viewport (when present),
-    // which makes these thresholds feel consistent.
+    // NARROW_ENTER: galaxy gets ~490px minimum before switching (1150 - 660 panel).
+    // NARROW_EXIT: in narrow mode panel is unmounted so effective ≈ window width;
+    //   1300 is easily reachable on a normal monitor. 150px band prevents flapping.
     const NARROW_ENTER = 1150;
-    const NARROW_EXIT = 1750;
+    const NARROW_EXIT = 1300;
+
+    // Debounce layout transitions by 400ms so CSS panel-collapse animations
+    // (300ms) finish before we re-evaluate. This prevents the momentary width
+    // dip during collapse from triggering a false narrow switch.
+    const DEBOUNCE_MS = 400;
 
     const updateFromWidth = (mainWidth: number) => {
       const effectiveWidth = mainWidth + (contextPanelWidthRef.current || 0);
-      setIsNarrowLayout((prev) => {
-        if (prev) {
-          // Currently narrow: only exit once we're clearly above the threshold.
-          return effectiveWidth < NARROW_EXIT;
+      const committed = isNarrowCommittedRef.current;
+
+      let target: boolean;
+      if (committed) {
+        target = effectiveWidth < NARROW_EXIT;
+      } else {
+        target = effectiveWidth <= NARROW_ENTER;
+      }
+
+      if (target === committed) {
+        if (narrowDebounceRef.current) {
+          clearTimeout(narrowDebounceRef.current);
+          narrowDebounceRef.current = null;
         }
-        // Currently wide: only enter once we're clearly below the threshold.
-        return effectiveWidth <= NARROW_ENTER;
-      });
+        return;
+      }
+
+      if (narrowDebounceRef.current) {
+        clearTimeout(narrowDebounceRef.current);
+      }
+      narrowDebounceRef.current = setTimeout(() => {
+        narrowDebounceRef.current = null;
+        isNarrowCommittedRef.current = target;
+        setIsNarrowLayout(target);
+      }, DEBOUNCE_MS);
     };
 
-    // Prefer the galaxy viewport when it's mounted; fallback to the full main content area.
-    // This avoids using header/other chrome as the primary signal.
     const measureEl = galaxyViewportRef.current ?? el;
 
     if (typeof ResizeObserver !== 'undefined') {
@@ -2849,14 +2861,43 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       });
       observer.observe(measureEl);
       updateFromWidth(measureEl.getBoundingClientRect().width);
-      return () => observer.disconnect();
+      return () => {
+        observer.disconnect();
+        if (narrowDebounceRef.current) {
+          clearTimeout(narrowDebounceRef.current);
+        }
+      };
     }
 
     const onResize = () => updateFromWidth(measureEl.getBoundingClientRect().width);
     onResize();
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      if (narrowDebounceRef.current) {
+        clearTimeout(narrowDebounceRef.current);
+      }
+    };
   }, []);
+
+  // When layout mode changes due to resize:
+  // 1. Suppress autoplay — panel unmount/remount resets the dedup key and causes
+  //    a jarring audio-restart loop.
+  // 2. Clear stale contextPanelWidth — the side panel unmounts in narrow mode so
+  //    it can't report width 0 itself. Without this the ResizeObserver sees
+  //    effective = mainWidth + 660(stale) and immediately wants to go back to wide,
+  //    causing infinite oscillation.
+  const prevNarrowRef = useRef(isNarrowLayout);
+  useEffect(() => {
+    if (prevNarrowRef.current !== isNarrowLayout) {
+      prevNarrowRef.current = isNarrowLayout;
+      setAutoPlayContextOnOpen(false);
+      if (isNarrowLayout) {
+        setContextPanelWidth(0);
+        contextPanelWidthRef.current = 0;
+      }
+    }
+  }, [isNarrowLayout]);
 
   const resetContextPanelState = () => {
     setIsContextPanelOpen(false);
