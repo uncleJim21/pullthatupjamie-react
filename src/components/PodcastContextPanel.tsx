@@ -1071,6 +1071,8 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                   </div>
                 </div>
 
+                {renderEpisodeMiniPlayer()}
+
                 {/* Selected Chapter Details */}
                 <div className="pt-4 border-t border-gray-800">
                   <p className="text-xs text-gray-500 mb-2">CHAPTER DETAILS</p>
@@ -1095,92 +1097,51 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                       </div>
                     )}
                     
-                    {/* Keywords and Listen Button Side by Side */}
+                    {/* Keywords */}
                     {selectedChapter.metadata.keywords && selectedChapter.metadata.keywords.length > 0 && (
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-gray-600 mb-1">Keywords</p>
-                          <div className="flex flex-wrap gap-1">
-                            {selectedChapter.metadata.keywords.map((keyword, idx) => (
-                              <KeywordTooltip
-                                key={idx}
-                                keyword={keyword}
-                                isOpen={openTooltipKeyword === keyword}
-                                onOpenChange={(isOpen) => setOpenTooltipKeyword(isOpen ? keyword : null)}
-                                options={[
-                                  {
-                                    label: 'Search - All Pods',
-                                    icon: <ScanSearch className="w-3.5 h-3.5" />,
-                                    color: HIERARCHY_COLORS.ALL_PODS,
-                                    onClick: () => {
-                                      printLog(`Searching all pods for keyword: ${keyword}`);
-                                      onKeywordSearch?.(keyword, undefined, undefined, true);
-                                    }
-                                  },
-                                  {
-                                    label: 'Search - This Feed',
-                                    icon: <ScanSearch className="w-3.5 h-3.5" />,
-                                    color: HIERARCHY_COLORS.FEED,
-                                    onClick: () => {
-                                      // Prefer numeric/string feedId from metadata (API filter expects the raw feed id, not "feed_####")
-                                      const feedId = hierarchy?.hierarchy.feed?.metadata.feedId || hierarchy?.hierarchy.feed?.id;
-                                      printLog(`Searching this feed (${feedId}) for keyword: ${keyword}`);
-                                      onKeywordSearch?.(keyword, feedId);
-                                    }
-                                  },
-                                  {
-                                    label: 'Search - This Episode',
-                                    icon: <ScanSearch className="w-3.5 h-3.5" />,
-                                    color: HIERARCHY_COLORS.EPISODE,
-                                    onClick: () => {
-                                      const episodeGuid = hierarchy?.hierarchy.episode?.metadata.guid;
-                                      printLog(`Searching this episode (${episodeGuid}) for keyword: ${keyword}`);
-                                      onKeywordSearch?.(keyword, undefined, episodeGuid);
-                                    }
+                      <div>
+                        <p className="text-xs text-gray-600 mb-1">Keywords</p>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedChapter.metadata.keywords.map((keyword, idx) => (
+                            <KeywordTooltip
+                              key={idx}
+                              keyword={keyword}
+                              isOpen={openTooltipKeyword === keyword}
+                              onOpenChange={(isOpen) => setOpenTooltipKeyword(isOpen ? keyword : null)}
+                              options={[
+                                {
+                                  label: 'Search - All Pods',
+                                  icon: <ScanSearch className="w-3.5 h-3.5" />,
+                                  color: HIERARCHY_COLORS.ALL_PODS,
+                                  onClick: () => {
+                                    printLog(`Searching all pods for keyword: ${keyword}`);
+                                    onKeywordSearch?.(keyword, undefined, undefined, true);
                                   }
-                                ]}
-                              />
-                            ))}
-                          </div>
+                                },
+                                {
+                                  label: 'Search - This Feed',
+                                  icon: <ScanSearch className="w-3.5 h-3.5" />,
+                                  color: HIERARCHY_COLORS.FEED,
+                                  onClick: () => {
+                                    const feedId = hierarchy?.hierarchy.feed?.metadata.feedId || hierarchy?.hierarchy.feed?.id;
+                                    printLog(`Searching this feed (${feedId}) for keyword: ${keyword}`);
+                                    onKeywordSearch?.(keyword, feedId);
+                                  }
+                                },
+                                {
+                                  label: 'Search - This Episode',
+                                  icon: <ScanSearch className="w-3.5 h-3.5" />,
+                                  color: HIERARCHY_COLORS.EPISODE,
+                                  onClick: () => {
+                                    const episodeGuid = hierarchy?.hierarchy.episode?.metadata.guid;
+                                    printLog(`Searching this episode (${episodeGuid}) for keyword: ${keyword}`);
+                                    onKeywordSearch?.(keyword, undefined, episodeGuid);
+                                  }
+                                }
+                              ]}
+                            />
+                          ))}
                         </div>
-                        <button
-                          onClick={handleChapterListenToggle}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-white text-black rounded hover:bg-gray-200 transition-colors text-xs font-medium flex-shrink-0 self-end"
-                        >
-                          {isContextTrackActive && contextIsPlaying ? (
-                            <>
-                              <span className="text-[10px] font-semibold">||</span>
-                              <span>Pause</span>
-                            </>
-                          ) : (
-                            <>
-                              <Play className="w-3 h-3" />
-                              <span>Listen</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
-                    
-                    {/* Listen Button Alone (if no keywords) */}
-                    {(!selectedChapter.metadata.keywords || selectedChapter.metadata.keywords.length === 0) && (
-                      <div className="flex justify-end">
-                        <button
-                          onClick={handleChapterListenToggle}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-white text-black rounded hover:bg-gray-200 transition-colors text-xs font-medium"
-                        >
-                          {isContextTrackActive && contextIsPlaying ? (
-                            <>
-                              <span className="text-[10px] font-semibold">||</span>
-                              <span>Pause</span>
-                            </>
-                          ) : (
-                            <>
-                              <Play className="w-3 h-3" />
-                              <span>Listen</span>
-                            </>
-                          )}
-                        </button>
                       </div>
                     )}
                   </div>
