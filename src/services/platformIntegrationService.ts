@@ -249,7 +249,76 @@ export class PlatformIntegrationService {
   }
 
   /**
+   * Check Twitter OAuth status for regular users (no podcast required)
+   * Uses /api/user/twitter/tokens endpoint
+   */
+  static async checkUserTwitterAuth(): Promise<PlatformState> {
+    printLog('Checking user Twitter auth status...');
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        printLog('No auth token found for user Twitter auth check');
+        return {
+          enabled: false,
+          available: true,
+          authenticated: false,
+          username: undefined,
+          error: 'No auth token found'
+        };
+      }
+
+      const response = await fetch(`${API_URL}/api/user/twitter/tokens`, {
+        method: 'POST',
+        headers: {
+          'Accept': '*/*',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin
+        },
+        credentials: 'include',
+        mode: 'cors'
+      });
+      
+      if (response.ok) {
+        const data: TwitterAuthStatus = await response.json();
+        printLog(`User Twitter auth check response: ${JSON.stringify(data)}`);
+        
+        return {
+          enabled: true,
+          available: true,
+          authenticated: data.authenticated === true,
+          username: data.authenticated ? data.twitterUsername : undefined,
+          // Extended capabilities
+          capabilities: data.capabilities,
+          requiresMediaAuth: data.requiresMediaAuth,
+          mediaAuthUrl: data.mediaAuthUrl,
+          mediaAuthMessage: data.mediaAuthMessage
+        };
+      } else {
+        printLog(`User Twitter auth check failed with status ${response.status}`);
+        return {
+          enabled: false,
+          available: true,
+          authenticated: false,
+          username: undefined,
+          error: `HTTP ${response.status}`
+        };
+      }
+    } catch (error) {
+      printLog(`Error checking user Twitter auth: ${error}`);
+      return {
+        enabled: false,
+        available: true,
+        authenticated: false,
+        username: undefined,
+        error: error instanceof Error ? error.message : 'Connection failed'
+      };
+    }
+  }
+
+  /**
    * Initiate Twitter OAuth connection (matches SocialShareModal workflow)
+   * For podcast admins only - requires podcast ownership
    */
   static async connectTwitter(): Promise<{ success: boolean; error?: string; redirectUrl?: string }> {
     try {
@@ -287,6 +356,52 @@ export class PlatformIntegrationService {
       }
     } catch (error) {
       printLog('Twitter connect failed:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Connection failed' 
+      };
+    }
+  }
+
+  /**
+   * Initiate Twitter OAuth connection for regular users (no podcast required)
+   */
+  static async connectUserTwitter(): Promise<{ success: boolean; error?: string; redirectUrl?: string }> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
+
+      printLog(`Starting user Twitter auth at ${API_URL}/api/user/twitter/oauth/start`);
+      const response = await fetch(`${API_URL}/api/user/twitter/oauth/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin
+        },
+        body: JSON.stringify({ token }),
+        credentials: 'include',
+        mode: 'cors'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || `Failed to start Twitter auth: ${response.status}`);
+      }
+
+      const data = await response.json();
+      printLog(`User Twitter auth response: ${JSON.stringify(data)}`);
+      
+      if (data.authUrl) {
+        // Open Twitter OAuth in new window
+        window.open(data.authUrl, '_blank');
+        return { success: true, redirectUrl: data.authUrl };
+      } else {
+        return { success: false, error: 'No auth URL received' };
+      }
+    } catch (error) {
+      printLog('User Twitter connect failed:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Connection failed' 

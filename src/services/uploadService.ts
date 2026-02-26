@@ -134,15 +134,21 @@ export const getUploadsList = async (authToken: string, page: number = 1): Promi
 
 // Get a presigned URL for file upload
 // cacheControl defaults to true for optimal caching and performance
+// useUserEndpoint: if true, uses /api/user/upload/presigned-url (no podcast required)
 export const getPresignedUrl = async (
   fileName: string, 
   fileType: string, 
   authToken: string,
-  cacheControl: boolean | string = true
+  cacheControl: boolean | string = true,
+  useUserEndpoint: boolean = false
 ): Promise<PresignedUrlResponse> => {
-  console.log('Requesting presigned URL for:', { fileName, fileType, cacheControl });
+  const endpoint = useUserEndpoint 
+    ? `${API_URL}/api/user/upload/presigned-url`
+    : `${API_URL}/api/generate-presigned-url`;
+    
+  console.log('Requesting presigned URL for:', { fileName, fileType, cacheControl, endpoint });
   
-  const response = await fetch(`${API_URL}/api/generate-presigned-url`, {
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -296,7 +302,8 @@ export const directUpload = async (
 export const processFileUpload = async (
   file: File, 
   authToken: string,
-  cacheControl: boolean | string = true
+  cacheControl: boolean | string = true,
+  useUserEndpoint: boolean = false
 ) => {
   let xhr: XMLHttpRequest | null = null;
   let aborted = false;
@@ -316,7 +323,7 @@ export const processFileUpload = async (
       progress: 10
     });
     
-    const presignedData = await getPresignedUrl(file.name, file.type, authToken, cacheControl);
+    const presignedData = await getPresignedUrl(file.name, file.type, authToken, cacheControl, useUserEndpoint);
     const { uploadUrl, key, publicUrl, cacheControl: responseCacheControl } = presignedData;
     
     // Extract a unique ID from the key (typically format: folder/id/filename)
