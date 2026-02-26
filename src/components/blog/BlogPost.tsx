@@ -303,13 +303,13 @@ const BlogPost: React.FC = () => {
       <Helmet>
         <title>{`${post.title} - Pull That Up Jamie`}</title>
         <meta name="description" content={seo.meta_description || post.summary || ''} />
-        <link rel="canonical" href={seo.canonical_url || ''} />
+        <link rel="canonical" href={seo.canonical_url || `${window.location.origin}/blog/${slug}`} />
 
         {/* OpenGraph */}
         <meta property="og:type" content="article" />
         <meta property="og:title" content={seo.og_title || post.title} />
         <meta property="og:description" content={seo.og_description || post.summary || ''} />
-        <meta property="og:url" content={seo.og_url || seo.canonical_url || ''} />
+        <meta property="og:url" content={seo.og_url || seo.canonical_url || `${window.location.origin}/blog/${slug}`} />
         {seo.og_image && <meta property="og:image" content={seo.og_image} />}
         <meta property="og:site_name" content="Pull That Up Jamie" />
 
@@ -382,7 +382,7 @@ const BlogPost: React.FC = () => {
 
             <ShareBar
               title={post.title}
-              url={seo.canonical_url || window.location.href}
+              url={seo.canonical_url || `${window.location.origin}/blog/${slug}`}
               summary={post.summary}
             />
           </header>
@@ -400,7 +400,7 @@ const BlogPost: React.FC = () => {
           {/* Share */}
           <ShareBar
             title={post.title}
-            url={seo.canonical_url || window.location.href}
+            url={seo.canonical_url || `${window.location.origin}/blog/${slug}`}
             summary={post.summary}
           />
 
