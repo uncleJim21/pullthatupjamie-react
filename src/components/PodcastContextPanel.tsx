@@ -1156,6 +1156,10 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                         key={chapter.id}
                         onClick={() => {
                           setSelectedChapter(chapter);
+                          if (isContextTrackActive) {
+                            seekTo(chapter.startTime);
+                          }
+                          onTimestampClick?.(chapter.startTime);
                         }}
                         className={`p-2 rounded cursor-pointer transition-colors ${
                           selectedChapter.id === chapter.id
@@ -1323,6 +1327,10 @@ const PodcastContextPanel: React.FC<PodcastContextPanelProps> = ({
                         if (currentChapter) {
                           setSelectedChapter(currentChapter);
                           pushView(ViewMode.CHAPTER, currentChapter);
+                          if (isContextTrackActive) {
+                            seekTo(currentChapter.startTime);
+                          }
+                          onTimestampClick?.(currentChapter.startTime);
                         }
                       }}
                     >
