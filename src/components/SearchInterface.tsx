@@ -2810,10 +2810,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     // Approximate "true available width" as mainContentWidth + contextPanelWidth
     // to avoid feedback loops when the side panel opens/closes.
     //
-    // Hysteresis band (100px) prevents flapping near the threshold without
-    // trapping users in narrow mode on normal-sized monitors.
-    const NARROW_ENTER = 950;
-    const NARROW_EXIT = 1050;
+    // NARROW_ENTER: galaxy gets ~490px minimum before switching (1150 - 660 panel).
+    // NARROW_EXIT: in narrow mode panel is unmounted so effective ≈ window width;
+    //   1300 is easily reachable on a normal monitor. 150px band prevents flapping.
+    const NARROW_ENTER = 1150;
+    const NARROW_EXIT = 1300;
 
     // Debounce layout transitions by 400ms so CSS panel-collapse animations
     // (300ms) finish before we re-evaluate. This prevents the momentary width
@@ -2879,14 +2880,22 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     };
   }, []);
 
-  // Suppress autoplay when layout mode changes due to resize.
-  // Without this, panel unmount/remount during layout transitions resets the
-  // autoplay dedup key and causes a jarring audio-restart loop.
+  // When layout mode changes due to resize:
+  // 1. Suppress autoplay — panel unmount/remount resets the dedup key and causes
+  //    a jarring audio-restart loop.
+  // 2. Clear stale contextPanelWidth — the side panel unmounts in narrow mode so
+  //    it can't report width 0 itself. Without this the ResizeObserver sees
+  //    effective = mainWidth + 660(stale) and immediately wants to go back to wide,
+  //    causing infinite oscillation.
   const prevNarrowRef = useRef(isNarrowLayout);
   useEffect(() => {
     if (prevNarrowRef.current !== isNarrowLayout) {
       prevNarrowRef.current = isNarrowLayout;
       setAutoPlayContextOnOpen(false);
+      if (isNarrowLayout) {
+        setContextPanelWidth(0);
+        contextPanelWidthRef.current = 0;
+      }
     }
   }, [isNarrowLayout]);
 
