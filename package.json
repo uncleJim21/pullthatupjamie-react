@@ -37,6 +37,7 @@
     "react-scripts": "5.0.1",
     "react-spinners": "^0.15.0",
     "readable-stream": "^4.6.0",
+    "rehype-raw": "^7.0.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.0",
     "stream-browserify": "^3.0.0",
