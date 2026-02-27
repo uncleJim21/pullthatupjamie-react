@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import rehypeRaw from 'rehype-raw';
 import { ArrowLeft, Calendar, ExternalLink, User, Share2, Link as LinkIcon, Mail, Check } from 'lucide-react';
 import {
   fetchBlogPost,
@@ -290,11 +291,35 @@ const BlogPost: React.FC = () => {
   const seo = post.seo || {} as any;
   const authorName = getAuthorName(seo);
 
-  // Custom components for ReactMarkdown — swap <img> for smart MediaEmbed
   const markdownComponents = {
     img: ({ node, src, alt, ...props }: any) => (
       <MediaEmbed src={src} alt={alt} />
     ),
+    iframe: ({ node, width, height, style, ...props }: any) => {
+      let src = props.src || '';
+      if (src.includes('sharedSession=') && !src.includes('embed=true')) {
+        src += (src.includes('?') ? '&' : '?') + 'embed=true';
+      }
+      return (
+        <div style={{
+          aspectRatio: '1 / 1',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,0.1)',
+          backgroundColor: '#000000',
+          boxShadow: '0 4px 32px rgba(0,0,0,0.5)',
+          position: 'relative',
+          margin: '1.5em 0 0.5em',
+        }}>
+          <iframe
+            src={src}
+            title="Jamie — Explore Ideas"
+            allow="autoplay"
+            style={{ width: '100%', height: '100%', border: 'none' }}
+          />
+        </div>
+      );
+    },
   };
 
   return (
@@ -391,6 +416,7 @@ const BlogPost: React.FC = () => {
           <article style={styles.articleBody} className="blog-prose">
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkBreaks]}
+              rehypePlugins={[rehypeRaw]}
               components={markdownComponents}
             >
               {post.content_md}
@@ -502,7 +528,6 @@ const BlogPost: React.FC = () => {
           color: #fff;
           font-weight: 600;
         }
-
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
