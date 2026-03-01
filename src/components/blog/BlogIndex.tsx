@@ -452,7 +452,7 @@ const styles: Record<string, React.CSSProperties> = {
   postImage: {
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
+    objectFit: 'contain',
     display: 'block',
   },
   postTitle: {
