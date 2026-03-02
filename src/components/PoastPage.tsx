@@ -9,6 +9,7 @@ import { userTwitterService } from '../services/userTwitterService.ts';
 import { API_URL } from '../constants/constants.ts';
 import { relayPool, buildRelayHintTags, publishToRelays, generatePrimalUrl } from '../utils/nostrUtils.ts';
 import { USER_TIMEZONE, USER_TZ_ABBREV, toLocalDatetimeStr, localDatetimeToISO } from '../utils/time.ts';
+import { useUserSettings } from '../hooks/useUserSettings.ts';
 import SignInModal from './SignInModal.tsx';
 import '../types/nostr.ts';
 
@@ -65,6 +66,9 @@ const PoastPage: React.FC = () => {
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [isSignedIn, setIsSignedIn] = useState(!!localStorage.getItem('auth_token'));
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(!localStorage.getItem('auth_token'));
+  const { settings, updateSetting } = useUserSettings();
+  const charCountOverride = settings.charCountOverride === true;
+  const [showCharOverrideModal, setShowCharOverrideModal] = useState(false);
   const composeRef = React.useRef<HTMLDivElement>(null);
 
   const adjustScheduleTime = (minutes: number) => {
@@ -182,7 +186,7 @@ const PoastPage: React.FC = () => {
 
   const charCount = text.length;
   const isTwitterSelected = platforms.includes('twitter');
-  const isOverLimit = isTwitterSelected && charCount > 280;
+  const isOverLimit = isTwitterSelected && !charCountOverride && charCount > 280;
   const isDisabled = (!text.trim() && !mediaUrl) || isOverLimit || platforms.length === 0;
 
   const getCharCountStyle = () => {
@@ -555,11 +559,36 @@ const PoastPage: React.FC = () => {
                   }}
                 />
                 {isTwitterSelected && (
-                  <div
-                    className="absolute bottom-3 right-3 text-sm font-mono font-medium"
-                    style={getCharCountStyle()}
-                  >
-                    {charCount}/280
+                  <div className="absolute bottom-3 right-3 flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <span className={`text-xs ${charCountOverride ? 'text-white/60' : 'text-[#82828c]/50'} transition-colors`}>
+                        Override
+                      </span>
+                      <div
+                        className={`relative w-7 h-4 rounded-full transition-colors duration-200 ${
+                          charCountOverride ? 'bg-white/30' : 'bg-white/10'
+                        }`}
+                        onClick={() => {
+                          if (charCountOverride) {
+                            updateSetting('charCountOverride', false);
+                          } else {
+                            setShowCharOverrideModal(true);
+                          }
+                        }}
+                      >
+                        <div
+                          className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200 ${
+                            charCountOverride ? 'translate-x-3' : ''
+                          }`}
+                        />
+                      </div>
+                    </label>
+                    <div
+                      className="text-sm font-mono font-medium"
+                      style={getCharCountStyle()}
+                    >
+                      {charCount}/{charCountOverride ? <span className="line-through opacity-50">280</span> : '280'}
+                    </div>
                   </div>
                 )}
               </div>
@@ -598,34 +627,47 @@ const PoastPage: React.FC = () => {
                   const isVideo = /\.(mp4|webm|mov)$/i.test(mediaUrl);
                   return (
                     <div className="relative inline-block rounded-xl border border-white/10 overflow-hidden">
-                      {isVideo ? (
-                        <div className="relative max-h-32 w-48">
-                          <video
-                            src={mediaUrl}
-                            className="max-h-32 w-full object-contain rounded-t-xl bg-black"
-                            muted
-                            preload="metadata"
-                            onLoadedData={(e) => { (e.target as HTMLVideoElement).currentTime = 0.5; }}
-                          />
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
-                              <Play className="w-4 h-4 text-white ml-0.5" />
+                      <a
+                        href={mediaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block cursor-pointer hover:opacity-80 transition-opacity"
+                        title="Open media in new tab"
+                      >
+                        {isVideo ? (
+                          <div className="relative max-h-32 w-48">
+                            <video
+                              src={mediaUrl}
+                              className="max-h-32 w-full object-contain rounded-t-xl bg-black"
+                              muted
+                              preload="metadata"
+                              onLoadedData={(e) => { (e.target as HTMLVideoElement).currentTime = 0.5; }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
+                                <Play className="w-4 h-4 text-white ml-0.5" />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ) : (
-                        <img
-                          src={mediaUrl}
-                          alt="Upload preview"
-                          className="max-h-32 w-auto object-contain"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      )}
+                        ) : (
+                          <img
+                            src={mediaUrl}
+                            alt="Upload preview"
+                            className="max-h-32 w-auto object-contain"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        )}
+                      </a>
                       <div className="flex items-center gap-2 px-3 py-2 bg-[#161617]">
                         <Check className="w-4 h-4 text-[#10b981]" />
-                        <span className="text-xs text-[#82828c] font-mono truncate max-w-[200px]">
+                        <a
+                          href={mediaUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-[#82828c] font-mono truncate max-w-[200px] hover:text-white transition-colors"
+                        >
                           {mediaUrl.split('/').pop()?.split('?')[0] || 'media attached'}
-                        </span>
+                        </a>
                       </div>
                       <button
                         onClick={() => setMediaUrl('')}
@@ -1158,6 +1200,34 @@ const PoastPage: React.FC = () => {
         onSignInSuccess={handleSignInSuccess}
         onSignUpSuccess={handleSignInSuccess}
       />
+
+      {showCharOverrideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#161617] border border-white/10 rounded-2xl p-6 max-w-sm mx-4 space-y-4">
+            <h3 className="text-white text-lg font-semibold">Override character limit?</h3>
+            <p className="text-[#c4c4c4] text-sm leading-relaxed">
+              Posts over 280 characters require a <strong className="text-white">Twitter Premium</strong> subscription. If you don't have one, longer posts will fail to publish.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowCharOverrideModal(false)}
+                className="flex-1 px-4 py-2 rounded-xl border border-white/10 text-[#82828c] hover:text-white hover:border-white/30 transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  updateSetting('charCountOverride', true);
+                  setShowCharOverrideModal(false);
+                }}
+                className="flex-1 px-4 py-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-all duration-200"
+              >
+                I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
