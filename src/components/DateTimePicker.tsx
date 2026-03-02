@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Calendar, Clock, ChevronDown } from 'lucide-react';
 import CustomCalendar from './CustomCalendar.tsx';
 import { printLog } from '../constants/constants.ts';
-import { formatShortDate } from '../utils/time.ts';
+import { formatShortDate, USER_TIMEZONE } from '../utils/time.ts';
 
 interface DateTimePickerProps {
   value?: Date;
@@ -106,13 +106,6 @@ const findNextAvailableTimeSlot = (date: string): string | null => {
   return result;
 };
 
-// Timezone utilities
-const getUserTimezone = (): string => {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
-};
-
-const SERVER_TIMEZONE = 'America/Chicago';
-
 // Simple helper to check if a date/time is in the past (with 1 minute buffer)
 const isDateTimeInPast = (date: string, time: string): boolean => {
   if (!date || !time) return false;
@@ -147,7 +140,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   const [editingValue, setEditingValue] = useState<string>('');
   const [showCalendar, setShowCalendar] = useState(false);
   const [isCalendarClosing, setIsCalendarClosing] = useState(false);
-  const [userTimezone] = useState(getUserTimezone());
+  const userTimezone = USER_TIMEZONE;
   
   const isInitializingRef = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);

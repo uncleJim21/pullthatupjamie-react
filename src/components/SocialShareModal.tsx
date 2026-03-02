@@ -19,7 +19,7 @@ import { Platform } from './MentionsLookupView.tsx';
 import { useStreamingMentionSearch } from '../hooks/useStreamingMentionSearch.ts';
 import ScheduledPostService from '../services/scheduledPostService.ts';
 import { CreateScheduledPostRequest, ScheduledPost } from '../types/scheduledPost.ts';
-import { formatScheduledDate } from '../utils/time.ts';
+import { formatScheduledDate, USER_TIMEZONE } from '../utils/time.ts';
 import ScheduledPostSlots from './ScheduledPostSlots.tsx';
 import { mentionService } from '../services/mentionService.ts';
 import { useUserSettings } from '../hooks/useUserSettings.ts';
@@ -1734,8 +1734,8 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
         let updateRequest: any = {
           text: finalContent,
           mediaUrl: mediaUrl,
-          scheduledFor: convertToChicagoTime(finalScheduledDate).toISOString(),
-          timezone: "America/Chicago"
+          scheduledFor: finalScheduledDate.toISOString(),
+          timezone: USER_TIMEZONE
         };
 
         // If this is a Nostr post, we need to re-sign the event with new content
@@ -1810,9 +1810,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             const nostrRequest: CreateScheduledPostRequest = {
               text: fullContentWithMedia, // Send the complete content including media URL
               mediaUrl, // Still send mediaUrl for backend reference
-              scheduledFor: convertToChicagoTime(finalScheduledDate).toISOString(),
+              scheduledFor: finalScheduledDate.toISOString(),
               platforms: ["nostr"],
-              timezone: "America/Chicago",
+              timezone: USER_TIMEZONE,
               platformData: {
                 nostrEventId: signedEvent.id,
                 nostrSignature: signedEvent.sig,
@@ -1848,9 +1848,9 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
             const twitterRequest: CreateScheduledPostRequest = {
               text: twitterFinalContent,
               mediaUrl,
-              scheduledFor: convertToChicagoTime(finalScheduledDate).toISOString(),
+              scheduledFor: finalScheduledDate.toISOString(),
               platforms: ["twitter"],
-              timezone: "America/Chicago"
+              timezone: USER_TIMEZONE
             };
             const twitterResult = await ScheduledPostService.createScheduledPost(twitterRequest);
             printLog(`Successfully scheduled ${twitterResult.length} Twitter post(s)`);
@@ -3013,12 +3013,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({
     setPendingScheduledDate(targetDate);
   };
 
-  // Helper function to convert user's local time to Chicago time for backend
-  const convertToChicagoTime = (localDate: Date): Date => {
-    // Simply return the date as-is since the backend expects UTC timestamps
-    // The timezone field ("America/Chicago") tells the backend how to interpret it
-    return localDate;
-  };
 
   // Helper function to randomize post time using white noise
   const randomizeTime = (date: Date, shouldRandomize: boolean): Date => {

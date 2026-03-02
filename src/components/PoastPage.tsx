@@ -8,6 +8,7 @@ import AuthService from '../services/authService.ts';
 import { userTwitterService } from '../services/userTwitterService.ts';
 import { API_URL } from '../constants/constants.ts';
 import { relayPool, buildRelayHintTags, publishToRelays, generatePrimalUrl } from '../utils/nostrUtils.ts';
+import { USER_TIMEZONE, USER_TZ_ABBREV, toLocalDatetimeStr, localDatetimeToISO } from '../utils/time.ts';
 import SignInModal from './SignInModal.tsx';
 import '../types/nostr.ts';
 
@@ -65,14 +66,6 @@ const PoastPage: React.FC = () => {
   const [isSignedIn, setIsSignedIn] = useState(!!localStorage.getItem('auth_token'));
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(!localStorage.getItem('auth_token'));
   const composeRef = React.useRef<HTMLDivElement>(null);
-
-  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const tzAbbrev = new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop() || '';
-
-  const toLocalDatetimeStr = (d: Date): string => {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  };
 
   const adjustScheduleTime = (minutes: number) => {
     const base = scheduledFor ? new Date(scheduledFor) : new Date();
@@ -253,7 +246,7 @@ const PoastPage: React.FC = () => {
     setMediaUrl(post.content?.mediaUrl || '');
     setPlatforms([post.platform]);
     setIsScheduled(true);
-    setScheduledFor(new Date(post.scheduledFor).toISOString().slice(0, 16));
+    setScheduledFor(toLocalDatetimeStr(new Date(post.scheduledFor)));
     setEditingPostId(post._id);
     setError('');
     composeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -393,7 +386,7 @@ const PoastPage: React.FC = () => {
     try {
       const token = localStorage.getItem('auth_token');
       const isUpdate = !!editingPostId;
-      const scheduledISO = new Date(scheduledFor).toISOString();
+      const scheduledISO = localDatetimeToISO(scheduledFor);
       const nostrEnabled = platforms.includes('nostr') && nostrConnected;
       const twitterEnabled = platforms.includes('twitter') && twitterConnected;
 
@@ -443,7 +436,7 @@ const PoastPage: React.FC = () => {
           mediaUrl: mediaUrl || undefined,
           platforms: ['nostr'],
           scheduledFor: scheduledISO,
-          timezone: userTimezone,
+          timezone: USER_TIMEZONE,
           platformData: {
             nostrEventId: signedEvent.id,
             nostrSignature: signedEvent.sig,
@@ -462,7 +455,7 @@ const PoastPage: React.FC = () => {
           mediaUrl: mediaUrl || undefined,
           platforms: ['twitter'],
           scheduledFor: scheduledISO,
-          timezone: userTimezone
+          timezone: USER_TIMEZONE
         }, isUpdate ? editingPostId! : undefined);
       }
 
@@ -785,7 +778,7 @@ const PoastPage: React.FC = () => {
                           ? new Date(scheduledFor).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
                           : 'No date selected'}
                       </span>
-                      <span>{tzAbbrev} ({userTimezone})</span>
+                      <span>{USER_TZ_ABBREV} ({USER_TIMEZONE})</span>
                     </div>
 
                     {/* Quick adjust buttons — 2 rows (+ top, − bottom) */}
