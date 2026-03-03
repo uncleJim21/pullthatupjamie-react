@@ -1,4 +1,6 @@
 import { API_URL } from '../constants/constants.ts';
+import { parseQuotaExceededResponse } from '../types/errors.ts';
+import { QuotaExceededError } from '../types/errors.ts';
 
 const TWITTER_API_BASE = `${API_URL}/api/user/twitter`;
 
@@ -34,6 +36,11 @@ export const userTwitterService = {
         body: JSON.stringify({ text, mediaUrl })
       });
 
+      if (response.status === 429) {
+        const data = await parseQuotaExceededResponse(response, 'twitter-post');
+        throw new QuotaExceededError(data);
+      }
+
       if (!response.ok) {
         const errorData = await response.json();
         return {
@@ -46,6 +53,7 @@ export const userTwitterService = {
 
       return await response.json();
     } catch (error) {
+      if (error instanceof QuotaExceededError) throw error;
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Network error'

@@ -11,6 +11,8 @@ import { relayPool, buildRelayHintTags, publishToRelays, generatePrimalUrl } fro
 import { USER_TIMEZONE, USER_TZ_ABBREV, toLocalDatetimeStr, localDatetimeToISO } from '../utils/time.ts';
 import { useUserSettings } from '../hooks/useUserSettings.ts';
 import SignInModal from './SignInModal.tsx';
+import { QuotaExceededModal, QuotaExceededData } from './QuotaExceededModal.tsx';
+import { QuotaExceededError, parseQuotaExceededResponse } from '../types/errors.ts';
 import '../types/nostr.ts';
 
 interface ScheduledPost {
@@ -69,6 +71,7 @@ const PoastPage: React.FC = () => {
   const { settings, updateSetting } = useUserSettings();
   const charCountOverride = settings.charCountOverride === true;
   const [showCharOverrideModal, setShowCharOverrideModal] = useState(false);
+  const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
   const composeRef = React.useRef<HTMLDivElement>(null);
 
   const adjustScheduleTime = (minutes: number) => {
@@ -296,6 +299,7 @@ const PoastPage: React.FC = () => {
       setError(response.message || response.error || 'Failed to post to Twitter');
       return false;
     } catch (err: any) {
+      if (err instanceof QuotaExceededError) throw err;
       setError(err.message || 'Failed to post to Twitter');
       return false;
     }
@@ -355,6 +359,16 @@ const PoastPage: React.FC = () => {
     
     try {
       const results = await Promise.allSettled(promises);
+
+      const quotaRejection = results.find(
+        r => r.status === 'rejected' && r.reason instanceof QuotaExceededError
+      ) as PromiseRejectedResult | undefined;
+      if (quotaRejection) {
+        setQuotaExceededData((quotaRejection.reason as QuotaExceededError).data);
+        setIsLoading(false);
+        return;
+      }
+
       const anySuccess = results.some(r => r.status === 'fulfilled' && r.value === true);
       
       if (anySuccess) {
@@ -410,6 +424,10 @@ const PoastPage: React.FC = () => {
           localStorage.removeItem('auth_token');
           navigate('/app');
           throw new Error('Authentication expired');
+        }
+        if (response.status === 429) {
+          const data = await parseQuotaExceededResponse(response, 'twitter-post');
+          throw new QuotaExceededError(data);
         }
         if (!response.ok) {
           const err = await response.json();
@@ -473,6 +491,11 @@ const PoastPage: React.FC = () => {
       setShowSuccess(true);
       await fetchPosts();
     } catch (err: any) {
+      if (err instanceof QuotaExceededError) {
+        setQuotaExceededData(err.data);
+        setIsLoading(false);
+        return;
+      }
       if (err.message?.includes('401') || err.message === 'Authentication expired') {
         localStorage.removeItem('auth_token');
         navigate('/app');
@@ -509,7 +532,7 @@ const PoastPage: React.FC = () => {
       <section className="pt-8 lg:pt-12 pb-6">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <h1
-            className="font-display text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6"
+            className="font-sans text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6"
             style={{
               textShadow: '0 0 40px rgba(255, 255, 255, 0.3), 0 0 80px rgba(255, 255, 255, 0.15)'
             }}
@@ -1199,6 +1222,22 @@ const PoastPage: React.FC = () => {
         onClose={() => setIsSignInModalOpen(false)}
         onSignInSuccess={handleSignInSuccess}
         onSignUpSuccess={handleSignInSuccess}
+      />
+
+      <QuotaExceededModal
+        isOpen={!!quotaExceededData}
+        onClose={() => setQuotaExceededData(null)}
+        data={quotaExceededData || { tier: 'registered', used: 0, max: 0 }}
+        onUpgrade={() => {
+          setQuotaExceededData(null);
+          navigate('/upgrade');
+        }}
+        onUpgradePro={() => {
+          setQuotaExceededData(null);
+          navigate('/upgrade');
+        }}
+        customTitle="Twitter post limit reached"
+        customIcon={<Twitter className="w-6 h-6 text-gray-500" />}
       />
 
       {showCharOverrideModal && (

@@ -39,6 +39,7 @@ export async function parseQuotaExceededResponse(
       resetDate: errorData.resetDate,
       daysUntilReset: errorData.daysUntilReset,
       entitlementType: entitlementType || errorData.entitlementType,
+      message: errorData.message,
     };
   } catch {
     // If we can't parse the response, return minimal data

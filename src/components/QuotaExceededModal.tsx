@@ -17,6 +17,7 @@ export interface QuotaExceededData {
   resetDate?: string;
   daysUntilReset?: number;
   entitlementType?: string;
+  message?: string;
 }
 
 interface QuotaExceededModalProps {
@@ -28,6 +29,9 @@ interface QuotaExceededModalProps {
   onUpgradePro?: () => void;  // For subscriber -> admin (Jamie Pro)
   onPreview?: () => void;     // Optional: preview what upgrade unlocks
   icon?: 'orbit' | 'radio-tower'; // Icon style: orbit for search, radio-tower for podcast processing
+  customTitle?: string;
+  customMessage?: string;
+  customIcon?: React.ReactNode;
 }
 
 /**
@@ -77,6 +81,8 @@ function getAccomplishmentText(type?: string, used?: number): string {
       return `You uncovered insights from ${count} analysis session${count !== 1 ? 's' : ''}`;
     case 'submit-on-demand-run':
       return `You added ${count} podcast${count !== 1 ? 's' : ''} to your library`;
+    case 'twitter-post':
+      return `You've posted ${count} tweet${count !== 1 ? 's' : ''} this cycle`;
     default:
       return `You've been exploring with Jamie`;
   }
@@ -101,7 +107,19 @@ function getMomentumTitle(tier: UserTier): string {
 /**
  * Get continuation CTA text
  */
-function getContinuationCTA(tier: UserTier): string {
+function getContinuationCTA(tier: UserTier, entitlementType?: string): string {
+  if (entitlementType === 'twitter-post') {
+    switch (tier) {
+      case 'anonymous':
+        return "Sign up to post more";
+      case 'registered':
+        return "Upgrade for more posts";
+      case 'subscriber':
+        return "Go unlimited with Jamie Pro";
+      default:
+        return "Continue";
+    }
+  }
   switch (tier) {
     case 'anonymous':
       return "Continue with a free account";
@@ -122,7 +140,10 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
   onUpgrade,
   onUpgradePro,
   onPreview,
-  icon = 'orbit', // Default to orbit for general use
+  icon = 'orbit',
+  customTitle,
+  customMessage,
+  customIcon,
 }) => {
   // Track if we've already tracked the "shown" event for this open
   const hasTrackedShown = useRef(false);
@@ -167,11 +188,11 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
 
   if (!isOpen) return null;
 
-  const { tier, used, max, resetDate, daysUntilReset, entitlementType } = data;
+  const { tier, used, max, resetDate, daysUntilReset, entitlementType, message } = data;
   const resetTime = formatResetTime(resetDate, daysUntilReset);
-  const accomplishment = getAccomplishmentText(entitlementType, used);
-  const title = getMomentumTitle(tier);
-  const ctaText = getContinuationCTA(tier);
+  const accomplishment = customMessage || message || getAccomplishmentText(entitlementType, used);
+  const title = customTitle || getMomentumTitle(tier);
+  const ctaText = getContinuationCTA(tier, entitlementType);
   
   // Render the appropriate icon
   const IconComponent = icon === 'radio-tower' ? RadioTower : Orbit;
@@ -225,7 +246,7 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
           {/* Icon - contextual based on entitlement type */}
           <div className="flex justify-center mb-6">
             <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
-              <IconComponent className="w-6 h-6 text-white/80" />
+              {customIcon || <IconComponent className="w-6 h-6 text-white/80" />}
             </div>
           </div>
 
