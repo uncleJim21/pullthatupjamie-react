@@ -43,11 +43,14 @@ export const userTwitterService = {
 
       if (!response.ok) {
         const errorData = await response.json();
+        const is401 = response.status === 401
+          || errorData.error === 'TWITTER_AUTH_EXPIRED'
+          || errorData.message?.includes('401');
         return {
           success: false,
           error: errorData.error || 'Failed to post tweet',
           message: errorData.message,
-          requiresReauth: errorData.error === 'TWITTER_AUTH_EXPIRED'
+          requiresReauth: is401
         };
       }
 

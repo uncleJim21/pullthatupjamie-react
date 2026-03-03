@@ -290,7 +290,8 @@ const PoastPage: React.FC = () => {
         return true;
       }
       
-      if (response.error === 'TWITTER_AUTH_EXPIRED' || response.requiresReauth) {
+      if (response.error === 'TWITTER_AUTH_EXPIRED' || response.requiresReauth
+          || response.message?.includes('401')) {
         setTwitterConnected(false);
         setError('Twitter authentication expired. Please reconnect.');
         return false;
