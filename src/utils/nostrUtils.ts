@@ -146,3 +146,91 @@ const DEFAULT_RELAYS_RAW = [
 export const relayPool = Array.from(
   new Set(DEFAULT_RELAYS_RAW.map(normalizeRelayUrl).filter(Boolean) as string[])
 );
+
+export interface RelayPublishResult {
+  success: boolean;
+  successCount: number;
+  totalRelays: number;
+  eventId: string;
+  primalUrl: string;
+}
+
+/**
+ * Build relay-hint "r" tags for a Nostr event (include before signing).
+ */
+export const buildRelayHintTags = (relays: string[] = relayPool, limit: number = 5): string[][] =>
+  relays.slice(0, Math.max(0, limit)).map((r) => ["r", r]);
+
+/**
+ * Publish a signed Nostr event to the relay pool via raw WebSockets.
+ *
+ * Resolves as soon as `minSuccesses` relays confirm with OK, or after all
+ * relays have been attempted. No React state — safe to call from anywhere.
+ */
+export const publishToRelays = (
+  signedEvent: any,
+  relays: string[] = relayPool,
+  { minSuccesses = 3, perRelayTimeoutMs = 10_000 } = {}
+): Promise<RelayPublishResult> => {
+  return new Promise((resolve) => {
+    let successCount = 0;
+    let settled = 0;
+    let resolved = false;
+    const total = relays.length;
+
+    const finish = (early: boolean) => {
+      if (resolved) return;
+      resolved = true;
+      resolve({
+        success: early || successCount >= minSuccesses,
+        successCount,
+        totalRelays: total,
+        eventId: signedEvent.id,
+        primalUrl: generatePrimalUrl(signedEvent.id),
+      });
+    };
+
+    relays.forEach((relay) => {
+      let done = false;
+      let ws: WebSocket | null = null;
+
+      const cleanup = () => {
+        if (done) return;
+        done = true;
+        settled++;
+        try { ws?.close(); } catch { /* ignore */ }
+        if (settled >= total) finish(false);
+      };
+
+      const timeout = setTimeout(cleanup, perRelayTimeoutMs);
+
+      try {
+        ws = new WebSocket(relay);
+
+        ws.onopen = () => {
+          ws!.send(JSON.stringify(["EVENT", signedEvent]));
+        };
+
+        ws.onmessage = (msg: MessageEvent) => {
+          try {
+            const data = JSON.parse(msg.data);
+            if (Array.isArray(data) && data[0] === "OK" && data[1] === signedEvent.id) {
+              clearTimeout(timeout);
+              if (data[2] === true) {
+                successCount++;
+                if (!resolved && successCount >= minSuccesses) finish(true);
+              }
+              cleanup();
+            }
+          } catch { /* ignore parse errors */ }
+        };
+
+        ws.onerror = () => { clearTimeout(timeout); cleanup(); };
+        ws.onclose = () => { clearTimeout(timeout); cleanup(); };
+      } catch {
+        clearTimeout(timeout);
+        cleanup();
+      }
+    });
+  });
+};

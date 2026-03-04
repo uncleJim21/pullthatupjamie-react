@@ -387,6 +387,42 @@ class AuthService {
         }
     }
 
+    static async startUserTwitterAuth(): Promise<string> {
+        try {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                throw new Error('No auth token found');
+            }
+
+            printLog(`Starting user Twitter auth at ${API_URL}/api/user/twitter/oauth/start`);
+            const response = await fetch(`${API_URL}/api/user/twitter/oauth/start`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Origin': window.location.origin
+                },
+                body: JSON.stringify({ token }),
+                credentials: 'include',
+                mode: 'cors'
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || `Failed to start Twitter auth: ${response.status}`);
+            }
+
+            const data = await response.json();
+            printLog(`User Twitter auth response: ${JSON.stringify(data)}`);
+            return data.authUrl;
+        } catch (error) {
+            printLog(`User Twitter auth error: ${error}`);
+            if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                throw new Error(`Could not connect to server at ${API_URL}. Please ensure the server is running and CORS is enabled.`);
+            }
+            throw error;
+        }
+    }
+
     /**
      * Initiate Twitter OAuth by redirecting to the backend's auth-initiate endpoint
      * This kicks off the OAuth flow - user will be redirected to Twitter

@@ -8,6 +8,7 @@ import {
 } from '../types/scheduledPost';
 import { API_URL, printLog } from '../constants/constants.ts';
 import { generatePrimalUrl, relayPool } from '../utils/nostrUtils.ts';
+import { USER_TIMEZONE } from '../utils/time.ts';
 
 export class ScheduledPostService {
   private static getAuthHeaders(): HeadersInit {
@@ -278,7 +279,7 @@ export class ScheduledPostService {
 
       if (newScheduledDate) {
         requestBody.newScheduledDate = newScheduledDate.toISOString();
-        requestBody.timezone = "America/Chicago";
+        requestBody.timezone = USER_TIMEZONE;
       }
 
       printLog(`Making PUT request to ${API_URL}/api/social/posts/${postId}`);
@@ -346,7 +347,7 @@ export class ScheduledPostService {
             },
             ...(newScheduledDate && {
               newScheduledDate: newScheduledDate.toISOString(),
-              timezone: "America/Chicago"
+              timezone: USER_TIMEZONE
             })
           };
         })

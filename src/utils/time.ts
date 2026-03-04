@@ -1,5 +1,24 @@
 // utils/time.ts
 
+// User's IANA timezone (e.g. "America/Chicago", "America/New_York")
+export const USER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// Short abbreviation (e.g. "CST", "EST")
+export const USER_TZ_ABBREV = new Date()
+  .toLocaleTimeString('en-US', { timeZoneName: 'short' })
+  .split(' ').pop() || '';
+
+// Formats a Date for <input type="datetime-local"> — uses LOCAL time components.
+// NEVER use toISOString().slice() for this purpose (that gives UTC digits).
+export const toLocalDatetimeStr = (d: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+// Converts a local datetime-local string to a UTC ISO string for API submission
+export const localDatetimeToISO = (localStr: string): string =>
+  new Date(localStr).toISOString();
+
 export const formatTime = (seconds: number): string => {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60);
