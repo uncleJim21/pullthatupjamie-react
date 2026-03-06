@@ -707,12 +707,12 @@ const PoastPage: React.FC = () => {
               {/* Platform Chips */}
               <div className="space-y-3">
                 <div className="text-sm text-[#82828c] font-medium">Select Platforms</div>
-                <div className="flex gap-3">
+                <div className="flex gap-2 sm:gap-3 flex-wrap">
                   {/* Twitter Chip */}
                   <button
                     onClick={() => togglePlatform('twitter')}
                     disabled={!twitterConnected}
-                    className={`relative px-6 py-3 rounded-xl border-2 flex items-center gap-2 transition-all duration-300 ${
+                    className={`relative px-4 sm:px-6 py-3 rounded-xl border-2 flex items-center gap-2 min-w-0 flex-shrink transition-all duration-300 ${
                       platforms.includes('twitter')
                         ? 'bg-[#1d9bf0]/10 border-[#1d9bf0]'
                         : 'bg-[#1a1a1b] border-white/10 opacity-50'
@@ -720,7 +720,7 @@ const PoastPage: React.FC = () => {
                     style={platforms.includes('twitter') ? { boxShadow: '0 0 30px rgba(29, 155, 240, 0.3)' } : {}}
                   >
                     <Twitter className="w-5 h-5" style={{ color: '#1d9bf0' }} />
-                    <span className="text-white font-medium">
+                    <span className="text-white font-medium text-sm sm:text-base">
                       Twitter {!twitterConnected && '(not connected)'}
                     </span>
                     {platforms.includes('twitter') && (
@@ -739,7 +739,7 @@ const PoastPage: React.FC = () => {
                   <button
                     onClick={() => togglePlatform('nostr')}
                     disabled={!nostrConnected}
-                    className={`relative px-6 py-3 rounded-xl border-2 flex items-center gap-2 transition-all duration-300 ${
+                    className={`relative px-4 sm:px-6 py-3 rounded-xl border-2 flex items-center gap-2 min-w-0 flex-shrink transition-all duration-300 ${
                       platforms.includes('nostr')
                         ? 'bg-[#8b5cf6]/10 border-[#8b5cf6]'
                         : 'bg-[#1a1a1b] border-white/10 opacity-50'
@@ -754,7 +754,7 @@ const PoastPage: React.FC = () => {
                         WebkitMask: 'url(/nostr-logo-square.png) center/contain no-repeat'
                       }}
                     />
-                    <span className="text-white font-medium">
+                    <span className="text-white font-medium text-sm sm:text-base">
                       Nostr {!nostrConnected && '(not connected)'}
                     </span>
                     {platforms.includes('nostr') && (
