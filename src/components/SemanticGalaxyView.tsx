@@ -1,14 +1,15 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS, printLog } from '../constants/constants.ts';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
-import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Layers, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Layers, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle, Loader, Crosshair } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
 import { saveResearchSession, clearLocalSession, ResearchSessionItem, MAX_RESEARCH_ITEMS } from '../services/researchSessionService.ts';
+import HierarchyCache from '../services/hierarchyCache.ts';
 import { shareCurrentSession, ShareNode } from '../services/researchSessionShareService.ts';
 import ResearchAnalysisPanel from './ResearchAnalysisModal.tsx';
 import ShareSessionModal from './ShareSessionModal.tsx';
@@ -34,6 +35,18 @@ const BOBBING_CONFIG = {
 // ============================================================================
 const SELECTION_CONFIG = {
   NON_SELECTED_DIM_FACTOR: 0.6, // How much to dim non-selected stars when a selection exists (0.0 = invisible, 1.0 = no dimming)
+};
+
+// ============================================================================
+// SPOTLIGHT MODE CONFIGURATION
+// ============================================================================
+const SPOTLIGHT_CONFIG = {
+  BEHIND_OFFSET: 8,             // How far behind the star the camera sits (away from cluster center)
+  LERP_SPEED: 0.06,             // Camera animation speed per frame (0-1)
+  ENHANCED_DIM: 0.4,            // Gentle dim — neighbors should feel inviting to click
+  NEAR_SELECTED_BRIGHT: 0.75,   // Nearby stars stay clearly visible
+  CARD_OFFSET_X: 40,            // Pixels to the right of the projected star position
+  ISO_ELEVATION: 3,             // Vertical lift above the star for a mild top-down angle
 };
 
 // ============================================================================
@@ -391,6 +404,10 @@ interface SemanticGalaxyViewProps {
   disableInteractions?: boolean;
   // Compact height mode: hide non-essential UI (reset button, title) for very short viewports
   isCompactHeight?: boolean;
+  // Narrow/mobile layout — suppresses spotlight zoom+card, shows keyword bar instead
+  isNarrowLayout?: boolean;
+  // Callback to trigger a full search for a keyword (Tier 2 of keyword navigation)
+  onKeywordSearch?: (keyword: string) => void;
 }
 
 // Transform color to compensate for additive blending brightening
@@ -433,10 +450,13 @@ interface StarProps {
   isSelected: boolean;
   isNearSelected: boolean;
   hasSelection: boolean;
+  isSpotlightActive: boolean;
+  isKeywordMatch: boolean;
+  hasKeywordFilter: boolean;
   onClick: () => void;
   onRightClick: (event: any) => void;
   onHover: (result: QuoteResult | null) => void;
-  overrideColor?: string; // Override color for brand mode
+  overrideColor?: string;
 }
 
 // Component to draw lines connecting results from the same episode, chapter, or feed
@@ -759,7 +779,7 @@ const HierarchyConnections: React.FC<HierarchyConnectionsProps> = ({ results, hi
   );
 };
 
-const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSelection, onClick, onRightClick, onHover, overrideColor }) => {
+const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSelection, isSpotlightActive, isKeywordMatch, hasKeywordFilter, onClick, onRightClick, onHover, overrideColor }) => {
   const groupRef = useRef<THREE.Group>(null);
   const mainSpikeRefs = useRef<(THREE.Mesh | null)[]>([]);
   const [hovered, setHovered] = useState(false);
@@ -790,7 +810,7 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSele
     
     groupRef.current.position.setY(result.coordinates3d.y * 10 + bobOffset);
     
-    const baseScale = isSelected ? 1.8 : hovered ? 1.4 : 1;
+    const baseScale = isSelected ? 1.8 : hovered ? 1.4 : (hasKeywordFilter && isKeywordMatch) ? 1.5 : 1;
     groupRef.current.scale.setScalar(baseScale);
     
     // Animate main spikes - each pulses independently
@@ -814,10 +834,15 @@ const Star: React.FC<StarProps> = ({ result, isSelected, isNearSelected, hasSele
   // Use a moderate darkening factor (0.65) to compensate for both the intensity multiplier and layer stacking
   const color = transformColorForBlending(baseColor, 0.65);
 
-  // Make the selected star brighter and dim all others when a selection exists.
   const baseIntensity =
-    isSelected ? 1.8 : hovered ? 1.3 : isNearSelected ? 0.8 : 1;
-  const dimFactor = hasSelection && !isSelected ? SELECTION_CONFIG.NON_SELECTED_DIM_FACTOR : 1;
+    isSelected ? 1.8 : hovered ? 1.3 : isKeywordMatch ? 1.6 : isNearSelected ? 0.8 : 1;
+  const dimFactor = hasKeywordFilter
+    ? (isKeywordMatch ? 1 : 0.15)
+    : hasSelection && !isSelected
+      ? (isSpotlightActive
+          ? (isNearSelected ? SPOTLIGHT_CONFIG.NEAR_SELECTED_BRIGHT : SPOTLIGHT_CONFIG.ENHANCED_DIM)
+          : SELECTION_CONFIG.NON_SELECTED_DIM_FACTOR)
+      : 1;
   const intensityMultiplier = baseIntensity * dimFactor;
 
   return (
@@ -1081,6 +1106,206 @@ const AnimatedCamera: React.FC<{
   });
 
   return null;
+};
+
+// Spotlight camera animator — smoothly zooms the camera to a selected star
+const SpotlightAnimator: React.FC<{
+  targetPosition: THREE.Vector3 | null;
+  isActive: boolean;
+  cameraRef: React.RefObject<THREE.PerspectiveCamera>;
+  controlsRef: React.RefObject<any>;
+  onReachedTarget: () => void;
+}> = ({ targetPosition, isActive, cameraRef, controlsRef, onReachedTarget }) => {
+  const goalCamPosRef = useRef(new THREE.Vector3());
+  const goalTargetRef = useRef(new THREE.Vector3());
+  const isLerpingRef = useRef(false);
+  const onReachedRef = useRef(onReachedTarget);
+  useEffect(() => { onReachedRef.current = onReachedTarget; }, [onReachedTarget]);
+
+  useEffect(() => {
+    if (!targetPosition || !isActive || !cameraRef.current || !controlsRef.current) {
+      isLerpingRef.current = false;
+      return;
+    }
+
+    // Strategy: place camera BEHIND the selected star (relative to cluster center)
+    // and look TOWARD the center. The selected star sits in the foreground with the
+    // rest of the star field visible behind it.
+    const clusterCenter = new THREE.Vector3(0, 0, 0);
+
+    // Direction from center outward to the star
+    const outward = new THREE.Vector3().subVectors(targetPosition, clusterCenter);
+    if (outward.lengthSq() < 0.001) outward.set(0, 0, 1); // fallback if star is at origin
+    outward.normalize();
+
+    // Camera goes behind the star (further from center) + slight elevation
+    const camPos = new THREE.Vector3()
+      .copy(targetPosition)
+      .addScaledVector(outward, SPOTLIGHT_CONFIG.BEHIND_OFFSET)
+      .add(new THREE.Vector3(0, SPOTLIGHT_CONFIG.ISO_ELEVATION, 0));
+
+    // Look toward the cluster center so all other stars are in view
+    goalTargetRef.current.copy(clusterCenter);
+    goalCamPosRef.current.copy(camPos);
+    isLerpingRef.current = true;
+  }, [targetPosition, isActive, cameraRef, controlsRef]);
+
+  useFrame(() => {
+    if (!isLerpingRef.current || !cameraRef.current || !controlsRef.current) return;
+    const cam = cameraRef.current;
+    const controls = controlsRef.current;
+
+    cam.position.lerp(goalCamPosRef.current, SPOTLIGHT_CONFIG.LERP_SPEED);
+    controls.target.lerp(goalTargetRef.current, SPOTLIGHT_CONFIG.LERP_SPEED);
+    controls.update();
+
+    if (cam.position.distanceTo(goalCamPosRef.current) < 0.1) {
+      cam.position.copy(goalCamPosRef.current);
+      controls.target.copy(goalTargetRef.current);
+      controls.update();
+      isLerpingRef.current = false;
+      onReachedRef.current();
+    }
+  });
+
+  return null;
+};
+
+// Selection card shown below a spotlighted star
+interface SelectionCardProps {
+  result: QuoteResult | null;
+  screenPosition: { x: number; y: number } | null;
+  isVisible: boolean;
+  keywords?: string[];
+  onKeywordClick?: (keyword: string) => void;
+}
+
+const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, isVisible, keywords, onKeywordClick }) => {
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setImgLoaded(false);
+    setImgError(false);
+  }, [result]);
+
+  if (!result || !screenPosition || !isVisible) return null;
+
+  const hierarchyColor = getHierarchyColor(result.hierarchyLevel);
+  const tooltipImage = extractImageFromAny(result);
+  const title = result.tooltipTitle ?? result.headline ?? result.episode ?? 'Unknown title';
+  const subtitle = result.tooltipSubtitle ?? result.summary ?? result.quote ?? 'Summary not available';
+  const dateValue = result.published ?? result.date;
+  const hasDate = Boolean(dateValue && dateValue !== 'Date not provided');
+
+  // Position card to the right of the star, vertically centered on it.
+  // If it would overflow the right edge, flip to the left side.
+  const cardWidth = 288; // max-w-xs ≈ 288px
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 9999;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 9999;
+  const fitsRight = screenPosition.x + SPOTLIGHT_CONFIG.CARD_OFFSET_X + cardWidth < vw;
+  const cardLeft = fitsRight
+    ? screenPosition.x + SPOTLIGHT_CONFIG.CARD_OFFSET_X
+    : screenPosition.x - SPOTLIGHT_CONFIG.CARD_OFFSET_X - cardWidth;
+  const clampedTop = Math.max(8, Math.min(screenPosition.y, vh - 260));
+
+  return (
+    <div
+      ref={cardRef}
+      className="absolute z-50 pointer-events-auto animate-fade-in"
+      style={{
+        left: Math.max(8, cardLeft),
+        top: clampedTop,
+        transform: 'translateY(-50%)',
+      }}
+    >
+      <div className="bg-black/95 backdrop-blur-sm border border-gray-600 rounded-lg p-3 max-w-xs shadow-2xl shadow-black/60">
+        <div className="flex items-start gap-3">
+          {tooltipImage ? (
+            <div className="w-14 h-14 rounded overflow-hidden flex-shrink-0 relative">
+              {!imgLoaded && !imgError && <div className="w-full h-full bg-gray-800 animate-pulse" />}
+              <img
+                src={tooltipImage}
+                alt={title || ''}
+                className={`w-full h-full object-cover ${imgLoaded ? 'block' : 'hidden'}`}
+                onLoad={() => setImgLoaded(true)}
+                onError={() => setImgError(true)}
+              />
+              {imgError && (
+                <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                  <Podcast className="w-7 h-7 text-gray-600" />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="w-14 h-14 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+              <Podcast className="w-7 h-7 text-gray-600" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: hierarchyColor, boxShadow: `0 0 8px ${hierarchyColor}` }}
+              />
+              <span className="text-xs text-gray-500 uppercase">{result.hierarchyLevel}</span>
+            </div>
+            <h3 className="text-sm font-medium text-white mb-0.5 line-clamp-2">{title}</h3>
+            {hasDate && (
+              <div className="flex items-center gap-1">
+                <Calendar className="w-3 h-3 text-gray-500" />
+                <span className="text-xs text-gray-500">
+                  {typeof dateValue === 'string' ? formatShortDate(dateValue) : ''}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-400 line-clamp-3 mt-2">{subtitle}</p>
+
+        {keywords && keywords.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-gray-700/60">
+            {keywords.map((kw, i) => (
+              <button
+                key={i}
+                onClick={() => onKeywordClick?.(kw)}
+                className="text-xs px-2 py-0.5 rounded-full bg-gray-800/80 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors border border-gray-700/60 cursor-pointer"
+              >
+                {kw}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Mobile keyword bar — horizontal scrollable strip shown on narrow layouts
+const MobileKeywordBar: React.FC<{
+  keywords: string[];
+  isVisible: boolean;
+  onKeywordClick?: (keyword: string) => void;
+}> = ({ keywords, isVisible, onKeywordClick }) => {
+  if (!isVisible || keywords.length === 0) return null;
+
+  return (
+    <div className="absolute bottom-16 left-0 right-0 z-50 px-3 pointer-events-auto animate-fade-in">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {keywords.map((kw, i) => (
+          <button
+            key={i}
+            onClick={() => onKeywordClick?.(kw)}
+            className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-sm text-gray-200 border border-gray-600/60 hover:bg-gray-800 hover:text-white active:bg-gray-700 transition-colors"
+          >
+            {kw}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 // Hover preview component
@@ -1364,9 +1589,12 @@ const GalaxyScene: React.FC<{
   } | null;
   showAxisLabels: boolean;
   isAnimatingCamera: boolean;
+  isSpotlightActive: boolean;
   nebulaDimOpacity?: number;
   brandColors?: string[];
-}> = ({ results, selectedStarId, onStarClick, onStarRightClick, onHover, axisLabels, showAxisLabels, isAnimatingCamera, nebulaDimOpacity, brandColors }) => {
+  keywordMatchIds: Set<string>;
+  hasKeywordFilter: boolean;
+}> = ({ results, selectedStarId, onStarClick, onStarRightClick, onHover, axisLabels, showAxisLabels, isAnimatingCamera, isSpotlightActive, nebulaDimOpacity, brandColors, keywordMatchIds, hasKeywordFilter }) => {
   // Calculate which stars are near the selected one
   const nearbyStars = useMemo(() => {
     if (!selectedStarId) return new Set<string>();
@@ -1436,8 +1664,8 @@ const GalaxyScene: React.FC<{
       {/* Point light at origin */}
       <pointLight position={[0, 0, 0]} intensity={0.5} />
 
-      {/* Axis Labels - Hidden during camera animation */}
-      {showAxisLabels && axisLabels && !isAnimatingCamera && (
+      {/* Axis Labels - Hidden during camera animation and spotlight mode */}
+      {showAxisLabels && axisLabels && !isAnimatingCamera && !isSpotlightActive && (
         <AxisLabels axisLabels={axisLabels} />
       )}
 
@@ -1491,6 +1719,9 @@ const GalaxyScene: React.FC<{
           isSelected={result.shareLink === selectedStarId}
           isNearSelected={nearbyStars.has(result.shareLink)}
           hasSelection={Boolean(selectedStarId)}
+          isSpotlightActive={isSpotlightActive}
+          isKeywordMatch={keywordMatchIds.has(result.shareLink)}
+          hasKeywordFilter={hasKeywordFilter}
           onClick={() => onStarClick(result)}
           onRightClick={(e) => onStarRightClick(result, e)}
           onHover={onHover}
@@ -1529,6 +1760,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   brandColors,
   disableInteractions = false,
   isCompactHeight = false,
+  isNarrowLayout = false,
+  onKeywordSearch,
 }) => {
   const [isTouchLikePointer, setIsTouchLikePointer] = useState(false);
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
@@ -1537,6 +1770,16 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   const [cameraAnimKey, setCameraAnimKey] = useState(0); // Force remount on results change
   const cameraAnimationRef = useRef<CameraAnimationState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Keyword filter state (Tier 1: highlight matching stars in current galaxy)
+  const [activeKeywordFilter, setActiveKeywordFilter] = useState<string | null>(null);
+
+  // Spotlight mode state
+  const [isSpotlightActive, setIsSpotlightActive] = useState(false);
+  const [isSpotlightAnimating, setIsSpotlightAnimating] = useState(false);
+  const [spotlightScreenPos, setSpotlightScreenPos] = useState<{ x: number; y: number } | null>(null);
+  const spotlightTargetRef = useRef<THREE.Vector3 | null>(null);
+  const [spotlightKeywords, setSpotlightKeywords] = useState<string[]>([]);
   const canvasDomRef = useRef<HTMLCanvasElement | null>(null);
   const pinchRef = useRef<{
     active: boolean;
@@ -1562,6 +1805,25 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   
   // Options menu state
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+
+  // Keyword filter: compute which stars match the active keyword
+  const keywordMatchIds = useMemo(() => {
+    if (!activeKeywordFilter) return new Set<string>();
+    const kw = activeKeywordFilter.toLowerCase();
+    const matches = new Set<string>();
+    results.forEach(r => {
+      const haystack = [r.quote, r.summary, r.headline, r.episode].filter(Boolean).join(' ').toLowerCase();
+      if (haystack.includes(kw)) {
+        matches.add(r.shareLink);
+      }
+    });
+    return matches;
+  }, [activeKeywordFilter, results]);
+
+  // Clear keyword filter when selection changes
+  useEffect(() => {
+    setActiveKeywordFilter(null);
+  }, [selectedStarId]);
   
   // Ensure we don't keep an "open" options menu in embed mode if this flag flips
   useEffect(() => {
@@ -1887,28 +2149,123 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
     return computeFitDistance(results, aspect);
   }, [results, containerSize.width, containerSize.height]);
 
-  // Prepare camera intro animation whenever a new set of results arrives.
-  // We only signal that an animation should start here; the actual parameters
-  // are initialized lazily inside the AnimatedCamera when the camera ref is ready.
+  // Skip the intro spin/zoom animation — it conflicts with the spotlight flow.
+  // Instead, just position the camera at the computed fit distance immediately.
   useEffect(() => {
     if (!results || results.length === 0) return;
-    
-    // Don't restart animation if one is already in progress
-    if (isAnimatingCamera) {
-      return;
+    if (cameraRef.current && controlsRef.current) {
+      const cam = cameraRef.current;
+      cam.position.set(0, cameraTargetDistance * 0.33, cameraTargetDistance);
+      cam.lookAt(0, 0, 0);
+      controlsRef.current.target.set(0, 0, 0);
+      controlsRef.current.update();
     }
-    
-    cameraAnimationRef.current = null; // force re-init in AnimatedCamera
-    setIsAnimatingCamera(true);
-    setCameraAnimKey(prev => prev + 1); // Force AnimatedCamera to remount
-  }, [results]);
+  }, [results, cameraTargetDistance]);
 
   // Reset camera to default position
   const handleResetCamera = () => {
     if (controlsRef.current) {
       controlsRef.current.reset();
     }
+    setIsSpotlightActive(false);
+    setIsSpotlightAnimating(false);
+    setSpotlightScreenPos(null);
   };
+
+  // Fetch keywords whenever a star is selected (both desktop and mobile)
+  useEffect(() => {
+    if (selectedStarId) {
+      setSpotlightKeywords([]);
+      HierarchyCache.getHierarchy(selectedStarId)
+        .then(hierarchy => {
+          const kw = hierarchy?.hierarchy?.chapter?.metadata?.keywords;
+          if (kw && kw.length > 0) setSpotlightKeywords(kw);
+        })
+        .catch(() => { /* keywords are non-critical */ });
+    } else {
+      setSpotlightKeywords([]);
+    }
+  }, [selectedStarId]);
+
+  // Activate spotlight camera + card (desktop only — narrow uses keyword bar instead)
+  useEffect(() => {
+    if (selectedStarId && !isAnimatingCamera && !isNarrowLayout) {
+      const result = results.find(r => r.shareLink === selectedStarId);
+      if (result) {
+        const worldPos = new THREE.Vector3(
+          result.coordinates3d.x * 10,
+          result.coordinates3d.y * 10,
+          result.coordinates3d.z * 10,
+        );
+        spotlightTargetRef.current = worldPos;
+        setIsSpotlightActive(true);
+        setIsSpotlightAnimating(true);
+        setSpotlightScreenPos(null);
+      }
+    } else if (!selectedStarId) {
+      spotlightTargetRef.current = null;
+      setIsSpotlightActive(false);
+      setIsSpotlightAnimating(false);
+      setSpotlightScreenPos(null);
+    }
+  }, [selectedStarId, results, isAnimatingCamera, isNarrowLayout]);
+
+  // Detect when user starts orbiting/panning — exit spotlight (but keep selection)
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const handleControlsStart = () => {
+      if (isSpotlightActive && !isSpotlightAnimating) {
+        setIsSpotlightActive(false);
+        setSpotlightScreenPos(null);
+      }
+    };
+    controls.addEventListener('start', handleControlsStart);
+    return () => { controls.removeEventListener('start', handleControlsStart); };
+  }, [isSpotlightActive, isSpotlightAnimating]);
+
+  // Recenter on the selected star
+  const handleRecenterSpotlight = useCallback(() => {
+    if (spotlightTargetRef.current && selectedStarId) {
+      setIsSpotlightActive(true);
+      setIsSpotlightAnimating(true);
+      setSpotlightScreenPos(null);
+    }
+  }, [selectedStarId]);
+
+  // Called when spotlight camera animation reaches its target
+  const handleSpotlightReached = useCallback(() => {
+    setIsSpotlightAnimating(false);
+    if (cameraRef.current && containerRef.current && spotlightTargetRef.current) {
+      const projected = spotlightTargetRef.current.clone().project(cameraRef.current);
+      const rect = containerRef.current.getBoundingClientRect();
+      setSpotlightScreenPos({
+        x: (projected.x * 0.5 + 0.5) * rect.width,
+        y: (-projected.y * 0.5 + 0.5) * rect.height,
+      });
+    }
+  }, []);
+
+  // Keyword click handler: activate Tier 1 (highlight matches in galaxy)
+  const handleKeywordClick = useCallback((keyword: string) => {
+    setActiveKeywordFilter(keyword);
+    setIsSpotlightActive(false);
+    setIsSpotlightAnimating(false);
+    setSpotlightScreenPos(null);
+  }, []);
+
+  // Dismiss keyword filter
+  const handleDismissKeywordFilter = useCallback(() => {
+    setActiveKeywordFilter(null);
+  }, []);
+
+  // Tier 2: trigger full search for the active keyword
+  const handleKeywordFullSearch = useCallback(() => {
+    if (activeKeywordFilter && onKeywordSearch) {
+      onKeywordSearch(activeKeywordFilter);
+      setActiveKeywordFilter(null);
+    }
+  }, [activeKeywordFilter, onKeywordSearch]);
 
   // Toggle axis labels and save to userSettings
   const handleToggleAxisLabels = () => {
@@ -2105,14 +2462,16 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           </div>
         )} */}
         
-        {/* Camera reset button - hidden in compact height mode */}
-        {!isCompactHeight && (
+        {/* Reset button removed — Recenter serves the same purpose */}
+
+        {/* Recenter button — visible when user has orbited away from a spotlighted star */}
+        {selectedStarId && !isSpotlightActive && !isCompactHeight && (
           <button
-            onClick={handleResetCamera}
-            className="px-2.5 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-gray-700 hover:bg-black/90 transition-colors text-sm flex items-center gap-1 w-fit"
+            onClick={handleRecenterSpotlight}
+            className="px-2.5 py-2 bg-black/80 backdrop-blur-sm text-white rounded-lg border border-cyan-700/60 hover:bg-black/90 hover:border-cyan-500/80 transition-colors text-sm flex items-center gap-1.5 w-fit"
           >
-            <RotateCcw className="w-4 h-4" />
-            <span className="hidden sm:inline">Reset</span>
+            <Crosshair className="w-4 h-4 text-cyan-400" />
+            <span className="hidden sm:inline">Recenter</span>
           </button>
         )}
 
@@ -2172,11 +2531,53 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         )}
       </div>
       
-      {/* Hover preview for stars */}
-      <HoverPreview 
-        result={hoveredResult} 
-        position={mousePosition}
-      />
+      {/* Hover preview for stars — hidden when spotlight card is showing */}
+      {!isSpotlightActive && (
+        <HoverPreview 
+          result={hoveredResult} 
+          position={mousePosition}
+        />
+      )}
+
+      {/* Selection card (spotlight mode — desktop only) */}
+      {!isNarrowLayout && (
+        <SelectionCard
+          result={selectedStarId ? results.find(r => r.shareLink === selectedStarId) ?? null : null}
+          screenPosition={spotlightScreenPos}
+          isVisible={isSpotlightActive && !isSpotlightAnimating}
+          keywords={spotlightKeywords}
+          onKeywordClick={handleKeywordClick}
+        />
+      )}
+
+      {/* Keyword filter banner — shown when a keyword chip is clicked */}
+      {activeKeywordFilter && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 animate-fade-in pointer-events-auto">
+          <div className="flex items-center gap-2 bg-black/90 backdrop-blur-sm border border-cyan-700/60 rounded-full px-4 py-2 shadow-xl">
+            <span className="text-cyan-400 text-sm font-medium">&ldquo;{activeKeywordFilter}&rdquo;</span>
+            <span className="text-gray-400 text-xs">
+              {keywordMatchIds.size} match{keywordMatchIds.size !== 1 ? 'es' : ''}
+            </span>
+            {onKeywordSearch && (
+              <button
+                onClick={handleKeywordFullSearch}
+                className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-cyan-900/60 text-cyan-300 hover:bg-cyan-800/80 hover:text-white transition-colors border border-cyan-700/40"
+              >
+                <Search className="w-3 h-3" />
+                Search
+              </button>
+            )}
+            <button
+              onClick={handleDismissKeywordFilter}
+              className="text-gray-500 hover:text-white transition-colors ml-1"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MobileKeywordBar is rendered by SearchInterface in the layout flow */}
 
       {/* Hover preview for research items (with delay) */}
       {showResearchTooltip && hoveredResearchItem && (
@@ -2506,7 +2907,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         {!disableInteractions && (
           <OrbitControls
             ref={controlsRef}
-            enabled={!isAnimatingCamera}
+            enabled={!isAnimatingCamera && !isSpotlightAnimating}
             enableRotate={true}
             enablePan={!isTouchLikePointer}
             enableZoom={!isTouchLikePointer}
@@ -2527,6 +2928,14 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           targetDistance={cameraTargetDistance}
         />
 
+        <SpotlightAnimator
+          targetPosition={spotlightTargetRef.current}
+          isActive={isSpotlightActive && isSpotlightAnimating}
+          cameraRef={cameraRef}
+          controlsRef={controlsRef}
+          onReachedTarget={handleSpotlightReached}
+        />
+
         <GalaxyScene
           results={results}
           selectedStarId={selectedStarId}
@@ -2536,8 +2945,11 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           axisLabels={axisLabels || null}
           showAxisLabels={showAxisLabels}
           isAnimatingCamera={isAnimatingCamera}
+          isSpotlightActive={isSpotlightActive}
           nebulaDimOpacity={nebulaDimOpacity}
           brandColors={brandColors}
+          keywordMatchIds={keywordMatchIds}
+          hasKeywordFilter={Boolean(activeKeywordFilter)}
         />
       </Canvas>
       

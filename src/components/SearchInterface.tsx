@@ -546,6 +546,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const cleanupIntervalRef = useRef();
   const resultTextRef = useRef('');
 
+  // Keywords for the mobile keyword bar (fetched from HierarchyCache)
+  const [mobileKeywords, setMobileKeywords] = useState<string[]>([]);
+
   // Native input event listener for Playwright/automation compatibility
   // React's onChange doesn't always fire from automated DOM events
   useEffect(() => {
@@ -2783,6 +2786,21 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     );
   }, [isEmbedMode, isNarrowLayout, isNarrowInfoExpanded]);
 
+  // Fetch keywords for mobile keyword bar when a star is selected
+  useEffect(() => {
+    if (selectedParagraphId && isNarrowLayout) {
+      setMobileKeywords([]);
+      HierarchyCache.getHierarchy(selectedParagraphId)
+        .then(hierarchy => {
+          const kw = hierarchy?.hierarchy?.chapter?.metadata?.keywords;
+          if (kw && kw.length > 0) setMobileKeywords(kw);
+        })
+        .catch(() => {});
+    } else {
+      setMobileKeywords([]);
+    }
+  }, [selectedParagraphId, isNarrowLayout]);
+
   // Track viewport height for compact mode (embed/landscape scenarios)
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -3797,6 +3815,21 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 brandImage={isEmbedMode ? (brandImage || undefined) : undefined}
                 brandColors={isEmbedMode ? (brandColors || undefined) : undefined}
                 isCompactHeight={isEmbedMode && isCompactHeight}
+                isNarrowLayout={isNarrowLayout}
+                onKeywordSearch={async (keyword) => {
+                  printLog(`Keyword search from galaxy: keyword="${keyword}"`);
+                  resetContextPanelState();
+                  setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
+                  setQuery(keyword);
+                  setGridFadeOut(true);
+                  setSearchState(prev => ({ ...prev, isLoading: true }));
+                  setIsDecelerationComplete(false);
+                  if (resultViewStyle === SearchResultViewStyle.GALAXY) {
+                    await performQuoteSearch3D(keyword);
+                  } else {
+                    await performQuoteSearch(keyword);
+                  }
+                }}
               />
             </div>
           ) : (
@@ -4036,6 +4069,43 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   />
                 </div>
                 <div className="w-10"></div>
+              </div>
+            )}
+            {/* Mobile keyword bar — sandwiched above the search input */}
+            {isNarrowLayout && mobileKeywords.length > 0 && selectedParagraphId && (
+              <div className="relative -mb-1.5" style={{ marginRight: '3rem' }}>
+                <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pr-6">
+                  {mobileKeywords.map((kw, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="flex-shrink-0 text-xs px-3 py-1 rounded-full bg-black/80 backdrop-blur-sm text-gray-200 border border-gray-600/60 hover:bg-gray-800 hover:text-white active:bg-gray-700 transition-colors"
+                      onClick={async () => {
+                        printLog(`Mobile keyword search: "${kw}"`);
+                        resetContextPanelState();
+                        setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
+                        setQuery(kw);
+                        setGridFadeOut(true);
+                        setSearchState(prev => ({ ...prev, isLoading: true }));
+                        setIsDecelerationComplete(false);
+                        if (resultViewStyle === SearchResultViewStyle.GALAXY) {
+                          await performQuoteSearch3D(kw);
+                        } else {
+                          await performQuoteSearch(kw);
+                        }
+                      }}
+                    >
+                      {kw}
+                    </button>
+                  ))}
+                </div>
+                <div className="absolute top-0 right-0 bottom-0 w-5 flex items-center justify-end pointer-events-none">
+                  <div className="bg-black/90 rounded-full p-0.5">
+                    <svg className="w-3 h-3 text-gray-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
               </div>
             )}
             <form onSubmit={handleSearch}>
