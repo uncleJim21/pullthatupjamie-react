@@ -55,10 +55,57 @@ interface CachedEpisodeChapters {
 
 const CACHE_KEY_PREFIX = 'episode_chapters_';
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_CACHED_EPISODES = 15;
 
 class ChapterService {
   private getCacheKey(episodeId: string): string {
     return `${CACHE_KEY_PREFIX}${episodeId}`;
+  }
+
+  private getAllCacheEntries(): { key: string; lastUpdated: number }[] {
+    const entries: { key: string; lastUpdated: number }[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(CACHE_KEY_PREFIX)) continue;
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          entries.push({ key, lastUpdated: parsed.lastUpdated ?? 0 });
+        }
+      } catch {
+        localStorage.removeItem(key!);
+      }
+    }
+    return entries;
+  }
+
+  private purgeExpiredEntries(): void {
+    const now = Date.now();
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(CACHE_KEY_PREFIX)) continue;
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (now - (parsed.lastUpdated ?? 0) > CACHE_EXPIRY_MS) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch {
+        localStorage.removeItem(key!);
+      }
+    }
+  }
+
+  private evictOldest(keepRoom: number = 1): void {
+    const entries = this.getAllCacheEntries();
+    entries.sort((a, b) => a.lastUpdated - b.lastUpdated);
+    const toRemove = entries.length - (MAX_CACHED_EPISODES - keepRoom);
+    for (let i = 0; i < toRemove && i < entries.length; i++) {
+      localStorage.removeItem(entries[i].key);
+    }
   }
 
   private getCachedData(episodeId: string): CachedEpisodeChapters | null {
@@ -72,7 +119,6 @@ class ChapterService {
 
       const data: CachedEpisodeChapters = JSON.parse(cached);
       
-      // Check if cache is expired
       const now = Date.now();
       if (now - data.lastUpdated > CACHE_EXPIRY_MS) {
         printLog(`Cache expired for episode ${episodeId}`);
@@ -89,20 +135,32 @@ class ChapterService {
   }
 
   private setCachedData(episodeId: string, response: EpisodeWithChaptersResponse): void {
-    try {
-      const cacheKey = this.getCacheKey(episodeId);
-      const data: CachedEpisodeChapters = {
-        episodeId,
-        lastUpdated: Date.now(),
-        chapters: response.chapters,
-        episode: response.episode,
-        chapterCount: response.chapterCount
-      };
+    const cacheKey = this.getCacheKey(episodeId);
+    const data: CachedEpisodeChapters = {
+      episodeId,
+      lastUpdated: Date.now(),
+      chapters: response.chapters,
+      episode: response.episode,
+      chapterCount: response.chapterCount
+    };
 
-      localStorage.setItem(cacheKey, JSON.stringify(data));
+    const payload = JSON.stringify(data);
+
+    // Purge expired first, then enforce the cap
+    this.purgeExpiredEntries();
+    this.evictOldest();
+
+    try {
+      localStorage.setItem(cacheKey, payload);
       printLog(`Cached data for episode ${episodeId}`);
-    } catch (error) {
-      console.error('Error writing to cache:', error);
+    } catch {
+      // Quota still exceeded — shed more entries and retry
+      this.evictOldest(Math.ceil(MAX_CACHED_EPISODES / 2));
+      try {
+        localStorage.setItem(cacheKey, payload);
+      } catch {
+        printLog(`Failed to cache episode ${episodeId} — localStorage full`);
+      }
     }
   }
 
