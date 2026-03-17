@@ -28,6 +28,7 @@ export interface PodcastSearchParams {
   maxDate?: string;
   episodeName?: string;
   hierarchyLevels?: string[]; // Filter by hierarchy levels: ['chapter', 'paragraph', etc.]
+  smartMode?: boolean;
 }
 
 export const handleQuoteSearch = async (
@@ -38,7 +39,8 @@ export const handleQuoteSearch = async (
   maxDate?: string,
   episodeName?: string,
   hierarchyLevels?: string[],
-  guid?: string
+  guid?: string,
+  smartMode?: boolean
 ) => {
   try{
     const headers = getAuthHeaders();
@@ -64,6 +66,9 @@ export const handleQuoteSearch = async (
     }
     if (hierarchyLevels && hierarchyLevels.length > 0) {
       body.hierarchyLevels = hierarchyLevels;
+    }
+    if (smartMode !== undefined) {
+      body.smartMode = smartMode;
     }
 
     const response = await fetch(`${API_URL}/api/search-quotes`, {
@@ -98,7 +103,8 @@ export const handleQuoteSearch3D = async (
   episodeName?: string,
   hierarchyLevels?: string[],
   extractAxisLabels?: boolean,
-  guid?: string
+  guid?: string,
+  smartMode?: boolean
 ) => {
   try {
     const headers = getAuthHeaders();
@@ -127,6 +133,9 @@ export const handleQuoteSearch3D = async (
     }
     if (hierarchyLevels && hierarchyLevels.length > 0) {
       body.hierarchyLevels = hierarchyLevels;
+    }
+    if (smartMode !== undefined) {
+      body.smartMode = smartMode;
     }
 
     console.log(`[3D Search Request] Sending to API with limit: ${body.limit}, feedIds: ${body.feedIds?.length || 0}`);
