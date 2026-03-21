@@ -107,11 +107,30 @@ const PoastPage: React.FC = () => {
       } catch {
         setTwitterConnected(false);
       }
-
-      setNostrConnected(!!window.nostr);
     };
 
     checkConnections();
+
+    // NIP-07 extensions inject window.nostr asynchronously; poll until it
+    // appears or we've waited long enough (~2 s).
+    if (window.nostr) {
+      setNostrConnected(true);
+      return;
+    }
+
+    let attempts = 0;
+    const maxAttempts = 10;
+    const interval = setInterval(() => {
+      attempts++;
+      if (window.nostr) {
+        setNostrConnected(true);
+        clearInterval(interval);
+      } else if (attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
