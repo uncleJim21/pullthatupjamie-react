@@ -334,6 +334,7 @@ export function emitVisitSharedSession(shareId: string, source: SharedSessionSou
 export function getPulseHeader(): Record<string, string> {
   return {
     'X-Pulse-Session': getSessionId(),
+    'X-Free-Tier': 'true',
   };
 }
 

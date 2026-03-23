@@ -24,7 +24,8 @@ import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import { getFountainLink } from '../services/fountainService.ts';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles, CheckCircle, AlertCircle} from 'lucide-react';
+import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles, Zap, Lightbulb, HelpCircle, CheckCircle, AlertCircle} from 'lucide-react';
+import SearchModeExplainerModal from './SearchModeExplainerModal.tsx';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
 import PageBanner from './PageBanner.tsx';
@@ -267,6 +268,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     const saved = localStorage.getItem('searchResultViewStyle');
     return saved === SearchResultViewStyle.LIST ? SearchResultViewStyle.LIST : SearchResultViewStyle.GALAXY;
   });
+
+  const [smartMode, setSmartMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('smartMode');
+    return saved === null ? true : saved === 'true';
+  });
+  const toggleSmartMode = useCallback(() => {
+    setSmartMode(prev => {
+      const next = !prev;
+      localStorage.setItem('smartMode', String(next));
+      return next;
+    });
+  }, []);
   
   // 3D search results state
   const [galaxyResults, setGalaxyResults] = useState<any[]>([]);
@@ -493,6 +506,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Add state to track if share modals are open
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSocialShareModalOpen, setIsSocialShareModalOpen] = useState(false);
+  const [isSearchModeExplainerOpen, setIsSearchModeExplainerOpen] = useState(false);
 
   // Add state for ShareModal data
   const [shareModalData, setShareModalData] = useState<{
@@ -1462,7 +1476,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         effectiveMaxDate,
         undefined, // episodeName (deprecated in favor of guid)
         ['chapter', 'paragraph'], // Include both chapters and paragraphs
-        effectiveGuid
+        effectiveGuid,
+        smartMode
       );
       setConversation(prev => [...prev.filter(item => item.type !== 'podcast-search'), {
         id: searchState.activeConversationId as number,
@@ -1572,7 +1587,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         undefined, // episodeName (deprecated in favor of guid)
         undefined, // hierarchyLevels - not currently used
         shouldExtractAxisLabels, // Request axis labels if enabled in settings
-        effectiveGuid
+        effectiveGuid,
+        smartMode
       );
       
       printLog(`[3D Search] Received ${quoteResults3D.results?.length || 0} results from API`);
@@ -2183,7 +2199,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 undefined, // episodeName
                 undefined, // hierarchyLevels
                 shouldExtractAxisLabels,
-                (searchFilters.episodeGuid || '').trim() || undefined
+                (searchFilters.episodeGuid || '').trim() || undefined,
+                smartMode
               );
               
               printLog(`[Auto-search 3D] Received ${quoteResults3D.results?.length || 0} results from API`);
@@ -2923,6 +2940,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     setSelectedAudioContext(null);
     setAutoPlayContextOnOpen(false);
     setIsNarrowInfoExpanded(false);
+    setCurrentResultIndex(0);
     // Also stop any in-flight audio playback via the shared controller
     window.dispatchEvent(new Event('stopAllAudio'));
   };
@@ -3567,6 +3585,44 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                       </button>
                     </div>
                   </div>
+                  {searchMode === 'podcast-search' && (
+                    <div className="flex items-center gap-1.5 mt-2 ml-1">
+                      <button
+                        type="button"
+                        onClick={toggleSmartMode}
+                        className="inline-flex items-center rounded-full border border-gray-700 p-0.5 bg-black/60 cursor-pointer text-xs"
+                      >
+                        <span className={`flex items-center gap-1 rounded-full font-medium transition-all duration-300 ease-out py-1 ${
+                          smartMode
+                            ? 'bg-amber-500/15 text-amber-400 pl-2 pr-2.5'
+                            : 'text-gray-500 px-1.5'
+                        }`}>
+                          <Lightbulb className="w-3 h-3 shrink-0" />
+                          <span className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
+                            smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
+                          }`}>Smart</span>
+                        </span>
+                        <span className={`flex items-center gap-1 rounded-full font-medium transition-all duration-300 ease-out py-1 ${
+                          !smartMode
+                            ? 'bg-cyan-500/15 text-cyan-400 pl-2 pr-2.5'
+                            : 'text-gray-500 px-1.5'
+                        }`}>
+                          <Zap className="w-3 h-3 shrink-0" />
+                          <span className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
+                            !smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
+                          }`}>Speed</span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsSearchModeExplainerOpen(true)}
+                        className="text-gray-600 hover:text-gray-400 transition-colors"
+                        aria-label="What are search modes?"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </form>
               </div>
             )}
@@ -4047,6 +4103,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               !isNarrowLayout &&
               searchMode === 'podcast-search' &&
               searchViewStyle === SearchViewStyle.SPLIT_SCREEN &&
+              resultViewStyle === SearchResultViewStyle.GALAXY &&
               (isContextPanelOpen || isAnalysisPanelOpen || isSessionsPanelOpen)
                 ? `${contextPanelWidth}px`
                 : '0',
@@ -4279,6 +4336,48 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 </button>
               </div>
             </div>
+            {searchMode === 'podcast-search' && (
+              <div className={`flex items-center gap-1.5 ${isNarrowLayout ? 'mt-1.5 ml-0.5' : 'mt-2 ml-1'}`}>
+                <button
+                  type="button"
+                  onClick={toggleSmartMode}
+                  className={`inline-flex items-center rounded-full border border-gray-700 p-0.5 bg-black/60 cursor-pointer ${isNarrowLayout ? 'text-[10px]' : 'text-xs'}`}
+                >
+                  <span className={`flex items-center gap-1 rounded-full font-medium transition-all duration-300 ease-out ${
+                    isNarrowLayout ? 'py-0.5' : 'py-1'
+                  } ${
+                    smartMode
+                      ? `bg-amber-500/15 text-amber-400 ${isNarrowLayout ? 'pl-1.5 pr-2' : 'pl-2 pr-2.5'}`
+                      : `text-gray-500 ${isNarrowLayout ? 'px-1' : 'px-1.5'}`
+                  }`}>
+                    <Lightbulb className={`shrink-0 ${isNarrowLayout ? 'w-2.5 h-2.5' : 'w-3 h-3'}`} />
+                    <span className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
+                      smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
+                    }`}>Smart</span>
+                  </span>
+                  <span className={`flex items-center gap-1 rounded-full font-medium transition-all duration-300 ease-out ${
+                    isNarrowLayout ? 'py-0.5' : 'py-1'
+                  } ${
+                    !smartMode
+                      ? `bg-cyan-500/15 text-cyan-400 ${isNarrowLayout ? 'pl-1.5 pr-2' : 'pl-2 pr-2.5'}`
+                      : `text-gray-500 ${isNarrowLayout ? 'px-1' : 'px-1.5'}`
+                  }`}>
+                    <Zap className={`shrink-0 ${isNarrowLayout ? 'w-2.5 h-2.5' : 'w-3 h-3'}`} />
+                    <span className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
+                      !smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
+                    }`}>Speed</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSearchModeExplainerOpen(true)}
+                  className="text-gray-600 hover:text-gray-400 transition-colors"
+                  aria-label="What are search modes?"
+                >
+                  <HelpCircle className={isNarrowLayout ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+                </button>
+              </div>
+            )}
           </form>
           </div>
         </div>
@@ -4477,11 +4576,15 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onComplete={() => {}}
         platform={SocialPlatform.Twitter}
       />
+      <SearchModeExplainerModal
+        isOpen={isSearchModeExplainerOpen}
+        onClose={() => setIsSearchModeExplainerOpen(false)}
+      />
       </div>
 
       {/* Unified Side Panel (Context + Analysis) for Split-Screen Mode - Hidden in embed mode.
           On narrow screens, we only mount this when the user expands from the mini player. */}
-      {!isEmbedMode && searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && isDecelerationComplete && (!isNarrowLayout || isNarrowInfoExpanded) && (
+      {!isEmbedMode && searchMode === 'podcast-search' && searchViewStyle === SearchViewStyle.SPLIT_SCREEN && resultViewStyle === SearchResultViewStyle.GALAXY && isDecelerationComplete && (!isNarrowLayout || isNarrowInfoExpanded) && (
         <UnifiedSidePanel
           layoutMode={isNarrowLayout ? 'bottom' : 'side'}
           defaultSheetMode={isNarrowLayout ? 'full' : 'peek'}

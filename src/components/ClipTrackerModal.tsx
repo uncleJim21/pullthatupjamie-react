@@ -32,6 +32,28 @@ interface ClipTrackerModalProps {
   onShareClick?: (lookupHash: string, cdnLink: string) => void;
 }
 
+const MAX_CLIP_HISTORY = 50;
+const CLIP_HISTORY_KEY = 'clipHistory';
+
+function saveClipHistory(items: ClipHistoryItem[]): void {
+  const trimmed = items.slice(0, MAX_CLIP_HISTORY);
+  try {
+    localStorage.setItem(CLIP_HISTORY_KEY, JSON.stringify(trimmed));
+  } catch (e) {
+    // localStorage full — progressively shed older entries and retry
+    for (let limit = Math.floor(trimmed.length / 2); limit >= 1; limit = Math.floor(limit / 2)) {
+      try {
+        localStorage.setItem(CLIP_HISTORY_KEY, JSON.stringify(trimmed.slice(0, limit)));
+        return;
+      } catch {
+        // keep shrinking
+      }
+    }
+    // Last resort: clear the key so the app doesn't crash
+    try { localStorage.removeItem(CLIP_HISTORY_KEY); } catch { /* nothing we can do */ }
+  }
+}
+
 export default function ClipTrackerModal({
   clipProgress,
   isCollapsed,
@@ -231,13 +253,12 @@ export default function ClipTrackerModal({
             )
           );
           
-          // Update localStorage
           const updatedHistory = historyJSON.map(item =>
             item.lookupHash === pendingClip.lookupHash
               ? { ...item, failed: true }
               : item
           );
-          localStorage.setItem('clipHistory', JSON.stringify(updatedHistory));
+          saveClipHistory(updatedHistory);
           continue;
         }
   
@@ -259,13 +280,12 @@ export default function ClipTrackerModal({
             )
           );
   
-          // Update localStorage
           const updatedHistory = historyJSON.map(item =>
             item.lookupHash === pendingClip.lookupHash
               ? { ...item, cdnLink: status.url }
               : item
           );
-          localStorage.setItem('clipHistory', JSON.stringify(updatedHistory));
+          saveClipHistory(updatedHistory);
         }
       } catch (error) {
         console.error(`Error updating clip ${pendingClip.clipId}:`, error);
@@ -275,11 +295,16 @@ export default function ClipTrackerModal({
 
   
   const refreshItems = async () =>{
-    const savedHistory = localStorage.getItem('clipHistory');
+    const savedHistory = localStorage.getItem(CLIP_HISTORY_KEY);
     if (savedHistory) {
-      const historyJSON = JSON.parse(savedHistory);
-      setClipHistory(historyJSON);
-      updateOldPendingItems(historyJSON)
+      try {
+        const historyJSON: ClipHistoryItem[] = JSON.parse(savedHistory);
+        const capped = historyJSON.slice(0, MAX_CLIP_HISTORY);
+        setClipHistory(capped);
+        updateOldPendingItems(capped);
+      } catch {
+        localStorage.removeItem(CLIP_HISTORY_KEY);
+      }
     }
   }
 
@@ -301,7 +326,7 @@ export default function ClipTrackerModal({
 
   // Save history to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem('clipHistory', JSON.stringify(clipHistory));
+    saveClipHistory(clipHistory);
   }, [clipHistory]);
 
   // Update history when new clip arrives or existing clip updates
@@ -337,10 +362,10 @@ export default function ClipTrackerModal({
       if (existingIndex >= 0) {
         const newHistory = [...prev];
         newHistory.splice(existingIndex, 1);
-        return [updatedItem, ...newHistory];
+        return [updatedItem, ...newHistory].slice(0, MAX_CLIP_HISTORY);
       }
 
-      return [updatedItem, ...prev];
+      return [updatedItem, ...prev].slice(0, MAX_CLIP_HISTORY);
     });
   }, [clipProgress]);
 
