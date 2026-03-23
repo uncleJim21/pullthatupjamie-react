@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Lightbulb, Zap } from 'lucide-react';
+import { X, Lightbulb, Zap, AlertTriangle } from 'lucide-react';
 
 interface SearchModeExplainerModalProps {
   isOpen: boolean;
@@ -36,9 +36,18 @@ const SearchModeExplainerModal: React.FC<SearchModeExplainerModalProps> = ({ isO
               </div>
               <p className="text-sm text-gray-300 leading-relaxed">
                 Uses AI to understand your intent — identifies people, shows, and topics, 
-                then rewrites your query for the best results. Slightly slower but 
-                significantly more accurate for natural-language searches.
+                then automatically applies the right filters and rewrites your query 
+                for the best results. Slightly slower but significantly more accurate 
+                for natural-language searches.
               </p>
+              <div className="flex items-start gap-2 mt-3 p-2.5 rounded-md bg-amber-500/5 border border-amber-500/20">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400/70 shrink-0 mt-0.5" />
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  Because Smart Mode handles filtering automatically, it is disabled 
+                  when manual filters (date range, episode) are active. Tap the 
+                  toggle to clear filters and re-enable Smart Mode.
+                </p>
+              </div>
             </div>
 
             {/* Speed Mode */}
@@ -52,7 +61,7 @@ const SearchModeExplainerModal: React.FC<SearchModeExplainerModalProps> = ({ isO
               <p className="text-sm text-gray-300 leading-relaxed">
                 Runs a direct vector search with no query rewriting. 
                 Fastest possible results — ideal when you already know exactly 
-                what you're looking for.
+                what you're looking for. Supports manual filters for fine-grained control.
               </p>
             </div>
           </div>
