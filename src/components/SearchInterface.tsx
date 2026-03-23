@@ -273,13 +273,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     const saved = localStorage.getItem('smartMode');
     return saved === null ? true : saved === 'true';
   });
-  const toggleSmartMode = useCallback(() => {
-    setSmartMode(prev => {
-      const next = !prev;
-      localStorage.setItem('smartMode', String(next));
-      return next;
-    });
-  }, []);
   
   // 3D search results state
   const [galaxyResults, setGalaxyResults] = useState<any[]>([]);
@@ -445,7 +438,20 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Add state for admin privileges and toggle
   const [adminFeedId, setAdminFeedId] = useState<string | null>(null);
   const [adminFeedUrl, setAdminFeedUrl] = useState<string | null>(null);
-  const [podcastSearchMode, setPodcastSearchMode] = useState<'global' | 'my-pod'>('global');
+  const [podcastSearchMode, setPodcastSearchMode] = useState<'global' | 'my-pod'>(() => {
+    try {
+      const settings = localStorage.getItem('userSettings');
+      if (settings) {
+        const parsed = JSON.parse(settings);
+        if (parsed.podcastSearchMode === 'my-pod' || parsed.podcastSearchMode === 'global') {
+          return parsed.podcastSearchMode;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading podcastSearchMode:', e);
+    }
+    return 'global';
+  });
   const [showPodcastModeLabel, setShowPodcastModeLabel] = useState(false);
   const [podcastModeLabelText, setPodcastModeLabelText] = useState('');
   const [showScopeSlideout, setShowScopeSlideout] = useState(false);
@@ -492,6 +498,48 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     }
     return new Set<string>();
   });
+
+  const filtersActive = podcastSearchMode === 'my-pod' ||
+    selectedSources.size > 0 ||
+    searchFilters.episodeGuid !== '' ||
+    searchFilters.minDate !== '' ||
+    searchFilters.maxDate !== '';
+
+  const handleSmartModeToggle = useCallback(() => {
+    const hasFilters = podcastSearchMode === 'my-pod' ||
+      selectedSources.size > 0 ||
+      searchFilters.episodeGuid !== '' ||
+      searchFilters.minDate !== '' ||
+      searchFilters.maxDate !== '';
+
+    if (hasFilters) {
+      const clearedFilters = { episodeGuid: '', minDate: '', maxDate: '' };
+      setSearchFilters(clearedFilters);
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(clearedFilters));
+      setSelectedSources(new Set<string>());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+      if (podcastSearchMode === 'my-pod') {
+        setPodcastSearchMode('global');
+        try {
+          const s = localStorage.getItem('userSettings');
+          const us = s ? JSON.parse(s) : {};
+          us.podcastSearchMode = 'global';
+          localStorage.setItem('userSettings', JSON.stringify(us));
+        } catch (e) {
+          console.error('Error saving podcastSearchMode:', e);
+        }
+      }
+      setSmartMode(true);
+      localStorage.setItem('smartMode', 'true');
+    } else {
+      setSmartMode(prev => {
+        const next = !prev;
+        localStorage.setItem('smartMode', String(next));
+        return next;
+      });
+    }
+  }, [searchFilters, selectedSources, podcastSearchMode]);
+
   const [gridFadeOut, setGridFadeOut] = useState(false);
   // In embed mode, start with search history true so landing page is skipped
   const [searchHistory, setSearchHistory] = useState({
@@ -718,6 +766,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const handlePodcastSearchModeChange = (mode: 'global' | 'my-pod') => {
     printLog(`[handlePodcastSearchModeChange] Called with mode: ${mode}`);
     setPodcastSearchMode(mode);
+    try {
+      const s = localStorage.getItem('userSettings');
+      const us = s ? JSON.parse(s) : {};
+      us.podcastSearchMode = mode;
+      localStorage.setItem('userSettings', JSON.stringify(us));
+    } catch (e) {
+      console.error('Error saving podcastSearchMode:', e);
+    }
     const label = mode === 'global' ? 'All Pods' : 'My Pod';
     setPodcastModeLabelText(label);
     setShowPodcastModeLabel(true);
@@ -1762,11 +1818,21 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     printLog(`hasSearchedInMode(searchMode): ${hasSearchedInMode(searchMode)}`);
   }, [adminFeedId, searchMode]);
 
-  // Auto-switch to 'my-pod' mode for users with admin privileges
+  // Default to 'my-pod' for admin users only if they have no saved preference
   useEffect(() => {
-    if (adminFeedId && podcastSearchMode === 'global') {
-      setPodcastSearchMode('my-pod');
-      printLog(`Auto-switched to 'my-pod' mode for admin user with feedId: ${adminFeedId}`);
+    if (adminFeedId) {
+      try {
+        const s = localStorage.getItem('userSettings');
+        const us = s ? JSON.parse(s) : {};
+        if (us.podcastSearchMode === undefined) {
+          setPodcastSearchMode('my-pod');
+          us.podcastSearchMode = 'my-pod';
+          localStorage.setItem('userSettings', JSON.stringify(us));
+          printLog(`First-time admin: defaulted to 'my-pod' with feedId: ${adminFeedId}`);
+        }
+      } catch (e) {
+        console.error('Error checking saved podcastSearchMode:', e);
+      }
     }
   }, [adminFeedId]);
 
@@ -2518,11 +2584,11 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     printLog("handleFilterClick function called");
   };
 
-  // Function to reset all filters
+  // Function to reset all filters (search filters, selected sources, and podcast scope)
   const handleResetFilters = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const emptyFilters = {
       episodeGuid: '',
       minDate: '',
@@ -2530,6 +2596,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     };
     setSearchFilters(emptyFilters);
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(emptyFilters));
+    setSelectedSources(new Set<string>());
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+    if (podcastSearchMode === 'my-pod') {
+      setPodcastSearchMode('global');
+      try {
+        const s = localStorage.getItem('userSettings');
+        const us = s ? JSON.parse(s) : {};
+        us.podcastSearchMode = 'global';
+        localStorage.setItem('userSettings', JSON.stringify(us));
+      } catch (e) {
+        console.error('Error saving podcastSearchMode:', e);
+      }
+    }
     printLog('All filters reset from filter icon');
   };
 
@@ -3529,7 +3608,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                         </button>
                         
                         {/* Reset filters badge */}
-                        {podcastSearchMode === 'global' && hasActiveFilters() && (
+                        {filtersActive && (
                           <button
                             type="button"
                             onClick={handleResetFilters}
@@ -3571,27 +3650,33 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     <div className="flex items-center gap-1.5 mt-2 ml-1">
                       <button
                         type="button"
-                        onClick={toggleSmartMode}
+                        onClick={handleSmartModeToggle}
                         className="inline-flex items-center rounded-full border border-gray-700 p-0.5 bg-black/60 cursor-pointer text-xs"
                       >
                         <span className={`flex items-center gap-1 rounded-full font-medium transition-all duration-300 ease-out py-1 ${
-                          smartMode
-                            ? 'bg-amber-500/15 text-amber-400 pl-2 pr-2.5'
-                            : 'text-gray-500 px-1.5'
+                          filtersActive
+                            ? 'bg-amber-500/5 text-amber-400/40 pl-2 pr-2.5'
+                            : smartMode
+                              ? 'bg-amber-500/15 text-amber-400 pl-2 pr-2.5'
+                              : 'text-gray-500 px-1.5'
                         }`}>
                           <Lightbulb className="w-3 h-3 shrink-0" />
                           <span className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
-                            smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
-                          }`}>Smart</span>
+                            filtersActive
+                              ? 'max-w-[4.5rem] opacity-100'
+                              : smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
+                          }`}>{filtersActive ? 'Disabled' : 'Smart'}</span>
                         </span>
                         <span className={`flex items-center gap-1 rounded-full font-medium transition-all duration-300 ease-out py-1 ${
-                          !smartMode
-                            ? 'bg-cyan-500/15 text-cyan-400 pl-2 pr-2.5'
-                            : 'text-gray-500 px-1.5'
+                          filtersActive
+                            ? 'text-gray-500 px-1.5'
+                            : !smartMode
+                              ? 'bg-cyan-500/15 text-cyan-400 pl-2 pr-2.5'
+                              : 'text-gray-500 px-1.5'
                         }`}>
                           <Zap className="w-3 h-3 shrink-0" />
                           <span className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
-                            !smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
+                            !filtersActive && !smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
                           }`}>Speed</span>
                         </span>
                       </button>
@@ -4228,7 +4313,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                   </button>
                   
                   {/* Reset filters badge */}
-                  {podcastSearchMode === 'global' && hasActiveFilters() && (
+                  {filtersActive && (
                     <button
                       type="button"
                       onClick={handleResetFilters}
@@ -4270,31 +4355,37 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               <div className={`flex items-center gap-1.5 ${isNarrowLayout ? 'mt-1.5 ml-0.5' : 'mt-2 ml-1'}`}>
                 <button
                   type="button"
-                  onClick={toggleSmartMode}
+                  onClick={handleSmartModeToggle}
                   className={`inline-flex items-center rounded-full border border-gray-700 p-0.5 bg-black/60 cursor-pointer ${isNarrowLayout ? 'text-[10px]' : 'text-xs'}`}
                 >
                   <span className={`flex items-center gap-1 rounded-full font-medium transition-all duration-300 ease-out ${
                     isNarrowLayout ? 'py-0.5' : 'py-1'
                   } ${
-                    smartMode
-                      ? `bg-amber-500/15 text-amber-400 ${isNarrowLayout ? 'pl-1.5 pr-2' : 'pl-2 pr-2.5'}`
-                      : `text-gray-500 ${isNarrowLayout ? 'px-1' : 'px-1.5'}`
+                    filtersActive
+                      ? `bg-amber-500/5 text-amber-400/40 ${isNarrowLayout ? 'pl-1.5 pr-2' : 'pl-2 pr-2.5'}`
+                      : smartMode
+                        ? `bg-amber-500/15 text-amber-400 ${isNarrowLayout ? 'pl-1.5 pr-2' : 'pl-2 pr-2.5'}`
+                        : `text-gray-500 ${isNarrowLayout ? 'px-1' : 'px-1.5'}`
                   }`}>
                     <Lightbulb className={`shrink-0 ${isNarrowLayout ? 'w-2.5 h-2.5' : 'w-3 h-3'}`} />
                     <span className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
-                      smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
-                    }`}>Smart</span>
+                      filtersActive
+                        ? 'max-w-[4.5rem] opacity-100'
+                        : smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
+                    }`}>{filtersActive ? 'Disabled' : 'Smart'}</span>
                   </span>
                   <span className={`flex items-center gap-1 rounded-full font-medium transition-all duration-300 ease-out ${
                     isNarrowLayout ? 'py-0.5' : 'py-1'
                   } ${
-                    !smartMode
-                      ? `bg-cyan-500/15 text-cyan-400 ${isNarrowLayout ? 'pl-1.5 pr-2' : 'pl-2 pr-2.5'}`
-                      : `text-gray-500 ${isNarrowLayout ? 'px-1' : 'px-1.5'}`
+                    filtersActive
+                      ? `text-gray-500 ${isNarrowLayout ? 'px-1' : 'px-1.5'}`
+                      : !smartMode
+                        ? `bg-cyan-500/15 text-cyan-400 ${isNarrowLayout ? 'pl-1.5 pr-2' : 'pl-2 pr-2.5'}`
+                        : `text-gray-500 ${isNarrowLayout ? 'px-1' : 'px-1.5'}`
                   }`}>
                     <Zap className={`shrink-0 ${isNarrowLayout ? 'w-2.5 h-2.5' : 'w-3 h-3'}`} />
                     <span className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
-                      !smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
+                      !filtersActive && !smartMode ? 'max-w-[3rem] opacity-100' : 'max-w-0 opacity-0'
                     }`}>Speed</span>
                   </span>
                 </button>
