@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -605,8 +605,9 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   const tabsWidth = isPanelOpen && !isCollapsed ? 60 : 0;
   const totalWidth = panelWidth + tabsWidth;
 
-  // Report total width to parent
-  useEffect(() => {
+  // Report total width to parent before paint so the ResizeObserver in
+  // SearchInterface reads fresh values and doesn't oscillate narrow/wide.
+  useLayoutEffect(() => {
     onWidthChange?.(totalWidth);
   }, [totalWidth, onWidthChange]);
 
@@ -632,7 +633,7 @@ export const UnifiedSidePanel: React.FC<UnifiedSidePanelProps> = ({
   }, [isBottomLayout, isPanelOpen, sheetMode]);
 
   // In bottom layout, width is irrelevant; never push/offset the main content.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isBottomLayout) return;
     onWidthChange?.(0);
   }, [isBottomLayout, onWidthChange]);

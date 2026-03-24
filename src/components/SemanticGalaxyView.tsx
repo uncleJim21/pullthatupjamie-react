@@ -2203,18 +2203,20 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
     return computeFitDistance(results, aspect);
   }, [results, containerSize.width, containerSize.height]);
 
-  // Skip the intro spin/zoom animation — it conflicts with the spotlight flow.
-  // Instead, just position the camera at the computed fit distance immediately.
+  // Prepare camera intro animation whenever a new set of results arrives.
+  // We only signal that an animation should start here; the actual parameters
+  // are initialized lazily inside the AnimatedCamera when the camera ref is ready.
   useEffect(() => {
     if (!results || results.length === 0) return;
-    if (cameraRef.current && controlsRef.current) {
-      const cam = cameraRef.current;
-      cam.position.set(0, cameraTargetDistance * 0.33, cameraTargetDistance);
-      cam.lookAt(0, 0, 0);
-      controlsRef.current.target.set(0, 0, 0);
-      controlsRef.current.update();
+    
+    if (isAnimatingCamera) {
+      return;
     }
-  }, [results, cameraTargetDistance]);
+    
+    cameraAnimationRef.current = null;
+    setIsAnimatingCamera(true);
+    setCameraAnimKey(prev => prev + 1);
+  }, [results]);
 
   // Reset camera to default position
   const handleResetCamera = () => {
@@ -2241,7 +2243,13 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
     }
   }, [selectedStarId]);
 
-  // Activate spotlight camera + card (desktop only — narrow uses keyword bar instead)
+  // Spotlight camera pan — disabled for now. When enabled, clicking a star zooms the
+  // camera behind it (SPOTLIGHT_CONFIG.BEHIND_OFFSET away from cluster center) with a
+  // mild top-down angle (ISO_ELEVATION), lerping at LERP_SPEED per frame via
+  // SpotlightAnimator. The selected star sits in the foreground with the rest of the
+  // field visible behind it. Orbit/pan exits spotlight but keeps the selection.
+  // To re-enable: uncomment this effect and the SelectionCard render below.
+  /*
   useEffect(() => {
     if (selectedStarId && !isAnimatingCamera && !isNarrowLayout) {
       const result = results.find(r => r.shareLink === selectedStarId);
@@ -2263,6 +2271,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       setSpotlightScreenPos(null);
     }
   }, [selectedStarId, results, isAnimatingCamera, isNarrowLayout]);
+  */
 
   // Detect when user starts orbiting/panning — exit spotlight (but keep selection)
   useEffect(() => {
