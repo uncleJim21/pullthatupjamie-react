@@ -1,9 +1,10 @@
 /**
  * Vercel Serverless Function for /blog/[slug]
  *
- * Serves full HTML with SEO meta tags (canonical, OpenGraph, JSON-LD)
- * for crawlers (Google, Twitter, Slack, iMessage).
- * Redirects human users (who execute JS) into the SPA at /app/blog/:slug.
+ * Serves full HTML with article content, SEO meta tags (canonical, OpenGraph,
+ * JSON-LD), and rendered markdown body for crawlers, LLM agents, and AEO.
+ * Human users (who execute JS) are redirected into the SPA at /app/blog/:slug
+ * before the body renders.
  *
  * Pattern mirrors api/researchSession/[shareId].js
  */
@@ -100,6 +101,9 @@ function generateHTML({
       })
     : '';
 
+  const articleHtml = markdownToHtml(post.content_md || '');
+  const tags = Array.isArray(post.tags) ? post.tags : [];
+
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -140,50 +144,76 @@ function generateHTML({
     <!-- Favicon -->
     <link rel="icon" href="${frontendUrl}/favicon.ico" />
 
-    <!-- Redirect human users into the SPA -->
+    <!-- Redirect human users into the SPA (fires before body renders) -->
     <script>
       if (typeof window !== 'undefined') {
         window.location.replace('${frontendUrl}/app/blog/${encodeURIComponent(slug)}');
       }
     </script>
-    <noscript>
-      <meta http-equiv="refresh" content="0; url=${frontendUrl}/app/blog/${encodeURIComponent(slug)}" />
-    </noscript>
 
     <style>
       body {
         margin: 0; padding: 0;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
           'Helvetica Neue', sans-serif;
-        background: #000; color: #fff;
-        display: flex; align-items: center; justify-content: center;
-        min-height: 100vh; text-align: center;
+        background: #000; color: #e0e0e0;
+        line-height: 1.7;
       }
-      .container { max-width: 500px; padding: 20px; }
-      h1 { font-size: 24px; margin-bottom: 8px; }
-      .date { font-size: 14px; color: #777; margin-bottom: 20px; }
-      .spinner {
-        border: 3px solid #333; border-top: 3px solid #fff;
-        border-radius: 50%; width: 40px; height: 40px;
-        animation: spin 1s linear infinite; margin: 20px auto;
+      article {
+        max-width: 720px; margin: 0 auto;
+        padding: 40px 20px;
       }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-      p { font-size: 16px; color: #aaa; margin-bottom: 20px; }
-      a { color: #fff; text-decoration: underline; }
+      article header { margin-bottom: 32px; }
+      article h1 { font-size: 32px; color: #fff; margin-bottom: 8px; line-height: 1.3; }
+      article time { font-size: 14px; color: #777; }
+      .article-body h2 { font-size: 24px; color: #fff; margin-top: 32px; }
+      .article-body h3 { font-size: 20px; color: #fff; margin-top: 24px; }
+      .article-body p { margin: 16px 0; }
+      .article-body a { color: #6cb4ff; }
+      .article-body strong { color: #fff; }
+      .article-body ul, .article-body ol { padding-left: 24px; margin: 16px 0; }
+      .article-body li { margin: 8px 0; }
+      .article-body pre {
+        background: #111; border: 1px solid #333; border-radius: 8px;
+        padding: 16px; overflow-x: auto; margin: 16px 0;
+      }
+      .article-body code { font-family: 'SF Mono', Menlo, monospace; font-size: 14px; }
+      .article-body p code {
+        background: #111; padding: 2px 6px; border-radius: 4px;
+      }
+      .article-body img { max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0; }
+      .article-body hr { border: none; border-top: 1px solid #333; margin: 32px 0; }
+      .article-body table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+      .article-body th, .article-body td { border: 1px solid #333; padding: 8px 12px; text-align: left; }
+      .article-body th { background: #111; color: #fff; }
+      .tags { margin-top: 32px; }
+      .tags span {
+        display: inline-block; background: #1a1a1a; border: 1px solid #333;
+        border-radius: 4px; padding: 4px 10px; margin: 4px; font-size: 13px; color: #aaa;
+      }
+      .article-footer {
+        margin-top: 40px; padding-top: 20px; border-top: 1px solid #333;
+        font-size: 14px; color: #777;
+      }
+      .article-footer a { color: #6cb4ff; }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1>${escapeHtml(title)}</h1>
-      ${publishDate ? `<div class="date">${escapeHtml(publishDate)}</div>` : ''}
-      <div class="spinner"></div>
-      <p>Loading article...</p>
-      <p>
-        <a href="${frontendUrl}/app/blog/${encodeURIComponent(slug)}">
-          Click here if you're not redirected automatically
-        </a>
-      </p>
-    </div>
+    <article>
+      <header>
+        <h1>${escapeHtml(title)}</h1>
+        ${publishDate ? `<time datetime="${post.created_at ? new Date(post.created_at * 1000).toISOString() : ''}">${escapeHtml(publishDate)}</time>` : ''}
+      </header>
+      ${post.summary ? `<p><em>${escapeHtml(post.summary)}</em></p>` : ''}
+      <div class="article-body">
+        ${articleHtml}
+      </div>
+      ${tags.length ? `<div class="tags">${tags.map(t => `<span>${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+      <div class="article-footer">
+        <p>Published on <a href="https://pullthatupjamie.ai">Pull That Up Jamie</a></p>
+        <p><a href="${frontendUrl}/app/blog/${encodeURIComponent(slug)}">Read on Pull That Up Jamie &rarr;</a></p>
+      </div>
+    </article>
   </body>
 </html>`;
 }
@@ -276,4 +306,96 @@ function escapeHtml(unsafe) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// ============================================================
+// MARKDOWN → HTML (lightweight, no dependencies)
+// ============================================================
+
+function markdownToHtml(md) {
+  if (!md) return '';
+
+  const codeBlocks = [];
+  let processed = md.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    const idx = codeBlocks.length;
+    codeBlocks.push(`<pre><code>${escapeHtml(code.trim())}</code></pre>`);
+    return `\n\n%%CODEBLOCK_${idx}%%\n\n`;
+  });
+
+  const tableBlocks = [];
+  processed = processed.replace(/((?:^\|.+\|$\n?)+)/gm, (match) => {
+    const idx = tableBlocks.length;
+    tableBlocks.push(parseTable(match.trim()));
+    return `\n\n%%TABLE_${idx}%%\n\n`;
+  });
+
+  const blocks = processed.split(/\n\n+/);
+  const htmlBlocks = blocks.map(block => {
+    block = block.trim();
+    if (!block) return '';
+
+    const cbMatch = block.match(/^%%CODEBLOCK_(\d+)%%$/);
+    if (cbMatch) return codeBlocks[parseInt(cbMatch[1])];
+
+    const tbMatch = block.match(/^%%TABLE_(\d+)%%$/);
+    if (tbMatch) return tableBlocks[parseInt(tbMatch[1])];
+
+    if (/^---+$/.test(block)) return '<hr />';
+
+    if (block.startsWith('#### ')) return `<h4>${inlineMarkdown(block.slice(5))}</h4>`;
+    if (block.startsWith('### ')) return `<h3>${inlineMarkdown(block.slice(4))}</h3>`;
+    if (block.startsWith('## ')) return `<h2>${inlineMarkdown(block.slice(3))}</h2>`;
+    if (block.startsWith('# ')) return `<h1>${inlineMarkdown(block.slice(2))}</h1>`;
+
+    const lines = block.split('\n');
+    if (lines.every(l => /^[-*] /.test(l.trim()))) {
+      const items = lines.map(l => `<li>${inlineMarkdown(l.trim().replace(/^[-*] /, ''))}</li>`);
+      return `<ul>${items.join('')}</ul>`;
+    }
+    if (lines.every(l => /^\d+\. /.test(l.trim()))) {
+      const items = lines.map(l => `<li>${inlineMarkdown(l.trim().replace(/^\d+\. /, ''))}</li>`);
+      return `<ol>${items.join('')}</ol>`;
+    }
+
+    return `<p>${inlineMarkdown(block).replace(/\n/g, '<br />')}</p>`;
+  });
+
+  return htmlBlocks.filter(Boolean).join('\n');
+}
+
+function inlineMarkdown(text) {
+  let r = escapeHtml(text);
+  r = r.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />');
+  r = r.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  r = r.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  r = r.replace(/(?<!\w)\*([^*]+)\*(?!\w)/g, '<em>$1</em>');
+  r = r.replace(/(?<!\w)_([^_]+)_(?!\w)/g, '<em>$1</em>');
+  r = r.replace(/`([^`]+)`/g, '<code>$1</code>');
+  return r;
+}
+
+function parseTable(tableStr) {
+  const rows = tableStr.split('\n').filter(r => r.trim());
+  if (rows.length < 2) return escapeHtml(tableStr);
+
+  const parseRow = row => row.split('|').slice(1, -1).map(c => c.trim());
+  const headerCells = parseRow(rows[0]);
+
+  const isSep = row => /^\|[\s\-:|]+\|$/.test(row.trim());
+  const dataStart = isSep(rows[1]) ? 2 : 1;
+
+  let html = '<table><thead><tr>';
+  headerCells.forEach(c => { html += `<th>${inlineMarkdown(c)}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  for (let i = dataStart; i < rows.length; i++) {
+    if (isSep(rows[i])) continue;
+    const cells = parseRow(rows[i]);
+    html += '<tr>';
+    cells.forEach(c => { html += `<td>${inlineMarkdown(c)}</td>`; });
+    html += '</tr>';
+  }
+
+  html += '</tbody></table>';
+  return html;
 }
