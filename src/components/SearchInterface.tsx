@@ -2912,14 +2912,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     );
   };
 
-  // Track the effective width of the podcast context panel so we can center the floating search bar
-  const [contextPanelWidth, setContextPanelWidth] = useState(0);
-  // Keep a ref so the narrow-layout ResizeObserver can incorporate the latest panel width
-  // without needing to re-register the observer on every width change.
+  // Track the effective width of the podcast context panel so we can center the floating search bar.
+  // The ref is updated synchronously inside the setter so the ResizeObserver always reads
+  // the latest value (useEffect would lag by one frame, letting the observer see stale
+  // width and potentially trigger a false narrow/wide oscillation).
+  const [contextPanelWidth, _setContextPanelWidth] = useState(0);
   const contextPanelWidthRef = useRef(0);
-  useEffect(() => {
-    contextPanelWidthRef.current = contextPanelWidth;
-  }, [contextPanelWidth]);
+  const setContextPanelWidth = useCallback((w: number | ((prev: number) => number)) => {
+    _setContextPanelWidth((prev) => {
+      const next = typeof w === 'function' ? w(prev) : w;
+      contextPanelWidthRef.current = next;
+      return next;
+    });
+  }, []);
 
   // Responsive layout: treat "narrow" the same way PageBanner collapses nav items.
   // We base this on the measured main content width (not window width) so it also triggers
@@ -3004,6 +3009,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     // dip during collapse from triggering a false narrow switch.
     const DEBOUNCE_MS = 400;
 
+    const measureEl = galaxyViewportRef.current ?? el;
+
     const updateFromWidth = (mainWidth: number) => {
       const effectiveWidth = mainWidth + (contextPanelWidthRef.current || 0);
       const committed = isNarrowCommittedRef.current;
@@ -3028,12 +3035,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       }
       narrowDebounceRef.current = setTimeout(() => {
         narrowDebounceRef.current = null;
-        isNarrowCommittedRef.current = target;
-        setIsNarrowLayout(target);
+        // Re-measure at commit time — panel width ref may have updated
+        // during the debounce window, making the original target stale.
+        const freshWidth = measureEl.getBoundingClientRect().width + (contextPanelWidthRef.current || 0);
+        const freshCommitted = isNarrowCommittedRef.current;
+        const freshTarget = freshCommitted
+          ? freshWidth < NARROW_EXIT
+          : freshWidth <= NARROW_ENTER;
+        if (freshTarget === freshCommitted) return;
+        isNarrowCommittedRef.current = freshTarget;
+        setIsNarrowLayout(freshTarget);
       }, DEBOUNCE_MS);
     };
-
-    const measureEl = galaxyViewportRef.current ?? el;
 
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver((entries) => {
@@ -3077,7 +3090,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       setAutoPlayContextOnOpen(false);
       if (isNarrowLayout) {
         setContextPanelWidth(0);
-        contextPanelWidthRef.current = 0;
       }
     }
   }, [isNarrowLayout]);
