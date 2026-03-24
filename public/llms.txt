@@ -21,6 +21,57 @@
 - [On-Demand Transcription](https://www.pullthatupjamie.ai/api/on-demand/submitOnDemandRun): Submit any podcast episode for transcription, chaptering, and permanent semantic indexing
 - [Clip Creation](https://www.pullthatupjamie.ai/api/make-clip): Generate shareable audio/video clips with burned-in subtitles from search results
 
+## Canonical Workflows
+
+### Deep Topic Research
+Survey the landscape, then drill into specifics, then collect and analyze.
+1. `POST /api/search-chapters` with a broad topic query — returns chapter headlines, summaries, and timestamps across the corpus to see who's discussing the topic and how it evolved
+2. `POST /api/search-quotes` with `smartMode: true` — deep dive into specific transcript segments using natural language (e.g. "What was Saylor saying about AI on TFTC last year")
+3. `POST /api/research-sessions/` with collected pineconeIds — bundle findings into a research session
+4. `POST /api/research-sessions/{id}/share` — create a shareable link with preview image
+5. `POST /api/research-sessions/{id}/analyze` — stream an AI analysis of the collected clips
+
+### Person Dossier / Meeting Prep
+Find everything someone has said publicly across indexed podcasts.
+1. `GET /api/corpus/people?search={name}` — find the person and their appearance count
+2. `POST /api/corpus/people/episodes` with `{ "name": "..." }` — get all episodes they appeared on
+3. `POST /api/search-quotes` filtered by their feedIds or episode GUIDs — search their quotes
+4. `POST /api/research-sessions/` — collect relevant clips into a session
+5. `POST /api/research-sessions/{id}/share` — share the dossier
+
+### Discover → Index → Search (New Content)
+Find a podcast or episode that isn't indexed yet, get it transcribed, then search it.
+1. `POST /api/discover-podcasts` with a natural language query — returns matching podcasts/episodes across 4M+ feeds, each flagged with transcript availability
+2. If `hasTranscripts: true` → go straight to `POST /api/search-quotes` with the feedId
+3. If `hasTranscripts: false` → `POST /api/on-demand/submitOnDemandRun` with the episode GUID and feedId to submit for transcription
+4. `POST /api/on-demand/getOnDemandJobStatus` with the jobId — poll every 15s until status is "complete" (typically 30-120s per episode)
+5. `POST /api/search-quotes` with the feedId — the newly transcribed content is now permanently searchable
+
+### Quote → Clip → Share
+Find an exact quote and turn it into a shareable video clip with burned-in subtitles.
+1. `POST /api/search-quotes` — find the quote with timestamp and audio deeplink
+2. `POST /api/make-clip` with the clipId from the search result — kicks off async clip generation
+3. `GET /api/clip-status/{lookupHash}` — poll every 5s until status is "completed" (typically under 1 min)
+4. Use the returned clip URL — an MP4 with burned-in subtitles ready to share
+
+### Competitive Intelligence / Sentiment Tracking
+Track how a topic or narrative evolves over time across the corpus.
+1. `POST /api/search-chapters` with date filtering — survey chapter-level coverage across a time range
+2. `POST /api/search-quotes` with `minDate`/`maxDate` filters — drill into transcript segments for specific periods
+3. `POST /api/research-sessions/` — collect clips from different time periods
+4. `POST /api/research-sessions/{id}/analyze` with custom instructions (e.g. "Compare how the narrative shifted between Q1 and Q3 2025")
+
+### Open-Ended Research (Agent Starting from a Vague Goal)
+When starting from a broad or ambiguous request like "research what people are saying about X".
+1. `POST /api/discover-podcasts` with the vague query — find relevant podcasts and episodes across the full Podcast Index catalog
+2. For each result, check the transcript availability flag:
+   - **Transcript available** → `POST /api/search-quotes` with the feedId to search existing transcripts immediately
+   - **No transcript** → `POST /api/on-demand/submitOnDemandRun` to request transcription, then poll `/api/on-demand/getOnDemandJobStatus` until complete, then search
+3. `POST /api/search-chapters` across discovered feedIds — broaden the survey to chapter-level metadata for additional context
+4. `POST /api/research-sessions/` — collect the best findings into a session
+5. `POST /api/research-sessions/{id}/analyze` — generate an AI synthesis of everything found
+6. `POST /api/research-sessions/{id}/share` — deliver the interactive research session link as the final output
+
 ## Auth
 
 - Free tier: corpus browsing, basic search (IP-based quota), and shared session viewing — no credentials needed
