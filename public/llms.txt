@@ -1,0 +1,37 @@
+# Pull That Up Jamie
+
+> Pull That Up Jamie is a podcast search and research platform with a semantically indexed corpus of 109+ feeds, ~7K episodes, and ~1.9M paragraphs. It provides vector search across podcast transcripts, interactive research sessions, on-demand transcription, and clip creation — all accessible via a public API with free and Lightning-paid (L402) tiers.
+
+## API
+
+- [OpenAPI Specification](https://www.pullthatupjamie.ai/api/openapi.json): Full machine-readable API spec (OpenAPI 3.0) covering search, corpus discovery, research sessions, clip creation, on-demand transcription, and L402 agent auth
+- [Corpus API Spec (Markdown)](https://www.pullthatupjamie.ai/api/corpus/spec): Human/LLM-readable markdown reference for the corpus navigation endpoints
+
+## Agent Integration
+
+- [ClawHub Skill](https://clawhub.ai/unclejim21/pullthatupjamie): Install as an agent skill — includes auth flow, search patterns, and research session workflows
+- [Corpus Stats](https://www.pullthatupjamie.ai/api/corpus/stats): Live corpus-wide statistics (feeds, episodes, chapters, paragraphs, people, topics) — no auth required
+- [Corpus Feeds](https://www.pullthatupjamie.ai/api/corpus/feeds): Browse all indexed podcast feeds — no auth required
+
+## Key Endpoints
+
+- [Semantic Search](https://www.pullthatupjamie.ai/api/search-quotes): Vector search across podcast transcripts with filtering by feed, episode, date range
+- [Chapter Search](https://www.pullthatupjamie.ai/api/search-chapters): Search chapter metadata (keywords, headlines, summaries) across the corpus — L402 required
+- [Podcast Discovery](https://www.pullthatupjamie.ai/api/discover-podcasts): LLM-assisted podcast discovery across 4M+ podcasts via the Podcast Index — free tier available
+- [On-Demand Transcription](https://www.pullthatupjamie.ai/api/on-demand/submitOnDemandRun): Submit any podcast episode for transcription, chaptering, and permanent semantic indexing
+- [Clip Creation](https://www.pullthatupjamie.ai/api/make-clip): Generate shareable audio/video clips with burned-in subtitles from search results
+
+## Auth
+
+- Free tier: corpus browsing, basic search (IP-based quota), and shared session viewing — no credentials needed
+- Paid tier: L402 Lightning prepaid credits. Hit any paid endpoint unauthenticated to receive a 402 challenge with a Lightning invoice. After payment, use `Authorization: L402 <macaroon>:<preimage>` for all requests. 500 sats (~$0.33) covers ~150+ searches.
+
+## About
+
+- [Blog](https://pullthatupjamie.ai/blog): Articles about the platform and podcast search
+- [For Podcasters](https://pullthatupjamie.ai/for-podcasters): Tools and features built for podcast creators
+
+## Optional
+
+- [Privacy Policy](https://pullthatupjamie.ai/privacy): Data protection and privacy information
+- [Terms of Service](https://pullthatupjamie.ai/terms): Service terms
