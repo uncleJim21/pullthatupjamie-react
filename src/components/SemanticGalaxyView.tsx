@@ -1215,7 +1215,8 @@ const SpotlightAnimator: React.FC<{
   return null;
 };
 
-// Selection card shown below a spotlighted star
+// Selection card shown near a spotlighted star.
+// Compact by default (title + keywords). Expandable to show image, quote, and date.
 interface SelectionCardProps {
   result: QuoteResult | null;
   screenPosition: { x: number; y: number } | null;
@@ -1224,12 +1225,17 @@ interface SelectionCardProps {
   onKeywordClick?: (keyword: string) => void;
 }
 
+const CARD_SAFE_MARGIN = 12;
+const CARD_TOP_SAFE_ZONE = 56;
+
 const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, isVisible, keywords, onKeywordClick }) => {
+  const [expanded, setExpanded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setExpanded(false);
     setImgLoaded(false);
     setImgError(false);
   }, [result]);
@@ -1243,79 +1249,83 @@ const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, i
   const dateValue = result.published ?? result.date;
   const hasDate = Boolean(dateValue && dateValue !== 'Date not provided');
 
-  // Position card to the right of the star, vertically centered on it.
-  // If it would overflow the right edge, flip to the left side.
-  const cardWidth = 288; // max-w-xs ≈ 288px
+  const cardWidth = expanded ? 240 : 200;
   const vw = typeof window !== 'undefined' ? window.innerWidth : 9999;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 9999;
-  const fitsRight = screenPosition.x + SPOTLIGHT_CONFIG.CARD_OFFSET_X + cardWidth < vw;
-  const cardLeft = fitsRight
+
+  const rightEdgeLimit = vw - CARD_SAFE_MARGIN - cardWidth;
+  const fitsRight = screenPosition.x + SPOTLIGHT_CONFIG.CARD_OFFSET_X + cardWidth < vw - CARD_SAFE_MARGIN;
+  const rawLeft = fitsRight
     ? screenPosition.x + SPOTLIGHT_CONFIG.CARD_OFFSET_X
     : screenPosition.x - SPOTLIGHT_CONFIG.CARD_OFFSET_X - cardWidth;
-  const clampedTop = Math.max(8, Math.min(screenPosition.y, vh - 260));
+  const cardLeft = Math.max(CARD_SAFE_MARGIN, Math.min(rawLeft, rightEdgeLimit));
+
+  const estimatedHeight = expanded ? 200 : 80;
+  const clampedTop = Math.max(CARD_TOP_SAFE_ZONE, Math.min(screenPosition.y, vh - estimatedHeight - CARD_SAFE_MARGIN));
 
   return (
     <div
       ref={cardRef}
       className="absolute z-50 pointer-events-auto animate-fade-in"
       style={{
-        left: Math.max(8, cardLeft),
+        left: cardLeft,
         top: clampedTop,
         transform: 'translateY(-50%)',
+        maxWidth: cardWidth,
       }}
     >
-      <div className="bg-black/95 backdrop-blur-sm border border-gray-600 rounded-lg p-3 max-w-xs shadow-2xl shadow-black/60">
-        <div className="flex items-start gap-3">
-          {tooltipImage ? (
-            <div className="w-14 h-14 rounded overflow-hidden flex-shrink-0 relative">
+      <div className="bg-black/95 backdrop-blur-sm border border-gray-600 rounded-lg p-2 shadow-2xl shadow-black/60">
+        {/* Compact header: image + title + hierarchy dot + expand toggle */}
+        <div className="flex items-center gap-1.5">
+          {tooltipImage && (
+            <div className="w-7 h-7 rounded overflow-hidden flex-shrink-0 relative">
               {!imgLoaded && !imgError && <div className="w-full h-full bg-gray-800 animate-pulse" />}
               <img
                 src={tooltipImage}
-                alt={title || ''}
+                alt=""
                 className={`w-full h-full object-cover ${imgLoaded ? 'block' : 'hidden'}`}
                 onLoad={() => setImgLoaded(true)}
                 onError={() => setImgError(true)}
               />
-              {imgError && (
-                <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                  <Podcast className="w-7 h-7 text-gray-600" />
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="w-14 h-14 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
-              <Podcast className="w-7 h-7 text-gray-600" />
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: hierarchyColor, boxShadow: `0 0 8px ${hierarchyColor}` }}
-              />
-              <span className="text-xs text-gray-500 uppercase">{result.hierarchyLevel}</span>
-            </div>
-            <h3 className="text-sm font-medium text-white mb-0.5 line-clamp-2">{title}</h3>
+          <div
+            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+            style={{ backgroundColor: hierarchyColor, boxShadow: `0 0 6px ${hierarchyColor}` }}
+          />
+          <h3 className="text-[11px] font-medium text-white flex-1 min-w-0 truncate">{title}</h3>
+          <button
+            onClick={() => setExpanded(prev => !prev)}
+            className="text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0 p-0.5"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+          >
+            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+        </div>
+
+        {/* Expanded section: quote + date */}
+        {expanded && (
+          <div className="mt-1.5 pt-1.5 border-t border-gray-700/60">
+            <p className="text-[10px] text-gray-400 line-clamp-3 leading-relaxed">{subtitle}</p>
             {hasDate && (
-              <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3 text-gray-500" />
-                <span className="text-xs text-gray-500">
+              <div className="flex items-center gap-1 mt-1">
+                <Calendar className="w-2.5 h-2.5 text-gray-500" />
+                <span className="text-[10px] text-gray-500">
                   {typeof dateValue === 'string' ? formatShortDate(dateValue) : ''}
                 </span>
               </div>
             )}
           </div>
-        </div>
+        )}
 
-        <p className="text-xs text-gray-400 line-clamp-3 mt-2">{subtitle}</p>
-
+        {/* Keywords — always visible, smaller pills */}
         {keywords && keywords.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-gray-700/60">
+          <div className="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-gray-700/60">
             {keywords.map((kw, i) => (
               <button
                 key={i}
                 onClick={() => onKeywordClick?.(kw)}
-                className="text-xs px-2 py-0.5 rounded-full bg-gray-800/80 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors border border-gray-700/60 cursor-pointer"
+                className="text-[10px] px-1.5 py-px rounded-full bg-gray-800/80 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors border border-gray-700/60 cursor-pointer"
               >
                 {kw}
               </button>
@@ -2583,7 +2593,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         />
       )}
 
-      {/* Selection card (spotlight mode — desktop only) */}
+      {/* Selection card (spotlight mode — desktop only) — temporarily hidden while iterating on design
       {!isNarrowLayout && (
         <SelectionCard
           result={selectedStarId ? results.find(r => r.shareLink === selectedStarId) ?? null : null}
@@ -2593,6 +2603,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           onKeywordClick={handleKeywordClick}
         />
       )}
+      */}
 
       {/* Keyword filter banner — shown when a keyword chip is clicked */}
       {activeKeywordFilter && (
