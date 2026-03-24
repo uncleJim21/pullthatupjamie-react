@@ -159,6 +159,71 @@ const defaultBackoff: BackoffConfig = {
 // ============================================================================
 const LANDING_NEBULA_DIM_OPACITY = 0.70;
 
+const TYPEWRITER_EXAMPLES = [
+  'Joe Rogan talking about aliens',
+  'Huberman on stress hormones',
+  'Walker and Erik Cason on the meaning of sovereignty',
+  'Naval Ravikant on building wealth',
+  'Lex Fridman interviewing a physicist about black holes',
+];
+
+const TYPEWRITER_TYPE_MS = 5;
+const TYPEWRITER_PAUSE_MS = 3200;
+const TYPEWRITER_FADE_MS = 600;
+
+function useTypewriterPlaceholder(examples: string[], enabled: boolean) {
+  const [text, setText] = useState('');
+  const [opacity, setOpacity] = useState(1);
+  const idxRef = useRef(0);
+
+  useEffect(() => {
+    if (!enabled) { setText(''); return; }
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout>;
+
+    const typeNext = () => {
+      if (cancelled) return;
+      const phrase = examples[idxRef.current % examples.length];
+      let charIdx = 0;
+      setOpacity(1);
+
+      const typeChar = () => {
+        if (cancelled) return;
+        charIdx++;
+        setText(phrase.slice(0, charIdx));
+        if (charIdx < phrase.length) {
+          timeout = setTimeout(typeChar, TYPEWRITER_TYPE_MS);
+        } else {
+          timeout = setTimeout(() => {
+            if (cancelled) return;
+            setOpacity(0);
+            timeout = setTimeout(() => {
+              if (cancelled) return;
+              idxRef.current++;
+              setText('');
+              typeNext();
+            }, TYPEWRITER_FADE_MS);
+          }, TYPEWRITER_PAUSE_MS);
+        }
+      };
+      typeChar();
+    };
+
+    typeNext();
+    return () => { cancelled = true; clearTimeout(timeout); };
+  }, [examples, enabled]);
+
+  return { text, opacity };
+}
+
+function formatCompactCount(n: number, fallback = '2M+'): string {
+  if (!n || n <= 0) return fallback;
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(n % 1_000_000_000 === 0 ? 0 : 1)}B+`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 2).replace(/\.?0+$/, '')}M+`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1).replace(/\.?0+$/, '')}K+`;
+  return `${n}+`;
+}
+
 const SubscriptionSuccessPopup = ({ onClose, isJamiePro = false }: SubscriptionSuccessPopupProps) => (
   <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center z-50">
     <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 text-center max-w-lg mx-auto">
@@ -222,6 +287,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const isEmbedMode = new URLSearchParams(window.location.search).get('embed') === 'true';
   
   const [query, setQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+  const typewriterActive = query === '' && !isSearchFocused;
+  const typewriter = useTypewriterPlaceholder(TYPEWRITER_EXAMPLES, typewriterActive);
   
   // Search view style state (Classic vs Split Screen)
   const [searchViewStyle, setSearchViewStyle] = useState<SearchViewStyle>(() => {
@@ -607,6 +676,9 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const searchInputRef = useRef<HTMLTextAreaElement>(null);
   const cleanupIntervalRef = useRef();
   const resultTextRef = useRef('');
+
+  // Keywords for the mobile keyword bar (fetched from HierarchyCache)
+  const [mobileKeywords, setMobileKeywords] = useState<string[]>([]);
 
   // Native input event listener for Playwright/automation compatibility
   // React's onChange doesn't always fire from automated DOM events
@@ -2879,6 +2951,21 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
     );
   }, [isEmbedMode, isNarrowLayout, isNarrowInfoExpanded]);
 
+  // Fetch keywords for mobile keyword bar when a star is selected
+  useEffect(() => {
+    if (selectedParagraphId && isNarrowLayout) {
+      setMobileKeywords([]);
+      HierarchyCache.getHierarchy(selectedParagraphId)
+        .then(hierarchy => {
+          const kw = hierarchy?.hierarchy?.chapter?.metadata?.keywords;
+          if (kw && kw.length > 0) setMobileKeywords(kw);
+        })
+        .catch(() => {});
+    } else {
+      setMobileKeywords([]);
+    }
+  }, [selectedParagraphId, isNarrowLayout]);
+
   // Track viewport height for compact mode (embed/landscape scenarios)
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -3439,7 +3526,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 className="text-gray-400 text-lg md:text-xl text-center"
                 style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400 }}
               >
-                Search podcasts by meaning, not minutes.
+                Search {formatCompactCount(podcastStats.clipCount)} podcast moments by meaning, not minutes.
               </p>
             </div>
           )
@@ -3494,20 +3581,31 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 )}
                 <form onSubmit={handleSearch}>
                   <div className="flex items-start gap-3">
-                    {/* Textarea - grows to fill available space */}
-                    <textarea
-                      ref={searchInputRef}
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `Search the web privately with LLM summary`}
-                      className="flex-1 bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSearch(e);
-                        }
-                      }}
-                    />
+                    <div className="flex-1 relative">
+                      {query === '' && searchMode === 'podcast-search' && (
+                        <span
+                          className="absolute left-4 top-3 text-gray-500 pointer-events-none select-none transition-opacity"
+                          style={{ opacity: typewriter.opacity, transitionDuration: `${TYPEWRITER_FADE_MS}ms` }}
+                        >
+                          {typewriter.text}<span className="animate-pulse">|</span>
+                        </span>
+                      )}
+                      <textarea
+                        ref={searchInputRef}
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        onFocus={() => setIsSearchFocused(true)}
+                        onBlur={() => setIsSearchFocused(false)}
+                        placeholder={searchMode !== 'podcast-search' ? `Search the web privately with LLM summary` : ''}
+                        className="w-full bg-[#111111] border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-white-glow resize-auto min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSearch(e);
+                          }
+                        }}
+                      />
+                    </div>
 
                     {/* Button column - fixed width */}
                     <div className="flex flex-col gap-2 relative">
@@ -3695,13 +3793,6 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             )}
           </div>
         )}
-
-      {/* Stats display for podcast search mode */}
-      {!hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && (
-        <div className="text-center mt-2 text-gray-300">
-          <p>Search from over <span className="font-bold">{podcastStats.clipCount.toLocaleString()}</span> podcast moments</p>
-        </div>
-      )}
 
       {/* Featured Galaxies Carousel - shown on landing page */}
       {!hasSearchedInMode(searchMode) && searchMode === 'podcast-search' && !isEmbedMode && !isSharePage && !isClipBatchPage && (
@@ -3938,6 +4029,21 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 brandImage={isEmbedMode ? (brandImage || undefined) : undefined}
                 brandColors={isEmbedMode ? (brandColors || undefined) : undefined}
                 isCompactHeight={isEmbedMode && isCompactHeight}
+                isNarrowLayout={isNarrowLayout}
+                onKeywordSearch={async (keyword) => {
+                  printLog(`Keyword search from galaxy: keyword="${keyword}"`);
+                  resetContextPanelState();
+                  setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
+                  setQuery(keyword);
+                  setGridFadeOut(true);
+                  setSearchState(prev => ({ ...prev, isLoading: true }));
+                  setIsDecelerationComplete(false);
+                  if (resultViewStyle === SearchResultViewStyle.GALAXY) {
+                    await performQuoteSearch3D(keyword);
+                  } else {
+                    await performQuoteSearch(keyword);
+                  }
+                }}
               />
             </div>
           ) : (
@@ -4180,37 +4286,98 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 <div className="w-10"></div>
               </div>
             )}
+            {/* Mobile keyword bar — sandwiched above the search input */}
+            {isNarrowLayout && mobileKeywords.length > 0 && selectedParagraphId && (
+              <div className="relative -mb-1.5" style={{ marginRight: '3rem' }}>
+                <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pr-6">
+                  {mobileKeywords.map((kw, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="flex-shrink-0 text-xs px-3 py-1 rounded-full bg-black/80 backdrop-blur-sm text-gray-200 border border-gray-600/60 hover:bg-gray-800 hover:text-white active:bg-gray-700 transition-colors"
+                      onClick={async () => {
+                        printLog(`Mobile keyword search: "${kw}"`);
+                        resetContextPanelState();
+                        setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
+                        setQuery(kw);
+                        setGridFadeOut(true);
+                        setSearchState(prev => ({ ...prev, isLoading: true }));
+                        setIsDecelerationComplete(false);
+                        if (resultViewStyle === SearchResultViewStyle.GALAXY) {
+                          await performQuoteSearch3D(kw);
+                        } else {
+                          await performQuoteSearch(kw);
+                        }
+                      }}
+                    >
+                      {kw}
+                    </button>
+                  ))}
+                </div>
+                <div className="absolute top-0 right-0 bottom-0 w-5 flex items-center justify-end pointer-events-none">
+                  <div className="bg-black/90 rounded-full p-0.5">
+                    <svg className="w-3 h-3 text-gray-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            )}
             <form onSubmit={handleSearch}>
             <div className={`flex gap-3 ${isNarrowLayout ? 'items-end' : 'items-start'}`}>
               {/* Input (narrow) / Textarea (wide) */}
               {isNarrowLayout ? (
-                <input
-                  ref={searchInputRef as any}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `Search the web privately with LLM summary`}
-                  className="flex-1 bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg min-h-[36px]"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSearch(e as any);
-                    }
-                  }}
-                />
+                <div className="flex-1 relative">
+                  {query === '' && searchMode === 'podcast-search' && (
+                    <span
+                      className="absolute left-3 top-2 text-gray-500 pointer-events-none select-none transition-opacity text-sm"
+                      style={{ opacity: typewriter.opacity, transitionDuration: `${TYPEWRITER_FADE_MS}ms` }}
+                    >
+                      {typewriter.text}<span className="animate-pulse">|</span>
+                    </span>
+                  )}
+                  <input
+                    ref={searchInputRef as any}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onFocus={() => setIsSearchFocused(true)}
+                    onBlur={() => setIsSearchFocused(false)}
+                    placeholder={searchMode !== 'podcast-search' ? `Search the web privately with LLM summary` : ''}
+                    className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg min-h-[36px]"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSearch(e as any);
+                      }
+                    }}
+                  />
+                </div>
               ) : (
-                <textarea
-                  ref={searchInputRef}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={searchMode === 'podcast-search' ? `Search thousands of moments` : `Search the web privately with LLM summary`}
-                  className="flex-1 bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSearch(e);
-                    }
-                  }}
-                />
+                <div className="flex-1 relative">
+                  {query === '' && searchMode === 'podcast-search' && (
+                    <span
+                      className="absolute left-4 top-3 text-gray-500 pointer-events-none select-none transition-opacity"
+                      style={{ opacity: typewriter.opacity, transitionDuration: `${TYPEWRITER_FADE_MS}ms` }}
+                    >
+                      {typewriter.text}<span className="animate-pulse">|</span>
+                    </span>
+                  )}
+                  <textarea
+                    ref={searchInputRef}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onFocus={() => setIsSearchFocused(true)}
+                    onBlur={() => setIsSearchFocused(false)}
+                    placeholder={searchMode !== 'podcast-search' ? `Search the web privately with LLM summary` : ''}
+                    className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSearch(e);
+                      }
+                    }}
+                  />
+                </div>
               )}
 
               {/* Button column - fixed width */}

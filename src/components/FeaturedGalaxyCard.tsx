@@ -363,7 +363,10 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
     <div
       ref={cardRef}
       onClick={onClick}
-      className="relative flex-shrink-0 w-[calc(50vw-64px)] h-[calc(50vw-24px)] sm:w-44 sm:h-44 md:w-52 md:h-52 sm:max-w-none sm:max-h-none rounded-lg overflow-hidden cursor-pointer group transition-all duration-300 hover:scale-[1.02] bg-[#0A0A0A] border border-gray-800 hover:border-gray-600"
+      className="relative flex-shrink-0 w-[calc(50vw-64px)] h-[calc(50vw-24px)] sm:w-44 sm:h-44 md:w-52 md:h-52 sm:max-w-none sm:max-h-none rounded-lg overflow-hidden cursor-pointer group bg-[#0A0A0A] border-[1.5px]"
+      style={{ borderColor: `${themeColor}33`, transition: 'border-color 0.3s' }}
+      onMouseEnter={(e) => e.currentTarget.style.borderColor = `${themeColor}88`}
+      onMouseLeave={(e) => e.currentTarget.style.borderColor = `${themeColor}33`}
     >
       {/* 3D scene — rendered via the shared Canvas using View scissoring.
           The View is only mounted when the card is fully within the scroll
@@ -394,9 +397,9 @@ export const FeaturedGalaxyCard: React.FC<FeaturedGalaxyCardProps> = ({
       {/* Hover overlay - subtle white glow */}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/5" />
       
-      {/* Top stripe - subtle dark bar with arrow icon */}
+      {/* Top stripe */}
       <div className="absolute top-0 left-0 right-0 bg-black/60 px-3 py-1.5 border-b border-gray-800 flex items-center justify-end">
-        <ArrowUpRight className="w-4 h-4 text-gray-400" />
+        <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-gray-400 transition-colors duration-300" />
       </div>
       
       {/* Title bar - solid black tab with title + subtitle */}
