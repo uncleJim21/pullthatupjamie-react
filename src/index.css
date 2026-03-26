@@ -47,3 +47,59 @@ html, body, #root {
   display: none;
 }
 
+/* Prev/Next navigation — breathing pulse glow */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(91, 184, 196, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(91, 184, 196, 0.35),
+                0 0 6px rgba(91, 184, 196, 0.15);
+  }
+}
+
+.btn-nav {
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1.5px solid rgba(91, 184, 196, 0.6);
+  background: transparent;
+  color: #b8dce4;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.btn-nav:hover {
+  border-color: #5bb8c4;
+  color: #fff;
+  animation: none;
+  box-shadow: 0 0 20px rgba(91, 184, 196, 0.4),
+              0 0 6px rgba(91, 184, 196, 0.2);
+}
+
+.btn-nav:active {
+  transform: scale(0.97);
+  box-shadow: 0 0 10px rgba(91, 184, 196, 0.3);
+}
+
+.btn-nav:disabled {
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(200, 210, 220, 0.2);
+  cursor: default;
+  animation: none;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-nav {
+    animation: none;
+    box-shadow: 0 0 8px rgba(91, 184, 196, 0.2);
+  }
+}
+

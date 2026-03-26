@@ -4344,18 +4344,18 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 <button
                   onClick={() => canGoPrev && navigateToResult(currentResultIndex - 1)}
                   disabled={!canGoPrev}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 hover:bg-cyan-900/90 active:bg-cyan-900 disabled:opacity-30 disabled:border-gray-700 disabled:text-gray-500 disabled:bg-transparent"
+                  className="btn-nav"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   Prev
                 </button>
-                <span className="text-[11px] text-gray-400 font-mono tabular-nums">
+                <span className="text-[11px] font-mono tabular-nums" style={{ color: 'rgba(184, 220, 228, 0.5)' }}>
                   {currentResultIndex + 1} of {galaxyResults.length}
                 </span>
                 <button
                   onClick={() => canGoNext && navigateToResult(currentResultIndex + 1)}
                   disabled={!canGoNext}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 hover:bg-cyan-900/90 active:bg-cyan-900 disabled:opacity-30 disabled:border-gray-700 disabled:text-gray-500 disabled:bg-transparent"
+                  className="btn-nav"
                 >
                   Next
                   <ChevronRight className="w-3.5 h-3.5" />
