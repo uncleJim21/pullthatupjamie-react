@@ -1160,7 +1160,8 @@ const SpotlightAnimator: React.FC<{
   cameraRef: React.RefObject<THREE.PerspectiveCamera>;
   controlsRef: React.RefObject<any>;
   onReachedTarget: () => void;
-}> = ({ targetPosition, isActive, cameraRef, controlsRef, onReachedTarget }) => {
+  isNarrowLayout?: boolean;
+}> = ({ targetPosition, isActive, cameraRef, controlsRef, onReachedTarget, isNarrowLayout = false }) => {
   const goalCamPosRef = useRef(new THREE.Vector3());
   const goalTargetRef = useRef(new THREE.Vector3());
   const isLerpingRef = useRef(false);
@@ -1188,6 +1189,12 @@ const SpotlightAnimator: React.FC<{
       .copy(targetPosition)
       .addScaledVector(outward, SPOTLIGHT_CONFIG.BEHIND_OFFSET)
       .add(new THREE.Vector3(0, SPOTLIGHT_CONFIG.ISO_ELEVATION, 0));
+
+    // On mobile, add extra elevation so the star renders in the upper third
+    // of the viewport instead of center (which gets obscured by the search bar).
+    if (isNarrowLayout) {
+      camPos.y -= SPOTLIGHT_CONFIG.BEHIND_OFFSET * 0.80;
+    }
 
     // Look toward the cluster center so all other stars are in view
     goalTargetRef.current.copy(clusterCenter);
@@ -1230,7 +1237,7 @@ interface SelectionCardProps {
 const CARD_SAFE_MARGIN = 12;
 const CARD_TOP_SAFE_ZONE = 56;
 
-const CARD_STAR_OFFSET = 20;
+const CARD_STAR_OFFSET = 32;
 
 const extractGuidFromShareLink = (shareLink?: string): string | undefined => {
   if (!shareLink) return undefined;
@@ -1260,7 +1267,7 @@ const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, i
   const episodeGuid = extractGuidFromShareLink(result.shareLink);
   const feedId = (result as any).feedId ?? (result as any).feed_id ?? (result.additionalFields?.feedId as string | undefined);
 
-  const cardWidth = 240;
+  const cardWidth = 264;
   const cw = containerSize?.width || (typeof window !== 'undefined' ? window.innerWidth : 9999);
   const ch = containerSize?.height || (typeof window !== 'undefined' ? window.innerHeight : 9999);
 
@@ -1341,13 +1348,14 @@ const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, i
           </div>
         </div>
 
-        {/* Keywords with scope tooltip */}
+        {/* Keywords with scope tooltip — capped to 5 chips */}
         {keywords && keywords.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-gray-700/60">
-            {keywords.map((kw, i) => (
+          <div className="flex flex-wrap gap-0.5 mt-1.5 pt-1 border-t border-gray-700/60">
+            {keywords.slice(0, 5).map((kw, i) => (
               <KeywordTooltip
                 key={i}
                 keyword={kw}
+                compact
                 isOpen={openTooltipKeyword === kw}
                 onOpenChange={(isOpen) => setOpenTooltipKeyword(isOpen ? kw : null)}
                 options={buildKeywordOptions(kw)}
@@ -2266,11 +2274,16 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
     }
   }, [selectedStarId]);
 
-  // Spotlight camera pan (widescreen only): clicking a star zooms the camera behind it
-  // with a mild top-down angle, lerping via SpotlightAnimator. Orbit/pan exits spotlight
-  // but keeps the selection.
+  // Spotlight camera pan (widescreen, non-embed only): clicking a star zooms the camera
+  // behind it with a mild top-down angle, lerping via SpotlightAnimator.
+  // If the intro animation is still playing when a star is selected, cancel it immediately
+  // so the spotlight can proceed without waiting for the zoom-out + spin to finish.
   useEffect(() => {
-    if (selectedStarId && !isAnimatingCamera && !isNarrowLayout) {
+    if (selectedStarId && !hideOptions) {
+      if (isAnimatingCamera) {
+        cameraAnimationRef.current = null;
+        setIsAnimatingCamera(false);
+      }
       const result = results.find(r => r.shareLink === selectedStarId);
       if (result) {
         const worldPos = new THREE.Vector3(
@@ -2289,7 +2302,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       setIsSpotlightAnimating(false);
       setSpotlightScreenPos(null);
     }
-  }, [selectedStarId, results, isAnimatingCamera, isNarrowLayout]);
+  }, [selectedStarId, results, hideOptions]);
 
   // Detect when user starts orbiting/panning — exit spotlight (but keep selection)
   useEffect(() => {
@@ -2620,8 +2633,8 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         />
       )}
 
-      {/* Selection card (spotlight mode — desktop only) */}
-      {!isNarrowLayout && (
+      {/* Selection card (spotlight mode — desktop, non-embed only) */}
+      {!isNarrowLayout && !hideOptions && (
         <SelectionCard
           result={selectedStarId ? results.find(r => r.shareLink === selectedStarId) ?? null : null}
           screenPosition={spotlightScreenPos}
@@ -3016,12 +3029,19 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           cameraRef={cameraRef}
           controlsRef={controlsRef}
           onReachedTarget={handleSpotlightReached}
+          isNarrowLayout={isNarrowLayout}
         />
 
         <GalaxyScene
           results={results}
           selectedStarId={selectedStarId}
-          onStarClick={onStarClick}
+          onStarClick={(result) => {
+            if (result.shareLink === selectedStarId) {
+              handleRecenterSpotlight();
+            } else {
+              onStarClick(result);
+            }
+          }}
           onStarRightClick={handleStarRightClick}
           onHover={setHoveredResult}
           axisLabels={axisLabels || null}
