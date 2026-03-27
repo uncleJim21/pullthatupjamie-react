@@ -4641,6 +4641,36 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         </div>
       )}
 
+      {/* Embed-mode navigation strip — sits above the mini player */}
+      {isEmbedMode && selectedAudioContext && galaxyResults.length > 1 && (
+        <div
+          className="fixed left-0 right-0 z-30 flex items-center justify-between px-14 sm:px-48"
+          style={{
+            bottom: 'calc(var(--embed-mini-player-height, 92px) + 4px)',
+          }}
+        >
+          <button
+            onClick={() => canGoPrev && navigateToResult(currentResultIndex - 1)}
+            disabled={!canGoPrev}
+            className="btn-nav"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            Prev
+          </button>
+          <span className="text-[11px] font-mono tabular-nums" style={{ color: 'rgba(184, 220, 228, 0.5)' }}>
+            {currentResultIndex + 1} of {galaxyResults.length}
+          </span>
+          <button
+            onClick={() => canGoNext && navigateToResult(currentResultIndex + 1)}
+            disabled={!canGoNext}
+            className="btn-nav"
+          >
+            Next
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Mini Player - hidden in list view on mobile (results have inline players) */}
       {(isEmbedMode || (isNarrowLayout && !isEmbedMode && selectedAudioContext && resultViewStyle !== SearchResultViewStyle.LIST)) && (
         <EmbedMiniPlayer
