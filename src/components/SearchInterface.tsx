@@ -4082,18 +4082,27 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 brandColors={isEmbedMode ? (brandColors || undefined) : undefined}
                 isCompactHeight={isEmbedMode && isCompactHeight}
                 isNarrowLayout={isNarrowLayout}
-                onKeywordSearch={async (keyword) => {
-                  printLog(`Keyword search from galaxy: keyword="${keyword}"`);
+                onKeywordSearch={async (keyword, feedId, guid, forceSearchAll = false) => {
+                  printLog(`Keyword search from galaxy: keyword="${keyword}", feedId="${feedId}", guid="${guid}", forceSearchAll="${forceSearchAll}"`);
                   resetContextPanelState();
                   setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
                   setQuery(keyword);
                   setGridFadeOut(true);
                   setSearchState(prev => ({ ...prev, isLoading: true }));
                   setIsDecelerationComplete(false);
+
+                  const override: KeywordSearchOverride | undefined = forceSearchAll
+                    ? { scope: 'all' }
+                    : guid
+                      ? { scope: 'episode', guid }
+                      : feedId
+                        ? { scope: 'feed', feedId }
+                        : undefined;
+
                   if (resultViewStyle === SearchResultViewStyle.GALAXY) {
-                    await performQuoteSearch3D(keyword);
+                    await performQuoteSearch3D(keyword, override);
                   } else {
-                    await performQuoteSearch(keyword);
+                    await performQuoteSearch(keyword, override);
                   }
                 }}
               />
