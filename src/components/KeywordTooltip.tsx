@@ -13,6 +13,7 @@ interface KeywordTooltipProps {
   onClose?: () => void;
   isOpen?: boolean;
   onOpenChange?: (isOpen: boolean) => void;
+  compact?: boolean;
 }
 
 export const KeywordTooltip: React.FC<KeywordTooltipProps> = ({
@@ -20,7 +21,8 @@ export const KeywordTooltip: React.FC<KeywordTooltipProps> = ({
   options,
   onClose,
   isOpen: externalIsOpen,
-  onOpenChange
+  onOpenChange,
+  compact = false
 }) => {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const showTooltip = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
@@ -113,7 +115,7 @@ export const KeywordTooltip: React.FC<KeywordTooltipProps> = ({
       <button
         ref={buttonRef}
         onClick={handleOpen}
-        className={`text-xs px-2 py-0.5 rounded transition-colors cursor-pointer ${
+        className={`${compact ? 'text-[10px] px-1.5 py-px' : 'text-xs px-2 py-0.5'} rounded transition-colors cursor-pointer ${
           showTooltip
             ? 'bg-white text-black hover:bg-gray-200'
             : 'bg-gray-800 text-gray-300 hover:bg-gray-700'

@@ -4,10 +4,11 @@ import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS, printLog } from '../constants/constants.ts';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
-import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Layers, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle, Loader, Crosshair } from 'lucide-react';
+import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Layers, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle, Loader, Crosshair, ScanSearch } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
+import { KeywordTooltip } from './KeywordTooltip.tsx';
 import { saveResearchSession, clearLocalSession, ResearchSessionItem, MAX_RESEARCH_ITEMS } from '../services/researchSessionService.ts';
 import HierarchyCache from '../services/hierarchyCache.ts';
 import { shareCurrentSession, ShareNode } from '../services/researchSessionShareService.ts';
@@ -407,7 +408,7 @@ interface SemanticGalaxyViewProps {
   // Narrow/mobile layout — suppresses spotlight zoom+card, shows keyword bar instead
   isNarrowLayout?: boolean;
   // Callback to trigger a full search for a keyword (Tier 2 of keyword navigation)
-  onKeywordSearch?: (keyword: string) => void;
+  onKeywordSearch?: (keyword: string, feedId?: string, episodeName?: string, forceSearchAll?: boolean) => void;
 }
 
 // Transform color to compensate for additive blending brightening
@@ -1159,7 +1160,8 @@ const SpotlightAnimator: React.FC<{
   cameraRef: React.RefObject<THREE.PerspectiveCamera>;
   controlsRef: React.RefObject<any>;
   onReachedTarget: () => void;
-}> = ({ targetPosition, isActive, cameraRef, controlsRef, onReachedTarget }) => {
+  isNarrowLayout?: boolean;
+}> = ({ targetPosition, isActive, cameraRef, controlsRef, onReachedTarget, isNarrowLayout = false }) => {
   const goalCamPosRef = useRef(new THREE.Vector3());
   const goalTargetRef = useRef(new THREE.Vector3());
   const isLerpingRef = useRef(false);
@@ -1187,6 +1189,12 @@ const SpotlightAnimator: React.FC<{
       .copy(targetPosition)
       .addScaledVector(outward, SPOTLIGHT_CONFIG.BEHIND_OFFSET)
       .add(new THREE.Vector3(0, SPOTLIGHT_CONFIG.ISO_ELEVATION, 0));
+
+    // On mobile, add extra elevation so the star renders in the upper third
+    // of the viewport instead of center (which gets obscured by the search bar).
+    if (isNarrowLayout) {
+      camPos.y -= SPOTLIGHT_CONFIG.BEHIND_OFFSET * 0.80;
+    }
 
     // Look toward the cluster center so all other stars are in view
     goalTargetRef.current.copy(clusterCenter);
@@ -1222,46 +1230,84 @@ interface SelectionCardProps {
   screenPosition: { x: number; y: number } | null;
   isVisible: boolean;
   keywords?: string[];
-  onKeywordClick?: (keyword: string) => void;
+  onKeywordSearch?: (keyword: string, feedId?: string, episodeName?: string, forceSearchAll?: boolean) => void;
+  containerSize?: { width: number; height: number };
 }
 
 const CARD_SAFE_MARGIN = 12;
 const CARD_TOP_SAFE_ZONE = 56;
 
-const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, isVisible, keywords, onKeywordClick }) => {
-  const [expanded, setExpanded] = useState(false);
+const CARD_STAR_OFFSET = 32;
+
+const extractGuidFromShareLink = (shareLink?: string): string | undefined => {
+  if (!shareLink) return undefined;
+  const match = shareLink.match(/^(.+?)_p\d+$/);
+  return match ? match[1] : undefined;
+};
+
+const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, isVisible, keywords, onKeywordSearch, containerSize }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [openTooltipKeyword, setOpenTooltipKeyword] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setExpanded(false);
     setImgLoaded(false);
     setImgError(false);
+    setOpenTooltipKeyword(null);
   }, [result]);
 
   if (!result || !screenPosition || !isVisible) return null;
 
-  const hierarchyColor = getHierarchyColor(result.hierarchyLevel);
   const tooltipImage = extractImageFromAny(result);
   const title = result.tooltipTitle ?? result.headline ?? result.episode ?? 'Unknown title';
-  const subtitle = result.tooltipSubtitle ?? result.summary ?? result.quote ?? 'Summary not available';
   const dateValue = result.published ?? result.date;
   const hasDate = Boolean(dateValue && dateValue !== 'Date not provided');
 
-  const cardWidth = expanded ? 240 : 200;
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 9999;
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 9999;
+  const episodeGuid = extractGuidFromShareLink(result.shareLink);
+  const feedId = (result as any).feedId ?? (result as any).feed_id ?? (result.additionalFields?.feedId as string | undefined);
 
-  const rightEdgeLimit = vw - CARD_SAFE_MARGIN - cardWidth;
-  const fitsRight = screenPosition.x + SPOTLIGHT_CONFIG.CARD_OFFSET_X + cardWidth < vw - CARD_SAFE_MARGIN;
+  const cardWidth = 264;
+  const cw = containerSize?.width || (typeof window !== 'undefined' ? window.innerWidth : 9999);
+  const ch = containerSize?.height || (typeof window !== 'undefined' ? window.innerHeight : 9999);
+
+  const rightEdgeLimit = cw - CARD_SAFE_MARGIN - cardWidth;
+  const fitsRight = screenPosition.x + CARD_STAR_OFFSET + cardWidth < cw - CARD_SAFE_MARGIN;
   const rawLeft = fitsRight
-    ? screenPosition.x + SPOTLIGHT_CONFIG.CARD_OFFSET_X
-    : screenPosition.x - SPOTLIGHT_CONFIG.CARD_OFFSET_X - cardWidth;
+    ? screenPosition.x + CARD_STAR_OFFSET
+    : screenPosition.x - CARD_STAR_OFFSET - cardWidth;
   const cardLeft = Math.max(CARD_SAFE_MARGIN, Math.min(rawLeft, rightEdgeLimit));
 
-  const estimatedHeight = expanded ? 200 : 80;
-  const clampedTop = Math.max(CARD_TOP_SAFE_ZONE, Math.min(screenPosition.y, vh - estimatedHeight - CARD_SAFE_MARGIN));
+  const estimatedHeight = 120;
+  const clampedTop = Math.max(CARD_TOP_SAFE_ZONE, Math.min(screenPosition.y, ch - estimatedHeight - CARD_SAFE_MARGIN));
+
+  const buildKeywordOptions = (keyword: string) => {
+    const options = [
+      {
+        label: 'Search - All Pods',
+        icon: <ScanSearch className="w-3.5 h-3.5" />,
+        color: HIERARCHY_COLORS.ALL_PODS,
+        onClick: () => onKeywordSearch?.(keyword, undefined, undefined, true),
+      },
+    ];
+    if (feedId) {
+      options.push({
+        label: 'Search - This Feed',
+        icon: <ScanSearch className="w-3.5 h-3.5" />,
+        color: HIERARCHY_COLORS.FEED,
+        onClick: () => onKeywordSearch?.(keyword, String(feedId)),
+      });
+    }
+    if (episodeGuid) {
+      options.push({
+        label: 'Search - This Episode',
+        icon: <ScanSearch className="w-3.5 h-3.5" />,
+        color: HIERARCHY_COLORS.EPISODE,
+        onClick: () => onKeywordSearch?.(keyword, undefined, episodeGuid),
+      });
+    }
+    return options;
+  };
 
   return (
     <div
@@ -1274,11 +1320,11 @@ const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, i
         maxWidth: cardWidth,
       }}
     >
-      <div className="bg-black/95 backdrop-blur-sm border border-gray-600 rounded-lg p-2 shadow-2xl shadow-black/60">
-        {/* Compact header: image + title + hierarchy dot + expand toggle */}
-        <div className="flex items-center gap-1.5">
+      <div className="bg-black/95 backdrop-blur-sm border border-gray-600 rounded-lg p-3 shadow-2xl shadow-black/60">
+        {/* Header: image + title + date */}
+        <div className="flex items-start gap-2.5">
           {tooltipImage && (
-            <div className="w-7 h-7 rounded overflow-hidden flex-shrink-0 relative">
+            <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0 relative">
               {!imgLoaded && !imgError && <div className="w-full h-full bg-gray-800 animate-pulse" />}
               <img
                 src={tooltipImage}
@@ -1289,46 +1335,31 @@ const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, i
               />
             </div>
           )}
-          <div
-            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-            style={{ backgroundColor: hierarchyColor, boxShadow: `0 0 6px ${hierarchyColor}` }}
-          />
-          <h3 className="text-[11px] font-medium text-white flex-1 min-w-0 truncate">{title}</h3>
-          <button
-            onClick={() => setExpanded(prev => !prev)}
-            className="text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0 p-0.5"
-            aria-label={expanded ? 'Collapse' : 'Expand'}
-          >
-            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-        </div>
-
-        {/* Expanded section: quote + date */}
-        {expanded && (
-          <div className="mt-1.5 pt-1.5 border-t border-gray-700/60">
-            <p className="text-[10px] text-gray-400 line-clamp-3 leading-relaxed">{subtitle}</p>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xs font-medium text-white line-clamp-2 leading-snug">{title}</h3>
             {hasDate && (
-              <div className="flex items-center gap-1 mt-1">
-                <Calendar className="w-2.5 h-2.5 text-gray-500" />
-                <span className="text-[10px] text-gray-500">
+              <div className="flex items-center gap-1.5 mt-1">
+                <Calendar className="w-3 h-3 text-gray-500" />
+                <span className="text-[11px] text-gray-500">
                   {typeof dateValue === 'string' ? formatShortDate(dateValue) : ''}
                 </span>
               </div>
             )}
           </div>
-        )}
+        </div>
 
-        {/* Keywords — always visible, smaller pills */}
+        {/* Keywords with scope tooltip — capped to 5 chips */}
         {keywords && keywords.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-gray-700/60">
-            {keywords.map((kw, i) => (
-              <button
+          <div className="flex flex-wrap gap-0.5 mt-1.5 pt-1 border-t border-gray-700/60">
+            {keywords.slice(0, 5).map((kw, i) => (
+              <KeywordTooltip
                 key={i}
-                onClick={() => onKeywordClick?.(kw)}
-                className="text-[10px] px-1.5 py-px rounded-full bg-gray-800/80 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors border border-gray-700/60 cursor-pointer"
-              >
-                {kw}
-              </button>
+                keyword={kw}
+                compact
+                isOpen={openTooltipKeyword === kw}
+                onOpenChange={(isOpen) => setOpenTooltipKeyword(isOpen ? kw : null)}
+                options={buildKeywordOptions(kw)}
+              />
             ))}
           </div>
         )}
@@ -2243,15 +2274,16 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
     }
   }, [selectedStarId]);
 
-  // Spotlight camera pan — disabled for now. When enabled, clicking a star zooms the
-  // camera behind it (SPOTLIGHT_CONFIG.BEHIND_OFFSET away from cluster center) with a
-  // mild top-down angle (ISO_ELEVATION), lerping at LERP_SPEED per frame via
-  // SpotlightAnimator. The selected star sits in the foreground with the rest of the
-  // field visible behind it. Orbit/pan exits spotlight but keeps the selection.
-  // To re-enable: uncomment this effect and the SelectionCard render below.
-  /*
+  // Spotlight camera pan (widescreen, non-embed only): clicking a star zooms the camera
+  // behind it with a mild top-down angle, lerping via SpotlightAnimator.
+  // If the intro animation is still playing when a star is selected, cancel it immediately
+  // so the spotlight can proceed without waiting for the zoom-out + spin to finish.
   useEffect(() => {
-    if (selectedStarId && !isAnimatingCamera && !isNarrowLayout) {
+    if (selectedStarId && !hideOptions) {
+      if (isAnimatingCamera) {
+        cameraAnimationRef.current = null;
+        setIsAnimatingCamera(false);
+      }
       const result = results.find(r => r.shareLink === selectedStarId);
       if (result) {
         const worldPos = new THREE.Vector3(
@@ -2270,8 +2302,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       setIsSpotlightAnimating(false);
       setSpotlightScreenPos(null);
     }
-  }, [selectedStarId, results, isAnimatingCamera, isNarrowLayout]);
-  */
+  }, [selectedStarId, results, hideOptions]);
 
   // Detect when user starts orbiting/panning — exit spotlight (but keep selection)
   useEffect(() => {
@@ -2602,17 +2633,17 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         />
       )}
 
-      {/* Selection card (spotlight mode — desktop only) — temporarily hidden while iterating on design
-      {!isNarrowLayout && (
+      {/* Selection card (spotlight mode — desktop, non-embed only) */}
+      {!isNarrowLayout && !hideOptions && (
         <SelectionCard
           result={selectedStarId ? results.find(r => r.shareLink === selectedStarId) ?? null : null}
           screenPosition={spotlightScreenPos}
           isVisible={isSpotlightActive && !isSpotlightAnimating}
           keywords={spotlightKeywords}
-          onKeywordClick={handleKeywordClick}
+          onKeywordSearch={onKeywordSearch}
+          containerSize={containerSize}
         />
       )}
-      */}
 
       {/* Keyword filter banner — shown when a keyword chip is clicked */}
       {activeKeywordFilter && (
@@ -2998,12 +3029,19 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           cameraRef={cameraRef}
           controlsRef={controlsRef}
           onReachedTarget={handleSpotlightReached}
+          isNarrowLayout={isNarrowLayout}
         />
 
         <GalaxyScene
           results={results}
           selectedStarId={selectedStarId}
-          onStarClick={onStarClick}
+          onStarClick={(result) => {
+            if (result.shareLink === selectedStarId) {
+              handleRecenterSpotlight();
+            } else {
+              onStarClick(result);
+            }
+          }}
           onStarRightClick={handleStarRightClick}
           onHover={setHoveredResult}
           axisLabels={axisLabels || null}

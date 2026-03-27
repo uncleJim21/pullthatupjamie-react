@@ -24,7 +24,7 @@ import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import { getFountainLink } from '../services/fountainService.ts';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles, Zap, Lightbulb, HelpCircle, CheckCircle, AlertCircle} from 'lucide-react';
+import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Sparkles, Zap, Lightbulb, HelpCircle, CheckCircle, AlertCircle} from 'lucide-react';
 import SearchModeExplainerModal from './SearchModeExplainerModal.tsx';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
@@ -3107,7 +3107,47 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
 
   // Check if we should show nebula background
   const showNebulaBackground = !hasSearchedInMode(searchMode) && !isClipBatchPage && !isSharePage;
-  
+
+  const navigateToResult = useCallback((index: number) => {
+    const result = galaxyResults[index];
+    if (!result) return;
+    printLog(`[Navigation] Moving to result at index ${index}`);
+    setCurrentResultIndex(index);
+    setSelectedParagraphId(result.shareLink);
+    setSelectedAudioContext({
+      audioUrl: result.audioUrl,
+      timeContext: {
+        start_time: result.timeContext?.start_time ?? 0,
+        end_time: result.timeContext?.end_time ?? 0,
+      },
+      episode: result.episode,
+      episodeImage: result.episodeImage || '',
+      creator: result.creator,
+      listenLink: result.listenLink,
+      date: result.date,
+      quote: result.quote,
+      summary: result.summary,
+      headline: result.headline,
+      hierarchyLevel: result.hierarchyLevel,
+      shareLink: result.shareLink,
+    });
+    if (!isEmbedMode && isNarrowLayout && result.audioUrl) {
+      window.dispatchEvent(
+        new CustomEvent('playAudioTrack', {
+          detail: {
+            id: result.shareLink,
+            audioUrl: result.audioUrl,
+            startTime: result.timeContext?.start_time ?? 0,
+            endTime: result.timeContext?.end_time,
+          },
+        }),
+      );
+    }
+  }, [galaxyResults, isEmbedMode, isNarrowLayout]);
+
+  const canGoPrev = Boolean(selectedAudioContext && currentResultIndex > 0);
+  const canGoNext = Boolean(selectedAudioContext && currentResultIndex < galaxyResults.length - 1);
+
   return (
     <AudioControllerProvider>
     {/* Nebula background - rendered at root level for proper layering */}
@@ -4042,18 +4082,27 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 brandColors={isEmbedMode ? (brandColors || undefined) : undefined}
                 isCompactHeight={isEmbedMode && isCompactHeight}
                 isNarrowLayout={isNarrowLayout}
-                onKeywordSearch={async (keyword) => {
-                  printLog(`Keyword search from galaxy: keyword="${keyword}"`);
+                onKeywordSearch={async (keyword, feedId, guid, forceSearchAll = false) => {
+                  printLog(`Keyword search from galaxy: keyword="${keyword}", feedId="${feedId}", guid="${guid}", forceSearchAll="${forceSearchAll}"`);
                   resetContextPanelState();
                   setConversation(prev => prev.filter(item => item.type !== 'podcast-search'));
                   setQuery(keyword);
                   setGridFadeOut(true);
                   setSearchState(prev => ({ ...prev, isLoading: true }));
                   setIsDecelerationComplete(false);
+
+                  const override: KeywordSearchOverride | undefined = forceSearchAll
+                    ? { scope: 'all' }
+                    : guid
+                      ? { scope: 'episode', guid }
+                      : feedId
+                        ? { scope: 'feed', feedId }
+                        : undefined;
+
                   if (resultViewStyle === SearchResultViewStyle.GALAXY) {
-                    await performQuoteSearch3D(keyword);
+                    await performQuoteSearch3D(keyword, override);
                   } else {
-                    await performQuoteSearch(keyword);
+                    await performQuoteSearch(keyword, override);
                   }
                 }}
               />
@@ -4298,6 +4347,31 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 <div className="w-10"></div>
               </div>
             )}
+            {/* Result navigation strip — galaxy view, when a result is selected */}
+            {selectedAudioContext && resultViewStyle === SearchResultViewStyle.GALAXY && galaxyResults.length > 1 && (
+              <div className={`relative z-[60] flex items-center justify-between mb-1.5 px-1 ${isNarrowLayout ? 'mr-10' : 'mr-14'}`}>
+                <button
+                  onClick={() => canGoPrev && navigateToResult(currentResultIndex - 1)}
+                  disabled={!canGoPrev}
+                  className="btn-nav"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  Prev
+                </button>
+                <span className="text-[11px] font-mono tabular-nums" style={{ color: 'rgba(184, 220, 228, 0.5)' }}>
+                  {currentResultIndex + 1} of {galaxyResults.length}
+                </span>
+                <button
+                  onClick={() => canGoNext && navigateToResult(currentResultIndex + 1)}
+                  disabled={!canGoNext}
+                  className="btn-nav"
+                >
+                  Next
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             {/* Mobile keyword bar — sandwiched above the search input */}
             {isNarrowLayout && mobileKeywords.length > 0 && selectedParagraphId && (
               <div className="relative -mb-1.5" style={{ marginRight: '3rem' }}>
@@ -4340,21 +4414,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               {/* Input (narrow) / Textarea (wide) */}
               {isNarrowLayout ? (
                 <div className="flex-1 relative">
-                  {query === '' && searchMode === 'podcast-search' && (
-                    <span
-                      className="absolute left-3 top-2 text-gray-500 pointer-events-none select-none transition-opacity text-sm"
-                      style={{ opacity: typewriter.opacity, transitionDuration: `${TYPEWRITER_FADE_MS}ms` }}
-                    >
-                      {typewriter.text}<span className="animate-pulse">|</span>
-                    </span>
-                  )}
                   <input
                     ref={searchInputRef as any}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => setIsSearchFocused(true)}
                     onBlur={() => setIsSearchFocused(false)}
-                    placeholder={searchMode !== 'podcast-search' ? `Search the web privately with LLM summary` : ''}
+                    placeholder={searchMode === 'podcast-search' ? 'Search...' : 'Search the web privately with LLM summary'}
                     className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg min-h-[36px]"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -4366,21 +4432,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 </div>
               ) : (
                 <div className="flex-1 relative">
-                  {query === '' && searchMode === 'podcast-search' && (
-                    <span
-                      className="absolute left-4 top-3 text-gray-500 pointer-events-none select-none transition-opacity"
-                      style={{ opacity: typewriter.opacity, transitionDuration: `${TYPEWRITER_FADE_MS}ms` }}
-                    >
-                      {typewriter.text}<span className="animate-pulse">|</span>
-                    </span>
-                  )}
                   <textarea
                     ref={searchInputRef}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => setIsSearchFocused(true)}
                     onBlur={() => setIsSearchFocused(false)}
-                    placeholder={searchMode !== 'podcast-search' ? `Search the web privately with LLM summary` : ''}
+                    placeholder={searchMode === 'podcast-search' ? 'Search...' : 'Search the web privately with LLM summary'}
                     className="w-full bg-black/80 backdrop-blur-lg border border-gray-800 rounded-lg shadow-white-glow px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 shadow-lg resize-none min-h-[50px] max-h-[200px] overflow-y-auto whitespace-pre-wrap"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
@@ -4603,87 +4661,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           isExpanded={isNarrowInfoExpanded}
           onExpandChange={(expanded) => setIsNarrowInfoExpanded(expanded)}
           isCompactHeight={isEmbedMode && isCompactHeight}
-          onPrevious={selectedAudioContext && currentResultIndex > 0 ? () => {
-            const prevIndex = currentResultIndex - 1;
-            const prevResult = galaxyResults[prevIndex];
-            if (prevResult) {
-              printLog(`[Navigation] Moving to previous result at index ${prevIndex}`);
-              setCurrentResultIndex(prevIndex);
-              setSelectedParagraphId(prevResult.shareLink);
-              setSelectedAudioContext({
-                audioUrl: prevResult.audioUrl,
-                timeContext: {
-                  start_time: prevResult.timeContext?.start_time ?? 0,
-                  end_time: prevResult.timeContext?.end_time ?? 0,
-                },
-                episode: prevResult.episode,
-                episodeImage: prevResult.episodeImage || '',
-                creator: prevResult.creator,
-                listenLink: prevResult.listenLink,
-                date: prevResult.date,
-                quote: prevResult.quote,
-                summary: prevResult.summary,
-                headline: prevResult.headline,
-                hierarchyLevel: prevResult.hierarchyLevel,
-                shareLink: prevResult.shareLink,
-              });
-
-              // Match embed-mode UX: immediately play the next/previous clip when user navigates.
-              // (Non-embed narrow mode does not have hover-autoplay.)
-              if (!isEmbedMode && isNarrowLayout && prevResult.audioUrl) {
-                window.dispatchEvent(
-                  new CustomEvent('playAudioTrack', {
-                    detail: {
-                      id: prevResult.shareLink,
-                      audioUrl: prevResult.audioUrl,
-                      startTime: prevResult.timeContext?.start_time ?? 0,
-                      endTime: prevResult.timeContext?.end_time,
-                    },
-                  }),
-                );
-              }
-            }
-          } : undefined}
-          onNext={selectedAudioContext && currentResultIndex < galaxyResults.length - 1 ? () => {
-            const nextIndex = currentResultIndex + 1;
-            const nextResult = galaxyResults[nextIndex];
-            if (nextResult) {
-              printLog(`[Navigation] Moving to next result at index ${nextIndex}`);
-              setCurrentResultIndex(nextIndex);
-              setSelectedParagraphId(nextResult.shareLink);
-              setSelectedAudioContext({
-                audioUrl: nextResult.audioUrl,
-                timeContext: {
-                  start_time: nextResult.timeContext?.start_time ?? 0,
-                  end_time: nextResult.timeContext?.end_time ?? 0,
-                },
-                episode: nextResult.episode,
-                episodeImage: nextResult.episodeImage || '',
-                creator: nextResult.creator,
-                listenLink: nextResult.listenLink,
-                date: nextResult.date,
-                quote: nextResult.quote,
-                summary: nextResult.summary,
-                headline: nextResult.headline,
-                hierarchyLevel: nextResult.hierarchyLevel,
-                shareLink: nextResult.shareLink,
-              });
-
-              // Match embed-mode UX: immediately play the next/previous clip when user navigates.
-              if (!isEmbedMode && isNarrowLayout && nextResult.audioUrl) {
-                window.dispatchEvent(
-                  new CustomEvent('playAudioTrack', {
-                    detail: {
-                      id: nextResult.shareLink,
-                      audioUrl: nextResult.audioUrl,
-                      startTime: nextResult.timeContext?.start_time ?? 0,
-                      endTime: nextResult.timeContext?.end_time,
-                    },
-                  }),
-                );
-              }
-            }
-          } : undefined}
+          onPrevious={canGoPrev ? () => navigateToResult(currentResultIndex - 1) : undefined}
+          onNext={canGoNext ? () => navigateToResult(currentResultIndex + 1) : undefined}
         />
       )}
 
@@ -4866,87 +4845,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           researchSessionShareLinks={researchSessionItems.map(item => item.shareLink)}
           onAddToResearch={handleAddToResearchSession}
           onRemoveFromResearch={handleRemoveFromResearchSession}
-          onPreviousTrack={
-            selectedAudioContext && currentResultIndex > 0 ? () => {
-              const prevIndex = currentResultIndex - 1;
-              const prevResult = galaxyResults[prevIndex];
-              if (!prevResult) return;
-              printLog(`[Navigation] Moving to previous result at index ${prevIndex}`);
-              setCurrentResultIndex(prevIndex);
-              setSelectedParagraphId(prevResult.shareLink);
-              setSelectedAudioContext({
-                audioUrl: prevResult.audioUrl,
-                timeContext: {
-                  start_time: prevResult.timeContext?.start_time ?? 0,
-                  end_time: prevResult.timeContext?.end_time ?? 0,
-                },
-                episode: prevResult.episode,
-                episodeImage: prevResult.episodeImage || '',
-                creator: prevResult.creator,
-                listenLink: prevResult.listenLink,
-                date: prevResult.date,
-                quote: prevResult.quote,
-                summary: prevResult.summary,
-                headline: prevResult.headline,
-                hierarchyLevel: prevResult.hierarchyLevel,
-                shareLink: prevResult.shareLink,
-              });
-
-              // Always auto-play when user explicitly navigates tracks from the player UI.
-              if (prevResult.audioUrl) {
-                window.dispatchEvent(
-                  new CustomEvent('playAudioTrack', {
-                    detail: {
-                      id: prevResult.shareLink,
-                      audioUrl: prevResult.audioUrl,
-                      startTime: prevResult.timeContext?.start_time ?? 0,
-                      endTime: prevResult.timeContext?.end_time,
-                    },
-                  }),
-                );
-              }
-            } : undefined
-          }
-          onNextTrack={
-            selectedAudioContext && currentResultIndex < galaxyResults.length - 1 ? () => {
-              const nextIndex = currentResultIndex + 1;
-              const nextResult = galaxyResults[nextIndex];
-              if (!nextResult) return;
-              printLog(`[Navigation] Moving to next result at index ${nextIndex}`);
-              setCurrentResultIndex(nextIndex);
-              setSelectedParagraphId(nextResult.shareLink);
-              setSelectedAudioContext({
-                audioUrl: nextResult.audioUrl,
-                timeContext: {
-                  start_time: nextResult.timeContext?.start_time ?? 0,
-                  end_time: nextResult.timeContext?.end_time ?? 0,
-                },
-                episode: nextResult.episode,
-                episodeImage: nextResult.episodeImage || '',
-                creator: nextResult.creator,
-                listenLink: nextResult.listenLink,
-                date: nextResult.date,
-                quote: nextResult.quote,
-                summary: nextResult.summary,
-                headline: nextResult.headline,
-                hierarchyLevel: nextResult.hierarchyLevel,
-                shareLink: nextResult.shareLink,
-              });
-
-              if (nextResult.audioUrl) {
-                window.dispatchEvent(
-                  new CustomEvent('playAudioTrack', {
-                    detail: {
-                      id: nextResult.shareLink,
-                      audioUrl: nextResult.audioUrl,
-                      startTime: nextResult.timeContext?.start_time ?? 0,
-                      endTime: nextResult.timeContext?.end_time,
-                    },
-                  }),
-                );
-              }
-            } : undefined
-          }
+          onPreviousTrack={canGoPrev ? () => navigateToResult(currentResultIndex - 1) : undefined}
+          onNextTrack={canGoNext ? () => navigateToResult(currentResultIndex + 1) : undefined}
           onQuotaExceededSignUp={() => {
             setSignInModalInitialMode('signup');
             setIsSignInModalOpen(true);
