@@ -1236,6 +1236,7 @@ interface SelectionCardProps {
 
 const CARD_SAFE_MARGIN = 12;
 const CARD_TOP_SAFE_ZONE = 56;
+const CARD_BOTTOM_SAFE_ZONE = 180;
 
 const CARD_STAR_OFFSET = 32;
 
@@ -1272,14 +1273,14 @@ const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, i
   const ch = containerSize?.height || (typeof window !== 'undefined' ? window.innerHeight : 9999);
 
   const rightEdgeLimit = cw - CARD_SAFE_MARGIN - cardWidth;
-  const fitsRight = screenPosition.x + CARD_STAR_OFFSET + cardWidth < cw - CARD_SAFE_MARGIN;
-  const rawLeft = fitsRight
-    ? screenPosition.x + CARD_STAR_OFFSET
-    : screenPosition.x - CARD_STAR_OFFSET - cardWidth;
+  const fitsLeft = screenPosition.x - CARD_STAR_OFFSET - cardWidth > CARD_SAFE_MARGIN;
+  const rawLeft = fitsLeft
+    ? screenPosition.x - CARD_STAR_OFFSET - cardWidth
+    : screenPosition.x + CARD_STAR_OFFSET;
   const cardLeft = Math.max(CARD_SAFE_MARGIN, Math.min(rawLeft, rightEdgeLimit));
 
   const estimatedHeight = 120;
-  const clampedTop = Math.max(CARD_TOP_SAFE_ZONE, Math.min(screenPosition.y, ch - estimatedHeight - CARD_SAFE_MARGIN));
+  const clampedTop = Math.max(CARD_TOP_SAFE_ZONE, Math.min(screenPosition.y, ch - estimatedHeight - CARD_BOTTOM_SAFE_ZONE));
 
   const buildKeywordOptions = (keyword: string) => {
     const options = [
