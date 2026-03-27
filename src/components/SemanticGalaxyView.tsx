@@ -1273,7 +1273,7 @@ const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, i
   const ch = containerSize?.height || (typeof window !== 'undefined' ? window.innerHeight : 9999);
 
   const rightEdgeLimit = cw - CARD_SAFE_MARGIN - cardWidth;
-  const fitsLeft = screenPosition.x - CARD_STAR_OFFSET - cardWidth > CARD_SAFE_MARGIN;
+  const fitsLeft = screenPosition.x - CARD_STAR_OFFSET - cardWidth >= 0;
   const rawLeft = fitsLeft
     ? screenPosition.x - CARD_STAR_OFFSET - cardWidth
     : screenPosition.x + CARD_STAR_OFFSET;

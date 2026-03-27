@@ -273,7 +273,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
 
             {/* Content Info — takes the lion's share */}
             <div className="flex-1 min-w-0">
-              {!isCompactHeight && (
+              {!isCompactHeight && mode !== 'embed' && (
                 <div className="flex items-center gap-2 mb-0.5">
                   <div
                     className="w-2 h-2 rounded-full flex-shrink-0"
@@ -306,13 +306,13 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
             </div>
 
             {/* Playback Controls — right-side column */}
-            <div className={`flex flex-col items-center flex-shrink-0 ${isCompactHeight ? 'gap-1' : 'gap-1.5'}`}>
+            <div className={`flex flex-col items-center flex-shrink-0 ${isCompactHeight ? 'gap-0.5' : 'gap-1.5'}`}>
               {/* Play + Time */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handlePlayPause}
+                  onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
                   disabled={!audioUrl}
-                  className={`flex items-center justify-center rounded-full text-black transition-colors ${
+                  className={`flex items-center justify-center rounded-full text-black transition-colors touch-manipulation ${
                     isCompactHeight ? 'h-8 w-8' : 'h-10 w-10 sm:h-11 sm:w-11'
                   } ${
                     !audioUrl
@@ -333,27 +333,29 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
                 </span>
               </div>
 
-              {/* Seek -5s / +5s — hidden in compact height */}
-              {!isCompactHeight && (
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => isTrackActive && seekBy(-5)}
-                    disabled={!isTrackActive || !audioUrl}
-                    className="px-2.5 py-1 rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
-                    title="Back 5 seconds"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => isTrackActive && seekBy(5)}
-                    disabled={!isTrackActive || !audioUrl}
-                    className="px-2.5 py-1 rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
-                    title="Forward 5 seconds"
-                  >
-                    <RotateCw className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
+              {/* Seek -5s / +5s — always shown, smaller in compact mode */}
+              <div className="flex gap-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); isTrackActive && seekBy(-5); }}
+                  disabled={!isTrackActive || !audioUrl}
+                  className={`rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center touch-manipulation ${
+                    isCompactHeight ? 'px-1.5 py-0.5' : 'px-2.5 py-1'
+                  }`}
+                  title="Back 5 seconds"
+                >
+                  <RotateCcw className={isCompactHeight ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); isTrackActive && seekBy(5); }}
+                  disabled={!isTrackActive || !audioUrl}
+                  className={`rounded text-white transition-colors hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center touch-manipulation ${
+                    isCompactHeight ? 'px-1.5 py-0.5' : 'px-2.5 py-1'
+                  }`}
+                  title="Forward 5 seconds"
+                >
+                  <RotateCw className={isCompactHeight ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+                </button>
+              </div>
             </div>
           </div>
         )}
