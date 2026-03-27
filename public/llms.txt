@@ -20,6 +20,7 @@
 - [Podcast Discovery](https://www.pullthatupjamie.ai/api/discover-podcasts): LLM-assisted podcast discovery across 4M+ podcasts via the Podcast Index — free tier available
 - [On-Demand Transcription](https://www.pullthatupjamie.ai/api/on-demand/submitOnDemandRun): Submit any podcast episode for transcription, chaptering, and permanent semantic indexing
 - [Clip Creation](https://www.pullthatupjamie.ai/api/make-clip): Generate shareable audio/video clips with burned-in subtitles from search results
+- [Transcript Download](https://www.pullthatupjamie.ai/api/on-demand/transcript/{jobId}/{guid}): Download full transcript JSON for a transcribed episode — requires the same L402 credential used to pay for the job (streamed, supports large files)
 
 ## Canonical Workflows
 
@@ -44,8 +45,9 @@ Find a podcast or episode that isn't indexed yet, get it transcribed, then searc
 1. `POST /api/discover-podcasts` with a natural language query — returns matching podcasts/episodes across 4M+ feeds, each flagged with transcript availability
 2. If `hasTranscripts: true` → go straight to `POST /api/search-quotes` with the feedId
 3. If `hasTranscripts: false` → `POST /api/on-demand/submitOnDemandRun` with the episode GUID and feedId to submit for transcription
-4. `POST /api/on-demand/getOnDemandJobStatus` with the jobId — poll every 15s until status is "complete" (typically 30-120s per episode)
-5. `POST /api/search-quotes` with the feedId — the newly transcribed content is now permanently searchable
+4. `POST /api/on-demand/getOnDemandJobStatus` with the jobId — poll every 15s until status is "complete" (typically 30-120s per episode). If you include the same L402 `Authorization` header used to pay, each completed episode includes a `transcriptUrl`
+5. `GET /api/on-demand/transcript/{jobId}/{guid}` with the same L402 header — download the full transcript JSON
+6. `POST /api/search-quotes` with the feedId — the newly transcribed content is now permanently searchable
 
 ### Quote → Clip → Share
 Find an exact quote and turn it into a shareable video clip with burned-in subtitles.
@@ -66,7 +68,7 @@ When starting from a broad or ambiguous request like "research what people are s
 1. `POST /api/discover-podcasts` with the vague query — find relevant podcasts and episodes across the full Podcast Index catalog
 2. For each result, check the transcript availability flag:
    - **Transcript available** → `POST /api/search-quotes` with the feedId to search existing transcripts immediately
-   - **No transcript** → `POST /api/on-demand/submitOnDemandRun` to request transcription, then poll `/api/on-demand/getOnDemandJobStatus` until complete, then search
+   - **No transcript** → `POST /api/on-demand/submitOnDemandRun` to request transcription, then poll `/api/on-demand/getOnDemandJobStatus` until complete (include L402 header to get `transcriptUrl` for full transcript download), then search
 3. `POST /api/search-chapters` across discovered feedIds — broaden the survey to chapter-level metadata for additional context
 4. `POST /api/research-sessions/` — collect the best findings into a session
 5. `POST /api/research-sessions/{id}/analyze` — generate an AI synthesis of everything found
