@@ -1273,7 +1273,7 @@ const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, i
   const ch = containerSize?.height || (typeof window !== 'undefined' ? window.innerHeight : 9999);
 
   const rightEdgeLimit = cw - CARD_SAFE_MARGIN - cardWidth;
-  const fitsLeft = screenPosition.x - CARD_STAR_OFFSET - cardWidth >= 0;
+  const fitsLeft = screenPosition.x > CARD_SAFE_MARGIN + CARD_STAR_OFFSET;
   const rawLeft = fitsLeft
     ? screenPosition.x - CARD_STAR_OFFSET - cardWidth
     : screenPosition.x + CARD_STAR_OFFSET;
@@ -2340,6 +2340,19 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
       });
     }
   }, []);
+
+  // Recompute spotlight screen position when the container resizes (e.g. context panel
+  // opens/closes) so the card tracks the star correctly.
+  useEffect(() => {
+    if (!isSpotlightActive || isSpotlightAnimating) return;
+    if (!cameraRef.current || !containerRef.current || !spotlightTargetRef.current) return;
+    const projected = spotlightTargetRef.current.clone().project(cameraRef.current);
+    const rect = containerRef.current.getBoundingClientRect();
+    setSpotlightScreenPos({
+      x: (projected.x * 0.5 + 0.5) * rect.width,
+      y: (-projected.y * 0.5 + 0.5) * rect.height,
+    });
+  }, [containerSize.width, containerSize.height, isSpotlightActive, isSpotlightAnimating]);
 
   // Keyword click handler: activate Tier 1 (highlight matches in galaxy)
   const handleKeywordClick = useCallback((keyword: string) => {
