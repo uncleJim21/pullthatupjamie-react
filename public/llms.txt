@@ -43,8 +43,8 @@ Find everything someone has said publicly across indexed podcasts.
 ### Discover → Index → Search (New Content)
 Find a podcast or episode that isn't indexed yet, get it transcribed, then search it.
 1. `POST /api/discover-podcasts` with a natural language query — returns matching podcasts/episodes across 4M+ feeds, each flagged with transcript availability
-2. If `hasTranscripts: true` → go straight to `POST /api/search-quotes` with the feedId
-3. If `hasTranscripts: false` → `POST /api/on-demand/submitOnDemandRun` with the episode GUID and feedId to submit for transcription
+2. If `transcriptAvailable: true` → go straight to `POST /api/search-quotes` with the feedId
+3. If `transcriptAvailable: false` → `POST /api/on-demand/submitOnDemandRun` with the episode `guid`, `feedGuid`, and `feedId` (all three required — available directly from the discover response's `nextSteps.requestTranscription.bodyTemplate.episodes`)
 4. `POST /api/on-demand/getOnDemandJobStatus` with the jobId — poll every 15s until status is "complete" (typically 30-120s per episode). If you include the same L402 `Authorization` header used to pay, each completed episode includes a `transcriptUrl`
 5. `GET /api/on-demand/transcript/{jobId}/{guid}` with the same L402 header — download the full transcript JSON
 6. `POST /api/search-quotes` with the feedId — the newly transcribed content is now permanently searchable
