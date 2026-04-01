@@ -15,7 +15,7 @@
 
 ## Key Endpoints
 
-- [Semantic Search](https://www.pullthatupjamie.ai/api/search-quotes): Vector search across podcast transcripts with filtering by feed, episode, date range
+- [Semantic Search](https://www.pullthatupjamie.ai/api/search-quotes): Vector search across podcast transcripts with filtering by feed (`feedIds`), episode (`guid` for one, `guids` for multiple), and date range (`minDate`/`maxDate`)
 - [Chapter Search](https://www.pullthatupjamie.ai/api/search-chapters): Search chapter metadata (keywords, headlines, summaries) across the corpus — L402 required
 - [Podcast Discovery](https://www.pullthatupjamie.ai/api/discover-podcasts): LLM-assisted podcast discovery across 4M+ podcasts via the Podcast Index — free tier available
 - [On-Demand Transcription](https://www.pullthatupjamie.ai/api/on-demand/submitOnDemandRun): Submit any podcast episode for transcription, chaptering, and permanent semantic indexing
@@ -36,7 +36,7 @@ Survey the landscape, then drill into specifics, then collect and analyze.
 Find everything someone has said publicly across indexed podcasts.
 1. `GET /api/corpus/people?search={name}` — find the person and their appearance count
 2. `POST /api/corpus/people/episodes` with `{ "name": "..." }` — get all episodes they appeared on
-3. `POST /api/search-quotes` filtered by their feedIds or episode GUIDs — search their quotes
+3. `POST /api/search-quotes` with `guids` array from step 2 results — search their quotes across all matched episodes in one request
 4. `POST /api/research-sessions/` — collect relevant clips into a session
 5. `POST /api/research-sessions/{id}/share` — share the dossier
 
