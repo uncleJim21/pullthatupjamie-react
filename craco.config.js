@@ -13,6 +13,13 @@ module.exports = {
         assert: require.resolve('assert'),
       };
 
+      // Allow non-fully-specified imports (e.g. 'process/browser')
+      // required by ESM packages like react-router >=7.12
+      webpackConfig.module.rules.push({
+        test: /\.m?js/,
+        resolve: { fullySpecified: false },
+      });
+
       // Provide globals
       webpackConfig.plugins.push(
         new webpack.ProvidePlugin({
