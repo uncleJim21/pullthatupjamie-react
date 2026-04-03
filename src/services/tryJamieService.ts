@@ -53,6 +53,14 @@ export interface OnDemandRunResponse {
   totalFeeds: number;
   message: string;
   awsResponse?: any;
+  nextSteps?: {
+    pollJobStatus?: {
+      method: string;
+      url: string;
+      body: { jobId: string };
+      pollIntervalSeconds: number;
+    };
+  };
 }
 
 export interface OnDemandJobStatus {
@@ -132,14 +140,17 @@ class TryJamieService {
   static async getOnDemandJobStatus(jobId: string): Promise<OnDemandJobStatus> {
     const token = localStorage.getItem('auth_token');
     const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
       ...getPulseHeader(),
     };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    const res = await fetch(`${BASE_URL}/api/on-demand/getOnDemandJobStatus/${jobId}`, {
+    const res = await fetch(`${BASE_URL}/api/on-demand/getOnDemandJobStatus`, {
+      method: 'POST',
       headers,
+      body: JSON.stringify({ jobId }),
     });
     
     if (!res.ok) {
