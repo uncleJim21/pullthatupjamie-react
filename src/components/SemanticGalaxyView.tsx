@@ -1258,7 +1258,7 @@ const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, i
     setOpenTooltipKeyword(null);
   }, [result]);
 
-  if (!result || !screenPosition || !isVisible) return null;
+  if (!result || !screenPosition) return null;
 
   const tooltipImage = extractImageFromAny(result);
   const title = result.tooltipTitle ?? result.headline ?? result.episode ?? 'Unknown title';
@@ -1313,7 +1313,7 @@ const SelectionCard: React.FC<SelectionCardProps> = ({ result, screenPosition, i
   return (
     <div
       ref={cardRef}
-      className="absolute z-50 pointer-events-auto animate-fade-in"
+      className={`absolute z-50 pointer-events-auto transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       style={{
         left: cardLeft,
         top: clampedTop,
@@ -2639,20 +2639,19 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         )}
       </div>
       
-      {/* Hover preview for stars — hidden when spotlight card is showing */}
-      {!isSpotlightActive && (
-        <HoverPreview 
-          result={hoveredResult} 
-          position={mousePosition}
-        />
-      )}
+      {/* Hover preview for stars */}
+      <HoverPreview 
+        result={hoveredResult} 
+        position={mousePosition}
+      />
 
       {/* Selection card (spotlight mode — desktop, non-embed only) */}
+      {/* Fades out when hovering a different star so the hover tooltip is unobstructed */}
       {!isNarrowLayout && !hideOptions && (
         <SelectionCard
           result={selectedStarId ? results.find(r => r.shareLink === selectedStarId) ?? null : null}
           screenPosition={spotlightScreenPos}
-          isVisible={isSpotlightActive && !isSpotlightAnimating}
+          isVisible={isSpotlightActive && !isSpotlightAnimating && !hoveredResult}
           keywords={spotlightKeywords}
           onKeywordSearch={onKeywordSearch}
           containerSize={containerSize}
