@@ -19,6 +19,7 @@ import BlogIndex from './components/blog/BlogIndex.tsx';
 import BlogPost from './components/blog/BlogPost.tsx';
 import UpgradePage from './components/UpgradePage.tsx';
 import PoastPage from './components/PoastPage.tsx';
+import WorkflowChatPage from './pages/WorkflowChatPage.tsx';
 import { DEBUG_MODE } from './constants/constants.ts';
 import { inject } from "@vercel/analytics"
 
@@ -142,6 +143,7 @@ const App = () => (
       <Route path="/app/feed/:feedId/myRssVideos" element={<PodcastFeedPage initialView="uploads" defaultTab="rss-feed" />} />
       <Route path="/app/automation-settings" element={<AutomationSettingsPage />} />
       <Route path="/app/poast" element={<PoastPage />} />
+      <Route path="/app/workflow" element={<WorkflowChatPage />} />
       <Route path="/try-jamie" element={<TryJamieWizard />} />
       <Route path="/auth/twitter/complete" element={<TwitterAuthCallback />} />
       {DEBUG_MODE && <Route path="/twitter-test" element={<TwitterTest />} />}
