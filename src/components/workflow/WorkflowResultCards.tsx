@@ -260,12 +260,12 @@ export const IterationTracker: React.FC<{ iterations: WorkflowIterationEvent[] }
     <div className="space-y-1.5">
       {iterations.map((it, i) => (
         <div key={i} className="flex items-center gap-2 text-xs">
-          {it.status === 'executing' ? (
-            <Loader2 className="w-3 h-3 text-gray-400 animate-spin" />
-          ) : it.status === 'complete' ? (
-            <CheckCircle className="w-3 h-3 text-green-500/70" />
+          {it.status === 'complete' ? (
+            <CheckCircle className="w-3 h-3 text-green-500/70 flex-shrink-0" />
+          ) : it.status === 'error' && it.error ? (
+            <AlertCircle className="w-3 h-3 text-red-500/70 flex-shrink-0" />
           ) : (
-            <AlertCircle className="w-3 h-3 text-red-500/70" />
+            <Loader2 className="w-3 h-3 text-white animate-spin flex-shrink-0" />
           )}
           <span className="text-gray-400">{it.step}</span>
           {it.status === 'complete' && it.resultCount != null && (

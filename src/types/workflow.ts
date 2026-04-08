@@ -19,7 +19,7 @@ export interface WorkflowIterationEvent {
   step: string;
   params?: Record<string, unknown>;
   resultCount?: number;
-  status: 'executing' | 'complete' | 'error';
+  status: 'executing' | 'running' | 'complete' | 'error';
   error?: string;
 }
 
@@ -51,13 +51,14 @@ export interface WorkflowClip {
   text: string;
   speaker: string;
   podcast: string;
-  timestamp: string;
+  episodeImage?: string;
+  timestamp: string | number;
   date: string;
   similarity: number;
   shareUrl: string;
   miniPlayer: ClipMiniPlayer;
   guid: string;
-  feedId: string;
+  feedId: string | number;
 }
 
 export interface WorkflowChapter {
@@ -109,6 +110,7 @@ export interface WorkflowStructuredResponse {
   sessionId: string;
   iterationsUsed: number;
   workflowType: string;
+  summary: string | null;
   results: WorkflowResults;
   steps: WorkflowStep[];
   cost: WorkflowCost;
@@ -120,6 +122,7 @@ export interface WorkflowTextResponse {
   sessionId: string;
   iterationsUsed: number;
   workflowType: string;
+  summary: string | null;
   text: string;
   steps: WorkflowStep[];
   cost: WorkflowCost;
