@@ -1,231 +1,105 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { AlertCircle, ShieldCheck, ShieldX, ChevronDown, Link as LinkIcon } from 'lucide-react';
-import type {
-  ChatMessage,
-  WorkflowClip,
-  WorkflowResults,
-} from '../../types/workflow';
-import { PodcastSearchResultItem } from '../podcast/PodcastSearchResultItem.tsx';
-import {
-  ChapterCard,
-  DiscoveryCard,
-  PersonEpisodeCard,
-  StepsTimeline,
-  IterationTracker,
-  ResponseMetadata,
-} from './WorkflowResultCards.tsx';
+import { AlertCircle, ShieldCheck, Link as LinkIcon } from 'lucide-react';
+import type { ChatMessage } from '../../types/workflow';
+import { ToolCallTracker, ResponseMetadata } from './WorkflowResultCards.tsx';
+import { FRONTEND_URL } from '../../constants/constants.ts';
 
-const CLIPS_PREVIEW_COUNT = 5;
+// ─── Inline clip pill (lightweight — just a share link) ─────────────────────
 
-// --- Inline pill card (matches UnifiedSidePanel's InlineCardMention) ---
-
-const InlineClipPill: React.FC<{
-  clip: WorkflowClip;
-  onClick?: (pineconeId: string) => void;
-}> = ({ clip, onClick }) => {
-  const title = clip.miniPlayer?.episode || clip.podcast || 'Source';
-  const imageUrl = clip.episodeImage;
-  const pineconeId = clip.miniPlayer?.pineconeId;
+const InlineClipPill: React.FC<{ pineconeId: string }> = ({ pineconeId }) => {
+  const shareUrl = `${FRONTEND_URL}/app/share?clip=${encodeURIComponent(pineconeId)}`;
+  const label = pineconeId.length > 40 ? `${pineconeId.slice(0, 18)}…${pineconeId.slice(-12)}` : pineconeId;
 
   return (
-    <span
-      className="inline-flex items-center gap-2 px-2 py-1 rounded-md border border-gray-800 bg-gray-900/40 align-middle cursor-pointer hover:bg-gray-900/70 transition-colors max-w-[420px]"
-      role="button"
-      tabIndex={0}
-      onClick={() => pineconeId && onClick?.(pineconeId)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          pineconeId && onClick?.(pineconeId);
-        }
-      }}
-      title={title}
-      aria-label={`Open source: ${title}`}
+    <a
+      href={shareUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-gray-800 bg-gray-900/40 align-middle hover:bg-gray-900/70 transition-colors max-w-[320px] no-underline"
+      title={`Open clip: ${pineconeId}`}
     >
-      {imageUrl ? (
-        <img
-          src={imageUrl}
-          alt=""
-          className="w-[14px] h-[14px] rounded-sm object-cover flex-shrink-0 opacity-90"
-          loading="lazy"
-        />
-      ) : (
-        <span className="w-[14px] h-[14px] rounded-sm bg-gray-800 flex items-center justify-center flex-shrink-0">
-          <LinkIcon className="w-3 h-3 text-gray-500" />
-        </span>
-      )}
-      <span className="text-xs text-gray-200 truncate">{title}</span>
-    </span>
+      <span className="w-[14px] h-[14px] rounded-sm bg-gray-800 flex items-center justify-center flex-shrink-0">
+        <LinkIcon className="w-3 h-3 text-gray-500" />
+      </span>
+      <span className="text-xs text-gray-200 truncate">{label}</span>
+    </a>
   );
 };
 
-// --- Token parser: replaces {{clip:id}} tokens inline within text ---
+// ─── Parse text with {{clip:...}} tokens into React nodes ───────────────────
 
-const TOKEN_RE = /\{\{(clip|chapter|episode):([^}]+)\}\}/g;
+const CLIP_TOKEN_RE = /\{\{clip:([^}]+)\}\}/g;
 
-function renderSummaryWithPills(
-  summary: string,
-  clipsByPineconeId: Map<string, WorkflowClip>,
-  inlinedClipIds: Set<string>,
-  onPillClick?: (pineconeId: string) => void,
-): React.ReactNode[] {
-  const result: React.ReactNode[] = [];
+function renderTextWithClipPills(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let keyCounter = 0;
 
-  for (const match of summary.matchAll(TOKEN_RE)) {
-    const before = summary.slice(lastIndex, match.index);
+  for (const match of text.matchAll(CLIP_TOKEN_RE)) {
+    const before = text.slice(lastIndex, match.index);
     if (before) {
-      result.push(...renderTextSegment(before, keyCounter));
-      keyCounter += before.split('\n\n').length;
+      parts.push(<React.Fragment key={`t-${keyCounter++}`}>{before}</React.Fragment>);
     }
-
-    const [, tokenType, tokenId] = match;
-    if (tokenType === 'clip') {
-      const clip = clipsByPineconeId.get(tokenId);
-      if (clip) {
-        inlinedClipIds.add(tokenId);
-        result.push(
-          <React.Fragment key={`pill-${keyCounter++}`}>
-            {'\n'}
-            <InlineClipPill clip={clip} onClick={onPillClick} />
-          </React.Fragment>
-        );
-      }
-    }
-
+    const pineconeId = match[1];
+    parts.push(
+      <React.Fragment key={`p-${keyCounter++}`}>
+        {'\n'}
+        <InlineClipPill pineconeId={pineconeId} />
+        {'\n'}
+      </React.Fragment>
+    );
     lastIndex = match.index! + match[0].length;
   }
 
-  const tail = summary.slice(lastIndex);
+  const tail = text.slice(lastIndex);
   if (tail) {
-    result.push(...renderTextSegment(tail, keyCounter));
+    parts.push(<React.Fragment key={`t-${keyCounter++}`}>{tail}</React.Fragment>);
   }
 
-  return result;
+  return parts.length === 1 ? parts[0] : parts;
 }
 
-function renderTextSegment(text: string, startKey: number): React.ReactNode[] {
-  return text.split('\n\n').map((para, j) => {
-    const trimmed = para.trim();
-    if (!trimmed) return null;
-    return (
-      <React.Fragment key={`t-${startKey + j}`}>
-        {j > 0 || startKey > 0 ? '\n\n' : ''}
-        {trimmed}
-      </React.Fragment>
-    );
-  }).filter(Boolean) as React.ReactNode[];
-}
+// ─── Suggested action card ──────────────────────────────────────────────────
 
-function renderClipItem(clip: WorkflowClip, i: number) {
-  return (
-    <PodcastSearchResultItem
-      key={clip.miniPlayer?.pineconeId || i}
-      quote={clip.text}
-      episode={clip.miniPlayer?.episode || clip.podcast}
-      creator={clip.speaker}
-      audioUrl={clip.miniPlayer?.audioUrl || ''}
-      date={clip.date || ''}
-      similarity={{ combined: clip.similarity, vector: clip.similarity }}
-      timeContext={{
-        start_time: clip.miniPlayer?.timestamp || 0,
-        end_time: (clip.miniPlayer?.timestamp || 0) + (clip.miniPlayer?.duration || 30),
-      }}
-      episodeImage={clip.episodeImage}
-      id={clip.miniPlayer?.pineconeId || `clip-${i}`}
-      shareUrl={clip.shareUrl || ''}
-      shareLink={clip.miniPlayer?.pineconeId || ''}
-    />
-  );
-}
-
-// --- Summary with inline pill citations ---
-
-const SummaryWithInlineCards: React.FC<{
-  summary: string;
-  results: WorkflowResults;
-  inlinedClipIds: Set<string>;
-}> = ({ summary, results, inlinedClipIds }) => {
-  const clipsByPineconeId = useMemo(() => {
-    const map = new Map<string, WorkflowClip>();
-    results.clips?.forEach(c => {
-      if (c.miniPlayer?.pineconeId) map.set(c.miniPlayer.pineconeId, c);
-    });
-    return map;
-  }, [results.clips]);
-
-  const handlePillClick = (pineconeId: string) => {
-    const el = document.getElementById(`clip-${pineconeId}`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
-
-  const rendered = useMemo(
-    () => renderSummaryWithPills(summary, clipsByPineconeId, inlinedClipIds, handlePillClick),
-    [summary, clipsByPineconeId, inlinedClipIds]
-  );
-
-  return (
-    <div className="bg-[#111111] border border-gray-800 rounded-lg p-5">
-      <div className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
-        {rendered}
+const SuggestedActionCard: React.FC<{ action: NonNullable<ChatMessage['suggestedAction']> }> = ({
+  action,
+}) => (
+  <div className="bg-[#111111] border border-blue-900/30 rounded-lg p-4">
+    <div className="flex items-start gap-2">
+      <ShieldCheck className="w-4 h-4 text-blue-400/70 flex-shrink-0 mt-0.5" />
+      <div>
+        <p className="text-gray-300 text-sm font-medium">
+          {action.type === 'submit-on-demand' ? 'Transcription suggested' : action.type}
+        </p>
+        <p className="text-gray-400 text-xs mt-1">{action.reason}</p>
+        {action.episodeTitle && (
+          <p className="text-gray-500 text-xs mt-1 italic">{action.episodeTitle}</p>
+        )}
       </div>
     </div>
-  );
-};
+  </div>
+);
 
-// --- Clips list ---
-
-const ClipsList: React.FC<{ clips: WorkflowClip[]; excludeIds?: Set<string> }> = ({
-  clips,
-  excludeIds,
-}) => {
-  const [expanded, setExpanded] = useState(false);
-  const filtered = excludeIds ? clips.filter(c => !excludeIds.has(c.miniPlayer?.pineconeId)) : clips;
-  if (!filtered.length) return null;
-
-  const hasMore = filtered.length > CLIPS_PREVIEW_COUNT;
-  const visible = expanded ? filtered : filtered.slice(0, CLIPS_PREVIEW_COUNT);
-
-  return (
-    <div>
-      <h3 className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-2">
-        {excludeIds?.size ? 'More clips' : 'Clips'} ({filtered.length})
-      </h3>
-      <div className="space-y-3">
-        {visible.map((clip, i) => (
-          <div key={clip.miniPlayer?.pineconeId || i} id={`clip-${clip.miniPlayer?.pineconeId}`}>
-            {renderClipItem(clip, i)}
-          </div>
-        ))}
-      </div>
-      {hasMore && !expanded && (
-        <button
-          onClick={() => setExpanded(true)}
-          className="flex items-center gap-1.5 mt-3 px-3 py-2 text-xs text-gray-400 hover:text-white bg-[#111111] border border-gray-800 rounded-lg hover:border-gray-700 transition-all w-full justify-center"
-        >
-          <ChevronDown className="w-3 h-3" />
-          Show {filtered.length - CLIPS_PREVIEW_COUNT} more clips
-        </button>
-      )}
-    </div>
-  );
-};
+// ─── Message component ──────────────────────────────────────────────────────
 
 interface WorkflowMessageProps {
   message: ChatMessage;
-  onApprove?: (sessionId: string) => void;
-  onDeny?: (messageId: string) => void;
 }
 
-export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({
-  message,
-  onApprove,
-  onDeny,
-}) => {
-  const inlinedClipIds = useMemo(() => new Set<string>(), []);
+export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message }) => {
+  const { statusMessages, toolCalls, toolResults, suggestedAction, text, donePayload, error, loading } =
+    message;
+
+  const hasClipTokens = text ? CLIP_TOKEN_RE.test(text) : false;
+  CLIP_TOKEN_RE.lastIndex = 0;
+
+  const renderedText = useMemo(() => {
+    if (!text) return null;
+    if (hasClipTokens) return renderTextWithClipPills(text);
+    return null;
+  }, [text, hasClipTokens]);
 
   if (message.role === 'user') {
     return (
@@ -236,10 +110,6 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({
       </div>
     );
   }
-
-  // --- Assistant message ---
-  const { textResponse, structuredResponse, statusMessages, iterations, approval, error, loading } =
-    message;
 
   return (
     <div className="flex justify-start">
@@ -255,140 +125,31 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({
           </div>
         )}
 
-        {/* Iteration progress */}
-        {iterations.length > 0 && <IterationTracker iterations={iterations} />}
-
-        {/* Approval card */}
-        {approval && (
-          <div className="bg-[#111111] border border-yellow-900/40 rounded-lg p-4">
-            <p className="text-yellow-200/80 text-sm font-medium mb-1">Approval required</p>
-            <p className="text-gray-400 text-xs mb-3">
-              {approval.pendingAction.description}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => onApprove?.(approval.sessionId)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg border border-gray-700 transition-colors"
-              >
-                <ShieldCheck className="w-3 h-3" />
-                Approve
-              </button>
-              <button
-                onClick={() => onDeny?.(message.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-transparent hover:bg-white/5 text-gray-400 rounded-lg border border-gray-800 transition-colors"
-              >
-                <ShieldX className="w-3 h-3" />
-                Deny
-              </button>
-            </div>
-          </div>
+        {/* Tool call progress */}
+        {toolCalls.length > 0 && (
+          <ToolCallTracker toolCalls={toolCalls} toolResults={toolResults} />
         )}
 
-        {/* Text response (Phase 1 — markdown) */}
-        {textResponse?.text && (
+        {/* Suggested action (non-blocking) */}
+        {suggestedAction && <SuggestedActionCard action={suggestedAction} />}
+
+        {/* Main text response */}
+        {text && (
           <div className="bg-[#111111] border border-gray-800 rounded-lg p-5">
-            <div className="prose prose-invert prose-sm max-w-none prose-p:text-gray-300 prose-headings:text-white prose-a:text-blue-400 prose-strong:text-white prose-code:text-gray-300 prose-code:bg-white/5 prose-code:px-1 prose-code:rounded">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {textResponse.text}
-              </ReactMarkdown>
-            </div>
+            {hasClipTokens ? (
+              <div className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
+                {renderedText}
+              </div>
+            ) : (
+              <div className="prose prose-invert prose-sm max-w-none prose-p:text-gray-300 prose-headings:text-white prose-a:text-blue-400 prose-strong:text-white prose-code:text-gray-300 prose-code:bg-white/5 prose-code:px-1 prose-code:rounded">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Summary with inline clip/chapter/episode cards */}
-        {structuredResponse?.summary && structuredResponse?.results && (
-          <SummaryWithInlineCards
-            summary={structuredResponse.summary}
-            results={structuredResponse.results}
-            inlinedClipIds={inlinedClipIds}
-          />
-        )}
-
-        {/* Plain summary (no results to inline) */}
-        {structuredResponse?.summary && !structuredResponse?.results && (
-          <div className="bg-[#111111] border border-gray-800 rounded-lg p-5">
-            {structuredResponse.summary.split('\n\n').map((para, i) => (
-              <p key={i} className={`text-gray-300 text-sm leading-relaxed ${i > 0 ? 'mt-3' : ''}`}>
-                {para}
-              </p>
-            ))}
-          </div>
-        )}
-
-        {/* Structured response (Phase 3 — remaining cards not shown inline) */}
-        {structuredResponse?.results && (
-          <div className="space-y-4">
-            {/* Clips not already shown inline in summary */}
-            {structuredResponse.results.clips?.length > 0 && (
-              <ClipsList clips={structuredResponse.results.clips} excludeIds={inlinedClipIds} />
-            )}
-
-            {/* Chapters */}
-            {structuredResponse.results.chapters?.length > 0 && (
-              <div>
-                <h3 className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-2">
-                  Chapters ({structuredResponse.results.chapters.length})
-                </h3>
-                <div className="space-y-2">
-                  {structuredResponse.results.chapters.map((ch, i) => (
-                    <ChapterCard key={i} chapter={ch} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Discoveries */}
-            {structuredResponse.results.discoveries?.length > 0 && (
-              <div>
-                <h3 className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-2">
-                  Discoveries ({structuredResponse.results.discoveries.length})
-                </h3>
-                <div className="space-y-2">
-                  {structuredResponse.results.discoveries.map((d, i) => (
-                    <DiscoveryCard key={i} discovery={d} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Person Episodes */}
-            {structuredResponse.results.personEpisodes?.length > 0 && (
-              <div>
-                <h3 className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-2">
-                  Appearances ({structuredResponse.results.personEpisodes.length})
-                </h3>
-                <div className="space-y-2">
-                  {structuredResponse.results.personEpisodes.map((ep, i) => (
-                    <PersonEpisodeCard key={i} episode={ep} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Steps timeline */}
-            {structuredResponse.steps && (
-              <StepsTimeline steps={structuredResponse.steps} />
-            )}
-
-            {/* Metadata footer */}
-            <ResponseMetadata
-              iterationsUsed={structuredResponse.iterationsUsed}
-              latencyMs={structuredResponse.latencyMs}
-              cost={structuredResponse.cost}
-              workflowType={structuredResponse.workflowType}
-            />
-          </div>
-        )}
-
-        {/* Text-mode metadata footer */}
-        {textResponse && !structuredResponse && (
-          <ResponseMetadata
-            iterationsUsed={textResponse.iterationsUsed}
-            latencyMs={textResponse.latencyMs}
-            cost={textResponse.cost}
-            workflowType={textResponse.workflowType}
-          />
-        )}
+        {/* Done metadata */}
+        {donePayload && <ResponseMetadata done={donePayload} />}
 
         {/* Error */}
         {error && (
@@ -399,7 +160,7 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({
         )}
 
         {/* Loading spinner */}
-        {loading && !iterations.length && !statusMessages.length && (
+        {loading && !toolCalls.length && !statusMessages.length && (
           <div className="flex items-center gap-2 py-2">
             <div className="w-4 h-4 rounded-full border-b-2 border-white animate-spin" />
             <span className="text-gray-500 text-xs">Thinking...</span>

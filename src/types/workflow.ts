@@ -1,147 +1,71 @@
-export interface WorkflowRequest {
-  task: string;
-  maxIterations?: number;
-  outputFormat: 'streaming' | 'structured' | 'text' | 'audio';
-  context?: Record<string, unknown>;
+// --- Agent endpoint request ---
+
+export interface AgentRequest {
+  message: string;
+  model?: 'fast' | 'quality';
+  sessionId?: string;
 }
 
 // --- SSE event payloads ---
 
-export interface WorkflowStatusEvent {
+export interface AgentStatusEvent {
   message: string;
   sessionId?: string;
-  workflowType?: string;
 }
 
-export interface WorkflowIterationEvent {
-  iteration: number;
-  maxIterations: number;
-  step: string;
-  params?: Record<string, unknown>;
-  resultCount?: number;
-  status: 'executing' | 'running' | 'complete' | 'error';
-  error?: string;
+export interface AgentToolCallEvent {
+  tool: string;
+  input: Record<string, unknown>;
+  round: number;
 }
 
-export interface WorkflowApprovalEvent {
+export interface AgentToolResultEvent {
+  tool: string;
+  resultCount: number;
+  latencyMs: number;
+  round: number;
+}
+
+export interface AgentSuggestedAction {
+  type: string;
+  reason: string;
+  episodeTitle?: string;
+  guid?: string;
+  feedId?: string;
+}
+
+export interface AgentTextEvent {
+  text: string;
+}
+
+export interface AgentDoneEvent {
   sessionId: string;
-  pendingAction: {
-    type: string;
-    description: string;
-    params: Record<string, unknown>;
-  };
+  model: string;
+  rounds: number;
+  toolCalls: { name: string; resultCount: number; latencyMs: number }[];
+  tokens: { input: number; output: number };
+  cost: { claude: number; tools: number; total: number };
+  latencyMs: number;
 }
 
-export interface WorkflowErrorEvent {
+export interface AgentErrorEvent {
   error: string;
-}
-
-// --- Structured result types ---
-
-export interface ClipMiniPlayer {
-  pineconeId: string;
-  timestamp: number;
-  duration: number;
-  episode: string;
-  speaker: string;
-  audioUrl: string;
-}
-
-export interface WorkflowClip {
-  text: string;
-  speaker: string;
-  podcast: string;
-  episodeImage?: string;
-  timestamp: string | number;
-  date: string;
-  similarity: number;
-  shareUrl: string;
-  miniPlayer: ClipMiniPlayer;
-  guid: string;
-  feedId: string | number;
-}
-
-export interface WorkflowChapter {
-  headline: string;
-  keywords: string[];
-  summary: string;
-  startTime: number;
-  endTime: number;
-  episode: string;
-  guid: string;
-  feedId: string;
-}
-
-export interface WorkflowDiscovery {
-  title: string;
-  author: string;
-  feedId: string;
-  transcriptAvailable: boolean;
-  description: string;
-}
-
-export interface WorkflowPersonEpisode {
-  title: string;
-  creator: string;
-  publishedDate: string;
-  guid: string;
-  feedId: string;
-  matchedGuest: string;
-}
-
-export interface WorkflowStep {
-  [key: string]: unknown;
-}
-
-export interface WorkflowResults {
-  clips: WorkflowClip[];
-  chapters: WorkflowChapter[];
-  discoveries: WorkflowDiscovery[];
-  personEpisodes: WorkflowPersonEpisode[];
-  sessionUrl?: string;
-}
-
-export interface WorkflowCost {
-  [key: string]: unknown;
-}
-
-export interface WorkflowStructuredResponse {
-  status: string;
-  sessionId: string;
-  iterationsUsed: number;
-  workflowType: string;
-  summary: string | null;
-  results: WorkflowResults;
-  steps: WorkflowStep[];
-  cost: WorkflowCost;
-  latencyMs: number;
-}
-
-export interface WorkflowTextResponse {
-  status: string;
-  sessionId: string;
-  iterationsUsed: number;
-  workflowType: string;
-  summary: string | null;
-  text: string;
-  steps: WorkflowStep[];
-  cost: WorkflowCost;
-  latencyMs: number;
 }
 
 // --- Chat message model ---
 
-export type WorkflowOutputMode = 'text' | 'streaming';
+export type AgentModel = 'fast' | 'quality';
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content?: string;
-  textResponse?: WorkflowTextResponse;
-  structuredResponse?: WorkflowStructuredResponse;
   statusMessages: string[];
-  iterations: WorkflowIterationEvent[];
-  approval?: WorkflowApprovalEvent;
+  toolCalls: AgentToolCallEvent[];
+  toolResults: AgentToolResultEvent[];
+  suggestedAction?: AgentSuggestedAction;
+  text?: string;
+  donePayload?: AgentDoneEvent;
   error?: string;
   loading: boolean;
   streamComplete: boolean;

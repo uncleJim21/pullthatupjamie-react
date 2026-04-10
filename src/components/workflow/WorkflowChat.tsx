@@ -1,18 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Send, Trash2, Zap, Sparkles } from 'lucide-react';
 import { useWorkflowChat } from '../../hooks/useWorkflowChat.ts';
 import { WorkflowMessage } from './WorkflowMessage.tsx';
-import type { WorkflowOutputMode } from '../../types/workflow';
+import type { AgentModel } from '../../types/workflow';
 
 export const WorkflowChat: React.FC = () => {
   const {
     messages,
     sendMessage,
-    approveAction,
-    denyAction,
     clearMessages,
-    outputMode,
-    setOutputMode,
+    model,
+    setModel,
   } = useWorkflowChat();
 
   const [input, setInput] = useState('');
@@ -37,8 +35,8 @@ export const WorkflowChat: React.FC = () => {
     }
   };
 
-  const toggleMode = () => {
-    setOutputMode(outputMode === 'text' ? 'streaming' : 'text');
+  const toggleModel = () => {
+    setModel(model === 'fast' ? 'quality' : 'fast');
   };
 
   const hasMessages = messages.length > 0;
@@ -48,25 +46,25 @@ export const WorkflowChat: React.FC = () => {
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-800">
         <div className="flex items-center gap-3">
-          <h1 className="text-sm font-medium text-white">Workflow Chat</h1>
+          <h1 className="text-sm font-medium text-white">Agent Chat</h1>
           <span className="px-2 py-0.5 text-[10px] bg-white/5 text-gray-500 rounded-full border border-gray-800">
             stub
           </span>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Mode toggle */}
+          {/* Model toggle */}
           <button
-            onClick={toggleMode}
+            onClick={toggleModel}
             className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-gray-400 hover:text-white bg-[#111111] border border-gray-800 rounded-lg hover:border-gray-700 transition-all"
-            title={`Switch to ${outputMode === 'text' ? 'streaming' : 'text'} mode`}
+            title={`Switch to ${model === 'fast' ? 'quality' : 'fast'} model`}
           >
-            {outputMode === 'streaming' ? (
-              <ToggleRight className="w-3.5 h-3.5 text-green-500/70" />
+            {model === 'fast' ? (
+              <Zap className="w-3.5 h-3.5 text-yellow-500/70" />
             ) : (
-              <ToggleLeft className="w-3.5 h-3.5" />
+              <Sparkles className="w-3.5 h-3.5 text-purple-400/70" />
             )}
-            <span>{outputMode === 'streaming' ? 'SSE' : 'Text'}</span>
+            <span>{model === 'fast' ? 'Fast' : 'Quality'}</span>
           </button>
 
           {/* Clear */}
@@ -91,18 +89,13 @@ export const WorkflowChat: React.FC = () => {
             </div>
             <p className="text-gray-400 text-sm">Ask Jamie anything about podcasts</p>
             <p className="text-gray-600 text-xs mt-1">
-              Mode: <span className="text-gray-500">{outputMode === 'streaming' ? 'SSE streaming' : 'blocking text'}</span>
+              Model: <span className="text-gray-500">{model === 'fast' ? 'Fast (Haiku 4.5)' : 'Quality (Sonnet 4.6)'}</span>
             </p>
           </div>
         )}
 
         {messages.map(msg => (
-          <WorkflowMessage
-            key={msg.id}
-            message={msg}
-            onApprove={approveAction}
-            onDeny={denyAction}
-          />
+          <WorkflowMessage key={msg.id} message={msg} />
         ))}
       </div>
 
