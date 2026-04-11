@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckCircle,
   Loader2,
@@ -12,6 +12,9 @@ import {
   AlignLeft,
   Lightbulb,
   PenLine,
+  ChevronDown,
+  ChevronRight,
+  MessageSquare,
 } from 'lucide-react';
 import type {
   AgentToolCallEvent,
@@ -19,39 +22,7 @@ import type {
   AgentDoneEvent,
 } from '../../types/workflow';
 
-// ─── Tool Call Tracker (live agent progress) ────────────────────────────────
-
-interface ToolStep {
-  tool: string;
-  round: number;
-  resultCount?: number;
-  latencyMs?: number;
-  complete: boolean;
-}
-
-function mergeToolSteps(
-  calls: AgentToolCallEvent[],
-  results: AgentToolResultEvent[]
-): ToolStep[] {
-  const steps: ToolStep[] = calls.map(tc => ({
-    tool: tc.tool,
-    round: tc.round,
-    complete: false,
-  }));
-
-  for (const tr of results) {
-    const match = steps.find(
-      s => s.tool === tr.tool && s.round === tr.round && !s.complete
-    );
-    if (match) {
-      match.complete = true;
-      match.resultCount = tr.resultCount;
-      match.latencyMs = tr.latencyMs;
-    }
-  }
-
-  return steps;
-}
+// ─── Tool label & icon maps ─────────────────────────────────────────────────
 
 const TOOL_LABELS: Record<string, string> = {
   search_quotes: 'Searching quotes',
@@ -85,36 +56,146 @@ const TOOL_ICONS: Record<string, React.FC<{ className?: string }>> = {
   suggest_action: Lightbulb,
 };
 
-function ToolIcon({ tool, className }: { tool: string; className?: string }) {
-  const Icon = TOOL_ICONS[tool] || PenLine;
-  return <Icon className={className} />;
+// ─── Unified timeline step type ─────────────────────────────────────────────
+
+interface TimelineStep {
+  kind: 'status' | 'tool';
+  label: string;
+  icon: React.FC<{ className?: string }>;
+  complete: boolean;
+  detail?: string;
 }
 
-export const ToolCallTracker: React.FC<{
+function buildTimeline(
+  statusMessages: string[],
+  toolCalls: AgentToolCallEvent[],
+  toolResults: AgentToolResultEvent[]
+): TimelineStep[] {
+  const steps: TimelineStep[] = [];
+
+  const resultMap = new Map<string, AgentToolResultEvent>();
+  for (const tr of toolResults) {
+    resultMap.set(`${tr.tool}-${tr.round}`, tr);
+  }
+
+  let statusIdx = 0;
+  let toolIdx = 0;
+
+  // Interleave: status messages and tool calls in the order they arrived.
+  // Since we don't have timestamps, we rely on the fact that statuses
+  // typically precede their corresponding tool calls.
+  while (statusIdx < statusMessages.length || toolIdx < toolCalls.length) {
+    // Emit status messages that came before the next tool call
+    if (statusIdx < statusMessages.length && (toolIdx >= toolCalls.length || statusIdx <= toolIdx)) {
+      steps.push({
+        kind: 'status',
+        label: statusMessages[statusIdx],
+        icon: MessageSquare,
+        complete: true,
+      });
+      statusIdx++;
+      continue;
+    }
+
+    if (toolIdx < toolCalls.length) {
+      const tc = toolCalls[toolIdx];
+      const key = `${tc.tool}-${tc.round}`;
+      const tr = resultMap.get(key);
+      const Icon = TOOL_ICONS[tc.tool] || PenLine;
+      steps.push({
+        kind: 'tool',
+        label: toolLabel(tc.tool),
+        icon: Icon,
+        complete: !!tr,
+        detail: tr ? `${tr.resultCount} results` : undefined,
+      });
+      toolIdx++;
+    }
+  }
+
+  return steps;
+}
+
+// ─── Activity Timeline (collapsible dot→line stepper) ───────────────────────
+
+export const ActivityTimeline: React.FC<{
+  statusMessages: string[];
   toolCalls: AgentToolCallEvent[];
   toolResults: AgentToolResultEvent[];
-}> = ({ toolCalls, toolResults }) => {
-  const steps = mergeToolSteps(toolCalls, toolResults);
+  hasText: boolean;
+}> = ({ statusMessages, toolCalls, toolResults, hasText }) => {
+  const steps = buildTimeline(statusMessages, toolCalls, toolResults);
+  const [expanded, setExpanded] = useState(true);
+
+  // Auto-collapse once the response text starts streaming
+  useEffect(() => {
+    if (hasText && steps.length > 1) setExpanded(false);
+  }, [hasText, steps.length]);
+
   if (!steps.length) return null;
 
+  const lastStep = steps[steps.length - 1];
+  const visibleSteps = expanded ? steps : [lastStep];
+  const collapsedCount = steps.length - 1;
+
   return (
-    <div className="space-y-1.5">
-      {steps.map((step, i) => (
-        <div key={i} className="flex items-center gap-2 text-xs">
-          {step.complete ? (
-            <CheckCircle className="w-3 h-3 text-green-500/70 flex-shrink-0" />
+    <div>
+      {/* Expand/collapse toggle */}
+      {steps.length > 1 && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="flex items-center gap-1 text-[10px] text-gray-600 hover:text-gray-400 transition-colors mb-1.5"
+        >
+          {expanded ? (
+            <ChevronDown className="w-3 h-3" />
           ) : (
-            <Loader2 className="w-3 h-3 text-white animate-spin flex-shrink-0" />
+            <ChevronRight className="w-3 h-3" />
           )}
-          <ToolIcon tool={step.tool} className="w-3 h-3 text-gray-600 flex-shrink-0" />
-          <span className="text-gray-400">{toolLabel(step.tool)}</span>
-          {step.complete && step.resultCount != null && (
-            <span className="px-1.5 py-0.5 bg-white/5 text-gray-500 rounded text-[10px]">
-              {step.resultCount} results
-            </span>
-          )}
-        </div>
-      ))}
+          <span>
+            {expanded ? 'Collapse' : `${collapsedCount} earlier step${collapsedCount > 1 ? 's' : ''}`}
+          </span>
+        </button>
+      )}
+
+      {/* Timeline */}
+      <div className="relative pl-4">
+        {/* Vertical connector line */}
+        {visibleSteps.length > 1 && (
+          <div
+            className="absolute left-[5px] top-[6px] w-px bg-gray-800"
+            style={{ height: `calc(100% - 12px)` }}
+          />
+        )}
+
+        {visibleSteps.map((step, i) => {
+          const isLast = i === visibleSteps.length - 1;
+          const Icon = step.icon;
+
+          return (
+            <div key={i} className="relative flex items-start gap-2.5 pb-2 last:pb-0">
+              {/* Dot */}
+              <div className="absolute -left-4 top-[3px] flex items-center justify-center">
+                {!step.complete && isLast ? (
+                  <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
+                ) : step.complete && step.kind === 'tool' ? (
+                  <div className="w-2 h-2 rounded-full bg-green-500/70" />
+                ) : (
+                  <div className="w-2 h-2 rounded-full bg-gray-600" />
+                )}
+              </div>
+
+              {/* Content */}
+              <Icon className="w-3 h-3 text-gray-600 flex-shrink-0 mt-[1px]" />
+              <span className="text-gray-400 text-xs leading-tight">{step.label}</span>
+              {step.detail && (
+                <span className="px-1.5 py-0.5 bg-white/5 text-gray-500 rounded text-[10px] leading-none">
+                  {step.detail}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

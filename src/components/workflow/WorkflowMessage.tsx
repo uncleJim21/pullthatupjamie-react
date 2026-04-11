@@ -2,16 +2,15 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { AlertCircle, ShieldCheck, Podcast, Play, Pause } from 'lucide-react';
+import { AlertCircle, ShieldCheck } from 'lucide-react';
 import type { ChatMessage } from '../../types/workflow';
-import { ToolCallTracker, ResponseMetadata } from './WorkflowResultCards.tsx';
+import { ActivityTimeline, ResponseMetadata } from './WorkflowResultCards.tsx';
 import { API_URL } from '../../constants/constants.ts';
-import { useAudioController } from '../../context/AudioControllerContext.tsx';
 import { InlineCardMention, type AnalysisCardJson } from '../UnifiedSidePanel.tsx';
 
 // ─── Clip metadata fetching & cache ─────────────────────────────────────────
 
-interface ClipMeta {
+export interface ClipMeta {
   pineconeId: string;
   episodeTitle: string;
   episodeImage: string;
@@ -240,55 +239,6 @@ const MarkdownWithClips: React.FC<{
   );
 };
 
-// ─── Now-playing mini bar ───────────────────────────────────────────────────
-
-const NowPlayingBar: React.FC<{ meta: ClipMeta }> = ({ meta }) => {
-  const { currentTrack, isPlaying, isBuffering, togglePlay, currentTime } = useAudioController();
-  const isActive = currentTrack?.id === meta.pineconeId;
-  if (!isActive) return null;
-
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, '0')}`;
-  };
-
-  return (
-    <div className="flex items-center gap-3 px-3 py-2 bg-[#0D0D0D] border border-gray-800 rounded-lg mt-2">
-      {meta.episodeImage ? (
-        <img
-          src={meta.episodeImage}
-          alt=""
-          className="w-8 h-8 rounded object-cover flex-shrink-0"
-        />
-      ) : (
-        <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
-          <Podcast className="w-4 h-4 text-gray-600" />
-        </div>
-      )}
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-white truncate">{meta.episodeTitle}</p>
-        <p className="text-[10px] text-gray-500 truncate">{meta.creator}</p>
-      </div>
-      <span className="text-[10px] text-gray-500 font-mono tabular-nums">
-        {formatTime(currentTime)}
-      </span>
-      <button
-        onClick={() => togglePlay()}
-        className="w-7 h-7 flex items-center justify-center rounded-full bg-white text-black hover:bg-gray-200 transition-colors flex-shrink-0"
-      >
-        {isBuffering ? (
-          <div className="w-3 h-3 rounded-full border-b-2 border-black animate-spin" />
-        ) : isPlaying ? (
-          <Pause className="w-3.5 h-3.5" />
-        ) : (
-          <Play className="w-3.5 h-3.5 ml-0.5" />
-        )}
-      </button>
-    </div>
-  );
-};
-
 // ─── Suggested action card ──────────────────────────────────────────────────
 
 const SuggestedActionCard: React.FC<{ action: NonNullable<ChatMessage['suggestedAction']> }> = ({
@@ -314,13 +264,12 @@ const SuggestedActionCard: React.FC<{ action: NonNullable<ChatMessage['suggested
 
 interface WorkflowMessageProps {
   message: ChatMessage;
+  onPlayClip?: (meta: ClipMeta) => void;
 }
 
-export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message }) => {
+export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPlayClip }) => {
   const { statusMessages, toolCalls, toolResults, suggestedAction, text, donePayload, error, loading } =
     message;
-  const { playTrack, currentTrack } = useAudioController();
-  const [activeClip, setActiveClip] = useState<ClipMeta | null>(null);
 
   const clipIds = useMemo(() => (text ? extractClipIds(text) : []), [text]);
   const metaCache = useClipMetadata(clipIds);
@@ -333,26 +282,10 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message }) => 
   const handleCardClick = useCallback(
     (pineconeId: string) => {
       const meta = clipMetaCache.get(pineconeId);
-      if (meta) {
-        setActiveClip(meta);
-        if (meta.audioUrl) {
-          playTrack({
-            id: meta.pineconeId,
-            audioUrl: meta.audioUrl,
-            startTime: meta.startTime,
-            endTime: meta.endTime,
-          });
-        }
-      }
+      if (meta && onPlayClip) onPlayClip(meta);
     },
-    [playTrack]
+    [onPlayClip]
   );
-
-  useEffect(() => {
-    if (activeClip && currentTrack?.id !== activeClip.pineconeId) {
-      setActiveClip(null);
-    }
-  }, [currentTrack, activeClip]);
 
   if (message.role === 'user') {
     return (
@@ -367,18 +300,13 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message }) => 
   return (
     <div className="flex justify-start">
       <div className="max-w-[90%] w-full space-y-3">
-        {statusMessages.length > 0 && (
-          <div className="space-y-1">
-            {statusMessages.map((s, i) => (
-              <p key={i} className="text-gray-500 text-xs italic">
-                {s}
-              </p>
-            ))}
-          </div>
-        )}
-
-        {toolCalls.length > 0 && (
-          <ToolCallTracker toolCalls={toolCalls} toolResults={toolResults} />
+        {(statusMessages.length > 0 || toolCalls.length > 0) && (
+          <ActivityTimeline
+            statusMessages={statusMessages}
+            toolCalls={toolCalls}
+            toolResults={toolResults}
+            hasText={!!text}
+          />
         )}
 
         {suggestedAction && <SuggestedActionCard action={suggestedAction} />}
@@ -393,8 +321,6 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message }) => 
             />
           </div>
         )}
-
-        {activeClip && <NowPlayingBar meta={activeClip} />}
 
         {donePayload && <ResponseMetadata done={donePayload} />}
 

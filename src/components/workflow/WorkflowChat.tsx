@@ -1,8 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Trash2, Zap, Sparkles } from 'lucide-react';
 import { useWorkflowChat } from '../../hooks/useWorkflowChat.ts';
 import { WorkflowMessage } from './WorkflowMessage.tsx';
+import type { ClipMeta } from './WorkflowMessage.tsx';
 import type { AgentModel } from '../../types/workflow';
+import { useAudioController } from '../../context/AudioControllerContext.tsx';
+import EmbedMiniPlayer from '../EmbedMiniPlayer.tsx';
 
 export const WorkflowChat: React.FC = () => {
   const {
@@ -13,13 +16,36 @@ export const WorkflowChat: React.FC = () => {
     setModel,
   } = useWorkflowChat();
 
+  const { playTrack, currentTrack } = useAudioController();
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [activeClip, setActiveClip] = useState<ClipMeta | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
+
+  const handlePlayClip = useCallback(
+    (meta: ClipMeta) => {
+      setActiveClip(meta);
+      if (meta.audioUrl) {
+        playTrack({
+          id: meta.pineconeId,
+          audioUrl: meta.audioUrl,
+          startTime: meta.startTime,
+          endTime: meta.endTime,
+        });
+      }
+    },
+    [playTrack]
+  );
+
+  useEffect(() => {
+    if (activeClip && currentTrack?.id !== activeClip.pineconeId) {
+      setActiveClip(null);
+    }
+  }, [currentTrack, activeClip]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +66,7 @@ export const WorkflowChat: React.FC = () => {
   };
 
   const hasMessages = messages.length > 0;
+  const showMiniPlayer = !!activeClip;
 
   return (
     <div className="flex flex-col h-full bg-black text-white">
@@ -53,7 +80,6 @@ export const WorkflowChat: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Model toggle */}
           <button
             onClick={toggleModel}
             className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-gray-400 hover:text-white bg-[#111111] border border-gray-800 rounded-lg hover:border-gray-700 transition-all"
@@ -67,7 +93,6 @@ export const WorkflowChat: React.FC = () => {
             <span>{model === 'fast' ? 'Fast' : 'Quality'}</span>
           </button>
 
-          {/* Clear */}
           {hasMessages && (
             <button
               onClick={clearMessages}
@@ -79,6 +104,28 @@ export const WorkflowChat: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Mini-player — pinned below header */}
+      {showMiniPlayer && (
+        <div className="flex-shrink-0 [&>div]:!relative [&>div]:!inset-auto [&>div]:!border-t-0 [&>div]:!border-b [&>div]:!border-gray-800">
+          <EmbedMiniPlayer
+            mode="app"
+            isHovered={true}
+            audioUnlocked={true}
+            trackId={activeClip.pineconeId}
+            audioUrl={activeClip.audioUrl}
+            episodeTitle={activeClip.episodeTitle}
+            episodeImage={activeClip.episodeImage}
+            creator={activeClip.creator}
+            timeContext={{
+              start_time: activeClip.startTime,
+              end_time: activeClip.endTime,
+            }}
+            quote={activeClip.text}
+            hierarchyLevel="paragraph"
+          />
+        </div>
+      )}
 
       {/* Messages area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-5">
@@ -95,7 +142,7 @@ export const WorkflowChat: React.FC = () => {
         )}
 
         {messages.map(msg => (
-          <WorkflowMessage key={msg.id} message={msg} />
+          <WorkflowMessage key={msg.id} message={msg} onPlayClip={handlePlayClip} />
         ))}
       </div>
 
