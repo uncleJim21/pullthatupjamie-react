@@ -11,6 +11,8 @@ import type {
   AgentDoneEvent,
 } from '../types/workflow';
 
+const STREAM_FLUSH_MS = 40;
+
 interface UseWorkflowChatReturn {
   messages: ChatMessage[];
   sendMessage: (task: string) => Promise<void>;
@@ -109,97 +111,118 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
-        let buffer = '';
+        let sseBuffer = '';
         let currentEventType = 'message';
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        // Buffered text streaming: accumulate deltas and flush on an
+        // interval so the UI updates at a steady ~25 fps instead of
+        // jumping with each network chunk.
+        let textAccum = '';
+        const flushText = () => {
+          if (!textAccum) return;
+          const chunk = textAccum;
+          textAccum = '';
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === aId ? { ...m, text: (m.text || '') + chunk } : m
+            )
+          );
+        };
+        const flushTimer = setInterval(flushText, STREAM_FLUSH_MS);
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          for (const line of lines) {
-            if (line.startsWith('event: ')) {
-              currentEventType = line.slice(7).trim();
-              continue;
-            }
+            sseBuffer += decoder.decode(value, { stream: true });
+            const lines = sseBuffer.split('\n');
+            sseBuffer = lines.pop() || '';
 
-            if (line.startsWith('data: ')) {
-              const raw = line.slice(6).trim();
-              if (!raw || raw === '[DONE]') continue;
-
-              try {
-                const payload = JSON.parse(raw);
-
-                switch (currentEventType) {
-                  case 'status': {
-                    const ev = payload as AgentStatusEvent;
-                    appendStatus(aId, ev.message);
-                    break;
-                  }
-                  case 'tool_call': {
-                    const ev = payload as AgentToolCallEvent;
-                    appendToolCall(aId, ev);
-                    break;
-                  }
-                  case 'tool_result': {
-                    const ev = payload as AgentToolResultEvent;
-                    appendToolResult(aId, ev);
-                    break;
-                  }
-                  case 'suggested_action': {
-                    const ev = payload as AgentSuggestedAction;
-                    updateMessage(aId, { suggestedAction: ev });
-                    break;
-                  }
-                  case 'text_delta': {
-                    const delta = payload.text || '';
-                    setMessages(prev =>
-                      prev.map(m =>
-                        m.id === aId ? { ...m, text: (m.text || '') + delta } : m
-                      )
-                    );
-                    break;
-                  }
-                  case 'text_done': {
-                    const ev = payload as AgentTextEvent;
-                    updateMessage(aId, { text: ev.text });
-                    break;
-                  }
-                  case 'text': {
-                    const ev = payload as AgentTextEvent;
-                    updateMessage(aId, { text: ev.text });
-                    break;
-                  }
-                  case 'done': {
-                    const ev = payload as AgentDoneEvent;
-                    updateMessage(aId, {
-                      donePayload: ev,
-                      loading: false,
-                      streamComplete: true,
-                    });
-                    break;
-                  }
-                  case 'error': {
-                    updateMessage(aId, {
-                      error: payload.error || 'Unknown error',
-                      loading: false,
-                      streamComplete: true,
-                    });
-                    break;
-                  }
-                  default:
-                    printLog(`Unknown SSE event: ${currentEventType}`);
-                }
-              } catch (e) {
-                printLog(`Failed to parse SSE data: ${raw}`);
+            for (const line of lines) {
+              if (line.startsWith('event: ')) {
+                currentEventType = line.slice(7).trim();
+                continue;
               }
 
-              currentEventType = 'message';
+              if (line.startsWith('data: ')) {
+                const raw = line.slice(6).trim();
+                if (!raw || raw === '[DONE]') continue;
+
+                try {
+                  const payload = JSON.parse(raw);
+
+                  switch (currentEventType) {
+                    case 'status': {
+                      const ev = payload as AgentStatusEvent;
+                      appendStatus(aId, ev.message);
+                      break;
+                    }
+                    case 'tool_call': {
+                      const ev = payload as AgentToolCallEvent;
+                      appendToolCall(aId, ev);
+                      break;
+                    }
+                    case 'tool_result': {
+                      const ev = payload as AgentToolResultEvent;
+                      appendToolResult(aId, ev);
+                      break;
+                    }
+                    case 'suggested_action': {
+                      const ev = payload as AgentSuggestedAction;
+                      updateMessage(aId, { suggestedAction: ev });
+                      break;
+                    }
+                    case 'text_delta': {
+                      textAccum += payload.text || '';
+                      break;
+                    }
+                    case 'text_done': {
+                      // Flush any buffered deltas, then set the final text
+                      clearInterval(flushTimer);
+                      textAccum = '';
+                      const ev = payload as AgentTextEvent;
+                      updateMessage(aId, { text: ev.text });
+                      break;
+                    }
+                    case 'text': {
+                      clearInterval(flushTimer);
+                      textAccum = '';
+                      const ev = payload as AgentTextEvent;
+                      updateMessage(aId, { text: ev.text });
+                      break;
+                    }
+                    case 'done': {
+                      const ev = payload as AgentDoneEvent;
+                      updateMessage(aId, {
+                        donePayload: ev,
+                        loading: false,
+                        streamComplete: true,
+                      });
+                      break;
+                    }
+                    case 'error': {
+                      updateMessage(aId, {
+                        error: payload.error || 'Unknown error',
+                        loading: false,
+                        streamComplete: true,
+                      });
+                      break;
+                    }
+                    default:
+                      printLog(`Unknown SSE event: ${currentEventType}`);
+                  }
+                } catch (e) {
+                  printLog(`Failed to parse SSE data: ${raw}`);
+                }
+
+                currentEventType = 'message';
+              }
             }
           }
+        } finally {
+          clearInterval(flushTimer);
+          flushText();
         }
 
         updateMessage(aId, { loading: false, streamComplete: true });

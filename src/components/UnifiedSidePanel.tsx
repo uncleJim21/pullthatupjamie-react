@@ -13,7 +13,7 @@ import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
 import { QuotaExceededError } from '../types/errors.ts';
 import QuotaExceededModal, { QuotaExceededData } from './QuotaExceededModal.tsx';
 
-type AnalysisCardJson = {
+export type AnalysisCardJson = {
   pineconeId: string;
   episodeImage?: string;
   title?: string;
@@ -216,7 +216,7 @@ const InlineCardMentionLoading: React.FC = () => {
   );
 };
 
-const InlineCardMention: React.FC<{
+export const InlineCardMention: React.FC<{
   card: AnalysisCardJson;
   onClick?: (pineconeId: string) => void;
 }> = ({ card, onClick }) => {
