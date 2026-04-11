@@ -105,28 +105,6 @@ export const WorkflowChat: React.FC = () => {
         </div>
       </div>
 
-      {/* Mini-player — pinned below header */}
-      {showMiniPlayer && (
-        <div className="flex-shrink-0 [&>div]:!relative [&>div]:!inset-auto [&>div]:!border-t-0 [&>div]:!border-b [&>div]:!border-gray-800">
-          <EmbedMiniPlayer
-            mode="app"
-            isHovered={true}
-            audioUnlocked={true}
-            trackId={activeClip.pineconeId}
-            audioUrl={activeClip.audioUrl}
-            episodeTitle={activeClip.episodeTitle}
-            episodeImage={activeClip.episodeImage}
-            creator={activeClip.creator}
-            timeContext={{
-              start_time: activeClip.startTime,
-              end_time: activeClip.endTime,
-            }}
-            quote={activeClip.text}
-            hierarchyLevel="paragraph"
-          />
-        </div>
-      )}
-
       {/* Messages area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-5">
         {!hasMessages && (
@@ -145,6 +123,28 @@ export const WorkflowChat: React.FC = () => {
           <WorkflowMessage key={msg.id} message={msg} onPlayClip={handlePlayClip} />
         ))}
       </div>
+
+      {/* Mini-player — above input bar */}
+      {showMiniPlayer && (
+        <div className="flex-shrink-0 [&>div]:!relative [&>div]:!inset-auto">
+          <EmbedMiniPlayer
+            mode="app"
+            isHovered={true}
+            audioUnlocked={true}
+            trackId={activeClip.pineconeId}
+            audioUrl={activeClip.audioUrl}
+            episodeTitle={activeClip.episodeTitle}
+            episodeImage={activeClip.episodeImage}
+            creator={activeClip.creator}
+            timeContext={{
+              start_time: activeClip.startTime,
+              end_time: activeClip.endTime,
+            }}
+            quote={activeClip.text}
+            hierarchyLevel="paragraph"
+          />
+        </div>
+      )}
 
       {/* Input area */}
       <div className="flex-shrink-0 border-t border-gray-800 bg-[#0A0A0A] px-5 py-4">
