@@ -23,30 +23,52 @@ export interface ClipMeta {
 
 const clipMetaCache = new Map<string, ClipMeta>();
 const clipMetaInFlight = new Set<string>();
+const clipMetaFailed = new Set<string>();
+
+// Concurrency-limited queue so we don't slam the backend
+const MAX_CONCURRENT = 2;
+let activeRequests = 0;
+const pendingQueue: (() => void)[] = [];
+
+function drainQueue() {
+  while (activeRequests < MAX_CONCURRENT && pendingQueue.length > 0) {
+    activeRequests++;
+    pendingQueue.shift()!();
+  }
+}
 
 async function fetchClipMeta(pineconeId: string): Promise<ClipMeta | null> {
-  try {
-    const res = await fetch(
-      `${API_URL}/api/get-hierarchy?paragraphId=${encodeURIComponent(pineconeId)}`
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const h = data.hierarchy;
-    const para = h?.paragraph?.metadata;
-    const ep = h?.episode?.metadata;
-    return {
-      pineconeId,
-      episodeTitle: ep?.title || para?.episode || 'Unknown episode',
-      episodeImage: ep?.imageUrl || para?.episodeImage || '',
-      creator: ep?.creator || para?.creator || '',
-      audioUrl: para?.audioUrl || ep?.audioUrl || '',
-      startTime: para?.start_time ?? 0,
-      endTime: para?.end_time ?? 0,
-      text: para?.text || '',
+  return new Promise<ClipMeta | null>(resolve => {
+    const run = async () => {
+      try {
+        const res = await fetch(
+          `${API_URL}/api/get-hierarchy?paragraphId=${encodeURIComponent(pineconeId)}`
+        );
+        if (!res.ok) { resolve(null); return; }
+        const data = await res.json();
+        const h = data.hierarchy;
+        const para = h?.paragraph?.metadata;
+        const ep = h?.episode?.metadata;
+        resolve({
+          pineconeId,
+          episodeTitle: ep?.title || para?.episode || 'Unknown episode',
+          episodeImage: ep?.imageUrl || para?.episodeImage || '',
+          creator: ep?.creator || para?.creator || '',
+          audioUrl: para?.audioUrl || ep?.audioUrl || '',
+          startTime: para?.start_time ?? 0,
+          endTime: para?.end_time ?? 0,
+          text: para?.text || '',
+        });
+      } catch {
+        resolve(null);
+      } finally {
+        activeRequests--;
+        drainQueue();
+      }
     };
-  } catch {
-    return null;
-  }
+    pendingQueue.push(run);
+    drainQueue();
+  });
 }
 
 function useClipMetadata(pineconeIds: string[]): Map<string, ClipMeta> {
@@ -58,17 +80,20 @@ function useClipMetadata(pineconeIds: string[]): Map<string, ClipMeta> {
     let cancelled = false;
 
     const toFetch = pineconeIds.filter(
-      id => !clipMetaCache.has(id) && !clipMetaInFlight.has(id)
+      id => !clipMetaCache.has(id) && !clipMetaInFlight.has(id) && !clipMetaFailed.has(id)
     );
 
     for (const id of toFetch) {
       clipMetaInFlight.add(id);
       fetchClipMeta(id).then(meta => {
         clipMetaInFlight.delete(id);
-        if (meta && !cancelled) {
+        if (cancelled) return;
+        if (meta) {
           clipMetaCache.set(id, meta);
-          setRev(r => r + 1);
+        } else {
+          clipMetaFailed.add(id);
         }
+        setRev(r => r + 1);
       });
     }
 
