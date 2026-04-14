@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -24,6 +24,7 @@ import { ActivityTimeline, ResponseMetadata } from './WorkflowResultCards.tsx';
 import { API_URL } from '../../constants/constants.ts';
 import { InlineCardMention, type AnalysisCardJson } from '../UnifiedSidePanel.tsx';
 import { createClipShareUrl } from '../../utils/urlUtils.ts';
+import TryJamieService from '../../services/tryJamieService.ts';
 
 
 // ─── Clip metadata fetching & cache ─────────────────────────────────────────
@@ -71,15 +72,15 @@ const clipMetaCache = hydrateCache();
 const clipMetaInFlight = new Set<string>();
 const clipMetaFailed = new Set<string>();
 
-const MAX_CONCURRENT = 2;
+const MAX_CONCURRENT = 1;
+const REQUEST_DELAY_MS = 500;
 let activeRequests = 0;
 const pendingQueue: (() => void)[] = [];
 
 function drainQueue() {
-  while (activeRequests < MAX_CONCURRENT && pendingQueue.length > 0) {
-    activeRequests++;
-    pendingQueue.shift()!();
-  }
+  if (activeRequests >= MAX_CONCURRENT || pendingQueue.length === 0) return;
+  activeRequests++;
+  pendingQueue.shift()!();
 }
 
 async function fetchClipMeta(pineconeId: string): Promise<ClipMeta | null> {
@@ -111,7 +112,7 @@ async function fetchClipMeta(pineconeId: string): Promise<ClipMeta | null> {
         resolve(null);
       } finally {
         activeRequests--;
-        drainQueue();
+        setTimeout(drainQueue, REQUEST_DELAY_MS);
       }
     };
     pendingQueue.push(run);
@@ -338,8 +339,28 @@ const MarkdownWithClips: React.FC<{
 
 const FOUNTAIN_API = 'https://rss-extractor-app-yufbq.ondigitalocean.app/getFountainLink';
 
+function extractImageFromAction(action: SubmitOnDemandAction): { title: string; image: string | undefined } {
+  if (action.image) return { title: action.episodeTitle || '', image: action.image };
+  const raw = action.episodeTitle || '';
+  const imgMatch = raw.match(/https?:\/\/\S+\.(?:jpe?g|png|gif|webp)\S*/i);
+  if (imgMatch) {
+    const cleaned = raw.replace(/<\/?\w[^>]*>/g, '').replace(imgMatch[0], '').replace(/\s{2,}/g, ' ').trim();
+    return { title: cleaned, image: imgMatch[0] };
+  }
+  return { title: raw, image: undefined };
+}
+
+type SubmitState = 'idle' | 'submitting' | 'polling' | 'done' | 'error';
+
+const POLL_INTERVAL_MS = 5000;
+
 const SubmitOnDemandChip: React.FC<{ action: SubmitOnDemandAction }> = ({ action }) => {
+  const { title: episodeTitle, image: episodeImage } = useMemo(() => extractImageFromAction(action), [action]);
   const [fountainUrl, setFountainUrl] = useState<string | null>(null);
+  const [submitState, setSubmitState] = useState<SubmitState>('idle');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [jobProgress, setJobProgress] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!action.guid) return;
@@ -355,13 +376,64 @@ const SubmitOnDemandChip: React.FC<{ action: SubmitOnDemandAction }> = ({ action
     return () => { cancelled = true; };
   }, [action.guid]);
 
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  const handleTranscribe = async () => {
+    if (!action.guid || !action.feedGuid || !action.feedId) return;
+    setSubmitState('submitting');
+    setErrorMsg(null);
+    try {
+      const res = await TryJamieService.submitOnDemandRun({
+        message: `Transcribe: ${episodeTitle || action.guid}`,
+        parameters: {},
+        episodes: [{
+          guid: action.guid,
+          feedGuid: action.feedGuid,
+          feedId: Number(action.feedId),
+        }],
+      });
+
+      setSubmitState('polling');
+      setJobProgress('Queued…');
+
+      pollRef.current = setInterval(async () => {
+        try {
+          const status = await TryJamieService.getOnDemandJobStatus(res.jobId);
+          const { stats } = status;
+          setJobProgress(`${stats.episodesProcessed}/${stats.totalEpisodes} processed`);
+          if (status.status === 'complete') {
+            if (pollRef.current) clearInterval(pollRef.current);
+            setSubmitState('done');
+            setJobProgress(null);
+          } else if (status.status === 'failed') {
+            if (pollRef.current) clearInterval(pollRef.current);
+            setSubmitState('error');
+            setErrorMsg('Transcription failed');
+            setJobProgress(null);
+          }
+        } catch {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setSubmitState('error');
+          setErrorMsg('Lost connection to job');
+        }
+      }, POLL_INTERVAL_MS);
+    } catch (err: any) {
+      setSubmitState('error');
+      setErrorMsg(err.message || 'Submission failed');
+    }
+  };
+
+  const isBusy = submitState === 'submitting' || submitState === 'polling';
+
   return (
     <div className="bg-[#111111] border border-blue-900/30 rounded-lg p-3">
       <div className="flex items-start gap-3">
-        {action.image ? (
+        {episodeImage ? (
           <img
-            src={action.image}
-            alt={action.episodeTitle || ''}
+            src={episodeImage}
+            alt={episodeTitle}
             className="w-10 h-10 rounded object-cover flex-shrink-0"
           />
         ) : (
@@ -371,15 +443,32 @@ const SubmitOnDemandChip: React.FC<{ action: SubmitOnDemandAction }> = ({ action
         )}
         <div className="flex-1 min-w-0">
           <p className="text-gray-300 text-sm font-medium">Transcribe this episode</p>
-          {action.episodeTitle && (
-            <p className="text-gray-500 text-xs mt-0.5 truncate">{action.episodeTitle}</p>
+          {episodeTitle && (
+            <p className="text-gray-300 text-xs mt-0.5 truncate">{episodeTitle}</p>
           )}
           <p className="text-gray-600 text-[10px] mt-1 line-clamp-2">{action.reason}</p>
+          {jobProgress && (
+            <p className="text-blue-400/70 text-[10px] mt-1">{jobProgress}</p>
+          )}
+          {submitState === 'error' && errorMsg && (
+            <p className="text-red-400/70 text-[10px] mt-1">{errorMsg}</p>
+          )}
         </div>
         <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-          <button className="px-3 py-1.5 text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors">
-            Transcribe
-          </button>
+          {submitState === 'done' ? (
+            <span className="px-3 py-1.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg">
+              Submitted
+            </span>
+          ) : (
+            <button
+              onClick={handleTranscribe}
+              disabled={isBusy || !action.guid}
+              className="px-3 py-1.5 text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            >
+              {isBusy && <Loader2 className="w-3 h-3 animate-spin" />}
+              {submitState === 'submitting' ? 'Submitting…' : submitState === 'polling' ? 'Processing…' : submitState === 'error' ? 'Retry' : 'Transcribe'}
+            </button>
+          )}
           {fountainUrl && (
             <a
               href={fountainUrl}
