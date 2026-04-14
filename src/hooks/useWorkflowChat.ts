@@ -95,7 +95,7 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
       }
 
       try {
-        const res = await fetch(`${API_URL}/api/chat/workflow`, {
+        const res = await fetch(`${API_URL}/api/pull`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
