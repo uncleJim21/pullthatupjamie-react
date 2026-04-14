@@ -22,6 +22,8 @@ import type {
 import { ActivityTimeline, ResponseMetadata } from './WorkflowResultCards.tsx';
 import { API_URL } from '../../constants/constants.ts';
 import { InlineCardMention, type AnalysisCardJson } from '../UnifiedSidePanel.tsx';
+import { createClipShareUrl } from '../../utils/urlUtils.ts';
+
 
 // ─── Clip metadata fetching & cache ─────────────────────────────────────────
 
@@ -36,11 +38,38 @@ export interface ClipMeta {
   text: string;
 }
 
-const clipMetaCache = new Map<string, ClipMeta>();
+const CACHE_STORAGE_KEY = 'workflow_clip_meta_cache';
+const CACHE_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
+function hydrateCache(): Map<string, ClipMeta> {
+  const map = new Map<string, ClipMeta>();
+  try {
+    const raw = sessionStorage.getItem(CACHE_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { ts: number; entries: [string, ClipMeta][] };
+      if (Date.now() - parsed.ts < CACHE_MAX_AGE_MS) {
+        for (const [k, v] of parsed.entries) map.set(k, v);
+      } else {
+        sessionStorage.removeItem(CACHE_STORAGE_KEY);
+      }
+    }
+  } catch { /* ignore corrupt storage */ }
+  return map;
+}
+
+function persistCache(cache: Map<string, ClipMeta>) {
+  try {
+    sessionStorage.setItem(
+      CACHE_STORAGE_KEY,
+      JSON.stringify({ ts: Date.now(), entries: [...cache.entries()] })
+    );
+  } catch { /* storage full — non-critical */ }
+}
+
+const clipMetaCache = hydrateCache();
 const clipMetaInFlight = new Set<string>();
 const clipMetaFailed = new Set<string>();
 
-// Concurrency-limited queue so we don't slam the backend
 const MAX_CONCURRENT = 2;
 let activeRequests = 0;
 const pendingQueue: (() => void)[] = [];
@@ -64,7 +93,7 @@ async function fetchClipMeta(pineconeId: string): Promise<ClipMeta | null> {
         const h = data.hierarchy;
         const para = h?.paragraph?.metadata;
         const ep = h?.episode?.metadata;
-        resolve({
+        const meta: ClipMeta = {
           pineconeId,
           episodeTitle: ep?.title || para?.episode || 'Unknown episode',
           episodeImage: ep?.imageUrl || para?.episodeImage || '',
@@ -73,7 +102,10 @@ async function fetchClipMeta(pineconeId: string): Promise<ClipMeta | null> {
           startTime: para?.start_time ?? 0,
           endTime: para?.end_time ?? 0,
           text: para?.text || '',
-        });
+        };
+        clipMetaCache.set(pineconeId, meta);
+        persistCache(clipMetaCache);
+        resolve(meta);
       } catch {
         resolve(null);
       } finally {
@@ -143,13 +175,33 @@ function buildMarkdownWithClipPlaceholders(text: string): {
   return { markdown, clipsByIndex };
 }
 
-// ─── Inject InlineCardMention into ReactMarkdown output ─────────────────────
+// ─── Time formatter ─────────────────────────────────────────────────────────
+
+function fmtTime(seconds: number): string {
+  const s = Math.round(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const mm = String(m).padStart(2, '0');
+  const ss = String(sec).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+}
+
+// ─── Build display title for a clip pill based on context ────────────────────
+
+function clipPillTitle(meta: ClipMeta | undefined): string {
+  if (!meta) return 'Loading…';
+  return `${fmtTime(meta.startTime)} — ${meta.episodeTitle}`;
+}
+
+// ─── Inject clip pills into ReactMarkdown output ────────────────────────────
 
 function injectClipCards(
   node: React.ReactNode,
   clipsByIndex: Record<number, string>,
   metaCache: Map<string, ClipMeta>,
-  onCardClick: (pineconeId: string) => void
+  onCardClick: (pineconeId: string) => void,
+  onCopyLink: (pineconeId: string) => void
 ): React.ReactNode {
   const tokenRe = /\[\[CLIP:(\d+)\]\]/g;
 
@@ -168,13 +220,14 @@ function injectClipCards(
         const card: AnalysisCardJson = {
           pineconeId,
           episodeImage: meta?.episodeImage,
-          title: meta?.episodeTitle,
+          title: clipPillTitle(meta),
         };
         out.push(
           <InlineCardMention
             key={`clip-${clipIdx}-${start}`}
             card={card}
             onClick={onCardClick}
+            onCopyLink={onCopyLink}
           />
         );
       } else {
@@ -188,7 +241,7 @@ function injectClipCards(
 
   if (Array.isArray(node)) {
     return node.map((child) =>
-      injectClipCards(child, clipsByIndex, metaCache, onCardClick)
+      injectClipCards(child, clipsByIndex, metaCache, onCardClick, onCopyLink)
     );
   }
 
@@ -197,7 +250,7 @@ function injectClipCards(
     if (!children) return node;
     return React.cloneElement(node as any, {
       ...(node.props as any),
-      children: injectClipCards(children, clipsByIndex, metaCache, onCardClick),
+      children: injectClipCards(children, clipsByIndex, metaCache, onCardClick, onCopyLink),
     });
   }
 
@@ -232,11 +285,12 @@ const MarkdownWithClips: React.FC<{
   clipsByIndex: Record<number, string>;
   metaCache: Map<string, ClipMeta>;
   onCardClick: (pineconeId: string) => void;
-}> = ({ text, clipsByIndex, metaCache, onCardClick }) => {
+  onCopyLink: (pineconeId: string) => void;
+}> = ({ text, clipsByIndex, metaCache, onCardClick, onCopyLink }) => {
   const inject = useCallback(
     (children: React.ReactNode) =>
-      injectClipCards(children, clipsByIndex, metaCache, onCardClick),
-    [clipsByIndex, metaCache, onCardClick]
+      injectClipCards(children, clipsByIndex, metaCache, onCardClick, onCopyLink),
+    [clipsByIndex, metaCache, onCardClick, onCopyLink]
   );
 
   const components = useMemo(
@@ -426,6 +480,11 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPla
     [onPlayClip]
   );
 
+  const handleCopyLink = useCallback((pineconeId: string) => {
+    const url = createClipShareUrl(pineconeId);
+    navigator.clipboard.writeText(url).catch(() => {});
+  }, []);
+
   if (message.role === 'user') {
     return (
       <div className="flex justify-end">
@@ -456,6 +515,7 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPla
                 clipsByIndex={clipsByIndex}
                 metaCache={metaCache}
                 onCardClick={handleCardClick}
+                onCopyLink={handleCopyLink}
               />
             </div>
             {message.textPaused && !message.streamComplete && (

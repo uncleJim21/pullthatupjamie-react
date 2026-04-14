@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Play, Podcast, RotateCcw, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Play, Podcast, RotateCcw, RotateCw, Link as LinkIcon, Check } from 'lucide-react';
 import { useAudioController } from '../context/AudioControllerContext.tsx';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
 
@@ -38,6 +38,8 @@ interface EmbedMiniPlayerProps {
   onExpandChange?: (expanded: boolean) => void;
   // Compact height mode: hide non-essential UI for very short viewports
   isCompactHeight?: boolean;
+  // Optional: copy shareable link to clipboard
+  onCopyLink?: () => void;
 }
 
 const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
@@ -60,6 +62,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   isExpanded,
   onExpandChange,
   isCompactHeight = false,
+  onCopyLink,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -82,6 +85,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   // Track image errors per episode to prevent hiding on subsequent selections
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const lastEpisodeImageRef = useRef<string | undefined>(undefined);
   
   // Reset image error state when episode image changes
@@ -309,6 +313,26 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
             <div className={`flex flex-col items-center flex-shrink-0 ${isCompactHeight ? 'gap-0.5' : 'gap-1.5'}`}>
               {/* Play + Time */}
               <div className="flex items-center gap-2">
+                {onCopyLink && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCopyLink();
+                      setLinkCopied(true);
+                      setTimeout(() => setLinkCopied(false), 1500);
+                    }}
+                    className={`flex items-center justify-center rounded-full transition-colors touch-manipulation ${
+                      isCompactHeight ? 'h-6 w-6' : 'h-7 w-7'
+                    } ${linkCopied ? 'text-green-400' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                    title={linkCopied ? 'Copied!' : 'Copy link'}
+                  >
+                    {linkCopied ? (
+                      <Check className={isCompactHeight ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+                    ) : (
+                      <LinkIcon className={isCompactHeight ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+                    )}
+                  </button>
+                )}
                 <button
                   onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
                   disabled={!audioUrl}

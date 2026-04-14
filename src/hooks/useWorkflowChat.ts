@@ -225,22 +225,27 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
                       startPauseTimer();
                       break;
                     }
-                    case 'text_done': {
-                      clearInterval(flushTimer);
-                      clearPauseTimer();
-                      textAccum = '';
-                      const ev = payload as AgentTextEvent;
-                      finalText = ev.text;
-                      updateMessage(aId, { text: ev.text, textPaused: false });
-                      break;
-                    }
+                    case 'text_done':
                     case 'text': {
                       clearInterval(flushTimer);
                       clearPauseTimer();
-                      textAccum = '';
                       const ev = payload as AgentTextEvent;
-                      finalText = ev.text;
-                      updateMessage(aId, { text: ev.text, textPaused: false });
+                      // If text_done carries the full text, use it;
+                      // if empty (server already streamed everything via deltas), keep accumulated text
+                      if (ev.text) {
+                        textAccum = '';
+                        finalText = ev.text;
+                        updateMessage(aId, { text: ev.text, textPaused: false });
+                      } else {
+                        flushText();
+                        setMessages(prev => {
+                          const msg = prev.find(m => m.id === aId);
+                          finalText = msg?.text || '';
+                          return prev.map(m =>
+                            m.id === aId ? { ...m, textPaused: false } : m
+                          );
+                        });
+                      }
                       break;
                     }
                     case 'done': {

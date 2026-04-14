@@ -219,13 +219,22 @@ const InlineCardMentionLoading: React.FC = () => {
 export const InlineCardMention: React.FC<{
   card: AnalysisCardJson;
   onClick?: (pineconeId: string) => void;
-}> = ({ card, onClick }) => {
+  onCopyLink?: (pineconeId: string) => void;
+}> = ({ card, onClick, onCopyLink }) => {
   const title = card.title || 'Open source';
   const imageUrl = card.episodeImage;
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onCopyLink?.(card.pineconeId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
     <span
-      className="inline-flex items-center gap-2 px-2 py-1 rounded-md border border-gray-800 bg-gray-900/40 align-middle cursor-pointer hover:bg-gray-900/70 transition-colors max-w-[420px]"
+      className="inline-flex items-center gap-2 px-2 py-1 rounded-md border border-gray-800 bg-gray-900/40 align-middle cursor-pointer hover:bg-gray-900/70 transition-colors max-w-[min(100%,420px)] overflow-hidden"
       role="button"
       tabIndex={0}
       onClick={() => onClick?.(card.pineconeId)}
@@ -250,7 +259,25 @@ export const InlineCardMention: React.FC<{
           <LinkIcon className="w-3 h-3 text-gray-500" />
         </span>
       )}
-      <span className="text-xs text-gray-200 truncate">{title}</span>
+      <span className="text-xs text-gray-200 truncate min-w-0">{title}</span>
+      {onCopyLink && (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={handleCopy}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleCopy(e as any); }
+          }}
+          className="flex-shrink-0 ml-0.5 text-gray-500 hover:text-gray-300 transition-colors"
+          title="Copy link"
+        >
+          {copied ? (
+            <Check className="w-3 h-3 text-green-400" />
+          ) : (
+            <LinkIcon className="w-3 h-3" />
+          )}
+        </span>
+      )}
     </span>
   );
 };

@@ -6,6 +6,7 @@ import type { ClipMeta } from './WorkflowMessage.tsx';
 import type { AgentModel } from '../../types/workflow';
 import { useAudioController } from '../../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from '../EmbedMiniPlayer.tsx';
+import { createClipShareUrl } from '../../utils/urlUtils.ts';
 
 export const WorkflowChat: React.FC = () => {
   const {
@@ -147,6 +148,10 @@ export const WorkflowChat: React.FC = () => {
             }}
             quote={activeClip.text}
             hierarchyLevel="paragraph"
+            onCopyLink={() => {
+              const url = createClipShareUrl(activeClip.pineconeId);
+              navigator.clipboard.writeText(url).catch(() => {});
+            }}
           />
         </div>
       )}
