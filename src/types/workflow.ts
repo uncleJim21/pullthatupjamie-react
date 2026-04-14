@@ -41,6 +41,9 @@ export interface SubmitOnDemandAction {
   guid?: string;
   feedGuid?: string;
   episodeTitle?: string;
+  image?: string;
+  enclosureUrl?: string;
+  link?: string;
 }
 
 export interface DirectQueryAction {

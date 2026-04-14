@@ -11,6 +11,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Play,
 } from 'lucide-react';
 import type {
   ChatMessage,
@@ -335,23 +336,68 @@ const MarkdownWithClips: React.FC<{
 
 // ─── Suggested action chips ─────────────────────────────────────────────────
 
-const SubmitOnDemandChip: React.FC<{ action: SubmitOnDemandAction }> = ({ action }) => (
-  <div className="bg-[#111111] border border-blue-900/30 rounded-lg p-3">
-    <div className="flex items-start gap-2.5">
-      <Upload className="w-4 h-4 text-blue-400/70 flex-shrink-0 mt-0.5" />
-      <div className="flex-1 min-w-0">
-        <p className="text-gray-300 text-sm font-medium">Transcribe this episode</p>
-        {action.episodeTitle && (
-          <p className="text-gray-500 text-xs mt-0.5 truncate">{action.episodeTitle}</p>
+const FOUNTAIN_API = 'https://rss-extractor-app-yufbq.ondigitalocean.app/getFountainLink';
+
+const SubmitOnDemandChip: React.FC<{ action: SubmitOnDemandAction }> = ({ action }) => {
+  const [fountainUrl, setFountainUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!action.guid) return;
+    let cancelled = false;
+    fetch(FOUNTAIN_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guid: action.guid }),
+    })
+      .then(r => r.json())
+      .then(data => { if (!cancelled && data.success) setFountainUrl(data.fountainLink); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [action.guid]);
+
+  return (
+    <div className="bg-[#111111] border border-blue-900/30 rounded-lg p-3">
+      <div className="flex items-start gap-3">
+        {action.image ? (
+          <img
+            src={action.image}
+            alt={action.episodeTitle || ''}
+            className="w-10 h-10 rounded object-cover flex-shrink-0"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+            <Upload className="w-4 h-4 text-blue-400/70" />
+          </div>
         )}
-        <p className="text-gray-600 text-[10px] mt-1">{action.reason}</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-gray-300 text-sm font-medium">Transcribe this episode</p>
+          {action.episodeTitle && (
+            <p className="text-gray-500 text-xs mt-0.5 truncate">{action.episodeTitle}</p>
+          )}
+          <p className="text-gray-600 text-[10px] mt-1 line-clamp-2">{action.reason}</p>
+        </div>
+        <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+          <button className="px-3 py-1.5 text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors">
+            Transcribe
+          </button>
+          {fountainUrl && (
+            <a
+              href={fountainUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 px-2 py-1 text-[10px] text-gray-500 rounded-md border border-gray-800 hover:text-gray-300 hover:border-gray-700 transition-colors"
+              title="Listen on Fountain.fm"
+            >
+              <Play className="w-2.5 h-2.5" />
+              Preview
+            </a>
+          )}
+        </div>
       </div>
-      <button className="flex-shrink-0 px-3 py-1.5 text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors">
-        Transcribe
-      </button>
     </div>
-  </div>
-);
+  );
+};
 
 const DirectQueryChip: React.FC<{
   action: DirectQueryAction;
