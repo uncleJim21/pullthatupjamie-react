@@ -1,9 +1,15 @@
 // --- Agent endpoint request ---
 
+export interface HistoryEntry {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface AgentRequest {
   message: string;
-  model?: 'fast' | 'quality';
+  model?: AgentModel;
   sessionId?: string;
+  history?: HistoryEntry[];
 }
 
 // --- SSE event payloads ---
@@ -26,13 +32,39 @@ export interface AgentToolResultEvent {
   round: number;
 }
 
-export interface AgentSuggestedAction {
-  type: string;
+// --- Suggested action variants ---
+
+export interface SubmitOnDemandAction {
+  type: 'submit-on-demand';
   reason: string;
-  episodeTitle?: string;
-  guid?: string;
   feedId?: string;
+  guid?: string;
+  feedGuid?: string;
+  episodeTitle?: string;
 }
+
+export interface DirectQueryAction {
+  type: 'direct-query';
+  reason: string;
+  label: string;
+  endpoint: string;
+  body: Record<string, unknown>;
+  method?: string;
+}
+
+export interface FollowUpMessageAction {
+  type: 'follow-up-message';
+  reason: string;
+  label: string;
+  message: string;
+}
+
+export type AgentSuggestedAction =
+  | SubmitOnDemandAction
+  | DirectQueryAction
+  | FollowUpMessageAction;
+
+// --- Other SSE payloads ---
 
 export interface AgentTextEvent {
   text: string;
@@ -63,10 +95,12 @@ export interface ChatMessage {
   statusMessages: string[];
   toolCalls: AgentToolCallEvent[];
   toolResults: AgentToolResultEvent[];
-  suggestedAction?: AgentSuggestedAction;
+  suggestedActions: AgentSuggestedAction[];
   text?: string;
   donePayload?: AgentDoneEvent;
   error?: string;
   loading: boolean;
   streamComplete: boolean;
+  /** True when text has been streaming but no new delta for ~3 seconds */
+  textPaused?: boolean;
 }

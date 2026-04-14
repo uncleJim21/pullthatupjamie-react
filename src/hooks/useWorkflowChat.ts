@@ -9,9 +9,12 @@ import type {
   AgentSuggestedAction,
   AgentTextEvent,
   AgentDoneEvent,
+  HistoryEntry,
 } from '../types/workflow';
 
 const STREAM_FLUSH_MS = 40;
+const MAX_HISTORY_ENTRIES = 4;
+const TEXT_PAUSE_MS = 3000;
 
 interface UseWorkflowChatReturn {
   messages: ChatMessage[];
@@ -33,6 +36,8 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [model, setModel] = useState<AgentModel>('fast');
   const abortControllerRef = useRef<AbortController | null>(null);
+  const historyRef = useRef<HistoryEntry[]>([]);
+  const sessionIdRef = useRef<string | undefined>(undefined);
 
   const updateMessage = useCallback((id: string, patch: Partial<ChatMessage>) => {
     setMessages(prev => prev.map(m => (m.id === id ? { ...m, ...patch } : m)));
@@ -58,6 +63,14 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
     );
   }, []);
 
+  const appendSuggestedAction = useCallback((id: string, action: AgentSuggestedAction) => {
+    setMessages(prev =>
+      prev.map(m =>
+        m.id === id ? { ...m, suggestedActions: [...m.suggestedActions, action] } : m
+      )
+    );
+  }, []);
+
   const sendMessage = useCallback(
     async (task: string) => {
       if (abortControllerRef.current) abortControllerRef.current.abort();
@@ -72,6 +85,7 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
         statusMessages: [],
         toolCalls: [],
         toolResults: [],
+        suggestedActions: [],
         loading: false,
         streamComplete: true,
       };
@@ -82,6 +96,7 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
         statusMessages: [],
         toolCalls: [],
         toolResults: [],
+        suggestedActions: [],
         loading: true,
         streamComplete: false,
       };
@@ -95,6 +110,12 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
       }
 
       try {
+        const reqBody: Record<string, unknown> = { message: task, model };
+        if (sessionIdRef.current) reqBody.sessionId = sessionIdRef.current;
+        if (historyRef.current.length > 0) {
+          reqBody.history = historyRef.current.slice(-MAX_HISTORY_ENTRIES);
+        }
+
         const res = await fetch(`${API_URL}/api/pull`, {
           method: 'POST',
           headers: {
@@ -102,7 +123,7 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
             'Content-Type': 'application/json',
             Accept: 'text/event-stream',
           },
-          body: JSON.stringify({ message: task, model }),
+          body: JSON.stringify(reqBody),
           signal: abortControllerRef.current?.signal,
         });
 
@@ -114,21 +135,47 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
         let sseBuffer = '';
         let currentEventType = 'message';
 
-        // Buffered text streaming: accumulate deltas and flush on an
-        // interval so the UI updates at a steady ~25 fps instead of
-        // jumping with each network chunk.
         let textAccum = '';
+        let pauseTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const clearPauseTimer = () => {
+          if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
+        };
+
         const flushText = () => {
           if (!textAccum) return;
           const chunk = textAccum;
           textAccum = '';
+          // Clear paused state when new text arrives
           setMessages(prev =>
             prev.map(m =>
-              m.id === aId ? { ...m, text: (m.text || '') + chunk } : m
+              m.id === aId ? { ...m, text: (m.text || '') + chunk, textPaused: false } : m
             )
           );
         };
         const flushTimer = setInterval(flushText, STREAM_FLUSH_MS);
+
+        const startPauseTimer = () => {
+          clearPauseTimer();
+          pauseTimer = setTimeout(() => {
+            // After TEXT_PAUSE_MS with no new delta: mark paused + append a space
+            // so the text doesn't look jammed against the edge
+            setMessages(prev =>
+              prev.map(m => {
+                if (m.id !== aId || m.streamComplete) return m;
+                const currentText = m.text || '';
+                const needsSpace = currentText.length > 0 && !currentText.endsWith(' ') && !currentText.endsWith('\n');
+                return {
+                  ...m,
+                  text: needsSpace ? currentText + ' ' : currentText,
+                  textPaused: true,
+                };
+              })
+            );
+          }, TEXT_PAUSE_MS);
+        };
+
+        let finalText = '';
 
         try {
           while (true) {
@@ -170,30 +217,35 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
                     }
                     case 'suggested_action': {
                       const ev = payload as AgentSuggestedAction;
-                      updateMessage(aId, { suggestedAction: ev });
+                      appendSuggestedAction(aId, ev);
                       break;
                     }
                     case 'text_delta': {
                       textAccum += payload.text || '';
+                      startPauseTimer();
                       break;
                     }
                     case 'text_done': {
-                      // Flush any buffered deltas, then set the final text
                       clearInterval(flushTimer);
+                      clearPauseTimer();
                       textAccum = '';
                       const ev = payload as AgentTextEvent;
-                      updateMessage(aId, { text: ev.text });
+                      finalText = ev.text;
+                      updateMessage(aId, { text: ev.text, textPaused: false });
                       break;
                     }
                     case 'text': {
                       clearInterval(flushTimer);
+                      clearPauseTimer();
                       textAccum = '';
                       const ev = payload as AgentTextEvent;
-                      updateMessage(aId, { text: ev.text });
+                      finalText = ev.text;
+                      updateMessage(aId, { text: ev.text, textPaused: false });
                       break;
                     }
                     case 'done': {
                       const ev = payload as AgentDoneEvent;
+                      sessionIdRef.current = ev.sessionId;
                       updateMessage(aId, {
                         donePayload: ev,
                         loading: false,
@@ -222,7 +274,17 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
           }
         } finally {
           clearInterval(flushTimer);
+          clearPauseTimer();
           flushText();
+        }
+
+        // Append completed turn to history for multi-turn
+        if (finalText) {
+          historyRef.current = [
+            ...historyRef.current,
+            { role: 'user', content: task },
+            { role: 'assistant', content: finalText },
+          ].slice(-MAX_HISTORY_ENTRIES);
         }
 
         updateMessage(aId, { loading: false, streamComplete: true });
@@ -231,12 +293,14 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
         updateMessage(aId, { loading: false, error: err.message || 'Stream failed' });
       }
     },
-    [model, updateMessage, appendStatus, appendToolCall, appendToolResult]
+    [model, updateMessage, appendStatus, appendToolCall, appendToolResult, appendSuggestedAction]
   );
 
   const clearMessages = useCallback(() => {
     if (abortControllerRef.current) abortControllerRef.current.abort();
     setMessages([]);
+    historyRef.current = [];
+    sessionIdRef.current = undefined;
   }, []);
 
   return {

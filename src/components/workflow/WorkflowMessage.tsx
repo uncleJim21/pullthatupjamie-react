@@ -2,8 +2,23 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { AlertCircle, ShieldCheck } from 'lucide-react';
-import type { ChatMessage } from '../../types/workflow';
+import {
+  AlertCircle,
+  ShieldCheck,
+  Search,
+  MessageSquareText,
+  Upload,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
+import type {
+  ChatMessage,
+  AgentSuggestedAction,
+  SubmitOnDemandAction,
+  DirectQueryAction,
+  FollowUpMessageAction,
+} from '../../types/workflow';
 import { ActivityTimeline, ResponseMetadata } from './WorkflowResultCards.tsx';
 import { API_URL } from '../../constants/constants.ts';
 import { InlineCardMention, type AnalysisCardJson } from '../UnifiedSidePanel.tsx';
@@ -264,36 +279,135 @@ const MarkdownWithClips: React.FC<{
   );
 };
 
-// ─── Suggested action card ──────────────────────────────────────────────────
+// ─── Suggested action chips ─────────────────────────────────────────────────
 
-const SuggestedActionCard: React.FC<{ action: NonNullable<ChatMessage['suggestedAction']> }> = ({
-  action,
-}) => (
-  <div className="bg-[#111111] border border-blue-900/30 rounded-lg p-4">
-    <div className="flex items-start gap-2">
-      <ShieldCheck className="w-4 h-4 text-blue-400/70 flex-shrink-0 mt-0.5" />
-      <div>
-        <p className="text-gray-300 text-sm font-medium">
-          {action.type === 'submit-on-demand' ? 'Transcription suggested' : action.type}
-        </p>
-        <p className="text-gray-400 text-xs mt-1">{action.reason}</p>
+const SubmitOnDemandChip: React.FC<{ action: SubmitOnDemandAction }> = ({ action }) => (
+  <div className="bg-[#111111] border border-blue-900/30 rounded-lg p-3">
+    <div className="flex items-start gap-2.5">
+      <Upload className="w-4 h-4 text-blue-400/70 flex-shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-gray-300 text-sm font-medium">Transcribe this episode</p>
         {action.episodeTitle && (
-          <p className="text-gray-500 text-xs mt-1 italic">{action.episodeTitle}</p>
+          <p className="text-gray-500 text-xs mt-0.5 truncate">{action.episodeTitle}</p>
         )}
+        <p className="text-gray-600 text-[10px] mt-1">{action.reason}</p>
       </div>
+      <button className="flex-shrink-0 px-3 py-1.5 text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors">
+        Transcribe
+      </button>
     </div>
   </div>
 );
+
+const DirectQueryChip: React.FC<{
+  action: DirectQueryAction;
+}> = ({ action }) => {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleClick = async () => {
+    if (loading || result) {
+      setExpanded(e => !e);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${API_URL}${action.endpoint}`, {
+        method: action.method || 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(action.body),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const data = await res.json();
+      setResult(data);
+      setExpanded(true);
+    } catch (err: any) {
+      setError(err.message || 'Request failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <button
+        onClick={handleClick}
+        className="flex items-center gap-2 px-3 py-2 text-xs text-gray-300 bg-[#111111] border border-gray-800 rounded-lg hover:border-gray-700 hover:bg-[#161616] transition-all w-full text-left"
+      >
+        <Search className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+        <span className="flex-1 truncate">{action.label}</span>
+        {loading && <Loader2 className="w-3 h-3 text-gray-500 animate-spin flex-shrink-0" />}
+        {result && (
+          expanded
+            ? <ChevronUp className="w-3 h-3 text-gray-600 flex-shrink-0" />
+            : <ChevronDown className="w-3 h-3 text-gray-600 flex-shrink-0" />
+        )}
+      </button>
+      {error && (
+        <p className="text-red-400/70 text-[10px] mt-1 px-1">{error}</p>
+      )}
+      {result && expanded && (
+        <div className="mt-2 bg-[#0D0D0D] border border-gray-800 rounded-lg p-3 text-xs text-gray-400 max-h-60 overflow-y-auto">
+          <pre className="whitespace-pre-wrap break-words">{JSON.stringify(result, null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const FollowUpChip: React.FC<{
+  action: FollowUpMessageAction;
+  onSend: (message: string) => void;
+}> = ({ action, onSend }) => (
+  <button
+    onClick={() => onSend(action.message)}
+    className="flex items-center gap-2 px-3 py-2 text-xs text-gray-300 bg-[#111111] border border-gray-800 rounded-lg hover:border-gray-700 hover:bg-[#161616] transition-all text-left"
+  >
+    <MessageSquareText className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+    <span className="truncate">{action.label}</span>
+  </button>
+);
+
+const SuggestedActions: React.FC<{
+  actions: AgentSuggestedAction[];
+  onFollowUp: (message: string) => void;
+}> = ({ actions, onFollowUp }) => {
+  if (!actions.length) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      {actions.map((action, i) => {
+        switch (action.type) {
+          case 'submit-on-demand':
+            return <SubmitOnDemandChip key={i} action={action} />;
+          case 'direct-query':
+            return <DirectQueryChip key={i} action={action} />;
+          case 'follow-up-message':
+            return <FollowUpChip key={i} action={action} onSend={onFollowUp} />;
+          default:
+            return null;
+        }
+      })}
+    </div>
+  );
+};
 
 // ─── Message component ──────────────────────────────────────────────────────
 
 interface WorkflowMessageProps {
   message: ChatMessage;
   onPlayClip?: (meta: ClipMeta) => void;
+  onFollowUp?: (message: string) => void;
 }
 
-export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPlayClip }) => {
-  const { statusMessages, toolCalls, toolResults, suggestedAction, text, donePayload, error, loading } =
+export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPlayClip, onFollowUp }) => {
+  const { statusMessages, toolCalls, toolResults, suggestedActions, text, donePayload, error, loading } =
     message;
 
   const clipIds = useMemo(() => (text ? extractClipIds(text) : []), [text]);
@@ -334,17 +448,27 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPla
           />
         )}
 
-        {suggestedAction && <SuggestedActionCard action={suggestedAction} />}
-
         {text && (
           <div className="bg-[#111111] border border-gray-800 rounded-lg p-5">
-            <MarkdownWithClips
-              text={markdown}
-              clipsByIndex={clipsByIndex}
-              metaCache={metaCache}
-              onCardClick={handleCardClick}
-            />
+            <div className={!message.streamComplete ? 'streaming-cursor' : undefined}>
+              <MarkdownWithClips
+                text={markdown}
+                clipsByIndex={clipsByIndex}
+                metaCache={metaCache}
+                onCardClick={handleCardClick}
+              />
+            </div>
+            {message.textPaused && !message.streamComplete && (
+              <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-800/30 animate-fade-in">
+                <div className="w-3 h-3 rounded-full border-b-2 border-gray-500 animate-spin" />
+                <span className="text-gray-600 text-[11px]">Still working...</span>
+              </div>
+            )}
           </div>
+        )}
+
+        {suggestedActions.length > 0 && onFollowUp && (
+          <SuggestedActions actions={suggestedActions} onFollowUp={onFollowUp} />
         )}
 
         {donePayload && <ResponseMetadata done={donePayload} />}

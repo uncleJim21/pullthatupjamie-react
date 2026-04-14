@@ -120,7 +120,12 @@ export const WorkflowChat: React.FC = () => {
         )}
 
         {messages.map(msg => (
-          <WorkflowMessage key={msg.id} message={msg} onPlayClip={handlePlayClip} />
+          <WorkflowMessage
+            key={msg.id}
+            message={msg}
+            onPlayClip={handlePlayClip}
+            onFollowUp={sendMessage}
+          />
         ))}
       </div>
 
