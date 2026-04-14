@@ -354,7 +354,11 @@ type SubmitState = 'idle' | 'submitting' | 'polling' | 'done' | 'error';
 
 const POLL_INTERVAL_MS = 5000;
 
-const SubmitOnDemandChip: React.FC<{ action: SubmitOnDemandAction }> = ({ action }) => {
+const SubmitOnDemandChip: React.FC<{
+  action: SubmitOnDemandAction;
+  originalQuery?: string;
+  onFollowUp?: (message: string) => void;
+}> = ({ action, originalQuery, onFollowUp }) => {
   const { title: episodeTitle, image: episodeImage } = useMemo(() => extractImageFromAction(action), [action]);
   const [fountainUrl, setFountainUrl] = useState<string | null>(null);
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
@@ -484,6 +488,20 @@ const SubmitOnDemandChip: React.FC<{ action: SubmitOnDemandAction }> = ({ action
           )}
         </div>
       </div>
+      {submitState === 'done' && onFollowUp && originalQuery && (
+        <button
+          onClick={() => {
+            const context = action.guid
+              ? `I just transcribed episode ${action.guid} (feedId: ${action.feedId}). `
+              : '';
+            onFollowUp(`${context}${originalQuery}`);
+          }}
+          className="flex items-center gap-2 mt-2 px-3 py-2 text-xs text-green-300 bg-green-500/5 border border-green-900/30 rounded-lg hover:bg-green-500/10 transition-colors w-full text-left"
+        >
+          <MessageSquareText className="w-3.5 h-3.5 text-green-400/70 flex-shrink-0" />
+          <span className="truncate">Re-ask: {originalQuery}</span>
+        </button>
+      )}
     </div>
   );
 };
@@ -567,14 +585,22 @@ const FollowUpChip: React.FC<{
 const SuggestedActions: React.FC<{
   actions: AgentSuggestedAction[];
   onFollowUp: (message: string) => void;
-}> = ({ actions, onFollowUp }) => {
+  originalQuery?: string;
+}> = ({ actions, onFollowUp, originalQuery }) => {
   if (!actions.length) return null;
   return (
     <div className="flex flex-col gap-2">
       {actions.map((action, i) => {
         switch (action.type) {
           case 'submit-on-demand':
-            return <SubmitOnDemandChip key={i} action={action} />;
+            return (
+              <SubmitOnDemandChip
+                key={i}
+                action={action}
+                originalQuery={originalQuery}
+                onFollowUp={onFollowUp}
+              />
+            );
           case 'direct-query':
             return <DirectQueryChip key={i} action={action} />;
           case 'follow-up-message':
@@ -593,13 +619,17 @@ interface WorkflowMessageProps {
   message: ChatMessage;
   onPlayClip?: (meta: ClipMeta) => void;
   onFollowUp?: (message: string) => void;
+  originalQuery?: string;
 }
 
-export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPlayClip, onFollowUp }) => {
+export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPlayClip, onFollowUp, originalQuery }) => {
   const { statusMessages, toolCalls, toolResults, suggestedActions, text, donePayload, error, loading } =
     message;
 
-  const clipIds = useMemo(() => (text ? extractClipIds(text) : []), [text]);
+  const clipIds = useMemo(
+    () => (text && message.streamComplete ? extractClipIds(text) : []),
+    [text, message.streamComplete]
+  );
   const metaCache = useClipMetadata(clipIds);
 
   const { markdown, clipsByIndex } = useMemo(() => {
@@ -663,7 +693,7 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPla
         )}
 
         {suggestedActions.length > 0 && onFollowUp && (
-          <SuggestedActions actions={suggestedActions} onFollowUp={onFollowUp} />
+          <SuggestedActions actions={suggestedActions} onFollowUp={onFollowUp} originalQuery={originalQuery} />
         )}
 
         {donePayload && <ResponseMetadata done={donePayload} />}

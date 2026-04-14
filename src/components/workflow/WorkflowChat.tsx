@@ -120,14 +120,26 @@ export const WorkflowChat: React.FC = () => {
           </div>
         )}
 
-        {messages.map(msg => (
-          <WorkflowMessage
-            key={msg.id}
-            message={msg}
-            onPlayClip={handlePlayClip}
-            onFollowUp={sendMessage}
-          />
-        ))}
+        {messages.map((msg, idx) => {
+          let originalQuery: string | undefined;
+          if (msg.role === 'assistant') {
+            for (let i = idx - 1; i >= 0; i--) {
+              if (messages[i].role === 'user') {
+                originalQuery = messages[i].content;
+                break;
+              }
+            }
+          }
+          return (
+            <WorkflowMessage
+              key={msg.id}
+              message={msg}
+              onPlayClip={handlePlayClip}
+              onFollowUp={sendMessage}
+              originalQuery={originalQuery}
+            />
+          );
+        })}
       </div>
 
       {/* Mini-player — above input bar */}
