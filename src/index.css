@@ -129,3 +129,37 @@ html, body, #root {
   animation: fade-in 0.5s ease-in;
 }
 
+/* Research session card — luminescent border glow */
+.research-session-card {
+  animation: session-glow 4s ease-in-out infinite;
+}
+.research-session-card canvas {
+  animation: star-pulse 3s ease-in-out infinite;
+}
+.research-session-card:hover {
+  box-shadow:
+    0 0 14px rgba(120, 60, 180, 0.3),
+    0 0 30px rgba(60, 100, 180, 0.12),
+    inset 0 0 20px rgba(80, 40, 120, 0.15) !important;
+}
+
+@keyframes session-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(120, 60, 180, 0.2),
+      0 0 25px rgba(60, 100, 180, 0.08),
+      inset 0 0 15px rgba(80, 40, 120, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(120, 60, 180, 0.28),
+      0 0 30px rgba(60, 100, 180, 0.12),
+      inset 0 0 18px rgba(80, 40, 120, 0.14);
+  }
+}
+
+@keyframes star-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.04); }
+}
+

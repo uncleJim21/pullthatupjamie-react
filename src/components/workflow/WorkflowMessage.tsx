@@ -179,6 +179,80 @@ function buildMarkdownWithClipPlaceholders(text: string): {
   return { markdown, clipsByIndex };
 }
 
+// ─── Galaxy star canvas for research session cards ──────────────────────────
+
+const STAR_SIZE = 48;
+const STAR_DPR = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1;
+
+const GalaxyStarCanvas: React.FC = React.memo(() => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const s = STAR_SIZE * STAR_DPR;
+    canvas.width = s;
+    canvas.height = s;
+    const cx = s / 2;
+    const cy = s / 2;
+
+    ctx.fillStyle = '#050508';
+    ctx.fillRect(0, 0, s, s);
+
+    // Outer halo — purple/cyan blend
+    const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, cx * 0.85);
+    halo.addColorStop(0, 'rgba(140, 100, 220, 0.35)');
+    halo.addColorStop(0.4, 'rgba(60, 120, 200, 0.15)');
+    halo.addColorStop(1, 'transparent');
+    ctx.fillStyle = halo;
+    ctx.fillRect(0, 0, s, s);
+
+    // Mid glow
+    const mid = ctx.createRadialGradient(cx, cy, 0, cx, cy, cx * 0.4);
+    mid.addColorStop(0, 'rgba(200, 180, 255, 0.7)');
+    mid.addColorStop(0.5, 'rgba(140, 100, 220, 0.25)');
+    mid.addColorStop(1, 'transparent');
+    ctx.fillStyle = mid;
+    ctx.fillRect(0, 0, s, s);
+
+    // Core
+    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, cx * 0.15);
+    core.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    core.addColorStop(0.6, 'rgba(220, 200, 255, 0.5)');
+    core.addColorStop(1, 'transparent');
+    ctx.fillStyle = core;
+    ctx.fillRect(0, 0, s, s);
+
+    // Diffraction spikes
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.globalCompositeOperation = 'screen';
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 4);
+      const spike = ctx.createLinearGradient(0, -cx * 0.7, 0, cx * 0.7);
+      spike.addColorStop(0, 'transparent');
+      spike.addColorStop(0.35, 'rgba(180, 160, 255, 0.12)');
+      spike.addColorStop(0.5, 'rgba(255, 255, 255, 0.25)');
+      spike.addColorStop(0.65, 'rgba(180, 160, 255, 0.12)');
+      spike.addColorStop(1, 'transparent');
+      ctx.fillStyle = spike;
+      ctx.fillRect(-0.5 * STAR_DPR, -cx * 0.7, 1 * STAR_DPR, cx * 1.4);
+    }
+    ctx.restore();
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="flex-shrink-0 rounded-md"
+      style={{ width: STAR_SIZE, height: STAR_SIZE }}
+    />
+  );
+});
+
 // ─── Time formatter ─────────────────────────────────────────────────────────
 
 function fmtTime(seconds: number): string {
@@ -327,16 +401,18 @@ const MarkdownWithClips: React.FC<{
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2.5 my-2 px-3 py-2.5 rounded-lg border border-purple-900/30 bg-purple-500/5 hover:bg-purple-500/10 transition-colors no-underline group"
+              className="research-session-card flex items-center gap-3 my-3 px-3 py-3 rounded-lg border border-purple-700/30 no-underline group relative overflow-hidden transition-all hover:border-purple-600/40"
+              style={{
+                background: 'radial-gradient(ellipse at 25% 40%, rgba(90,40,120,0.3), transparent 60%), radial-gradient(ellipse at 75% 60%, rgba(30,60,140,0.2), transparent 55%), #08080c',
+                boxShadow: '0 0 10px rgba(120,60,180,0.2), 0 0 25px rgba(60,100,180,0.08), inset 0 0 15px rgba(80,40,120,0.1)',
+              }}
             >
-              <span className="w-8 h-8 rounded-md bg-purple-500/10 border border-purple-800/30 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-4 h-4 text-purple-400" />
-              </span>
-              <span className="flex-1 min-w-0">
+              <GalaxyStarCanvas />
+              <span className="flex-1 min-w-0 z-10">
                 <span className="block text-sm font-medium text-white truncate">{titleText}</span>
-                <span className="block text-[10px] text-purple-400/70">Research Session</span>
+                <span className="block text-[10px] text-purple-300/50 mt-0.5">Research Session</span>
               </span>
-              <ArrowUpRight className="w-4 h-4 text-gray-500 group-hover:text-purple-400 transition-colors flex-shrink-0" />
+              <ArrowUpRight className="w-4 h-4 text-purple-400/40 group-hover:text-purple-300 transition-colors flex-shrink-0 z-10" />
             </a>
           );
         }
