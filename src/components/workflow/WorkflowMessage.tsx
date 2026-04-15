@@ -750,8 +750,8 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPla
     message;
 
   const clipIds = useMemo(
-    () => (text && message.streamComplete ? extractClipIds(text) : []),
-    [text, message.streamComplete]
+    () => (text ? extractClipIds(text) : []),
+    [text]
   );
   const metaCache = useClipMetadata(clipIds);
 
