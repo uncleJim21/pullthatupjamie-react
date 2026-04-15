@@ -285,6 +285,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Check embed mode early (before any hooks) so state initializers can reference it
   // Uses window.location directly since URL doesn't change during component lifecycle
   const isEmbedMode = new URLSearchParams(window.location.search).get('embed') === 'true';
+  const isStrippedMode = new URLSearchParams(window.location.search).get('stripped') === 'true';
   
   const [query, setQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -4078,7 +4079,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                 compactStats={isNarrowLayout}
                 hideOptions={isEmbedMode}
                 nebulaDimOpacity={isEmbedMode ? 0.78 : undefined}
-                brandImage={isEmbedMode ? (brandImage || undefined) : undefined}
+                brandImage={isEmbedMode && !isStrippedMode ? (brandImage || undefined) : undefined}
                 brandColors={isEmbedMode ? (brandColors || undefined) : undefined}
                 isCompactHeight={isEmbedMode && isCompactHeight}
                 isNarrowLayout={isNarrowLayout}
@@ -4677,7 +4678,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           mode={isEmbedMode ? 'embed' : 'app'}
           isHovered={isEmbedMode ? isEmbedHovered : true}
           audioUnlocked={isEmbedMode ? audioUnlocked : true}
-          brandImage={isEmbedMode ? (brandImage || undefined) : undefined}
+          brandImage={isEmbedMode && !isStrippedMode ? (brandImage || undefined) : undefined}
           audioUrl={selectedAudioContext?.audioUrl}
           episodeTitle={selectedAudioContext?.episode}
           episodeImage={selectedAudioContext?.episodeImage}
@@ -4696,8 +4697,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         />
       )}
 
-      {/* Embed Mode Attribution (bottom-right) */}
-      {isEmbedMode && (
+      {/* Embed Mode Attribution (bottom-right) — hidden in stripped mode */}
+      {isEmbedMode && !isStrippedMode && (
         <div
           className="fixed right-4 z-40"
           style={{ bottom: 'calc(var(--embed-mini-player-height, 92px) + 12px)' }}

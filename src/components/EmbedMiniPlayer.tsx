@@ -232,7 +232,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
             )}
             <div className="text-center flex-shrink-0">
               <p className="text-base sm:text-lg font-medium text-white">
-                Click or tap to play
+                Click or tap anywhere to play
               </p>
               <p className="text-xs text-gray-400">
                 Unlock audio playback
