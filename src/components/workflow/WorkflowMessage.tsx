@@ -12,6 +12,8 @@ import {
   ChevronDown,
   ChevronUp,
   Play,
+  Sparkles,
+  ArrowUpRight,
 } from 'lucide-react';
 import type {
   ChatMessage,
@@ -313,14 +315,50 @@ const MarkdownWithClips: React.FC<{
       ),
       strong: ({ children }: any) => <strong>{inject(children)}</strong>,
       em: ({ children }: any) => <em>{inject(children)}</em>,
+      a: ({ href, children }: any) => {
+        if (href && /[?&]researchSessionId=/.test(href)) {
+          const titleText = typeof children === 'string'
+            ? children
+            : Array.isArray(children)
+              ? children.filter((c: unknown) => typeof c === 'string').join('')
+              : 'Research Session';
+          return (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2.5 my-2 px-3 py-2.5 rounded-lg border border-purple-900/30 bg-purple-500/5 hover:bg-purple-500/10 transition-colors no-underline group"
+            >
+              <span className="w-8 h-8 rounded-md bg-purple-500/10 border border-purple-800/30 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-white truncate">{titleText}</span>
+                <span className="block text-[10px] text-purple-400/70">Research Session</span>
+              </span>
+              <ArrowUpRight className="w-4 h-4 text-gray-500 group-hover:text-purple-400 transition-colors flex-shrink-0" />
+            </a>
+          );
+        }
+        return (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+          >
+            {children}
+          </a>
+        );
+      },
       h1: ({ children }: any) => (
-        <h1 className="text-2xl font-bold text-white my-2">{children}</h1>
+        <h1 className="text-2xl font-bold text-white my-2">{inject(children)}</h1>
       ),
       h2: ({ children }: any) => (
-        <h2 className="text-xl font-bold text-white my-2">{children}</h2>
+        <h2 className="text-xl font-bold text-white my-2">{inject(children)}</h2>
       ),
       h3: ({ children }: any) => (
-        <h3 className="text-lg font-semibold text-white my-2">{children}</h3>
+        <h3 className="text-lg font-semibold text-white my-2">{inject(children)}</h3>
       ),
     }),
     [inject]
