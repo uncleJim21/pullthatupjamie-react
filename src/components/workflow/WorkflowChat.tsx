@@ -169,7 +169,7 @@ export const WorkflowChat: React.FC = () => {
       )}
 
       {/* Input area */}
-      <div className="flex-shrink-0 border-t border-gray-800 bg-[#0A0A0A] px-5 py-4">
+      <div className="flex-shrink-0 border-t border-gray-800/50 bg-black/80 backdrop-blur-lg px-5 py-4">
         <form onSubmit={handleSubmit} className="flex items-center gap-3">
           <input
             type="text"
@@ -177,7 +177,7 @@ export const WorkflowChat: React.FC = () => {
             onChange={e => setInput(e.target.value)}
             placeholder="What are you looking for?"
             disabled={sending}
-            className="flex-1 bg-[#111111] border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-700 disabled:opacity-50 transition-colors"
+            className="flex-1 bg-black/80 backdrop-blur-lg border border-gray-800 rounded-xl shadow-white-glow px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-gray-700 disabled:opacity-50 transition-colors"
           />
           <button
             type="submit"

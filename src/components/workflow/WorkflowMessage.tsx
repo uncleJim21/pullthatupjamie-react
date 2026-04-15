@@ -776,7 +776,7 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPla
   if (message.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] bg-white/10 border border-gray-700 rounded-2xl rounded-tr-sm px-4 py-3">
+        <div className="max-w-[80%] rounded-2xl rounded-tr-sm px-4 py-3" style={{ background: 'radial-gradient(ellipse at 50% 50%, #1a1a1c, #111113)', border: '1.5px solid rgba(255,255,255,0.4)' }}>
           <p className="text-white text-sm">{message.content}</p>
         </div>
       </div>
@@ -796,7 +796,7 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPla
         )}
 
         {text && (
-          <div className="bg-[#111111] border border-gray-800 rounded-lg p-5">
+          <div className="rounded-lg p-5" style={{ background: 'radial-gradient(ellipse at 50% 50%, #141416, #0e0e10)', border: '2px solid rgba(255,255,255,0.35)' }}>
             <div className={!message.streamComplete ? 'streaming-cursor' : undefined}>
               <MarkdownWithClips
                 text={markdown}
