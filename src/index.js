@@ -20,6 +20,7 @@ import BlogPost from './components/blog/BlogPost.tsx';
 import UpgradePage from './components/UpgradePage.tsx';
 import PoastPage from './components/PoastPage.tsx';
 import WorkflowChatPage from './pages/WorkflowChatPage.tsx';
+import DevSwatches from './pages/DevSwatches.tsx';
 import { DEBUG_MODE } from './constants/constants.ts';
 import { inject } from "@vercel/analytics"
 
@@ -148,6 +149,7 @@ const App = () => (
       <Route path="/auth/twitter/complete" element={<TwitterAuthCallback />} />
       {DEBUG_MODE && <Route path="/twitter-test" element={<TwitterTest />} />}
       {DEBUG_MODE && <Route path="/browser-test" element={<BrowserTestInput />} />}
+      {DEBUG_MODE && <Route path="/dev/swatches" element={<DevSwatches />} />}
 
       {/* Upgrade page */}
       <Route path="/upgrade" element={<UpgradePage />} />

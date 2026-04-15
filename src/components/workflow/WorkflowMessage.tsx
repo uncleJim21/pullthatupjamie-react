@@ -12,7 +12,6 @@ import {
   ChevronDown,
   ChevronUp,
   Play,
-  Sparkles,
   ArrowUpRight,
 } from 'lucide-react';
 import type {
@@ -179,12 +178,17 @@ function buildMarkdownWithClipPlaceholders(text: string): {
   return { markdown, clipsByIndex };
 }
 
-// ─── Galaxy star canvas for research session cards ──────────────────────────
+// ─── Nebula thumbnail for research session cards ────────────────────────────
 
-const STAR_SIZE = 48;
-const STAR_DPR = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1;
+const NEBULA_SIZE = 48;
+const NEBULA_DPR = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1;
 
-const GalaxyStarCanvas: React.FC = React.memo(() => {
+function seededRand(seed: number) {
+  let s = seed;
+  return () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; };
+}
+
+export const NebulaThumbnail: React.FC<{ size?: number }> = React.memo(({ size = NEBULA_SIZE }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -193,62 +197,65 @@ const GalaxyStarCanvas: React.FC = React.memo(() => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const s = STAR_SIZE * STAR_DPR;
+    const s = size * NEBULA_DPR;
     canvas.width = s;
     canvas.height = s;
-    const cx = s / 2;
-    const cy = s / 2;
+    const rand = seededRand(42);
 
-    ctx.fillStyle = '#050508';
+    ctx.fillStyle = '#08080c';
     ctx.fillRect(0, 0, s, s);
 
-    // Outer halo — purple/cyan blend
-    const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, cx * 0.85);
-    halo.addColorStop(0, 'rgba(140, 100, 220, 0.35)');
-    halo.addColorStop(0.4, 'rgba(60, 120, 200, 0.15)');
-    halo.addColorStop(1, 'transparent');
-    ctx.fillStyle = halo;
+    // Nebula clouds — warm orange/amber blobs
+    const clouds = [
+      { x: 0.3, y: 0.35, r: 0.5, color: 'rgba(240,139,71,0.22)' },
+      { x: 0.7, y: 0.6,  r: 0.45, color: 'rgba(204,68,0,0.15)' },
+      { x: 0.5, y: 0.5,  r: 0.35, color: 'rgba(255,180,100,0.12)' },
+    ];
+    for (const c of clouds) {
+      const g = ctx.createRadialGradient(c.x * s, c.y * s, 0, c.x * s, c.y * s, c.r * s);
+      g.addColorStop(0, c.color);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, s, s);
+    }
+
+    // Scattered stars
+    ctx.globalCompositeOperation = 'screen';
+    for (let i = 0; i < 30; i++) {
+      const x = rand() * s;
+      const y = rand() * s;
+      const brightness = 0.3 + rand() * 0.5;
+      const radius = (0.3 + rand() * 0.8) * NEBULA_DPR;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,${200 + Math.floor(rand() * 55)},${180 + Math.floor(rand() * 75)},${brightness})`;
+      ctx.fill();
+    }
+
+    // Bright core star with glow
+    const cx = s * 0.42;
+    const cy = s * 0.40;
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, s * 0.18);
+    glow.addColorStop(0, 'rgba(255,220,180,0.8)');
+    glow.addColorStop(0.4, 'rgba(240,139,71,0.3)');
+    glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow;
     ctx.fillRect(0, 0, s, s);
 
-    // Mid glow
-    const mid = ctx.createRadialGradient(cx, cy, 0, cx, cy, cx * 0.4);
-    mid.addColorStop(0, 'rgba(200, 180, 255, 0.7)');
-    mid.addColorStop(0.5, 'rgba(140, 100, 220, 0.25)');
-    mid.addColorStop(1, 'transparent');
-    ctx.fillStyle = mid;
-    ctx.fillRect(0, 0, s, s);
-
-    // Core
-    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, cx * 0.15);
-    core.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-    core.addColorStop(0.6, 'rgba(220, 200, 255, 0.5)');
+    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, s * 0.05);
+    core.addColorStop(0, 'rgba(255,255,240,0.95)');
     core.addColorStop(1, 'transparent');
     ctx.fillStyle = core;
     ctx.fillRect(0, 0, s, s);
 
-    // Diffraction spikes
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.globalCompositeOperation = 'screen';
-    for (let i = 0; i < 4; i++) {
-      ctx.rotate(Math.PI / 4);
-      const spike = ctx.createLinearGradient(0, -cx * 0.7, 0, cx * 0.7);
-      spike.addColorStop(0, 'transparent');
-      spike.addColorStop(0.35, 'rgba(180, 160, 255, 0.12)');
-      spike.addColorStop(0.5, 'rgba(255, 255, 255, 0.25)');
-      spike.addColorStop(0.65, 'rgba(180, 160, 255, 0.12)');
-      spike.addColorStop(1, 'transparent');
-      ctx.fillStyle = spike;
-      ctx.fillRect(-0.5 * STAR_DPR, -cx * 0.7, 1 * STAR_DPR, cx * 1.4);
-    }
-    ctx.restore();
-  }, []);
+    ctx.globalCompositeOperation = 'source-over';
+  }, [size]);
 
   return (
     <canvas
       ref={canvasRef}
       className="flex-shrink-0 rounded-md"
-      style={{ width: STAR_SIZE, height: STAR_SIZE }}
+      style={{ width: size, height: size }}
     />
   );
 });
@@ -401,18 +408,19 @@ const MarkdownWithClips: React.FC<{
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="research-session-card flex items-center gap-3 my-3 px-3 py-3 rounded-lg border border-purple-700/30 no-underline group relative overflow-hidden transition-all hover:border-purple-600/40"
+              className="research-session-card flex items-center gap-3 my-3 px-3 py-3 rounded-lg no-underline group relative overflow-hidden transition-all"
               style={{
-                background: 'radial-gradient(ellipse at 25% 40%, rgba(90,40,120,0.3), transparent 60%), radial-gradient(ellipse at 75% 60%, rgba(30,60,140,0.2), transparent 55%), #08080c',
-                boxShadow: '0 0 10px rgba(120,60,180,0.2), 0 0 25px rgba(60,100,180,0.08), inset 0 0 15px rgba(80,40,120,0.1)',
+                border: '3px solid rgba(240,139,71,0.15)',
+                background: 'radial-gradient(ellipse at 25% 40%, rgba(240,139,71,0.15), transparent 60%), radial-gradient(ellipse at 75% 60%, rgba(204,68,0,0.1), transparent 55%), #08080c',
+                boxShadow: '0 0 10px rgba(240,139,71,0.15), 0 0 25px rgba(204,68,0,0.06), inset 0 0 15px rgba(240,139,71,0.06)',
               }}
             >
-              <GalaxyStarCanvas />
+              <NebulaThumbnail />
               <span className="flex-1 min-w-0 z-10">
                 <span className="block text-sm font-medium text-white truncate">{titleText}</span>
-                <span className="block text-[10px] text-purple-300/50 mt-0.5">Research Session</span>
+                <span className="block text-[10px] text-orange-300/50 mt-0.5">Research Session</span>
               </span>
-              <ArrowUpRight className="w-4 h-4 text-purple-400/40 group-hover:text-purple-300 transition-colors flex-shrink-0 z-10" />
+              <ArrowUpRight className="w-4 h-4 text-orange-400/40 group-hover:text-orange-300 transition-colors flex-shrink-0 z-10" />
             </a>
           );
         }
@@ -546,7 +554,7 @@ const SubmitOnDemandChip: React.FC<{
   const isBusy = submitState === 'submitting' || submitState === 'polling';
 
   return (
-    <div className="bg-[#111111] border border-blue-900/30 rounded-lg p-3">
+    <div className="action-chip action-chip--transcribe rounded-lg p-3">
       <div className="flex items-start gap-3">
         {episodeImage ? (
           <img
@@ -555,12 +563,12 @@ const SubmitOnDemandChip: React.FC<{
             className="w-10 h-10 rounded object-cover flex-shrink-0"
           />
         ) : (
-          <div className="w-10 h-10 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded bg-gray-800/60 flex items-center justify-center flex-shrink-0">
             <Upload className="w-4 h-4 text-blue-400/70" />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-gray-300 text-sm font-medium">Transcribe this episode</p>
+          <p className="text-gray-200 text-sm font-medium">Transcribe this episode</p>
           {episodeTitle && (
             <p className="text-gray-300 text-xs mt-0.5 truncate">{episodeTitle}</p>
           )}
@@ -581,7 +589,8 @@ const SubmitOnDemandChip: React.FC<{
             <button
               onClick={handleTranscribe}
               disabled={isBusy || !action.guid}
-              className="px-3 py-1.5 text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              className="px-3 py-1.5 text-xs rounded-lg hover:bg-blue-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              style={{ color: '#7799ff', background: 'rgba(51,102,255,0.1)', border: '1px solid rgba(51,102,255,0.22)' }}
             >
               {isBusy && <Loader2 className="w-3 h-3 animate-spin" />}
               {submitState === 'submitting' ? 'Submitting…' : submitState === 'polling' ? 'Processing…' : submitState === 'error' ? 'Retry' : 'Transcribe'}
@@ -660,11 +669,11 @@ const DirectQueryChip: React.FC<{
     <div>
       <button
         onClick={handleClick}
-        className="flex items-center gap-2 px-3 py-2 text-xs text-gray-300 bg-[#111111] border border-gray-800 rounded-lg hover:border-gray-700 hover:bg-[#161616] transition-all w-full text-left"
+        className="action-chip action-chip--query flex items-center gap-2 px-3 py-2 text-xs text-gray-300 rounded-lg transition-all w-full text-left"
       >
-        <Search className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+        <Search className="w-3.5 h-3.5 text-cyan-500/70 flex-shrink-0" />
         <span className="flex-1 truncate">{action.label}</span>
-        {loading && <Loader2 className="w-3 h-3 text-gray-500 animate-spin flex-shrink-0" />}
+        {loading && <Loader2 className="w-3 h-3 text-cyan-500/50 animate-spin flex-shrink-0" />}
         {result && (
           expanded
             ? <ChevronUp className="w-3 h-3 text-gray-600 flex-shrink-0" />
@@ -689,9 +698,9 @@ const FollowUpChip: React.FC<{
 }> = ({ action, onSend }) => (
   <button
     onClick={() => onSend(action.message)}
-    className="flex items-center gap-2 px-3 py-2 text-xs text-gray-300 bg-[#111111] border border-gray-800 rounded-lg hover:border-gray-700 hover:bg-[#161616] transition-all text-left"
+    className="action-chip action-chip--followup flex items-center gap-2 px-3 py-2 text-xs text-gray-300 rounded-lg transition-all text-left"
   >
-    <MessageSquareText className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+    <MessageSquareText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
     <span className="truncate">{action.label}</span>
   </button>
 );
