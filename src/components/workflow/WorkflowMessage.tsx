@@ -4,13 +4,9 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import {
   AlertCircle,
-  ShieldCheck,
-  Search,
   MessageSquareText,
   Upload,
   Loader2,
-  ChevronDown,
-  ChevronUp,
   Play,
   ArrowUpRight,
 } from 'lucide-react';
@@ -18,8 +14,8 @@ import type {
   ChatMessage,
   AgentSuggestedAction,
   SubmitOnDemandAction,
-  DirectQueryAction,
   FollowUpMessageAction,
+  FollowUpContext,
 } from '../../types/workflow';
 import { ActivityTimeline, ResponseMetadata } from './WorkflowResultCards.tsx';
 import { API_URL } from '../../constants/constants.ts';
@@ -394,6 +390,14 @@ const MarkdownWithClips: React.FC<{
       li: ({ children }: any) => (
         <li className="my-1">{inject(children)}</li>
       ),
+      blockquote: ({ children }: any) => (
+        <div className="relative my-3 pl-4 py-2.5 pr-3 border-l-[3px] border-white/25 bg-white/[0.03] rounded-r-md">
+          <span className="absolute -top-2 left-3 px-1.5 py-px text-[8px] uppercase tracking-widest text-gray-500 bg-[#0e0e10] rounded-sm">
+            Quote
+          </span>
+          <div className="text-gray-400 text-[13px] leading-relaxed">{inject(children)}</div>
+        </div>
+      ),
       strong: ({ children }: any) => <strong>{inject(children)}</strong>,
       em: ({ children }: any) => <em>{inject(children)}</em>,
       a: ({ href, children }: any) => {
@@ -461,17 +465,6 @@ const MarkdownWithClips: React.FC<{
 
 const FOUNTAIN_API = 'https://rss-extractor-app-yufbq.ondigitalocean.app/getFountainLink';
 
-function extractImageFromAction(action: SubmitOnDemandAction): { title: string; image: string | undefined } {
-  if (action.image) return { title: action.episodeTitle || '', image: action.image };
-  const raw = action.episodeTitle || '';
-  const imgMatch = raw.match(/https?:\/\/\S+\.(?:jpe?g|png|gif|webp)\S*/i);
-  if (imgMatch) {
-    const cleaned = raw.replace(/<\/?\w[^>]*>/g, '').replace(imgMatch[0], '').replace(/\s{2,}/g, ' ').trim();
-    return { title: cleaned, image: imgMatch[0] };
-  }
-  return { title: raw, image: undefined };
-}
-
 type SubmitState = 'idle' | 'submitting' | 'polling' | 'done' | 'error';
 
 const POLL_INTERVAL_MS = 5000;
@@ -481,7 +474,8 @@ const SubmitOnDemandChip: React.FC<{
   originalQuery?: string;
   onFollowUp?: (message: string) => void;
 }> = ({ action, originalQuery, onFollowUp }) => {
-  const { title: episodeTitle, image: episodeImage } = useMemo(() => extractImageFromAction(action), [action]);
+  const episodeTitle = action.episodeTitle || '';
+  const episodeImage = action.image;
   const [fountainUrl, setFountainUrl] = useState<string | null>(null);
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -629,75 +623,12 @@ const SubmitOnDemandChip: React.FC<{
   );
 };
 
-const DirectQueryChip: React.FC<{
-  action: DirectQueryAction;
-}> = ({ action }) => {
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleClick = async () => {
-    if (loading || result) {
-      setExpanded(e => !e);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const token = localStorage.getItem('auth_token');
-      const res = await fetch(`${API_URL}${action.endpoint}`, {
-        method: action.method || 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(action.body),
-      });
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      const data = await res.json();
-      setResult(data);
-      setExpanded(true);
-    } catch (err: any) {
-      setError(err.message || 'Request failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div>
-      <button
-        onClick={handleClick}
-        className="action-chip action-chip--query flex items-center gap-2 px-3 py-2 text-xs text-gray-300 rounded-lg transition-all w-full text-left"
-      >
-        <Search className="w-3.5 h-3.5 text-cyan-500/70 flex-shrink-0" />
-        <span className="flex-1 truncate">{action.label}</span>
-        {loading && <Loader2 className="w-3 h-3 text-cyan-500/50 animate-spin flex-shrink-0" />}
-        {result && (
-          expanded
-            ? <ChevronUp className="w-3 h-3 text-gray-600 flex-shrink-0" />
-            : <ChevronDown className="w-3 h-3 text-gray-600 flex-shrink-0" />
-        )}
-      </button>
-      {error && (
-        <p className="text-red-400/70 text-[10px] mt-1 px-1">{error}</p>
-      )}
-      {result && expanded && (
-        <div className="mt-2 bg-[#0D0D0D] border border-gray-800 rounded-lg p-3 text-xs text-gray-400 max-h-60 overflow-y-auto">
-          <pre className="whitespace-pre-wrap break-words">{JSON.stringify(result, null, 2)}</pre>
-        </div>
-      )}
-    </div>
-  );
-};
-
 const FollowUpChip: React.FC<{
   action: FollowUpMessageAction;
-  onSend: (message: string) => void;
+  onSend: (message: string, context?: FollowUpContext) => void;
 }> = ({ action, onSend }) => (
   <button
-    onClick={() => onSend(action.message)}
+    onClick={() => onSend(action.message, action.context)}
     className="action-chip action-chip--followup flex items-center gap-2 px-3 py-2 text-xs text-gray-300 rounded-lg transition-all text-left"
   >
     <MessageSquareText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
@@ -707,7 +638,7 @@ const FollowUpChip: React.FC<{
 
 const SuggestedActions: React.FC<{
   actions: AgentSuggestedAction[];
-  onFollowUp: (message: string) => void;
+  onFollowUp: (message: string, context?: FollowUpContext) => void;
   originalQuery?: string;
 }> = ({ actions, onFollowUp, originalQuery }) => {
   if (!actions.length) return null;
@@ -724,8 +655,6 @@ const SuggestedActions: React.FC<{
                 onFollowUp={onFollowUp}
               />
             );
-          case 'direct-query':
-            return <DirectQueryChip key={i} action={action} />;
           case 'follow-up-message':
             return <FollowUpChip key={i} action={action} onSend={onFollowUp} />;
           default:
@@ -741,7 +670,7 @@ const SuggestedActions: React.FC<{
 interface WorkflowMessageProps {
   message: ChatMessage;
   onPlayClip?: (meta: ClipMeta) => void;
-  onFollowUp?: (message: string) => void;
+  onFollowUp?: (message: string, context?: FollowUpContext) => void;
   originalQuery?: string;
 }
 

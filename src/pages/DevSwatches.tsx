@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, MessageSquareText, Upload, Play, ArrowUpRight, Loader2 } from 'lucide-react';
+import { MessageSquareText, Upload, Play, ArrowUpRight, Loader2 } from 'lucide-react';
 import { NebulaThumbnail } from '../components/workflow/WorkflowMessage.tsx';
 
 const Section: React.FC<{ title: string; accent?: string; children: React.ReactNode }> = ({ title, accent, children }) => (
@@ -100,15 +100,6 @@ const DevSwatches: React.FC = () => (
           </button>
         </div>
       </div>
-    </Section>
-
-    {/* ── Direct Query Chip ── */}
-    <Section title="DirectQueryChip (API Query)" accent="cyan — #50b4c8">
-      <p className="text-gray-600 text-[10px] mb-2 italic">Backend-triggered — fires a pre-packaged API call and shows raw JSON. No real examples observed yet.</p>
-      <button className="action-chip action-chip--query flex items-center gap-2 px-3 py-2 text-xs text-gray-300 rounded-lg transition-all w-full text-left">
-        <Search className="w-3.5 h-3.5 text-cyan-500/70 flex-shrink-0" />
-        <span className="flex-1 truncate">Get episode details for Corporate Gossip #47</span>
-      </button>
     </Section>
 
     {/* ── Follow-up Chip ── */}

@@ -10,6 +10,7 @@ export interface AgentRequest {
   model?: AgentModel;
   sessionId?: string;
   history?: HistoryEntry[];
+  context?: FollowUpContext;
 }
 
 // --- SSE event payloads ---
@@ -46,13 +47,11 @@ export interface SubmitOnDemandAction {
   link?: string;
 }
 
-export interface DirectQueryAction {
-  type: 'direct-query';
-  reason: string;
-  label: string;
-  endpoint: string;
-  body: Record<string, unknown>;
-  method?: string;
+export interface FollowUpContext {
+  guids?: string[];
+  feedIds?: string[];
+  persons?: string[];
+  hint?: string;
 }
 
 export interface FollowUpMessageAction {
@@ -60,11 +59,11 @@ export interface FollowUpMessageAction {
   reason: string;
   label: string;
   message: string;
+  context?: FollowUpContext;
 }
 
 export type AgentSuggestedAction =
   | SubmitOnDemandAction
-  | DirectQueryAction
   | FollowUpMessageAction;
 
 // --- Other SSE payloads ---

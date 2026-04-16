@@ -10,6 +10,7 @@ import type {
   AgentTextEvent,
   AgentDoneEvent,
   HistoryEntry,
+  FollowUpContext,
 } from '../types/workflow';
 
 const STREAM_FLUSH_MS = 40;
@@ -18,7 +19,7 @@ const TEXT_PAUSE_MS = 3000;
 
 interface UseWorkflowChatReturn {
   messages: ChatMessage[];
-  sendMessage: (task: string) => Promise<void>;
+  sendMessage: (task: string, context?: FollowUpContext) => Promise<void>;
   clearMessages: () => void;
   model: AgentModel;
   setModel: (model: AgentModel) => void;
@@ -72,7 +73,7 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
   }, []);
 
   const sendMessage = useCallback(
-    async (task: string) => {
+    async (task: string, context?: FollowUpContext) => {
       if (abortControllerRef.current) abortControllerRef.current.abort();
       abortControllerRef.current = new AbortController();
 
@@ -115,6 +116,7 @@ export const useWorkflowChat = (): UseWorkflowChatReturn => {
         if (historyRef.current.length > 0) {
           reqBody.history = historyRef.current.slice(-MAX_HISTORY_ENTRIES);
         }
+        if (context) reqBody.context = context;
 
         const res = await fetch(`${API_URL}/api/pull`, {
           method: 'POST',
