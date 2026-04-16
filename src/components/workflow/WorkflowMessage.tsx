@@ -80,39 +80,52 @@ function drainQueue() {
   pendingQueue.shift()!();
 }
 
+const MAX_RETRIES = 2;
+const INITIAL_RETRY_DELAY_MS = 1000;
+
 async function fetchClipMeta(pineconeId: string): Promise<ClipMeta | null> {
   return new Promise<ClipMeta | null>(resolve => {
     const run = async () => {
-      try {
-        const res = await fetch(
-          `${API_URL}/api/get-hierarchy?paragraphId=${encodeURIComponent(pineconeId)}`
-        );
-        if (!res.ok) { resolve(null); return; }
-        const data = await res.json();
-        const h = data.hierarchy;
-        const para = h?.paragraph?.metadata;
-        const ep = h?.episode?.metadata;
-        const meta: ClipMeta = {
-          pineconeId,
-          episodeTitle: ep?.title || para?.episode || 'Unknown episode',
-          episodeImage: ep?.imageUrl || para?.episodeImage || '',
-          creator: ep?.creator || para?.creator || '',
-          audioUrl: para?.audioUrl || ep?.audioUrl || '',
-          startTime: para?.start_time ?? 0,
-          endTime: para?.end_time ?? 0,
-          text: para?.text || '',
-        };
-        clipMetaCache.set(pineconeId, meta);
-        persistCache(clipMetaCache);
-        resolve(meta);
-      } catch {
-        resolve(null);
-      } finally {
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const res = await fetch(
+            `${API_URL}/api/get-hierarchy?paragraphId=${encodeURIComponent(pineconeId)}`
+          );
+          if (!res.ok) { resolve(null); return; }
+          const data = await res.json();
+          const h = data.hierarchy;
+          const para = h?.paragraph?.metadata;
+          const ep = h?.episode?.metadata;
+          const meta: ClipMeta = {
+            pineconeId,
+            episodeTitle: ep?.title || para?.episode || 'Unknown episode',
+            episodeImage: ep?.imageUrl || para?.episodeImage || '',
+            creator: ep?.creator || para?.creator || '',
+            audioUrl: para?.audioUrl || ep?.audioUrl || '',
+            startTime: para?.start_time ?? 0,
+            endTime: para?.end_time ?? 0,
+            text: para?.text || '',
+          };
+          clipMetaCache.set(pineconeId, meta);
+          persistCache(clipMetaCache);
+          resolve(meta);
+          return;
+        } catch {
+          if (attempt < MAX_RETRIES) {
+            await new Promise(r => setTimeout(r, INITIAL_RETRY_DELAY_MS * (attempt + 1)));
+            continue;
+          }
+          resolve(null);
+        }
+      }
+    };
+    const cleanup = async () => {
+      try { await run(); } finally {
         activeRequests--;
         setTimeout(drainQueue, REQUEST_DELAY_MS);
       }
     };
-    pendingQueue.push(run);
+    pendingQueue.push(cleanup);
     drainQueue();
   });
 }
