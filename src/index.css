@@ -122,11 +122,40 @@ html, body, #root {
 
 /* Fade-in for "Still working..." indicator */
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-in {
-  animation: fade-in 0.5s ease-in;
+  animation: fade-in 0.5s ease-out;
+}
+
+@keyframes logo-glow {
+  0%, 100% { opacity: 0.4; transform: scale(1.5); }
+  50% { opacity: 0.7; transform: scale(1.7); }
+}
+.animate-logo-glow {
+  animation: logo-glow 4s ease-in-out infinite;
+}
+
+/* Category card — uses action-chip pattern with per-card accent */
+.category-card {
+  background: radial-gradient(ellipse at 50% 50%, #141416, #0e0e10);
+  border: 2px solid rgba(255, 255, 255, 0.06);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.category-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.04), inset 0 0 15px rgba(255, 255, 255, 0.02);
+}
+
+/* Chat input glow — subtle white edge glow + focus brightening */
+.chat-input-glow {
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.04), 0 0 4px rgba(255, 255, 255, 0.02);
+  transition: box-shadow 0.3s, border-color 0.3s;
+}
+.chat-input-glow:focus {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.08), 0 0 60px rgba(255, 255, 255, 0.03);
 }
 
 /* Research session card — warm luminescent border glow */
