@@ -1047,13 +1047,15 @@ export const WorkflowChat: React.FC = () => {
       <div ref={scrollRef} className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
         {!hasMessages ? (
           <div className="flex flex-col items-center min-h-full px-5 pt-8 sm:pt-10 pb-8">
-            {/* Logo lockup */}
-            <div className="relative animate-fade-in">
+            {/* Logo lockup — aspect-ratio preserved via max-w + object-contain;
+                scaled down on small screens so the wide wordmark doesn't get
+                squeezed or forced into an oddly-truncated state. */}
+            <div className="relative animate-fade-in max-w-full">
               <div className="absolute inset-0 bg-white/5 blur-2xl scale-110 animate-logo-glow" />
               <img
                 src="/jamie-pull.png"
                 alt="Jamie Pull"
-                className="relative h-24 sm:h-32 w-auto"
+                className="relative h-16 sm:h-24 md:h-32 w-auto max-w-full object-contain"
               />
             </div>
 
@@ -1111,7 +1113,9 @@ export const WorkflowChat: React.FC = () => {
                     Create & Publish are wired up. */}
                 {SHOW_SKILL_CHIPS && (
                   <div className="w-full flex justify-center mb-10">
-                    <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full max-w-[40rem]">
+                    {/* 1-col stack on mobile (legible chip content), 3-col
+                        grid at sm+ where the 4:1 strip shape works. */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 w-full max-w-[40rem]">
                       {SKILLS.map((s, i) => (
                         <SkillChip
                           key={s.id}
