@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, Landmark, Brain, X, Telescope, Film, Send, HelpCircle } from 'lucide-react';
+import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, Landmark, Brain, X, Telescope, Film, Send, HelpCircle, Workflow } from 'lucide-react';
 import { useWorkflowChat } from '../../hooks/useWorkflowChat.ts';
 import { WorkflowMessage, clipMetaCache, extractClipIds } from './WorkflowMessage.tsx';
 import type { ClipMeta } from './WorkflowMessage.tsx';
@@ -12,12 +12,12 @@ import { createClipShareUrl } from '../../utils/urlUtils.ts';
 // ─── Skill chips ─────────────────────────────────────────────────────────────
 // Flip to `false` to hide the Research / Create / Publish draft row until
 // Create & Publish are actually wired up by their respective devs.
-const SHOW_SKILL_CHIPS = true;
+const SHOW_SKILL_CHIPS = false;
 
 type SkillStatus = 'live' | 'coming_soon';
 
 interface Skill {
-  id: 'research' | 'create' | 'publish';
+  id: 'research' | 'create' | 'publish' | 'worker';
   title: string;
   tagline: string; // short copy on the chip itself
   description: string; // long copy in the modal
@@ -72,6 +72,21 @@ const SKILLS: Skill[] = [
       'One-click post to Nostr + X',
       'Podcasting 2.0 timestamp links',
       'Scheduled drops & cross-posting',
+    ],
+  },
+  {
+    id: 'worker',
+    title: 'Worker',
+    tagline: 'Run jobs in the background',
+    description:
+      "Hand Jamie a long-running task — a standing research brief, a scheduled clip drop, a recurring digest — and it runs async. Nothing blocks your chat; you get pinged when work completes.",
+    icon: Workflow,
+    accent: '#5ecfa8',
+    status: 'coming_soon',
+    planned: [
+      'Scheduled + recurring tasks',
+      'Multi-step pipelines across skills',
+      'Notifications when jobs finish',
     ],
   },
 ];
@@ -1113,9 +1128,11 @@ export const WorkflowChat: React.FC = () => {
                     Create & Publish are wired up. */}
                 {SHOW_SKILL_CHIPS && (
                   <div className="w-full flex justify-center mb-10">
-                    {/* 1-col stack on mobile (legible chip content), 3-col
-                        grid at sm+ where the 4:1 strip shape works. */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 w-full max-w-[40rem]">
+                    {/* 1-col stack on mobile (legible chip content), 2x2
+                        grid at sm+. 2x2 keeps chips chunky enough to read
+                        at the 40rem hero-input width; a 4-across row would
+                        squeeze each chip to ~150px and look cramped. */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 w-full max-w-[40rem]">
                       {SKILLS.map((s, i) => (
                         <SkillChip
                           key={s.id}
