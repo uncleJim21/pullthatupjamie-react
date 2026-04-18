@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers, Copy, Check, Mic } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers, Copy, Check, Mic, AudioLines } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -220,7 +220,9 @@ export const InlineCardMention: React.FC<{
   card: AnalysisCardJson;
   onClick?: (pineconeId: string) => void;
   onCopyLink?: (pineconeId: string) => void;
-}> = ({ card, onClick, onCopyLink }) => {
+  /** When true, renders a white breathing glow to signal this clip is currently playing. */
+  isActive?: boolean;
+}> = ({ card, onClick, onCopyLink, isActive }) => {
   const title = card.title || 'Open source';
   const imageUrl = card.episodeImage;
   const [copied, setCopied] = React.useState(false);
@@ -234,7 +236,7 @@ export const InlineCardMention: React.FC<{
 
   return (
     <span
-      className="inline-flex items-center gap-2 px-2 py-1 rounded-md border border-gray-800 bg-gray-900/40 align-middle cursor-pointer hover:bg-gray-800/80 hover:border-gray-600 hover:shadow-[0_0_8px_rgba(255,255,255,0.08)] transition-all max-w-[min(100%,420px)] overflow-hidden"
+      className={`inline-flex items-center gap-2 px-2 py-1 rounded-md border border-gray-800 bg-gray-900/40 align-middle cursor-pointer hover:bg-gray-800/80 hover:border-gray-600 hover:shadow-[0_0_8px_rgba(255,255,255,0.08)] transition-all max-w-[min(100%,420px)] overflow-hidden${isActive ? ' clip-pill-active' : ''}`}
       role="button"
       tabIndex={0}
       onClick={() => onClick?.(card.pineconeId)}
@@ -258,6 +260,12 @@ export const InlineCardMention: React.FC<{
         <span className="w-[14px] h-[14px] rounded-sm bg-gray-800 flex items-center justify-center flex-shrink-0">
           <Mic className="w-3 h-3 text-gray-500" />
         </span>
+      )}
+      {isActive && (
+        <AudioLines
+          className="w-3.5 h-3.5 text-white flex-shrink-0 clip-pill-playing-icon"
+          aria-label="Now playing"
+        />
       )}
       <span className="text-xs text-gray-200 truncate min-w-0">{title}</span>
       {onCopyLink && (

@@ -47,44 +47,51 @@ html, body, #root {
   display: none;
 }
 
-/* Prev/Next navigation — breathing pulse glow */
+/* Prev/Next navigation — breathing pulse glow.
+   Glow color is configurable via the CSS variable `--nav-glow-rgb`
+   (default: teal). Consumers can override per-instance by setting
+   `style={{ '--nav-glow-rgb': '255,255,255' }}` for e.g. white. */
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 6px rgba(91, 184, 196, 0.15);
+    box-shadow: 0 0 6px rgba(var(--nav-glow-rgb), 0.15);
   }
   50% {
-    box-shadow: 0 0 18px rgba(91, 184, 196, 0.35),
-                0 0 6px rgba(91, 184, 196, 0.15);
+    box-shadow: 0 0 18px rgba(var(--nav-glow-rgb), 0.35),
+                0 0 6px rgba(var(--nav-glow-rgb), 0.15);
   }
 }
 
 .btn-nav {
+  --nav-glow-rgb: 91, 184, 196;
   padding: 6px 14px;
   border-radius: 9999px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  border: 1.5px solid rgba(91, 184, 196, 0.6);
+  border: 1.5px solid rgba(var(--nav-glow-rgb), 0.6);
   background: transparent;
-  color: #b8dce4;
+  color: rgba(var(--nav-glow-rgb), 0.85);
   transition: all 0.25s ease;
   display: flex;
   align-items: center;
   gap: 4px;
   animation: pulseGlow 3s ease-in-out infinite;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .btn-nav:hover {
-  border-color: #5bb8c4;
+  border-color: rgba(var(--nav-glow-rgb), 1);
   color: #fff;
   animation: none;
-  box-shadow: 0 0 20px rgba(91, 184, 196, 0.4),
-              0 0 6px rgba(91, 184, 196, 0.2);
+  box-shadow: 0 0 20px rgba(var(--nav-glow-rgb), 0.4),
+              0 0 6px rgba(var(--nav-glow-rgb), 0.2);
 }
 
 .btn-nav:active {
   transform: scale(0.97);
-  box-shadow: 0 0 10px rgba(91, 184, 196, 0.3);
+  box-shadow: 0 0 10px rgba(var(--nav-glow-rgb), 0.3);
 }
 
 .btn-nav:disabled {
@@ -99,7 +106,45 @@ html, body, #root {
 @media (prefers-reduced-motion: reduce) {
   .btn-nav {
     animation: none;
-    box-shadow: 0 0 8px rgba(91, 184, 196, 0.2);
+    box-shadow: 0 0 8px rgba(var(--nav-glow-rgb), 0.2);
+  }
+}
+
+/* Active clip pill — white breathing glow to signal what's playing */
+@keyframes clipPillGlow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.18),
+                0 0 2px rgba(255, 255, 255, 0.10);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(255, 255, 255, 0.32),
+                0 0 4px rgba(255, 255, 255, 0.18);
+  }
+}
+
+.clip-pill-active {
+  border-color: rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  animation: clipPillGlow 2.4s ease-in-out infinite;
+}
+
+@keyframes clipPillIconPulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+
+.clip-pill-playing-icon {
+  animation: clipPillIconPulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clip-pill-active {
+    animation: none;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.22);
+  }
+  .clip-pill-playing-icon {
+    animation: none;
+    opacity: 1;
   }
 }
 

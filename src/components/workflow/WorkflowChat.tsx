@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, Landmark, Brain, X } from 'lucide-react';
 import { useWorkflowChat } from '../../hooks/useWorkflowChat.ts';
-import { WorkflowMessage } from './WorkflowMessage.tsx';
+import { WorkflowMessage, clipMetaCache, extractClipIds } from './WorkflowMessage.tsx';
 import type { ClipMeta } from './WorkflowMessage.tsx';
+import { NavGlowButton } from '../NavGlowButton.tsx';
 import type { AgentModel } from '../../types/workflow';
 import { useAudioController } from '../../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from '../EmbedMiniPlayer.tsx';
@@ -665,6 +666,43 @@ export const WorkflowChat: React.FC = () => {
     }
   }, [currentTrack, activeClip]);
 
+  // Ordered list of unique clip pineconeIds across the whole conversation.
+  // Used by the prev/next nav above the mini-player.
+  const orderedClipIds = useMemo(() => {
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const msg of messages) {
+      if (msg.role !== 'assistant' || !msg.text) continue;
+      for (const id of extractClipIds(msg.text)) {
+        if (!seen.has(id)) {
+          seen.add(id);
+          ordered.push(id);
+        }
+      }
+    }
+    return ordered;
+  }, [messages]);
+
+  const activeClipIndex = useMemo(
+    () => (activeClip ? orderedClipIds.indexOf(activeClip.pineconeId) : -1),
+    [orderedClipIds, activeClip]
+  );
+
+  const gotoClip = useCallback(
+    (delta: -1 | 1) => {
+      if (activeClipIndex < 0 || orderedClipIds.length === 0) return;
+      const nextIdx = activeClipIndex + delta;
+      if (nextIdx < 0 || nextIdx >= orderedClipIds.length) return;
+      const nextId = orderedClipIds[nextIdx];
+      const meta = clipMetaCache.get(nextId);
+      if (meta) handlePlayClip(meta);
+    },
+    [activeClipIndex, orderedClipIds, handlePlayClip]
+  );
+
+  const hasPrevClip = activeClipIndex > 0;
+  const hasNextClip = activeClipIndex >= 0 && activeClipIndex < orderedClipIds.length - 1;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const task = input.trim();
@@ -831,6 +869,7 @@ export const WorkflowChat: React.FC = () => {
                     onPlayClip={handlePlayClip}
                     onFollowUp={sendMessage}
                     originalQuery={originalQuery}
+                    activeClipId={activeClip?.pineconeId}
                   />
                 </div>
               );
@@ -843,7 +882,34 @@ export const WorkflowChat: React.FC = () => {
 
       {/* Mini-player */}
       {showMiniPlayer && (
-        <div className="flex-shrink-0 [&>div]:!relative [&>div]:!inset-auto">
+        <div className="flex-shrink-0">
+          {/* Prev/Next clip nav */}
+          {orderedClipIds.length > 1 && (
+            <div className="flex items-center justify-center gap-2 px-5 py-2 bg-black/80 backdrop-blur-sm">
+              <NavGlowButton
+                direction="prev"
+                size="sm"
+                glowRgb="255,255,255"
+                disabled={!hasPrevClip}
+                onClick={() => gotoClip(-1)}
+                label="Prev"
+                title="Previous clip"
+              />
+              <span className="text-[11px] text-gray-500 tabular-nums min-w-[3.5rem] text-center">
+                {activeClipIndex >= 0 ? `${activeClipIndex + 1} / ${orderedClipIds.length}` : ''}
+              </span>
+              <NavGlowButton
+                direction="next"
+                size="sm"
+                glowRgb="255,255,255"
+                disabled={!hasNextClip}
+                onClick={() => gotoClip(1)}
+                label="Next"
+                title="Next clip"
+              />
+            </div>
+          )}
+          <div className="[&>div]:!relative [&>div]:!inset-auto">
           <EmbedMiniPlayer
             mode="app"
             isHovered={true}
@@ -864,6 +930,7 @@ export const WorkflowChat: React.FC = () => {
               navigator.clipboard.writeText(url).catch(() => {});
             }}
           />
+          </div>
         </div>
       )}
 

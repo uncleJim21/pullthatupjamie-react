@@ -65,7 +65,7 @@ function persistCache(cache: Map<string, ClipMeta>) {
   } catch { /* storage full — non-critical */ }
 }
 
-const clipMetaCache = hydrateCache();
+export const clipMetaCache = hydrateCache();
 const clipMetaInFlight = new Set<string>();
 const clipMetaFailed = new Set<string>();
 
@@ -166,7 +166,7 @@ function useClipMetadata(pineconeIds: string[]): Map<string, ClipMeta> {
 
 const CLIP_TOKEN_RE = /\{\{clip:([^}]+)\}\}/g;
 
-function extractClipIds(text: string): string[] {
+export function extractClipIds(text: string): string[] {
   const ids: string[] = [];
   for (const m of text.matchAll(CLIP_TOKEN_RE)) ids.push(m[1]);
   return [...new Set(ids)];
@@ -295,7 +295,8 @@ function injectClipCards(
   clipsByIndex: Record<number, string>,
   metaCache: Map<string, ClipMeta>,
   onCardClick: (pineconeId: string) => void,
-  onCopyLink: (pineconeId: string) => void
+  onCopyLink: (pineconeId: string) => void,
+  activeClipId?: string
 ): React.ReactNode {
   const tokenRe = /\[\[CLIP:(\d+)\]\]/g;
 
@@ -322,6 +323,7 @@ function injectClipCards(
             card={card}
             onClick={onCardClick}
             onCopyLink={onCopyLink}
+            isActive={activeClipId === pineconeId}
           />
         );
       } else {
@@ -335,7 +337,7 @@ function injectClipCards(
 
   if (Array.isArray(node)) {
     return node.map((child) =>
-      injectClipCards(child, clipsByIndex, metaCache, onCardClick, onCopyLink)
+      injectClipCards(child, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId)
     );
   }
 
@@ -344,7 +346,7 @@ function injectClipCards(
     if (!children) return node;
     return React.cloneElement(node as any, {
       ...(node.props as any),
-      children: injectClipCards(children, clipsByIndex, metaCache, onCardClick, onCopyLink),
+      children: injectClipCards(children, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId),
     });
   }
 
@@ -380,11 +382,12 @@ const MarkdownWithClips: React.FC<{
   metaCache: Map<string, ClipMeta>;
   onCardClick: (pineconeId: string) => void;
   onCopyLink: (pineconeId: string) => void;
-}> = ({ text, clipsByIndex, metaCache, onCardClick, onCopyLink }) => {
+  activeClipId?: string;
+}> = ({ text, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId }) => {
   const inject = useCallback(
     (children: React.ReactNode) =>
-      injectClipCards(children, clipsByIndex, metaCache, onCardClick, onCopyLink),
-    [clipsByIndex, metaCache, onCardClick, onCopyLink]
+      injectClipCards(children, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId),
+    [clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId]
   );
 
   const components = useMemo(
@@ -685,9 +688,10 @@ interface WorkflowMessageProps {
   onPlayClip?: (meta: ClipMeta) => void;
   onFollowUp?: (message: string, context?: FollowUpContext) => void;
   originalQuery?: string;
+  activeClipId?: string;
 }
 
-export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPlayClip, onFollowUp, originalQuery }) => {
+export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPlayClip, onFollowUp, originalQuery, activeClipId }) => {
   const { statusMessages, toolCalls, toolResults, suggestedActions, text, donePayload, error, loading } =
     message;
 
@@ -746,6 +750,7 @@ export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPla
                 metaCache={metaCache}
                 onCardClick={handleCardClick}
                 onCopyLink={handleCopyLink}
+                activeClipId={activeClipId}
               />
             </div>
             {message.textPaused && !message.streamComplete && (
