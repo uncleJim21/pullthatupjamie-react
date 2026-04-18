@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, Landmark, Brain, X } from 'lucide-react';
+import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, Landmark, Brain, X, Telescope, Film, Send, HelpCircle } from 'lucide-react';
 import { useWorkflowChat } from '../../hooks/useWorkflowChat.ts';
 import { WorkflowMessage, clipMetaCache, extractClipIds } from './WorkflowMessage.tsx';
 import type { ClipMeta } from './WorkflowMessage.tsx';
@@ -8,6 +8,109 @@ import type { AgentModel } from '../../types/workflow';
 import { useAudioController } from '../../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from '../EmbedMiniPlayer.tsx';
 import { createClipShareUrl } from '../../utils/urlUtils.ts';
+
+// ─── Skill chips ─────────────────────────────────────────────────────────────
+// Flip to `false` to hide the Research / Create / Publish draft row until
+// Create & Publish are actually wired up by their respective devs.
+const SHOW_SKILL_CHIPS = true;
+
+type SkillStatus = 'live' | 'coming_soon';
+
+interface Skill {
+  id: 'research' | 'create' | 'publish';
+  title: string;
+  tagline: string; // short copy on the chip itself
+  description: string; // long copy in the modal
+  icon: React.FC<{ className?: string; style?: React.CSSProperties }>;
+  accent: string;
+  status: SkillStatus;
+  examples?: string[]; // example prompts (Research modal)
+  planned?: string[]; // bullets for coming-soon chips
+}
+
+const SKILLS: Skill[] = [
+  {
+    id: 'research',
+    title: 'Research',
+    tagline: 'Ask anything across podcasts',
+    description:
+      "Jamie searches ~2M paragraphs from 109+ podcast feeds semantically — not by keyword. Ask in plain English and surface quotes, episodes, and clips that actually answer your question.",
+    icon: Telescope,
+    accent: '#3b6df0',
+    status: 'live',
+    examples: [
+      'What has Balaji said about CBDCs?',
+      'Find the bull case for gold in 2025',
+      'Best podcast advice on improving attention and focus',
+    ],
+  },
+  {
+    id: 'create',
+    title: 'Create',
+    tagline: 'Turn moments into clips',
+    description:
+      'Point Jamie at a quote or a timestamp range and it assembles a shareable audio/video clip with captions — ready to post without touching an editor.',
+    icon: Film,
+    accent: '#ff9f7a',
+    status: 'coming_soon',
+    planned: [
+      'Auto-captioned audio & video clips',
+      'Timestamp range → rendered clip in seconds',
+      'Direct hand-off to the Publish skill',
+    ],
+  },
+  {
+    id: 'publish',
+    title: 'Publish',
+    tagline: 'Share where your audience lives',
+    description:
+      'Push clips and research findings to the places people actually follow you — Nostr, X, podcasting 2.0 timestamps, and more — with one click.',
+    icon: Send,
+    accent: '#9a6bff',
+    status: 'coming_soon',
+    planned: [
+      'One-click post to Nostr + X',
+      'Podcasting 2.0 timestamp links',
+      'Scheduled drops & cross-posting',
+    ],
+  },
+];
+
+// ─── Tagline A/B pool ────────────────────────────────────────────────────────
+// Add more variants to split-test. A session-stable pick is made on first
+// render (stored in sessionStorage) so the tagline doesn't flicker on
+// client-side navigation. Fires a `data-tagline-id` attribute on the DOM
+// element for analytics pickup.
+interface TaglineVariant {
+  id: string;
+  headline: string;
+  subline: string;
+}
+const TAGLINES: TaglineVariant[] = [
+  {
+    id: 'openclaw-plain-english-verbs',
+    headline: 'OpenClaw-grade podcast native Agent. Zero hassle.',
+    subline: 'Plain English finds the quote, cuts the clip, cross posts the thread.',
+  },
+  // Drop additional variants here to add them to the A/B pool, e.g.:
+  // { id: 'openclaw-kicker',     headline: 'OpenClaw-grade skills, podcast-native. Zero setup.',
+  //   subline: 'Find the quote, cut the clip, post the thread — all in plain English.' },
+  // { id: 'openclaw-headline',   headline: 'OpenClaw-grade skills in plain English. Zero setup.',
+  //   subline: 'Find the quote, cut the clip, post the thread — one sentence each.' },
+];
+
+const pickTagline = (): TaglineVariant => {
+  try {
+    const cachedId = sessionStorage.getItem('ptuj.taglineId');
+    if (cachedId) {
+      const hit = TAGLINES.find(t => t.id === cachedId);
+      if (hit) return hit;
+    }
+  } catch { /* sessionStorage may be unavailable; fall through */ }
+  const pick = TAGLINES[Math.floor(Math.random() * TAGLINES.length)];
+  try { sessionStorage.setItem('ptuj.taglineId', pick.id); } catch {}
+  return pick;
+};
 
 // ─── Category grid — galaxy-inspired accent palette ──────────────────────────
 
@@ -432,7 +535,7 @@ const ChatInput: React.FC<{
 }> = ({ input, setInput, sending, onSubmit, inputRef, size = 'bar' }) => {
   const isHero = size === 'hero';
   return (
-    <form onSubmit={onSubmit} className={`relative w-full ${isHero ? 'max-w-[40rem]' : 'max-w-[40rem]'}`}>
+    <form onSubmit={onSubmit} className="relative w-full max-w-[40rem]">
       <input
         ref={inputRef}
         type="text"
@@ -440,10 +543,10 @@ const ChatInput: React.FC<{
         onChange={e => setInput(e.target.value)}
         placeholder="What are you looking for?"
         disabled={sending}
-        className={`w-full bg-white/[0.04] rounded-2xl text-white placeholder-gray-500 focus:outline-none disabled:opacity-50 transition-all chat-input-glow ${
+        className={`w-full bg-white/[0.04] rounded-2xl text-white placeholder-gray-500 focus:outline-none disabled:opacity-50 transition-all ${
           isHero
-            ? 'border-2 border-gray-600/60 pl-6 pr-14 py-4 text-base'
-            : 'border border-gray-700/60 pl-5 pr-12 py-3.5 text-sm'
+            ? 'hero-input-neon pl-6 pr-14 py-4 text-base'
+            : 'chat-input-glow border border-gray-700/60 pl-5 pr-12 py-3.5 text-sm'
         }`}
       />
       <button
@@ -473,12 +576,15 @@ const CategoryCard: React.FC<{
 
   return (
     <div
-      className="category-neon rounded-xl overflow-hidden animate-fade-in"
+      className="animate-fade-in"
       style={{
-        '--neon': c,
         animationDelay: `${animDelay}ms`,
         animationFillMode: 'backwards',
-      } as React.CSSProperties}
+      }}
+    >
+    <div
+      className="category-neon rounded-xl overflow-hidden"
+      style={{ '--neon': c } as React.CSSProperties}
     >
       {/* Header */}
       <button
@@ -516,6 +622,169 @@ const CategoryCard: React.FC<{
         ))}
       </div>
     </div>
+    </div>
+  );
+};
+
+// ─── Skill chip + modal ──────────────────────────────────────────────────────
+
+const SkillChip: React.FC<{
+  skill: Skill;
+  animDelay: number;
+  onOpenInfo: (skill: Skill) => void;
+}> = ({ skill, animDelay, onOpenInfo }) => {
+  const Icon = skill.icon;
+  const isLive = skill.status === 'live';
+  return (
+    <div
+      className="animate-fade-in"
+      style={{ animationDelay: `${animDelay}ms`, animationFillMode: 'backwards' }}
+    >
+      <button
+        type="button"
+        onClick={() => onOpenInfo(skill)}
+        className={`skill-chip-neon relative w-full aspect-[4/1] rounded-xl overflow-hidden text-left flex items-center gap-3 px-4 group ${
+          isLive ? '' : 'skill-chip--coming-soon'
+        }`}
+        style={{ '--neon': skill.accent } as React.CSSProperties}
+      >
+        <Icon
+          className="w-5 h-5 flex-shrink-0"
+          style={{ color: skill.accent, filter: `drop-shadow(0 0 6px ${skill.accent})` }}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium text-gray-100 group-hover:text-white transition-colors truncate">
+            {skill.title}
+          </div>
+          <div className="text-[11px] text-gray-400 truncate">{skill.tagline}</div>
+        </div>
+        {!isLive && (
+          <span
+            className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0"
+            style={{
+              color: `${skill.accent}dd`,
+              backgroundColor: `${skill.accent}14`,
+              border: `1px solid ${skill.accent}33`,
+            }}
+          >
+            Soon
+          </span>
+        )}
+        <span
+          className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+          aria-hidden
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+        </span>
+      </button>
+    </div>
+  );
+};
+
+const SkillInfoModal: React.FC<{
+  skill: Skill | null;
+  onClose: () => void;
+  onExample: (prompt: string) => void;
+}> = ({ skill, onClose, onExample }) => {
+  // Close on Esc
+  useEffect(() => {
+    if (!skill) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [skill, onClose]);
+
+  if (!skill) return null;
+  const Icon = skill.icon;
+  const isLive = skill.status === 'live';
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 animate-fade-in"
+      style={{ animationDuration: '0.2s' }}
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-[28rem] rounded-2xl overflow-hidden skill-chip-neon p-6"
+        style={{ '--neon': skill.accent } as React.CSSProperties}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="flex items-center gap-3 mb-3">
+          <Icon
+            className="w-6 h-6 flex-shrink-0"
+            style={{ color: skill.accent, filter: `drop-shadow(0 0 8px ${skill.accent})` }}
+          />
+          <h3 className="text-lg font-semibold text-white">{skill.title}</h3>
+          {!isLive && (
+            <span
+              className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full"
+              style={{
+                color: `${skill.accent}dd`,
+                backgroundColor: `${skill.accent}14`,
+                border: `1px solid ${skill.accent}33`,
+              }}
+            >
+              Coming soon
+            </span>
+          )}
+        </div>
+
+        <p className="text-sm text-gray-300 leading-relaxed mb-4">{skill.description}</p>
+
+        {isLive && skill.examples && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-2">Try it</div>
+            <div className="flex flex-col gap-1.5">
+              {skill.examples.map((ex) => (
+                <button
+                  key={ex}
+                  onClick={() => {
+                    onExample(ex);
+                    onClose();
+                  }}
+                  className="subtopic-neon text-left px-3 py-2 rounded-lg text-xs text-gray-300 transition-all"
+                  style={{ '--neon': skill.accent } as React.CSSProperties}
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isLive && skill.planned && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-2">What's coming</div>
+            <ul className="flex flex-col gap-1.5">
+              {skill.planned.map((p) => (
+                <li
+                  key={p}
+                  className="text-xs text-gray-300 flex items-start gap-2 px-3 py-1.5"
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                    style={{ backgroundColor: skill.accent, boxShadow: `0 0 6px ${skill.accent}` }}
+                  />
+                  <span>{p}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -535,6 +804,9 @@ export const WorkflowChat: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [activeClip, setActiveClip] = useState<ClipMeta | null>(null);
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  const [activeSkill, setActiveSkill] = useState<Skill | null>(null);
+  // Session-stable tagline A/B pick (see TAGLINES array near the top).
+  const tagline = useMemo(() => pickTagline(), []);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastUserMsgRef = useRef<HTMLDivElement>(null);
@@ -786,12 +1058,18 @@ export const WorkflowChat: React.FC = () => {
             </div>
 
             {/* Tagline */}
-            <p
-              className="text-sm sm:text-base text-gray-400 mt-1 mb-5 animate-fade-in text-center"
+            <div
+              data-tagline-id={tagline.id}
+              className="max-w-[28rem] mx-auto mt-1 mb-6 text-center animate-fade-in"
               style={{ animationDelay: '150ms', animationFillMode: 'backwards' }}
             >
-              Start your research backed by millions of podcast moments. Ask in plain English.
-            </p>
+              <p className="text-sm sm:text-base text-gray-200 font-medium">
+                {tagline.headline}
+              </p>
+              <p className="text-xs sm:text-sm text-gray-400 mt-1">
+                {tagline.subline}
+              </p>
+            </div>
 
             {activeTemplate ? (
               /* Template fill-in mode — replaces hero input + pills */
@@ -822,24 +1100,52 @@ export const WorkflowChat: React.FC = () => {
 
                 {/* Prompt conveyor */}
                 <div
-                  className="w-full flex justify-center mb-12 animate-fade-in"
+                  className="w-full flex justify-center mb-6 animate-fade-in"
                   style={{ animationDelay: '350ms', animationFillMode: 'backwards' }}
                 >
                   <PromptConveyor onSelect={handlePromptPill} />
                 </div>
+
+                {/* Skill chips — Research / Create / Publish. Toggle
+                    SHOW_SKILL_CHIPS at the top of this file to hide until
+                    Create & Publish are wired up. */}
+                {SHOW_SKILL_CHIPS && (
+                  <div className="w-full flex justify-center mb-10">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full max-w-[40rem]">
+                      {SKILLS.map((s, i) => (
+                        <SkillChip
+                          key={s.id}
+                          skill={s}
+                          animDelay={400 + i * 80}
+                          onOpenInfo={setActiveSkill}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
-            {/* Category grid */}
+            {/* Category grid — staggered fade-in, row-by-row (top first,
+                bottom last). Assumes desktop 3-col layout; on smaller
+                viewports the delays still cascade monotonically. */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-[56rem]">
-              {CATEGORIES.map((cat, i) => (
-                <CategoryCard
-                  key={cat.title}
-                  category={cat}
-                  onSelect={handleQuerySelect}
-                  animDelay={400 + i * 100}
-                />
-              ))}
+              {CATEGORIES.map((cat, i) => {
+                const row = Math.floor(i / 3);
+                const col = i % 3;
+                // If skill chips are showing, nudge the grid later so the
+                // chips resolve first and the wave reads top-down cleanly.
+                const base = SHOW_SKILL_CHIPS ? 650 : 200;
+                const delay = base + row * 420 + col * 70;
+                return (
+                  <CategoryCard
+                    key={cat.title}
+                    category={cat}
+                    onSelect={handleQuerySelect}
+                    animDelay={delay}
+                  />
+                );
+              })}
             </div>
 
             {/* Model label */}
@@ -946,6 +1252,13 @@ export const WorkflowChat: React.FC = () => {
           />
         </div>
       )}
+
+      {/* Skill info modal */}
+      <SkillInfoModal
+        skill={activeSkill}
+        onClose={() => setActiveSkill(null)}
+        onExample={handleQuerySelect}
+      />
     </div>
   );
 };

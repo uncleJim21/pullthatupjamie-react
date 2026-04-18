@@ -191,7 +191,7 @@ html, body, #root {
     radial-gradient(ellipse at 75% 70%, color-mix(in srgb, var(--neon) 8%, transparent), transparent 50%),
     #08080c;
   border: 3px solid color-mix(in srgb, var(--neon) 18%, transparent);
-  animation: category-breathe 4s ease-in-out infinite;
+  animation: category-breathe 8s ease-in-out infinite;
   transition: border-color 0.25s, box-shadow 0.25s;
 }
 .category-neon:hover {
@@ -218,6 +218,36 @@ html, body, #root {
       0 0 52px rgba(255, 255, 255, 0.05),
       inset 0 0 22px color-mix(in srgb, var(--neon) 12%, transparent);
   }
+}
+
+/* ─── Skill chip (Research / Create / Publish action chips) ──────────────────
+   Same visual family as .category-neon but more compact — used for the
+   4:1 action chips row above the topic grid. */
+.skill-chip-neon {
+  background:
+    radial-gradient(ellipse at 25% 30%, color-mix(in srgb, var(--neon) 12%, transparent), transparent 55%),
+    radial-gradient(ellipse at 75% 70%, color-mix(in srgb, var(--neon) 8%, transparent), transparent 50%),
+    #08080c;
+  border: 2px solid color-mix(in srgb, var(--neon) 22%, transparent);
+  animation: category-breathe 8s ease-in-out infinite;
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.18s;
+  cursor: pointer;
+}
+.skill-chip-neon:hover {
+  border-color: color-mix(in srgb, var(--neon) 45%, transparent);
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--neon) 35%, transparent),
+    0 0 36px color-mix(in srgb, var(--neon) 15%, transparent),
+    inset 0 0 22px color-mix(in srgb, var(--neon) 12%, transparent);
+}
+/* Coming-soon chips: dimmed, no lift on hover, but still clickable for info */
+.skill-chip--coming-soon {
+  opacity: 0.7;
+}
+.skill-chip--coming-soon:hover {
+  opacity: 0.92;
+  transform: none;
 }
 
 /* ─── Subtopic neon (thinner, less bright) ────────────────────────────────── */
@@ -302,6 +332,42 @@ html, body, #root {
 .chat-input-glow:focus {
   border-color: rgba(255, 255, 255, 0.25) !important;
   box-shadow: 0 0 20px rgba(255, 255, 255, 0.08), 0 0 60px rgba(255, 255, 255, 0.03);
+}
+
+/* Hero-input neon — same aesthetic as .category-neon (grid topic cards)
+   but white, and breathing slightly faster so it draws the eye on the
+   empty state. */
+.hero-input-neon {
+  border: 2px solid rgba(255, 255, 255, 0.38);
+  animation: hero-input-breathe 5s ease-in-out infinite;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.hero-input-neon:focus {
+  border-color: rgba(255, 255, 255, 0.65);
+}
+
+@keyframes hero-input-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 12px rgba(255, 255, 255, 0.3),
+      0 0 28px rgba(255, 255, 255, 0.14),
+      0 0 48px rgba(255, 255, 255, 0.06);
+  }
+  50% {
+    box-shadow:
+      0 0 18px rgba(255, 255, 255, 0.48),
+      0 0 38px rgba(255, 255, 255, 0.22),
+      0 0 60px rgba(255, 255, 255, 0.09);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-input-neon {
+    animation: none;
+    box-shadow:
+      0 0 14px rgba(255, 255, 255, 0.34),
+      0 0 32px rgba(255, 255, 255, 0.15);
+  }
 }
 
 /* Research session card — warm luminescent border glow */

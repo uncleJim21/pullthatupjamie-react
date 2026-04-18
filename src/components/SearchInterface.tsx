@@ -24,7 +24,8 @@ import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import { getFountainLink } from '../services/fountainService.ts';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Sparkles, Zap, Lightbulb, HelpCircle, CheckCircle, AlertCircle} from 'lucide-react';
+import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles, Zap, Lightbulb, HelpCircle, CheckCircle, AlertCircle} from 'lucide-react';
+import { NavGlowButton } from './NavGlowButton.tsx';
 import SearchModeExplainerModal from './SearchModeExplainerModal.tsx';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
@@ -4350,25 +4351,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             {/* Result navigation strip — galaxy view, when a result is selected */}
             {selectedAudioContext && resultViewStyle === SearchResultViewStyle.GALAXY && galaxyResults.length > 1 && (
               <div className={`relative z-[60] flex items-center justify-between mb-1.5 px-1 ${isNarrowLayout ? 'mr-10' : 'mr-14'}`}>
-                <button
-                  onClick={() => canGoPrev && navigateToResult(currentResultIndex - 1)}
+                <NavGlowButton
+                  direction="prev"
                   disabled={!canGoPrev}
-                  className="btn-nav"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  Prev
-                </button>
+                  onClick={() => canGoPrev && navigateToResult(currentResultIndex - 1)}
+                />
                 <span className="text-[11px] font-mono tabular-nums" style={{ color: 'rgba(184, 220, 228, 0.5)' }}>
                   {currentResultIndex + 1} of {galaxyResults.length}
                 </span>
-                <button
-                  onClick={() => canGoNext && navigateToResult(currentResultIndex + 1)}
+                <NavGlowButton
+                  direction="next"
                   disabled={!canGoNext}
-                  className="btn-nav"
-                >
-                  Next
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
+                  onClick={() => canGoNext && navigateToResult(currentResultIndex + 1)}
+                />
               </div>
             )}
 
@@ -4649,25 +4644,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             bottom: 'calc(var(--embed-mini-player-height, 92px) + 4px)',
           }}
         >
-          <button
-            onClick={() => canGoPrev && navigateToResult(currentResultIndex - 1)}
+          <NavGlowButton
+            direction="prev"
             disabled={!canGoPrev}
-            className="btn-nav"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-            Prev
-          </button>
+            onClick={() => canGoPrev && navigateToResult(currentResultIndex - 1)}
+          />
           <span className="text-[11px] font-mono tabular-nums" style={{ color: 'rgba(184, 220, 228, 0.5)' }}>
             {currentResultIndex + 1} of {galaxyResults.length}
           </span>
-          <button
-            onClick={() => canGoNext && navigateToResult(currentResultIndex + 1)}
+          <NavGlowButton
+            direction="next"
             disabled={!canGoNext}
-            className="btn-nav"
-          >
-            Next
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+            onClick={() => canGoNext && navigateToResult(currentResultIndex + 1)}
+          />
         </div>
       )}
 
