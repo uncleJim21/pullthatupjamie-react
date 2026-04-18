@@ -35,6 +35,7 @@ export interface ClipMeta {
   startTime: number;
   endTime: number;
   text: string;
+  publishedDate?: string;
 }
 
 const CACHE_STORAGE_KEY = 'workflow_clip_meta_cache';
@@ -105,6 +106,7 @@ async function fetchClipMeta(pineconeId: string): Promise<ClipMeta | null> {
             startTime: para?.start_time ?? 0,
             endTime: para?.end_time ?? 0,
             text: para?.text || '',
+            publishedDate: ep?.publishedDate || para?.publishedDate || undefined,
           };
           clipMetaCache.set(pineconeId, meta);
           persistCache(clipMetaCache);

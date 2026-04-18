@@ -104,7 +104,7 @@ interface TaglineVariant {
 const TAGLINES: TaglineVariant[] = [
   {
     id: 'openclaw-plain-english-verbs',
-    headline: 'OpenClaw quality podcast Agent. Zero hassle.',
+    headline: 'OpenClaw quality web Agent for podcasts. Zero hassle.',
     subline: 'Plain English finds the quote, cuts the clip, cross posts the thread.',
   },
   // Drop additional variants here to add them to the A/B pool, e.g.:
@@ -1259,6 +1259,7 @@ export const WorkflowChat: React.FC = () => {
             episodeTitle={activeClip.episodeTitle}
             episodeImage={activeClip.episodeImage}
             creator={activeClip.creator}
+            publishedDate={activeClip.publishedDate}
             timeContext={{
               start_time: activeClip.startTime,
               end_time: activeClip.endTime,

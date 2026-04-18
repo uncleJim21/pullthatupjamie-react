@@ -18,6 +18,9 @@ interface EmbedMiniPlayerProps {
   episodeTitle?: string;
   episodeImage?: string;
   creator?: string;
+  /** Episode publish date — ISO string, timestamp, or any Date-parseable value.
+   *  When provided, rendered as "<creator> | <Month D YYYY>" on the creator line. */
+  publishedDate?: string | number;
   timeContext?: {
     start_time: number;
     end_time: number;
@@ -51,6 +54,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   episodeTitle,
   episodeImage,
   creator,
+  publishedDate,
   timeContext,
   quote,
   summary,
@@ -168,6 +172,29 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
 
   // Determine what text to display
   const displayText = headline || summary || quote || 'No description available';
+
+  // Format publish date as "Month D YYYY" (no comma) for the creator pipe.
+  // Accepts ISO strings, unix seconds, or unix ms. Returns '' if the value
+  // can't be parsed so we silently skip the pipe rather than show "Invalid Date".
+  const formatPublishedDate = (value: string | number | undefined): string => {
+    if (value === undefined || value === null || value === '') return '';
+    let d: Date;
+    if (typeof value === 'number') {
+      d = new Date(value < 1e12 ? value * 1000 : value);
+    } else {
+      const asNum = Number(value);
+      if (!Number.isNaN(asNum) && /^\d+$/.test(value.trim())) {
+        d = new Date(asNum < 1e12 ? asNum * 1000 : asNum);
+      } else {
+        d = new Date(value);
+      }
+    }
+    if (Number.isNaN(d.getTime())) return '';
+    return d
+      .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      .replace(',', '');
+  };
+  const formattedDate = formatPublishedDate(publishedDate);
 
   // Expose the rendered player height as a CSS variable so other overlays (e.g. attribution pill)
   // can position themselves above it without overlapping.
@@ -296,9 +323,11 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
                 {episodeTitle || 'Episode'}
               </h3>
               
-              {creator && (
+              {(creator || formattedDate) && (
                 <p className={`text-gray-500 line-clamp-1 ${isCompactHeight ? 'text-[9px]' : 'text-[10px] sm:text-xs'}`}>
                   {creator}
+                  {creator && formattedDate && <span className="text-gray-600"> | </span>}
+                  {formattedDate}
                 </p>
               )}
               
