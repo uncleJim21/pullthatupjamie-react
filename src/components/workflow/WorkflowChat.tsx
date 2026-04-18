@@ -561,7 +561,7 @@ const ChatInput: React.FC<{
         className={`w-full bg-white/[0.04] rounded-2xl text-white placeholder-gray-500 focus:outline-none disabled:opacity-50 transition-all ${
           isHero
             ? 'hero-input-neon pl-6 pr-14 py-4 text-base'
-            : 'chat-input-glow border border-gray-700/60 pl-5 pr-12 py-3.5 text-sm'
+            : 'chat-input-neon pl-5 pr-12 py-3.5 text-sm'
         }`}
       />
       <button
@@ -1100,9 +1100,10 @@ export const WorkflowChat: React.FC = () => {
               </div>
             ) : (
               <>
-                {/* Hero input */}
+                {/* Hero input — extra bottom margin so the conveyor doesn't
+                    crowd the input and the eye can land on the search first. */}
                 <div
-                  className="w-full flex justify-center mb-3 animate-fade-in"
+                  className="w-full flex justify-center mb-8 animate-fade-in"
                   style={{ animationDelay: '250ms', animationFillMode: 'backwards' }}
                 >
                   <ChatInput

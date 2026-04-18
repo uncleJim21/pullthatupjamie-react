@@ -334,6 +334,42 @@ html, body, #root {
   box-shadow: 0 0 20px rgba(255, 255, 255, 0.08), 0 0 60px rgba(255, 255, 255, 0.03);
 }
 
+/* Chat input neon (docked bar variant) — same breathing aesthetic as
+   .hero-input-neon but toned down for a permanent docked input so it
+   calls attention without shouting over the conversation. */
+.chat-input-neon {
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  animation: chat-input-breathe 5s ease-in-out infinite;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.chat-input-neon:focus {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+@keyframes chat-input-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 8px rgba(255, 255, 255, 0.18),
+      0 0 20px rgba(255, 255, 255, 0.09),
+      0 0 36px rgba(255, 255, 255, 0.04);
+  }
+  50% {
+    box-shadow:
+      0 0 12px rgba(255, 255, 255, 0.3),
+      0 0 28px rgba(255, 255, 255, 0.14),
+      0 0 44px rgba(255, 255, 255, 0.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-input-neon {
+    animation: none;
+    box-shadow:
+      0 0 10px rgba(255, 255, 255, 0.22),
+      0 0 24px rgba(255, 255, 255, 0.1);
+  }
+}
+
 /* Hero-input neon — same aesthetic as .category-neon (grid topic cards)
    but white, and breathing slightly faster so it draws the eye on the
    empty state. */
