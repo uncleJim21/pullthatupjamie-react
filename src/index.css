@@ -191,6 +191,24 @@ html, body, #root {
     inset 0 0 10px color-mix(in srgb, var(--neon) 4%, transparent);
 }
 
+/* ─── Prompt conveyor (horizontal scrolling pills, fade at edges) ─────────── */
+.prompt-conveyor-mask {
+  mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0%,
+    rgb(0, 0, 0) 8%,
+    rgb(0, 0, 0) 92%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0%,
+    rgb(0, 0, 0) 8%,
+    rgb(0, 0, 0) 92%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
 /* ─── Template fill-in (pill-style with inline blanks) ────────────────────── */
 @keyframes fill-in-scale {
   from { opacity: 0; transform: scale(0.92); }

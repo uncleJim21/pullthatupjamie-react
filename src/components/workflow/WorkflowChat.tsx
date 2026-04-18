@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, X } from 'lucide-react';
 import { useWorkflowChat } from '../../hooks/useWorkflowChat.ts';
 import { WorkflowMessage } from './WorkflowMessage.tsx';
@@ -122,7 +122,146 @@ const PROMPT_TEMPLATES = [
   'What did __ say about __',
   'Steelman both sides of __',
   'Make me a playlist about __',
+  "Find __'s last 5 appearances",
+  'What is the bull case for __?',
+  'Find __ talking about __',
+  'What has __ said about __?',
+  'Compare __ and __ on __',
+  'Find the strongest arguments for __',
+  'Has anyone discussed __?',
+  'What is the contrarian take on __?',
+  'Explain the tradeoffs of __ vs __',
+  'Find a detailed retelling of __',
+  'What are podcasters saying about __?',
 ];
+
+// ─── Prompt conveyor belt (horizontal scrolling pills, pause on hover) ──────
+
+const PromptPill: React.FC<{ template: string; onSelect: (tpl: string) => void }> = ({
+  template,
+  onSelect,
+}) => (
+  <button
+    onClick={() => onSelect(template)}
+    className="prompt-pill flex-shrink-0 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.08] hover:border-white/30 text-gray-500 hover:text-white text-xs px-3.5 py-1.5 transition-colors"
+  >
+    {template.split('__').map((part, j, arr) => (
+      <React.Fragment key={j}>
+        {part}
+        {j < arr.length - 1 && <span className="text-white/50 font-medium">___</span>}
+      </React.Fragment>
+    ))}
+  </button>
+);
+
+const PromptConveyor: React.FC<{ onSelect: (tpl: string) => void }> = ({ onSelect }) => {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const hoverPausedRef = useRef(false);
+  const userTookControlRef = useRef(false);
+  const oneSetWidthRef = useRef(0);
+
+  // Triplicate for seamless looping in both directions
+  const tripled = useMemo(
+    () => [...PROMPT_TEMPLATES, ...PROMPT_TEMPLATES, ...PROMPT_TEMPLATES],
+    []
+  );
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const children = Array.from(el.children) as HTMLElement[];
+      if (children.length === 0) return;
+      const oneSetLength = Math.floor(children.length / 3);
+      let w = 0;
+      for (let i = 0; i < oneSetLength; i++) w += children[i].offsetWidth;
+      w += 12 * oneSetLength; // gap-3
+      oneSetWidthRef.current = w;
+      // Start in the middle set so user can scroll both directions
+      el.scrollLeft = w;
+    };
+
+    const measureTimeout = setTimeout(measure, 50);
+
+    const SPEED = 0.3; // px/frame — slow enough to read
+    let rafId = 0;
+    // Safari/Brave snap scrollLeft to integers — accumulate sub-pixel progress ourselves
+    let subpixelAcc = 0;
+
+    const tick = () => {
+      const oneSet = oneSetWidthRef.current;
+      if (oneSet > 0) {
+        const paused = hoverPausedRef.current || userTookControlRef.current;
+        if (!paused) {
+          subpixelAcc += SPEED;
+          if (subpixelAcc >= 1) {
+            const whole = Math.floor(subpixelAcc);
+            el.scrollLeft += whole;
+            subpixelAcc -= whole;
+          }
+        }
+        // Seamless wrap in either direction (invisible because content is triplicated)
+        if (el.scrollLeft >= oneSet * 2) {
+          el.scrollLeft -= oneSet;
+        } else if (el.scrollLeft <= 0) {
+          el.scrollLeft += oneSet;
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+
+    // Real scroll gestures (wheel / touch swipe) → stop auto-scroll permanently
+    const stopAuto = () => {
+      userTookControlRef.current = true;
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      // Redirect vertical wheel into horizontal scroll while hovering
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && !e.shiftKey) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+      stopAuto();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchmove', stopAuto, { passive: true });
+
+    const onResize = () => measure();
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      clearTimeout(measureTimeout);
+      cancelAnimationFrame(rafId);
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchmove', stopAuto);
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
+
+  return (
+    <div
+      className="prompt-conveyor-mask w-full max-w-[44rem]"
+      onMouseEnter={() => { hoverPausedRef.current = true; }}
+      onMouseLeave={() => { hoverPausedRef.current = false; }}
+    >
+      <div
+        ref={scrollerRef}
+        className="flex gap-3 items-center overflow-x-auto scrollbar-hide"
+        style={{
+          scrollbarWidth: 'none',
+          overscrollBehaviorX: 'contain',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        {tripled.map((tpl, i) => (
+          <PromptPill key={`${tpl}-${i}`} template={tpl} onSelect={onSelect} />
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // ─── Template fill-in (CRT-style inverted blanks) ───────────────────────────
 
@@ -635,27 +774,12 @@ export const WorkflowChat: React.FC = () => {
                   />
                 </div>
 
-                {/* Prompt pills */}
+                {/* Prompt conveyor */}
                 <div
-                  className="flex flex-wrap justify-center gap-2 mb-12 max-w-[40rem] animate-fade-in"
+                  className="w-full flex justify-center mb-12 animate-fade-in"
                   style={{ animationDelay: '350ms', animationFillMode: 'backwards' }}
                 >
-                  {PROMPT_TEMPLATES.map((tpl) => (
-                    <button
-                      key={tpl}
-                      onClick={() => handlePromptPill(tpl)}
-                      className="rounded-full border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/[0.15] text-gray-500 hover:text-gray-200 text-xs px-3.5 py-1.5 transition-all hover:shadow-[0_0_12px_rgba(255,255,255,0.04)]"
-                    >
-                      {tpl.split('__').map((part, j, arr) => (
-                        <React.Fragment key={j}>
-                          {part}
-                          {j < arr.length - 1 && (
-                            <span className="text-white/50 font-medium">___</span>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </button>
-                  ))}
+                  <PromptConveyor onSelect={handlePromptPill} />
                 </div>
               </>
             )}
