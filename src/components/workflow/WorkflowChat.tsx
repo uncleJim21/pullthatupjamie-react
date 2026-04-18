@@ -89,7 +89,7 @@ interface TaglineVariant {
 const TAGLINES: TaglineVariant[] = [
   {
     id: 'openclaw-plain-english-verbs',
-    headline: 'OpenClaw-grade podcast native Agent. Zero hassle.',
+    headline: 'OpenClaw quality podcast Agent. Zero hassle.',
     subline: 'Plain English finds the quote, cuts the clip, cross posts the thread.',
   },
   // Drop additional variants here to add them to the A/B pool, e.g.:
@@ -1125,6 +1125,19 @@ export const WorkflowChat: React.FC = () => {
                 )}
               </>
             )}
+
+            {/* Topic grid label */}
+            <div
+              className="w-full max-w-[56rem] mb-6 animate-fade-in"
+              style={{ animationDelay: '550ms', animationFillMode: 'backwards' }}
+            >
+              <div className="text-sm uppercase tracking-wide text-gray-300 font-medium">
+                Popular Topics
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Curated starting points across the podcast corpus.
+              </div>
+            </div>
 
             {/* Category grid — staggered fade-in, row-by-row (top first,
                 bottom last). Assumes desktop 3-col layout; on smaller
