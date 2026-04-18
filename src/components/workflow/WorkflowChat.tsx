@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Trash2, Zap, Sparkles, ArrowUp } from 'lucide-react';
+import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye } from 'lucide-react';
 import { useWorkflowChat } from '../../hooks/useWorkflowChat.ts';
 import { WorkflowMessage } from './WorkflowMessage.tsx';
 import type { ClipMeta } from './WorkflowMessage.tsx';
@@ -8,7 +8,7 @@ import { useAudioController } from '../../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from '../EmbedMiniPlayer.tsx';
 import { createClipShareUrl } from '../../utils/urlUtils.ts';
 
-// ─── Category grid with sub-queries ─────────────────────────────────────────
+// ─── Category grid — galaxy-inspired accent palette ──────────────────────────
 
 interface SubQuery {
   label: string;
@@ -18,13 +18,16 @@ interface SubQuery {
 interface Category {
   title: string;
   accent: string;
+  icon: React.FC<{ className?: string; style?: React.CSSProperties }>;
   queries: SubQuery[];
 }
 
 const CATEGORIES: Category[] = [
   {
+    // Health & Wellness carousel: hue 190, aqua-blue
     title: 'Health & Science',
-    accent: '#22c55e',
+    accent: '#70c9db',
+    icon: HeartPulse,
     queries: [
       { label: 'Hormones & metabolism', prompt: 'What has Huberman said about hormones and metabolism?' },
       { label: 'Sleep optimization', prompt: 'Find the best podcast advice on optimizing sleep' },
@@ -34,8 +37,10 @@ const CATEGORIES: Category[] = [
     ],
   },
   {
+    // Culture Wars carousel: hue 350, deep crimson
     title: 'Geopolitics',
-    accent: '#f59e0b',
+    accent: '#dd3c57',
+    icon: Globe2,
     queries: [
       { label: 'BRICS vs dollar', prompt: 'Find discussions about BRICS challenging dollar hegemony' },
       { label: 'Tariffs & trade wars', prompt: 'What are podcasters saying about tariffs this year?' },
@@ -45,8 +50,10 @@ const CATEGORIES: Category[] = [
     ],
   },
   {
+    // AI & Tech carousel: hue 215, pale blue-silver
     title: 'Tech & AI',
-    accent: '#8b5cf6',
+    accent: '#82a0c9',
+    icon: Cpu,
     queries: [
       { label: 'Open vs closed AI', prompt: 'What are the best arguments for and against open source AI?' },
       { label: 'AI regulation debate', prompt: 'What are podcasters saying about AI regulation?' },
@@ -56,14 +63,55 @@ const CATEGORIES: Category[] = [
     ],
   },
   {
+    // Business carousel: hue 130, dollar-bill green
     title: 'Finance & Markets',
-    accent: '#06b6d4',
+    accent: '#98cda1',
+    icon: TrendingUp,
     queries: [
       { label: 'Bull case for gold', prompt: 'What is the bull case for gold right now?' },
       { label: 'Bitcoin macro thesis', prompt: 'What is the strongest macro case for Bitcoin?' },
       { label: 'Fed policy outlook', prompt: 'What are macro analysts saying about Fed policy?' },
       { label: 'Real estate trends', prompt: 'Find podcast discussion on real estate market trends' },
       { label: 'Venture capital shifts', prompt: 'What are VCs saying about the current funding environment?' },
+    ],
+  },
+  {
+    // Bitcoin carousel: hue 12, coral-orange
+    title: 'Bitcoin & Crypto',
+    accent: '#f06d4c',
+    icon: Bitcoin,
+    queries: [
+      { label: 'Bitcoin as money', prompt: 'What is the strongest case for Bitcoin as money?' },
+      { label: 'Lightning & Layer 2', prompt: 'Find discussions about the Lightning Network and Layer 2 solutions' },
+      { label: 'Bitcoin mining & energy', prompt: 'What are podcasters saying about Bitcoin mining and energy use?' },
+      { label: 'Crypto regulation', prompt: 'Find the latest podcast takes on crypto regulation' },
+      { label: 'Bitcoin vs gold', prompt: 'What are the best arguments comparing Bitcoin to gold?' },
+    ],
+  },
+  {
+    // Startups carousel: hue 5, warm coral-red
+    title: 'Startups & Founders',
+    accent: '#e96e63',
+    icon: Rocket,
+    queries: [
+      { label: 'Founder stories', prompt: 'Find the best founder origin stories from podcasts' },
+      { label: 'Hiring & culture', prompt: 'What do founders say about hiring and building culture?' },
+      { label: 'Raising a seed round', prompt: 'Find advice on raising a seed round as a first-time founder' },
+      { label: 'Creator economy', prompt: 'What are podcasters saying about the creator economy?' },
+      { label: 'Building in public', prompt: 'Find discussions about building startups in public' },
+    ],
+  },
+  {
+    // Lunatic Fringe carousel: hue 290, fuschia-purple
+    title: 'Frontier & Fringe',
+    accent: '#c557db',
+    icon: Eye,
+    queries: [
+      { label: 'UFOs & UAPs', prompt: 'What are the most credible podcast discussions about UFOs and UAPs?' },
+      { label: 'Consciousness & reality', prompt: 'Find deep discussions about consciousness and the nature of reality' },
+      { label: 'Surveillance & privacy', prompt: 'What are podcasters saying about surveillance and digital privacy?' },
+      { label: 'Media manipulation', prompt: 'Find discussions about media manipulation and narrative control' },
+      { label: 'Simulation theory', prompt: 'What are the strongest arguments for simulation theory on podcasts?' },
     ],
   },
 ];
@@ -115,7 +163,7 @@ const ChatInput: React.FC<{
   );
 };
 
-// ─── Category card component ─────────────────────────────────────────────────
+// ─── Category card ───────────────────────────────────────────────────────────
 
 const CategoryCard: React.FC<{
   category: Category;
@@ -124,31 +172,38 @@ const CategoryCard: React.FC<{
 }> = ({ category, onSelect, animDelay }) => {
   const [expanded, setExpanded] = useState(false);
   const visibleQueries = expanded ? category.queries : category.queries.slice(0, 3);
+  const Icon = category.icon;
+  const c = category.accent;
 
   return (
     <div
-      className="category-card rounded-xl overflow-hidden animate-fade-in"
+      className="category-neon rounded-xl overflow-hidden animate-fade-in"
       style={{
+        '--neon': c,
         animationDelay: `${animDelay}ms`,
         animationFillMode: 'backwards',
-        borderColor: `${category.accent}22`,
-      }}
+      } as React.CSSProperties}
     >
       {/* Header */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center gap-2.5 px-4 py-3 text-left group"
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-left group"
       >
-        <div
-          className="w-2 h-2 rounded-full flex-shrink-0"
-          style={{ backgroundColor: category.accent, boxShadow: `0 0 6px ${category.accent}80` }}
+        <Icon
+          className="w-4 h-4 flex-shrink-0"
+          style={{ color: c, filter: `drop-shadow(0 0 6px ${c})` }}
         />
         <span className="text-sm font-medium text-gray-200 group-hover:text-white transition-colors">
           {category.title}
         </span>
-        <span className="ml-auto text-[10px] text-gray-600">
-          {expanded ? '−' : `+${category.queries.length - 3}`}
-        </span>
+        {!expanded && category.queries.length > 3 && (
+          <span
+            className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full"
+            style={{ color: `${c}cc`, backgroundColor: `${c}12`, border: `1px solid ${c}20` }}
+          >
+            +{category.queries.length - 3}
+          </span>
+        )}
       </button>
 
       {/* Sub-queries */}
@@ -157,7 +212,8 @@ const CategoryCard: React.FC<{
           <button
             key={q.label}
             onClick={() => onSelect(q.prompt)}
-            className="text-left px-3 py-2 rounded-lg text-xs text-gray-400 hover:text-gray-100 transition-all hover:bg-white/[0.05] border border-transparent hover:border-gray-700/50"
+            className="subtopic-neon text-left px-3 py-2 rounded-lg text-xs text-gray-400 transition-all"
+            style={{ '--neon': c } as React.CSSProperties}
           >
             {q.label}
           </button>
@@ -305,15 +361,24 @@ export const WorkflowChat: React.FC = () => {
             </div>
 
             {/* Tagline */}
-            <h2 className="text-xl sm:text-2xl font-light text-gray-200 mb-2 animate-fade-in text-center" style={{ animationDelay: '100ms', animationFillMode: 'backwards' }}>
+            <h2
+              className="text-xl sm:text-2xl font-light text-gray-200 mb-2 animate-fade-in text-center"
+              style={{ animationDelay: '100ms', animationFillMode: 'backwards' }}
+            >
               Millions of moments. One search.
             </h2>
-            <p className="text-sm text-gray-500 mb-10 animate-fade-in text-center" style={{ animationDelay: '200ms', animationFillMode: 'backwards' }}>
+            <p
+              className="text-sm text-gray-500 mb-10 animate-fade-in text-center"
+              style={{ animationDelay: '200ms', animationFillMode: 'backwards' }}
+            >
               Search across the world's podcasts — quotes, clips, and conversations
             </p>
 
             {/* Hero input */}
-            <div className="w-full flex justify-center mb-3 animate-fade-in" style={{ animationDelay: '250ms', animationFillMode: 'backwards' }}>
+            <div
+              className="w-full flex justify-center mb-3 animate-fade-in"
+              style={{ animationDelay: '250ms', animationFillMode: 'backwards' }}
+            >
               <ChatInput
                 input={input}
                 setInput={setInput}
@@ -324,19 +389,22 @@ export const WorkflowChat: React.FC = () => {
               />
             </div>
 
-            {/* Prompt pills — just 3, compact */}
-            <div className="flex flex-wrap justify-center gap-2 mb-12 max-w-[40rem] animate-fade-in" style={{ animationDelay: '350ms', animationFillMode: 'backwards' }}>
+            {/* Prompt pills */}
+            <div
+              className="flex flex-wrap justify-center gap-2 mb-12 max-w-[40rem] animate-fade-in"
+              style={{ animationDelay: '350ms', animationFillMode: 'backwards' }}
+            >
               {PROMPT_TEMPLATES.map((tpl) => (
                 <button
                   key={tpl}
                   onClick={() => handlePromptPill(tpl)}
-                  className="rounded-full border border-gray-700/40 bg-white/[0.02] hover:bg-white/[0.06] hover:border-gray-600 text-gray-500 hover:text-gray-200 text-xs px-3 py-1.5 transition-all"
+                  className="rounded-full border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/[0.15] text-gray-500 hover:text-gray-200 text-xs px-3.5 py-1.5 transition-all hover:shadow-[0_0_12px_rgba(255,255,255,0.04)]"
                 >
                   {tpl.split('__').map((part, j, arr) => (
                     <React.Fragment key={j}>
                       {part}
                       {j < arr.length - 1 && (
-                        <span className="text-white/60 font-medium">___</span>
+                        <span className="text-white/50 font-medium">___</span>
                       )}
                     </React.Fragment>
                   ))}
@@ -345,7 +413,7 @@ export const WorkflowChat: React.FC = () => {
             </div>
 
             {/* Category grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-[40rem]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-[56rem]">
               {CATEGORIES.map((cat, i) => (
                 <CategoryCard
                   key={cat.title}

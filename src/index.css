@@ -137,15 +137,58 @@ html, body, #root {
   animation: logo-glow 4s ease-in-out infinite;
 }
 
-/* Category card — uses action-chip pattern with per-card accent */
-.category-card {
-  background: radial-gradient(ellipse at 50% 50%, #141416, #0e0e10);
-  border: 2px solid rgba(255, 255, 255, 0.06);
+/* Category cards are styled inline with per-card accent colors */
+
+/* ─── Category card neon glow (research-session-card tier) ─────────────────── */
+.category-neon {
+  background:
+    radial-gradient(ellipse at 25% 30%, color-mix(in srgb, var(--neon) 12%, transparent), transparent 55%),
+    radial-gradient(ellipse at 75% 70%, color-mix(in srgb, var(--neon) 8%, transparent), transparent 50%),
+    #08080c;
+  border: 3px solid color-mix(in srgb, var(--neon) 18%, transparent);
+  animation: category-breathe 4s ease-in-out infinite;
   transition: border-color 0.25s, box-shadow 0.25s;
 }
-.category-card:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.04), inset 0 0 15px rgba(255, 255, 255, 0.02);
+.category-neon:hover {
+  border-color: color-mix(in srgb, var(--neon) 40%, transparent);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--neon) 38%, transparent),
+    0 0 38px color-mix(in srgb, var(--neon) 16%, transparent),
+    0 0 58px rgba(255, 255, 255, 0.05),
+    inset 0 0 24px color-mix(in srgb, var(--neon) 14%, transparent);
+}
+
+@keyframes category-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 10px color-mix(in srgb, var(--neon) 22%, transparent),
+      0 0 25px color-mix(in srgb, var(--neon) 10%, transparent),
+      0 0 42px rgba(255, 255, 255, 0.03),
+      inset 0 0 16px color-mix(in srgb, var(--neon) 8%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 14px color-mix(in srgb, var(--neon) 32%, transparent),
+      0 0 32px color-mix(in srgb, var(--neon) 14%, transparent),
+      0 0 52px rgba(255, 255, 255, 0.05),
+      inset 0 0 22px color-mix(in srgb, var(--neon) 12%, transparent);
+  }
+}
+
+/* ─── Subtopic neon (thinner, less bright) ────────────────────────────────── */
+.subtopic-neon {
+  border: 1px solid color-mix(in srgb, var(--neon) 10%, transparent);
+  background: transparent;
+  transition: all 0.25s ease;
+}
+.subtopic-neon:hover {
+  color: rgb(229, 231, 235);
+  background: color-mix(in srgb, var(--neon) 6%, transparent);
+  border-color: color-mix(in srgb, var(--neon) 25%, transparent);
+  box-shadow:
+    0 0 8px color-mix(in srgb, var(--neon) 12%, transparent),
+    0 0 20px color-mix(in srgb, var(--neon) 6%, transparent),
+    inset 0 0 10px color-mix(in srgb, var(--neon) 4%, transparent);
 }
 
 /* Chat input glow — subtle white edge glow + focus brightening */
