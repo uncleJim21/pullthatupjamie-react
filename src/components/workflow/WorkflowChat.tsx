@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye } from 'lucide-react';
+import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, X } from 'lucide-react';
 import { useWorkflowChat } from '../../hooks/useWorkflowChat.ts';
 import { WorkflowMessage } from './WorkflowMessage.tsx';
 import type { ClipMeta } from './WorkflowMessage.tsx';
@@ -124,6 +124,135 @@ const PROMPT_TEMPLATES = [
   'Make me a playlist about __',
 ];
 
+// ─── Template fill-in (CRT-style inverted blanks) ───────────────────────────
+
+const TemplateFillIn: React.FC<{
+  template: string;
+  onSubmit: (filled: string) => void;
+  onCancel: () => void;
+}> = ({ template, onSubmit, onCancel }) => {
+  const parts = template.split('__');
+  const blankCount = parts.length - 1;
+  const [blanks, setBlanks] = useState<string[]>(() => Array(blankCount).fill(''));
+  const [focusIdx, setFocusIdx] = useState(0);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    const t = setTimeout(() => inputRefs.current[0]?.focus(), 50);
+    return () => clearTimeout(t);
+  }, []);
+
+  const allFilled = blanks.every(b => b.trim().length > 0);
+
+  const submit = () => {
+    if (!allFilled) return;
+    const filled = parts.reduce(
+      (acc, p, i) => acc + p + (i < blankCount ? blanks[i] : ''),
+      ''
+    );
+    onSubmit(filled);
+  };
+
+  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onCancel();
+      return;
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        if (idx > 0) inputRefs.current[idx - 1]?.focus();
+        return;
+      }
+      if (idx < blankCount - 1) {
+        inputRefs.current[idx + 1]?.focus();
+      } else if (allFilled) {
+        submit();
+      } else {
+        // Wrap to first empty blank
+        const firstEmpty = blanks.findIndex(b => !b.trim());
+        if (firstEmpty >= 0) inputRefs.current[firstEmpty]?.focus();
+      }
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (allFilled) {
+        submit();
+        return;
+      }
+      const firstEmpty = blanks.findIndex(b => !b.trim());
+      if (firstEmpty >= 0) inputRefs.current[firstEmpty]?.focus();
+    }
+  };
+
+  const onLastBlank = focusIdx === blankCount - 1;
+  const hint = onLastBlank && allFilled
+    ? (
+      <>
+        <kbd className="fill-kbd">Tab</kbd> or <kbd className="fill-kbd">⏎</kbd> to send
+      </>
+    )
+    : (
+      <>
+        <kbd className="fill-kbd">Tab</kbd> to continue
+      </>
+    );
+
+  return (
+    <div className="flex flex-col items-center animate-fill-in relative">
+      <button
+        type="button"
+        onClick={onCancel}
+        aria-label="Cancel template"
+        className="absolute -top-3 -right-3 w-7 h-7 flex items-center justify-center rounded-full border border-white/20 bg-black/80 text-gray-400 hover:text-white hover:border-white/50 hover:bg-black transition-all z-10"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+      <div
+        className="rounded-full border border-white/[0.15] bg-white/[0.04] text-gray-200 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 px-6 py-2.5 max-w-[44rem] shadow-[0_0_16px_rgba(255,255,255,0.04)]"
+        style={{ fontSize: 'clamp(1rem, 1.8vw, 1.25rem)' }}
+      >
+        {parts.map((part, i) => {
+          const trimmed = part.trim();
+          return (
+            <React.Fragment key={i}>
+              {trimmed && <span>{trimmed}</span>}
+              {i < blankCount && (
+                <input
+                  ref={(el) => { inputRefs.current[i] = el; }}
+                  value={blanks[i]}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBlanks((prev) => prev.map((b, j) => (j === i ? val : b)));
+                  }}
+                  onFocus={() => setFocusIdx(i)}
+                  onKeyDown={(e) => handleKey(e, i)}
+                  size={Math.max(blanks[i].length || 4, 4)}
+                  className="fill-blank-input"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-3 mt-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5">{hint}</span>
+        <span className="text-gray-700">·</span>
+        <button
+          onClick={onCancel}
+          className="hover:text-gray-300 transition-colors flex items-center gap-1.5"
+        >
+          <kbd className="fill-kbd">Esc</kbd> to cancel
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main chat input (shared) ────────────────────────────────────────────────
 
 const ChatInput: React.FC<{
@@ -238,6 +367,7 @@ export const WorkflowChat: React.FC = () => {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [activeClip, setActiveClip] = useState<ClipMeta | null>(null);
+  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastUserMsgRef = useRef<HTMLDivElement>(null);
@@ -388,16 +518,17 @@ export const WorkflowChat: React.FC = () => {
   };
 
   const handlePromptPill = (template: string) => {
-    setInput(template);
-    setTimeout(() => {
-      const el = inputRef.current;
-      if (!el) return;
-      el.focus();
-      const pos = template.indexOf('__');
-      if (pos >= 0) {
-        el.setSelectionRange(pos, pos + 2);
-      }
-    }, 0);
+    setActiveTemplate(template);
+  };
+
+  const handleTemplateSubmit = async (filled: string) => {
+    setActiveTemplate(null);
+    setSending(true);
+    try {
+      await sendMessage(filled);
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleQuerySelect = (prompt: string) => {
@@ -477,43 +608,57 @@ export const WorkflowChat: React.FC = () => {
               Search across the world's podcasts — quotes, clips, and conversations
             </p>
 
-            {/* Hero input */}
-            <div
-              className="w-full flex justify-center mb-3 animate-fade-in"
-              style={{ animationDelay: '250ms', animationFillMode: 'backwards' }}
-            >
-              <ChatInput
-                input={input}
-                setInput={setInput}
-                sending={sending}
-                onSubmit={handleSubmit}
-                inputRef={inputRef}
-                size="hero"
-              />
-            </div>
-
-            {/* Prompt pills */}
-            <div
-              className="flex flex-wrap justify-center gap-2 mb-12 max-w-[40rem] animate-fade-in"
-              style={{ animationDelay: '350ms', animationFillMode: 'backwards' }}
-            >
-              {PROMPT_TEMPLATES.map((tpl) => (
-                <button
-                  key={tpl}
-                  onClick={() => handlePromptPill(tpl)}
-                  className="rounded-full border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/[0.15] text-gray-500 hover:text-gray-200 text-xs px-3.5 py-1.5 transition-all hover:shadow-[0_0_12px_rgba(255,255,255,0.04)]"
+            {activeTemplate ? (
+              /* Template fill-in mode — replaces hero input + pills */
+              <div className="w-full flex justify-center mb-12 min-h-[10rem] items-center">
+                <TemplateFillIn
+                  key={activeTemplate}
+                  template={activeTemplate}
+                  onSubmit={handleTemplateSubmit}
+                  onCancel={() => setActiveTemplate(null)}
+                />
+              </div>
+            ) : (
+              <>
+                {/* Hero input */}
+                <div
+                  className="w-full flex justify-center mb-3 animate-fade-in"
+                  style={{ animationDelay: '250ms', animationFillMode: 'backwards' }}
                 >
-                  {tpl.split('__').map((part, j, arr) => (
-                    <React.Fragment key={j}>
-                      {part}
-                      {j < arr.length - 1 && (
-                        <span className="text-white/50 font-medium">___</span>
-                      )}
-                    </React.Fragment>
+                  <ChatInput
+                    input={input}
+                    setInput={setInput}
+                    sending={sending}
+                    onSubmit={handleSubmit}
+                    inputRef={inputRef}
+                    size="hero"
+                  />
+                </div>
+
+                {/* Prompt pills */}
+                <div
+                  className="flex flex-wrap justify-center gap-2 mb-12 max-w-[40rem] animate-fade-in"
+                  style={{ animationDelay: '350ms', animationFillMode: 'backwards' }}
+                >
+                  {PROMPT_TEMPLATES.map((tpl) => (
+                    <button
+                      key={tpl}
+                      onClick={() => handlePromptPill(tpl)}
+                      className="rounded-full border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/[0.15] text-gray-500 hover:text-gray-200 text-xs px-3.5 py-1.5 transition-all hover:shadow-[0_0_12px_rgba(255,255,255,0.04)]"
+                    >
+                      {tpl.split('__').map((part, j, arr) => (
+                        <React.Fragment key={j}>
+                          {part}
+                          {j < arr.length - 1 && (
+                            <span className="text-white/50 font-medium">___</span>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </button>
                   ))}
-                </button>
-              ))}
-            </div>
+                </div>
+              </>
+            )}
 
             {/* Category grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-[56rem]">

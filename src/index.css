@@ -191,6 +191,46 @@ html, body, #root {
     inset 0 0 10px color-mix(in srgb, var(--neon) 4%, transparent);
 }
 
+/* ─── Template fill-in (pill-style with inline blanks) ────────────────────── */
+@keyframes fill-in-scale {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-fill-in {
+  animation: fill-in-scale 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.fill-blank-input {
+  background: transparent;
+  color: #ffffff;
+  border: none;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.28);
+  outline: none;
+  padding: 0 4px 1px 4px;
+  margin: 0 1px;
+  font: inherit;
+  text-align: left;
+  caret-color: rgba(255, 255, 255, 0.9);
+  transition: border-color 0.2s ease, background 0.2s ease;
+  border-radius: 2px;
+}
+.fill-blank-input:focus {
+  border-bottom-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.fill-kbd {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 10px;
+  padding: 1.5px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1;
+}
+
 /* Chat input glow — subtle white edge glow + focus brightening */
 .chat-input-glow {
   box-shadow: 0 0 12px rgba(255, 255, 255, 0.04), 0 0 4px rgba(255, 255, 255, 0.02);
