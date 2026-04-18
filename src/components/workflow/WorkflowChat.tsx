@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, X } from 'lucide-react';
+import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, Landmark, Brain, X } from 'lucide-react';
 import { useWorkflowChat } from '../../hooks/useWorkflowChat.ts';
 import { WorkflowMessage } from './WorkflowMessage.tsx';
 import type { ClipMeta } from './WorkflowMessage.tsx';
@@ -112,6 +112,33 @@ const CATEGORIES: Category[] = [
       { label: 'Surveillance & privacy', prompt: 'What are podcasters saying about surveillance and digital privacy?' },
       { label: 'Media manipulation', prompt: 'Find discussions about media manipulation and narrative control' },
       { label: 'Simulation theory', prompt: 'What are the strongest arguments for simulation theory on podcasts?' },
+    ],
+  },
+  {
+    // History: hue 52, faded-paper yellow — Dan Carlin / WhatIfAltHist energy
+    title: 'History & Anthropology',
+    accent: '#e5d67a',
+    icon: Landmark,
+    queries: [
+      { label: 'Fall of empires', prompt: 'What patterns repeat in the fall of great empires across history?' },
+      { label: 'WWII what-ifs', prompt: 'Find alt-history takes on what if the Axis had won WWII' },
+      { label: 'Mongol conquests', prompt: 'Find deep dives on Genghis Khan and the Mongol conquests' },
+      { label: 'Nuclear close calls', prompt: "What are the closest humanity has come to nuclear war?" },
+      { label: 'Lost civilizations', prompt: 'Find compelling podcast theories about lost or forgotten civilizations' },
+      { label: 'Human origins', prompt: 'What are podcasters saying about human origins and prehistory?' },
+    ],
+  },
+  {
+    // Psychology & Mind: hue 170, dusty teal / sea-glass — cerebral, calm
+    title: 'Psychology & Mind',
+    accent: '#6fbca8',
+    icon: Brain,
+    queries: [
+      { label: 'Attention & focus', prompt: 'Find the best podcast advice on improving attention and focus' },
+      { label: 'Habits & behavior change', prompt: 'What does the science of habits and behavior change look like?' },
+      { label: 'Overcoming anxiety', prompt: 'What do psychologists on podcasts say about overcoming anxiety?' },
+      { label: 'Dark triad personalities', prompt: 'Find discussions of narcissism, Machiavellianism, and psychopathy' },
+      { label: 'Evidence-based therapy', prompt: 'Which therapy approaches have the strongest evidence base?' },
     ],
   },
 ];
@@ -679,72 +706,53 @@ export const WorkflowChat: React.FC = () => {
   const showMiniPlayer = !!activeClip;
 
   return (
-    <div className="flex flex-col h-full bg-black text-white">
-      {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-800">
-        <div className="flex items-center gap-2.5">
-          <img
-            src="/default-source-favicon.png"
-            alt="Jamie"
-            className="w-7 h-7 rounded"
-          />
-          <span className="text-xs font-semibold tracking-[0.2em] uppercase text-white">
-            Jamie Pull
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleModel}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-gray-400 hover:text-white bg-[#111111] border border-gray-800 rounded-lg hover:border-gray-700 transition-all"
-            title={`Switch to ${model === 'fast' ? 'quality' : 'fast'} model`}
-          >
-            {model === 'fast' ? (
-              <Zap className="w-3.5 h-3.5 text-yellow-500/70" />
-            ) : (
-              <Sparkles className="w-3.5 h-3.5 text-purple-400/70" />
-            )}
-            <span>{model === 'fast' ? 'Fast' : 'Quality'}</span>
-          </button>
-
-          {hasMessages && (
-            <button
-              onClick={clearMessages}
-              className="p-1.5 text-gray-500 hover:text-white transition-colors"
-              title="Clear chat"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+    <div className="relative flex flex-col h-full bg-black text-white">
+      {/* Floating top-right controls (header hidden for now) */}
+      <div className="absolute top-3 right-4 z-10 flex items-center gap-2">
+        <button
+          onClick={toggleModel}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-gray-400 hover:text-white bg-black/60 backdrop-blur-sm border border-gray-800 rounded-lg hover:border-gray-700 transition-all"
+          title={`Switch to ${model === 'fast' ? 'quality' : 'fast'} model`}
+        >
+          {model === 'fast' ? (
+            <Zap className="w-3.5 h-3.5 text-yellow-500/70" />
+          ) : (
+            <Sparkles className="w-3.5 h-3.5 text-purple-400/70" />
           )}
-        </div>
+          <span>{model === 'fast' ? 'Fast' : 'Quality'}</span>
+        </button>
+
+        {hasMessages && (
+          <button
+            onClick={clearMessages}
+            className="p-1.5 text-gray-500 hover:text-white bg-black/60 backdrop-blur-sm border border-gray-800 rounded-lg hover:border-gray-700 transition-all"
+            title="Clear chat"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Messages / Empty State */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
         {!hasMessages ? (
-          <div className="flex flex-col items-center min-h-full px-5 pt-12 sm:pt-16 pb-8">
-            {/* Logo with glow */}
-            <div className="relative mb-5 animate-fade-in">
-              <div className="absolute inset-0 rounded-full bg-white/10 blur-xl scale-150 animate-logo-glow" />
+          <div className="flex flex-col items-center min-h-full px-5 pt-8 sm:pt-10 pb-8">
+            {/* Logo lockup */}
+            <div className="relative animate-fade-in">
+              <div className="absolute inset-0 bg-white/5 blur-2xl scale-110 animate-logo-glow" />
               <img
-                src="/default-source-favicon.png"
-                alt="Jamie"
-                className="relative w-14 h-14 rounded-xl"
+                src="/jamie-pull.png"
+                alt="Jamie Pull"
+                className="relative h-24 sm:h-32 w-auto"
               />
             </div>
 
             {/* Tagline */}
-            <h2
-              className="text-xl sm:text-2xl font-light text-gray-200 mb-2 animate-fade-in text-center"
-              style={{ animationDelay: '100ms', animationFillMode: 'backwards' }}
-            >
-              Millions of moments. One search.
-            </h2>
             <p
-              className="text-sm text-gray-500 mb-10 animate-fade-in text-center"
-              style={{ animationDelay: '200ms', animationFillMode: 'backwards' }}
+              className="text-sm sm:text-base text-gray-400 mt-1 mb-5 animate-fade-in text-center"
+              style={{ animationDelay: '150ms', animationFillMode: 'backwards' }}
             >
-              Search across the world's podcasts — quotes, clips, and conversations
+              Start your research backed by millions of podcast moments. Ask in plain English.
             </p>
 
             {activeTemplate ? (
