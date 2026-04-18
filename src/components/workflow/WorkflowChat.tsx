@@ -240,9 +240,112 @@ export const WorkflowChat: React.FC = () => {
   const [activeClip, setActiveClip] = useState<ClipMeta | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastUserMsgRef = useRef<HTMLDivElement>(null);
+
+  // Scroll state machine: idle | anchor-top | follow-bottom
+  const scrollModeRef = useRef<'idle' | 'anchor-top' | 'follow-bottom'>('idle');
+  const prevMsgCountRef = useRef(0);
+  const userScrolledAwayRef = useRef(false);
+  const [slackHeight, setSlackHeight] = useState(0);
+  const slackHeightRef = useRef(0);
+  const updateSlack = (h: number) => {
+    slackHeightRef.current = h;
+    setSlackHeight(h);
+  };
+
+  // Detect manual user scroll during follow-bottom to pause auto-scroll
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        if (scrollModeRef.current === 'follow-bottom') {
+          const gap = container.scrollHeight - container.scrollTop - container.clientHeight;
+          userScrolledAwayRef.current = gap > 80;
+        }
+      });
+    };
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => container.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    const container = scrollRef.current;
+    if (!container) return;
+    const count = messages.length;
+
+    if (count === 0) {
+      prevMsgCountRef.current = 0;
+      scrollModeRef.current = 'idle';
+      updateSlack(0);
+      return;
+    }
+
+    // Detect a new message pair (user + assistant stub) being added
+    if (count > prevMsgCountRef.current && count >= 2) {
+      const penultimate = messages[count - 2];
+      if (penultimate?.role === 'user') {
+        const isFollowUp = prevMsgCountRef.current > 0;
+        if (isFollowUp) {
+          scrollModeRef.current = 'anchor-top';
+          userScrolledAwayRef.current = false;
+
+          // Inject slack equal to viewport height so the user msg can reach the top.
+          // Then smooth-scroll the user message to the top.
+          // The slack stays while streaming; shrinks as assistant content grows.
+          requestAnimationFrame(() => {
+            updateSlack(container.clientHeight);
+            // Wait for the slack to be painted before scrolling
+            requestAnimationFrame(() => {
+              const el = lastUserMsgRef.current;
+              if (!el) return;
+              const containerRect = container.getBoundingClientRect();
+              const elRect = el.getBoundingClientRect();
+              const target = container.scrollTop + (elRect.top - containerRect.top);
+              container.scrollTo({ top: target, behavior: 'smooth' });
+            });
+          });
+        } else {
+          scrollModeRef.current = 'follow-bottom';
+          userScrolledAwayRef.current = false;
+        }
+      }
+      prevMsgCountRef.current = count;
+    }
+
+    const mode = scrollModeRef.current;
+
+    if (mode === 'anchor-top') {
+      // Shrink slack as assistant content grows; once it hits 0, switch to follow-bottom
+      const el = lastUserMsgRef.current;
+      if (el) {
+        const elRect = el.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const userMsgTopInContainer = container.scrollTop + (elRect.top - containerRect.top);
+        // Real content height below user msg = scrollHeight MINUS current slack MINUS userMsgTop
+        const contentBelowUser = container.scrollHeight - slackHeightRef.current - userMsgTopInContainer;
+        const needed = Math.max(0, container.clientHeight - contentBelowUser);
+        if (Math.abs(needed - slackHeightRef.current) > 2) {
+          updateSlack(needed);
+        }
+        if (needed === 0) {
+          scrollModeRef.current = 'follow-bottom';
+        }
+      }
+    } else if (mode === 'follow-bottom' && !userScrolledAwayRef.current) {
+      container.scrollTop = container.scrollHeight - container.clientHeight;
+    }
+
+    // Stream finished → return to idle
+    const last = messages[count - 1];
+    if (last?.role === 'assistant' && last.streamComplete && mode !== 'idle') {
+      scrollModeRef.current = 'idle';
+      userScrolledAwayRef.current = false;
+    }
   }, [messages]);
 
   const handlePlayClip = useCallback(
@@ -347,7 +450,7 @@ export const WorkflowChat: React.FC = () => {
       </div>
 
       {/* Messages / Empty State */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
         {!hasMessages ? (
           <div className="flex flex-col items-center min-h-full px-5 pt-12 sm:pt-16 pb-8">
             {/* Logo with glow */}
@@ -441,16 +544,22 @@ export const WorkflowChat: React.FC = () => {
                   }
                 }
               }
+              const isLastUserMsg =
+                msg.role === 'user' &&
+                !messages.slice(idx + 1).some(m => m.role === 'user');
               return (
-                <WorkflowMessage
-                  key={msg.id}
-                  message={msg}
-                  onPlayClip={handlePlayClip}
-                  onFollowUp={sendMessage}
-                  originalQuery={originalQuery}
-                />
+                <div key={msg.id} ref={isLastUserMsg ? lastUserMsgRef : undefined}>
+                  <WorkflowMessage
+                    message={msg}
+                    onPlayClip={handlePlayClip}
+                    onFollowUp={sendMessage}
+                    originalQuery={originalQuery}
+                  />
+                </div>
               );
             })}
+            {/* Viewport slack — dynamic; only exists when anchoring new user msg to top */}
+            {slackHeight > 0 && <div style={{ height: slackHeight }} aria-hidden="true" />}
           </div>
         )}
       </div>
