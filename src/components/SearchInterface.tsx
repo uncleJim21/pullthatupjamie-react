@@ -3261,7 +3261,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         content area so it never overlaps landing carousels, list items,
         or the Galaxy canvas. */}
     {!isEmbedMode && !isClipBatchPage && !isSharePage && resultViewStyle === SearchResultViewStyle.AGENT && (
-      <div className="fixed top-[76px] left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+      // Agent mode hides the PageBanner (the main body is display:none),
+      // so the floating control sits close to the viewport top rather
+      // than being pushed below a phantom ~68px banner.
+      <div className="fixed top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
         {renderViewToggle()}
       </div>
     )}
@@ -3271,14 +3274,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         switching tabs doesn't destroy Galaxy's 3D canvas or list results.
         The `pt-14` clears the floating segmented control above. */}
     {resultViewStyle === SearchResultViewStyle.AGENT && (
-      // pt-32 (128px) clears the PageBanner-aligned floating segmented
-      // control (top-[76px] + ~40px control height + small gap). In Agent
-      // mode the main body is display:none so the banner is hidden too.
+      // pt-14 (56px) clears the Agent-mode floating segmented control
+      // (top-3 = 12px + ~40px control height + small gap). No banner in
+      // Agent mode, so no extra padding is needed for it.
       <div
-        className="min-h-screen bg-black pt-32"
+        className="min-h-screen bg-black pt-14"
         style={{ position: 'relative', zIndex: 1 }}
       >
-        <div className="h-[calc(100vh-8rem)]">
+        <div className="h-[calc(100vh-3.5rem)]">
           <JamiePullAgent />
         </div>
       </div>

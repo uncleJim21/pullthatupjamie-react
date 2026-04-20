@@ -1060,7 +1060,7 @@ export const JamiePullAgent: React.FC = () => {
       {/* Messages / Empty State */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
         {!hasMessages ? (
-          <div className="flex flex-col items-center min-h-full px-5 pt-8 sm:pt-10 pb-8">
+          <div className="flex flex-col items-center min-h-full px-5 pt-2 sm:pt-4 pb-8">
             {/* Logo lockup — aspect-ratio preserved via max-w + object-contain;
                 scaled down on small screens so the wide wordmark doesn't get
                 squeezed or forced into an oddly-truncated state. */}
@@ -1069,7 +1069,7 @@ export const JamiePullAgent: React.FC = () => {
               <img
                 src="/jamie-pull.png"
                 alt="Jamie Pull"
-                className="relative h-16 sm:h-24 md:h-32 w-auto max-w-full object-contain"
+                className="relative h-[52px] sm:h-[77px] md:h-[102px] w-auto max-w-full object-contain"
               />
             </div>
 
