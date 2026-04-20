@@ -247,9 +247,29 @@ Optional UX sugar: our chip also fetches a Fountain preview link via `https://rs
 
 ### b) `follow-up-message` — one-click refinement
 
-Fields: `reason`, `label`, `message`, optional `context: { guids?, feedIds?, persons?, hint? }`.
+Fields: `reason`, `label?`, `message`, optional `context: { guids?, feedIds?, persons?, hint? }`.
 
-Client flow: render a chip labeled with `label`; on click, call your `sendMessage` wrapper with `(action.message, action.context)`. Pass the `context` straight through into the next `/api/pull` request body as `context` — it hints the agent (e.g. "stay within these guids", "focus on this person").
+**Display text priority** (important — the fields are not interchangeable):
+
+1. If `label` is a non-empty string → show `label`. This is the short, user-facing chip copy.
+2. Else → show a **truncated `message`** (e.g. first ~60 chars + `…`). `message` is a pre-filled query that can run 1-2 sentences long; never render it raw as chip text.
+3. **Never** use `reason` as the chip label. It's an internal-ish explanation the agent emits for debuggability — not user-facing copy.
+4. Do not concatenate `reason + message` for display.
+
+Recommended: set `title={action.message}` on the button so the full query shows in a native tooltip on hover.
+
+**Click handler** — POST the full `message` (not the truncated display text) plus the `context` passthrough:
+
+```json
+{
+  "message": "<action.message — the full pre-filled query>",
+  "sessionId": "<current session>",
+  "context": { /* action.context as-is */ },
+  "stream": true
+}
+```
+
+`context` is already structured (`guids`, `feedIds`, `persons`, `hint`) — pass it through unchanged so the next turn skips re-resolving those references. Dropping it is a silent regression: the agent will re-search for entities it already has pinned.
 
 ### Placement
 

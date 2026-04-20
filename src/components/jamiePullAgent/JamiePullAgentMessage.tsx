@@ -644,18 +644,36 @@ const SubmitOnDemandChip: React.FC<{
   );
 };
 
+const FOLLOW_UP_MAX_CHARS = 60;
+
+// Backend may omit `label` or send an empty string. In that case fall back to
+// a truncated `message` so the chip stays compact and doesn't render a wall of
+// text. Never use `reason` here — it's an internal explanation string, not
+// user-facing copy. The full `message` is still what gets POSTed on click.
+const getFollowUpDisplayText = (action: FollowUpMessageAction): string => {
+  const label = action.label?.trim();
+  if (label) return label;
+  const msg = action.message?.trim() ?? '';
+  if (msg.length <= FOLLOW_UP_MAX_CHARS) return msg;
+  return `${msg.slice(0, FOLLOW_UP_MAX_CHARS).trimEnd()}…`;
+};
+
 const FollowUpChip: React.FC<{
   action: FollowUpMessageAction;
   onSend: (message: string, context?: FollowUpContext) => void;
-}> = ({ action, onSend }) => (
-  <button
-    onClick={() => onSend(action.message, action.context)}
-    className="action-chip action-chip--followup flex items-center gap-2 px-3 py-2 text-xs text-gray-300 rounded-lg transition-all text-left"
-  >
-    <MessageSquareText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-    <span className="truncate">{action.label}</span>
-  </button>
-);
+}> = ({ action, onSend }) => {
+  const displayText = getFollowUpDisplayText(action);
+  return (
+    <button
+      onClick={() => onSend(action.message, action.context)}
+      title={action.message}
+      className="action-chip action-chip--followup flex items-center gap-2 px-3 py-2 text-xs text-gray-300 rounded-lg transition-all text-left max-w-full sm:max-w-md"
+    >
+      <MessageSquareText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+      <span className="truncate">{displayText}</span>
+    </button>
+  );
+};
 
 const SuggestedActions: React.FC<{
   actions: AgentSuggestedAction[];

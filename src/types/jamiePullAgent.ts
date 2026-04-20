@@ -57,7 +57,9 @@ export interface FollowUpContext {
 export interface FollowUpMessageAction {
   type: 'follow-up-message';
   reason: string;
-  label: string;
+  /** Short, user-facing chip copy. May be missing/empty — clients MUST fall back
+   *  to a truncated `message`. Never use `reason` as the display label. */
+  label?: string;
   message: string;
   context?: FollowUpContext;
 }
