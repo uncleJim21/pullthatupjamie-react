@@ -1,6 +1,6 @@
 # Pull That Up Jamie
 
-> Pull That Up Jamie is a podcast search and research platform with a semantically indexed corpus of 109+ feeds, ~7K episodes, and ~1.9M paragraphs. It provides vector search across podcast transcripts, interactive research sessions, on-demand transcription, and clip creation — all accessible via a public API with free and Lightning-paid (L402) tiers.
+> Pull That Up Jamie is a podcast search and research platform with a semantically indexed corpus of 109+ feeds, ~7K episodes, and ~1.9M paragraphs. It provides vector search across podcast transcripts, interactive research sessions, on-demand transcription, and clip creation — all accessible via a public API with free and Lightning-paid (L402) tiers. On top of the raw endpoints, an orchestration layer (`POST /api/pull`) accepts a plain-English task and returns a streaming multi-tool agent response (SSE) — L402-payable like the other paid endpoints.
 
 ## API
 
@@ -21,6 +21,11 @@
 - [On-Demand Transcription](https://www.pullthatupjamie.ai/api/on-demand/submitOnDemandRun): Submit any podcast episode for transcription, chaptering, and permanent semantic indexing
 - [Clip Creation](https://www.pullthatupjamie.ai/api/make-clip): Generate shareable audio/video clips with burned-in subtitles from search results
 - [Transcript Download](https://www.pullthatupjamie.ai/api/on-demand/transcript/{jobId}/{guid}): Download full transcript JSON for a transcribed episode — requires the same L402 credential used to pay for the job (streamed, supports large files)
+
+## Agent Orchestration Layer
+
+- [Jamie Pull Agent (POST /api/pull)](https://www.pullthatupjamie.ai/api/pull): Plain-English orchestration over every /api above. Defaults to a single JSON response `{ sessionId, text, suggestedActions, session? }`; opt into live streaming by sending `stream: true` in the POST body (or `Accept: text/event-stream`), which emits SSE events `status | tool_call | tool_result | text_delta | text_done | suggested_action | session_created | done | error`. Multi-turn via `sessionId` + rolling `history`. Anonymous free tier via `X-Free-Tier: true` header; authenticated users send `Authorization: Bearer <jwt>`; machine agents send `Authorization: L402 <macaroon>:<preimage>` (same credential format as the rest of the L402-paid endpoints). Embeds `{{clip:<pineconeId>}}` tokens in the text response that clients resolve to real podcast clips via /api/get-hierarchy.
+- [Jamie Pull Client Dev Guide](https://www.pullthatupjamie.ai/JamiePullAgentClientDevGuide.md): Reference implementation guide for rich clients — SSE handling, clip-ID resolution, next-step action dispatch, markdown rendering, session continuity.
 
 ## Canonical Workflows
 
@@ -77,7 +82,7 @@ When starting from a broad or ambiguous request like "research what people are s
 ## Auth
 
 - Free tier: corpus browsing, basic search (IP-based quota), and shared session viewing — no credentials needed
-- Paid tier: L402 Lightning prepaid credits. Hit any paid endpoint unauthenticated to receive a 402 challenge with a Lightning invoice. After payment, use `Authorization: L402 <macaroon>:<preimage>` for all requests. 500 sats (~$0.33) covers ~150+ searches.
+- Paid tier: L402 Lightning prepaid credits. Hit any paid endpoint (search-chapters, make-clip, on-demand transcription, /api/pull, etc.) unauthenticated to receive a 402 challenge with a Lightning invoice. After payment, use `Authorization: L402 <macaroon>:<preimage>` for all requests. 500 sats (~$0.33) covers ~150+ searches.
 
 ## About
 

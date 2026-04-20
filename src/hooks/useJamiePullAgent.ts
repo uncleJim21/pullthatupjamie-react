@@ -119,7 +119,12 @@ export const useJamiePullAgent = (): UseJamiePullAgentReturn => {
       const aId = assistantMsg.id;
 
       try {
-        const reqBody: Record<string, unknown> = { message: task, model };
+        // `stream: true` is required — the /api/pull endpoint defaults to a
+        // single JSON response. This client is built around the SSE event
+        // stream (status / tool_call / tool_result / text_delta / done etc.),
+        // so we opt into streaming on every request. `Accept: text/event-stream`
+        // below is a belt-and-suspenders for the same intent.
+        const reqBody: Record<string, unknown> = { message: task, model, stream: true };
         if (sessionIdRef.current) reqBody.sessionId = sessionIdRef.current;
         if (historyRef.current.length > 0) {
           reqBody.history = historyRef.current.slice(-MAX_HISTORY_ENTRIES);
