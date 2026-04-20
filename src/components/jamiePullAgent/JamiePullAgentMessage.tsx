@@ -318,6 +318,9 @@ function injectClipCards(
           pineconeId,
           episodeImage: meta?.episodeImage,
           title: clipPillTitle(meta),
+          // Transcript text powers the "explore in Galaxy" arrow — opens
+          // /app?view=galaxy&q=<quote> so the user can see neighbors.
+          quote: meta?.text,
         };
         out.push(
           <InlineCardMention

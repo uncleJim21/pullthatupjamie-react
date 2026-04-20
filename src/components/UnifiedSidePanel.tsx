@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers, Copy, Check, Mic, AudioLines } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers, Copy, Check, Mic, AudioLines, ArrowUpRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -17,6 +17,10 @@ export type AnalysisCardJson = {
   pineconeId: string;
   episodeImage?: string;
   title?: string;
+  /** Raw transcript text for this clip. When provided the inline pill renders
+   *  an "open in Galaxy" arrow that opens `/app?view=galaxy&q=<quote>` in a
+   *  new tab so the user can explore nearest-neighbor clips. */
+  quote?: string;
 };
 
 type ParsedAnalysisPart =
@@ -268,6 +272,22 @@ export const InlineCardMention: React.FC<{
         />
       )}
       <span className="text-xs text-gray-200 truncate min-w-0">{title}</span>
+      {card.quote && (
+        <a
+          href={`${FRONTEND_URL}/app?view=galaxy&q=${encodeURIComponent(card.quote)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+          }}
+          className="flex-shrink-0 ml-0.5 text-gray-500 hover:text-gray-200 transition-colors"
+          title="Explore similar quotes in Galaxy"
+          aria-label="Explore similar quotes in Galaxy"
+        >
+          <ArrowUpRight className="w-3.5 h-3.5" />
+        </a>
+      )}
       {onCopyLink && (
         <span
           role="button"
