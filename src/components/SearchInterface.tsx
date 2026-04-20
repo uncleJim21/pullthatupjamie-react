@@ -3254,18 +3254,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         Always visible unless in embed / clip batch / share modes where the
         toggle would conflict with dedicated flows. Writes selection to
         localStorage.searchResultViewStyle so it persists across reloads. */}
-    {!isEmbedMode && !isClipBatchPage && !isSharePage && (
-      // Floating top-center toggle. Hidden in Galaxy mode once results are
-      // rendered because SemanticGalaxyView takes the full viewport and a
-      // fixed overlay visually crops the scene; in that case we render an
-      // inline version above the galaxy viewport instead (see below).
-      resultViewStyle === SearchResultViewStyle.GALAXY &&
-      conversation.length > 0 &&
-      searchMode === 'podcast-search' ? null : (
-        <div className="fixed top-[76px] left-1/2 -translate-x-1/2 z-30 pointer-events-none">
-          {renderViewToggle()}
-        </div>
-      )
+    {/* Floating top-center view toggle — only used in Agent mode, where the
+        main search body is display:none and there's no in-flow content to
+        attach the toggle to. For List and Galaxy modes (pre- and
+        post-search) the toggle is rendered inline at the top of the main
+        content area so it never overlaps landing carousels, list items,
+        or the Galaxy canvas. */}
+    {!isEmbedMode && !isClipBatchPage && !isSharePage && resultViewStyle === SearchResultViewStyle.AGENT && (
+      <div className="fixed top-[76px] left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+        {renderViewToggle()}
+      </div>
     )}
 
     {/* Agent pane — mounts JamiePullAgent when the Agent tab is active.
@@ -3338,6 +3336,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             setIsUserSignedIn={setIsUserSignedIn}
             navigationMode={NavigationMode.CLEAN}
           />
+        )}
+
+        {/* Inline view toggle (List / Galaxy / Agent) — lives directly
+            below the nav bar for List and Galaxy modes so it never
+            overlaps landing carousels, list items, or the Galaxy canvas.
+            In Agent mode the main body is display:none, so that tab uses
+            the floating fixed variant rendered near the root instead. */}
+        {!isEmbedMode && !isClipBatchPage && !isSharePage && (
+          <div className="w-full flex justify-center pt-3 pb-1 relative z-20">
+            {renderViewToggle()}
+          </div>
         )}
 
         {/* Web Search Deprecation Banner */}
@@ -4043,17 +4052,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {/* Conversation History / Galaxy View */}
       {((conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && searchMode === 'podcast-search') && (
         <div>
-          {/* Inline view toggle above the Galaxy viewport.
-              In Galaxy mode the floating top-center toggle is hidden
-              (it would overlap the 3D scene); we render it here in a
-              static row instead so it never occludes the canvas. Kept
-              outside the Galaxy wrapper so switching to List mode also
-              preserves vertical layout / scroll behaviour. */}
-          {!isEmbedMode && !isClipBatchPage && !isSharePage && resultViewStyle === SearchResultViewStyle.GALAXY && (
-            <div className="w-full flex justify-center py-2">
-              {renderViewToggle()}
-            </div>
-          )}
+          {/* (The inline view toggle previously rendered here was hoisted
+              up so it sits directly below PageBanner for both pre- and
+              post-search states — see the renderViewToggle() block near
+              the top of this component's return.) */}
 
           {/* Conditional rendering: List or Galaxy view */}
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (
@@ -4061,7 +4063,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               ref={galaxyViewportRef}
               className="relative w-full transition-all duration-300 ease-in-out"
               style={{
-              height: isEmbedMode ? '100vh' : 'calc(100vh - 200px)' 
+              height: isEmbedMode ? '100vh' : 'calc(100vh - 200px)' /* 200px leaves room for the PageBanner + inline view toggle + bottom player */ 
               }}
             >
               <SemanticGalaxyView
