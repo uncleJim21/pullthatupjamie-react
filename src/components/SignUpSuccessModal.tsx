@@ -43,27 +43,28 @@ export const SignUpSuccessModal: React.FC<SignUpSuccessModalProps> = ({
 
           {/* Subtitle */}
           <p className="text-gray-400 text-center text-sm mb-2">
-            Your account is ready.
+            Your free account is ready.
           </p>
 
           {/* Value prop for upgrading */}
           <p className="text-gray-500 text-center text-sm mb-8">
-            Want more searches, clips, and AI assists each day? Unlock higher limits with Jamie Plus.
+            Want more room to search, clip, and ask Jamie anything? Unlock higher limits with Jamie Plus.
           </p>
 
           {/* Feature highlights */}
+          {/* TODO(jamie-pull-skills): highlight Create / Publish / Worker once live. */}
           <div className="mb-8 space-y-2">
             <div className="flex items-center gap-3 text-sm text-gray-400">
               <span className="text-green-500">✓</span>
-              <span>10x more daily searches</span>
+              <span>Jamie agent with higher daily ask limits</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-gray-400">
+              <span className="text-green-500">✓</span>
+              <span>10x more daily searches & clips</span>
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-400">
               <span className="text-green-500">✓</span>
               <span>Visual concept exploration in 3D</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm text-gray-400">
-              <span className="text-green-500">✓</span>
-              <span>AI summaries & key point analysis</span>
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-400">
               <span className="text-green-500">✓</span>

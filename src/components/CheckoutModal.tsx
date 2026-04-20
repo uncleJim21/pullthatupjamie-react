@@ -85,16 +85,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Determine the plan display information
   const displayPrice = selectedPlan === 'basic' ? (customPrice || MONTHLY_PRICE_STRING.replace('$', '')) : "49.99";
-  const displayDescription = selectedPlan === 'basic' ? (customDescription || "Do more with the podcasts you love.") : "Full automation. Unlimited usage.";
+  const displayDescription = selectedPlan === 'basic' ? (customDescription || "Ask Jamie more. Explore more. Clip more.") : "The most advanced Jamie, wired for automation.";
+  // TODO(jamie-pull-skills): once Create / Publish / Worker ship, surface them here (e.g. "Auto-clip + publish via Jamie").
   const displayFeatures = selectedPlan === 'basic' ? (customFeatures || [
+    "Ask Jamie anything — higher agent limits",
     "More searches, clips, and AI assists each month",
-    "Visual concept exploration with 3D maps",
-    "AI summaries and key point analysis",
+    "3D galaxy exploration + AI summaries",
     "Add any podcast to Jamie's searchable library"
   ]) : [
+    "The most advanced Jamie agent — priority access",
     "Auto transcribe & search every episode from your feed",
     "Curated clips + automation pipeline",
-    "Video editing from browser",
     "Crosspost in seconds"
   ];
   const displayPlan = selectedPlan === 'basic' ? "Jamie Plus" : "Jamie Pro";
