@@ -204,7 +204,9 @@ export const ActivityTimeline: React.FC<{
 
 export const ResponseMetadata: React.FC<{ done: AgentDoneEvent }> = ({ done }) => (
   <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-gray-800/50 text-[10px] text-gray-600">
-    {done.model && <span>{done.model}</span>}
+    {/* Model name intentionally hidden from the UI (2026-04). Restore the
+        `{done.model && <span>{done.model}</span>}` line if we ever want to
+        expose which model answered again. */}
     {done.rounds != null && <span>{done.rounds} rounds</span>}
     {done.latencyMs != null && <span>{(done.latencyMs / 1000).toFixed(1)}s</span>}
     {done.cost?.total != null && <span>${done.cost.total.toFixed(4)}</span>}

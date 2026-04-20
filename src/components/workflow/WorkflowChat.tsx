@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Trash2, Zap, Sparkles, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, Landmark, Brain, X, Telescope, Film, Send, HelpCircle, Workflow } from 'lucide-react';
+import { RotateCcw, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, Landmark, Brain, X, Telescope, Film, Send, HelpCircle, Workflow } from 'lucide-react';
 import { useWorkflowChat } from '../../hooks/useWorkflowChat.ts';
 import { WorkflowMessage, clipMetaCache, extractClipIds } from './WorkflowMessage.tsx';
 import type { ClipMeta } from './WorkflowMessage.tsx';
@@ -810,7 +810,9 @@ export const WorkflowChat: React.FC = () => {
     messages,
     sendMessage,
     clearMessages,
-    model,
+    // `model` / `setModel` are intentionally kept in the hook API even though
+    // the UI toggle is deprecated (2026-04). We still read setModel below to
+    // silence the unused-var lint; re-wire here when the toggle returns.
     setModel,
   } = useWorkflowChat();
 
@@ -1004,9 +1006,14 @@ export const WorkflowChat: React.FC = () => {
     }
   };
 
-  const toggleModel = () => {
-    setModel(model === 'fast' ? 'quality' : 'fast');
-  };
+  // DEPRECATED (2026-04): fast/quality model toggle was removed from the UI.
+  // The hook still accepts `setModel` and defaults to 'fast', so we can reintroduce
+  // the toggle later without touching the hook. Leaving this stub commented out
+  // as a reminder of where the UI switch used to live.
+  // const toggleModel = () => {
+  //   setModel(model === 'fast' ? 'quality' : 'fast');
+  // };
+  void setModel; // silence unused-var lint while the toggle is parked
 
   const handlePromptPill = (template: string) => {
     setActiveTemplate(template);
@@ -1032,28 +1039,20 @@ export const WorkflowChat: React.FC = () => {
 
   return (
     <div className="relative flex flex-col h-full bg-black text-white">
-      {/* Floating top-right controls (header hidden for now) */}
+      {/* Floating top-right controls (header hidden for now).
+          DEPRECATED (2026-04): the fast/quality model toggle used to live
+          here alongside the reset button. It's been removed while we
+          standardize on 'fast' (Haiku 4.5). Reintroduce here when/if we
+          expose model selection to users again. */}
       <div className="absolute top-3 right-4 z-10 flex items-center gap-2">
-        <button
-          onClick={toggleModel}
-          className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-gray-400 hover:text-white bg-black/60 backdrop-blur-sm border border-gray-800 rounded-lg hover:border-gray-700 transition-all"
-          title={`Switch to ${model === 'fast' ? 'quality' : 'fast'} model`}
-        >
-          {model === 'fast' ? (
-            <Zap className="w-3.5 h-3.5 text-yellow-500/70" />
-          ) : (
-            <Sparkles className="w-3.5 h-3.5 text-purple-400/70" />
-          )}
-          <span>{model === 'fast' ? 'Fast' : 'Quality'}</span>
-        </button>
-
         {hasMessages && (
           <button
             onClick={clearMessages}
-            className="p-1.5 text-gray-500 hover:text-white bg-black/60 backdrop-blur-sm border border-gray-800 rounded-lg hover:border-gray-700 transition-all"
-            title="Clear chat"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-200 hover:text-white bg-black/70 backdrop-blur-sm border border-gray-700 rounded-lg hover:border-gray-500 hover:bg-white/5 transition-all"
+            title="Reset conversation"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset</span>
           </button>
         )}
       </div>
@@ -1183,13 +1182,15 @@ export const WorkflowChat: React.FC = () => {
               })}
             </div>
 
-            {/* Model label */}
-            <p className="text-gray-700 text-[10px] mt-8">
-              {model === 'fast' ? 'Haiku 4.5' : 'Sonnet 4.6'}
-            </p>
+            {/* Model label removed — hiding model identity from the UI
+                (2026-04). Reinstate a dynamic label here if/when we bring
+                back model selection. */}
           </div>
         ) : (
-          <div className="px-5 py-6 space-y-5">
+          /* Top padding leaves room for the floating Reset button
+             (absolute top-3 right-4) so it never overlaps the first
+             message bubble on narrow viewports. */
+          <div className="px-5 pt-14 pb-6 space-y-5">
             {messages.map((msg, idx) => {
               let originalQuery: string | undefined;
               if (msg.role === 'assistant') {
