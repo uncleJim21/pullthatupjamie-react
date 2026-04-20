@@ -102,12 +102,16 @@ function buildTimeline(
       const key = `${tc.tool}-${tc.round}`;
       const tr = resultMap.get(key);
       const Icon = TOOL_ICONS[tc.tool] || PenLine;
+      // Only show a detail when the backend actually reported a numeric
+      // resultCount; some tool_result payloads omit it and we don't want
+      // to render "undefined results" in the timeline.
+      const hasCount = tr && typeof tr.resultCount === 'number' && Number.isFinite(tr.resultCount);
       steps.push({
         kind: 'tool',
         label: toolLabel(tc.tool),
         icon: Icon,
         complete: !!tr,
-        detail: tr ? `${tr.resultCount} results` : undefined,
+        detail: hasCount ? `${tr!.resultCount} result${tr!.resultCount === 1 ? '' : 's'}` : undefined,
       });
       toolIdx++;
     }

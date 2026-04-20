@@ -24,7 +24,7 @@ import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import { getFountainLink } from '../services/fountainService.ts';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles, Zap, Lightbulb, HelpCircle, CheckCircle, AlertCircle} from 'lucide-react';
+import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles, Zap, Lightbulb, HelpCircle, CheckCircle, AlertCircle, Bot } from 'lucide-react';
 import { NavGlowButton } from './NavGlowButton.tsx';
 import SearchModeExplainerModal from './SearchModeExplainerModal.tsx';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
@@ -48,6 +48,7 @@ import ContextService from '../services/contextService.ts';
 import HierarchyCache from '../services/hierarchyCache.ts';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
+import { WorkflowChat } from './workflow/WorkflowChat.tsx';
 import EmbedMiniPlayer from './EmbedMiniPlayer.tsx';
 import PoweredByJamiePill from './PoweredByJamiePill.tsx';
 import FeaturedGalaxiesCarousel from './FeaturedGalaxiesCarousel.tsx';
@@ -328,15 +329,24 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // In embed mode, start as false so warp speed animation plays from the beginning
   const [isDecelerationComplete, setIsDecelerationComplete] = useState(!isEmbedMode);
   
-  // Result view style state (List vs Galaxy)
+  // Result view style state (List vs Galaxy vs Agent)
   // In embed mode, always use GALAXY view
   // In clip batch page or clip share deeplink, always use LIST view
+  // Agent mode (WorkflowChat) is user-opt-in via the floating top-center segmented control.
   const [resultViewStyle, setResultViewStyle] = useState<SearchResultViewStyle>(() => {
     if (isClipBatchPage) return SearchResultViewStyle.LIST;
     if (isSharePage && new URLSearchParams(window.location.search).has('clip')) return SearchResultViewStyle.LIST;
     if (isEmbedMode) return SearchResultViewStyle.GALAXY;
+    // `?view=agent|list|galaxy` query param wins over localStorage so you can
+    // deep-link directly into a specific tab (e.g. /app?view=agent).
+    const viewParam = new URLSearchParams(window.location.search).get('view')?.toLowerCase();
+    if (viewParam === SearchResultViewStyle.AGENT) return SearchResultViewStyle.AGENT;
+    if (viewParam === SearchResultViewStyle.LIST) return SearchResultViewStyle.LIST;
+    if (viewParam === SearchResultViewStyle.GALAXY) return SearchResultViewStyle.GALAXY;
     const saved = localStorage.getItem('searchResultViewStyle');
-    return saved === SearchResultViewStyle.LIST ? SearchResultViewStyle.LIST : SearchResultViewStyle.GALAXY;
+    if (saved === SearchResultViewStyle.LIST) return SearchResultViewStyle.LIST;
+    if (saved === SearchResultViewStyle.AGENT) return SearchResultViewStyle.AGENT;
+    return SearchResultViewStyle.GALAXY;
   });
 
   const [smartMode, setSmartMode] = useState<boolean>(() => {
@@ -3164,11 +3174,90 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <NebulaBackground dimOpacity={LANDING_NEBULA_DIM_OPACITY} />
       </div>
     )}
+
+    {/* Floating top-center view toggle (List / Galaxy / Agent).
+        Always visible unless in embed / clip batch / share modes where the
+        toggle would conflict with dedicated flows. Writes selection to
+        localStorage.searchResultViewStyle so it persists across reloads. */}
+    {!isEmbedMode && !isClipBatchPage && !isSharePage && (
+      // top-[76px] sits the control just below the 68px-tall PageBanner
+      // (36px logo + 16px top/bottom padding + 1px border) plus a small gap
+      // so the toggle never overlaps the nav bar.
+      <div className="fixed top-[76px] left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+        <div className="pointer-events-auto inline-flex rounded-lg border border-white/10 p-0.5 bg-black/40 backdrop-blur-md">
+          <button
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+              resultViewStyle === SearchResultViewStyle.LIST
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:text-white'
+            }`}
+            onClick={() => {
+              setResultViewStyle(SearchResultViewStyle.LIST);
+              localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.LIST);
+            }}
+          >
+            <List className="w-4 h-4" />
+            <span>List</span>
+          </button>
+          <button
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+              resultViewStyle === SearchResultViewStyle.GALAXY
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:text-white'
+            }`}
+            onClick={() => {
+              setResultViewStyle(SearchResultViewStyle.GALAXY);
+              localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.GALAXY);
+            }}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Galaxy</span>
+          </button>
+          <button
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+              resultViewStyle === SearchResultViewStyle.AGENT
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:text-white'
+            }`}
+            onClick={() => {
+              setResultViewStyle(SearchResultViewStyle.AGENT);
+              localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.AGENT);
+            }}
+          >
+            <Bot className="w-4 h-4" />
+            <span>Agent</span>
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* Agent pane — mounts WorkflowChat when the Agent tab is active.
+        Rendered as a sibling of the main search body (not replacing it) so
+        switching tabs doesn't destroy Galaxy's 3D canvas or list results.
+        The `pt-14` clears the floating segmented control above. */}
+    {resultViewStyle === SearchResultViewStyle.AGENT && (
+      // pt-32 (128px) clears the PageBanner-aligned floating segmented
+      // control (top-[76px] + ~40px control height + small gap). In Agent
+      // mode the main body is display:none so the banner is hidden too.
+      <div
+        className="min-h-screen bg-black pt-32"
+        style={{ position: 'relative', zIndex: 1 }}
+      >
+        <div className="h-[calc(100vh-8rem)]">
+          <WorkflowChat />
+        </div>
+      </div>
+    )}
+
     <div 
       className="min-h-screen text-white flex relative"
       style={{ 
         zIndex: 1,
         backgroundColor: showNebulaBackground ? 'transparent' : '#000000',
+        // Hide (but keep mounted) while Agent tab is active so that
+        // Galaxy canvas state, list scroll position, and search results
+        // survive tab-switches unchanged.
+        display: resultViewStyle === SearchResultViewStyle.AGENT ? 'none' : undefined,
       }}
       onMouseEnter={() => isEmbedMode && setIsEmbedHovered(true)}
       onMouseLeave={() => isEmbedMode && setIsEmbedHovered(false)}
@@ -3917,41 +4006,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {/* Conversation History / Galaxy View */}
       {((conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && searchMode === 'podcast-search') && (
         <div>
-          {/* View Toggle - Hidden in embed mode and clip batch page - show during loading in galaxy mode OR when we have results */}
-          {!isEmbedMode && !isClipBatchPage && (conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && (
-          <div className="flex justify-center mt-4 mb-3">
-            <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
-              <button
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-                  resultViewStyle === SearchResultViewStyle.LIST
-                    ? 'bg-[#1A1A1A] text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                onClick={() => {
-                  setResultViewStyle(SearchResultViewStyle.LIST);
-                  localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.LIST);
-                }}
-              >
-                <List className="w-4 h-4" />
-                <span>List</span>
-              </button>
-              <button
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-                  resultViewStyle === SearchResultViewStyle.GALAXY
-                    ? 'bg-[#1A1A1A] text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                onClick={() => {
-                  setResultViewStyle(SearchResultViewStyle.GALAXY);
-                  localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.GALAXY);
-                }}
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Galaxy</span>
-              </button>
-            </div>
-          </div>
-          )}
+          {/* The inline List/Galaxy toggle that used to live here was
+              promoted into a persistent floating top-center segmented
+              control near the top of this component's return. That bar
+              (List / Galaxy / Agent) is now the single source of truth. */}
 
           {/* Conditional rendering: List or Galaxy view */}
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (

@@ -50,7 +50,8 @@ export enum SearchViewStyle {
 
 export enum SearchResultViewStyle {
   LIST = 'list',
-  GALAXY = 'galaxy'
+  GALAXY = 'galaxy',
+  AGENT = 'agent'
 }
 
 // Numerical hierarchy levels (higher = broader scope)
