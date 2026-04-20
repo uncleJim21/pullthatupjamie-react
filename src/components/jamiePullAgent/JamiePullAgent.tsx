@@ -1181,7 +1181,7 @@ export const JamiePullAgent: React.FC = () => {
                     file to swap between the compact single-row pill row
                     and the chunky 2×N grid. */}
                 {SHOW_SKILL_CHIPS && (
-                  <div className="w-full flex justify-center mb-10">
+                  <div className="w-full flex justify-center mb-4">
                     {SKILL_CHIP_LAYOUT === 'slim' ? (
                       // Slim: icon + title + optional "Soon" + help icon,
                       // laid out in a single row. flex-wrap kicks in on
