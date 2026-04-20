@@ -8,6 +8,7 @@ import type { AgentModel } from '../../types/jamiePullAgent';
 import { useAudioController } from '../../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from '../EmbedMiniPlayer.tsx';
 import { createClipShareUrl } from '../../utils/urlUtils.ts';
+import { QuotaExceededModal } from '../QuotaExceededModal.tsx';
 
 // ─── Skill chips ─────────────────────────────────────────────────────────────
 // Flip to `false` to hide the Research / Create / Publish draft row until
@@ -857,7 +858,19 @@ const SkillInfoModal: React.FC<{
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export const JamiePullAgent: React.FC = () => {
+interface JamiePullAgentProps {
+  /** Invoked when the quota modal's "Sign Up" CTA is clicked. Host
+   *  (SearchInterface) owns the actual sign-in flow. */
+  onSignUp?: () => void;
+  /** Invoked when the quota modal's "Upgrade" CTA is clicked
+   *  (anonymous/registered -> Jamie Plus). */
+  onUpgrade?: () => void;
+  /** Invoked when the quota modal's Pro upgrade CTA is clicked
+   *  (subscriber -> Jamie Pro). */
+  onUpgradePro?: () => void;
+}
+
+export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgrade, onUpgradePro }) => {
   const {
     messages,
     sendMessage,
@@ -866,6 +879,8 @@ export const JamiePullAgent: React.FC = () => {
     // the UI toggle is deprecated (2026-04). We still read setModel below to
     // silence the unused-var lint; re-wire here when the toggle returns.
     setModel,
+    quotaExceededData,
+    clearQuotaExceeded,
   } = useJamiePullAgent();
 
   const { playTrack, currentTrack } = useAudioController();
@@ -1365,6 +1380,19 @@ export const JamiePullAgent: React.FC = () => {
         skill={activeSkill}
         onClose={() => setActiveSkill(null)}
         onExample={handleQuerySelect}
+      />
+
+      {/* Quota exceeded modal — triggered when /api/pull returns 429.
+          Host-supplied callbacks (onSignUp / onUpgrade / onUpgradePro) let
+          SearchInterface reuse its existing sign-in + checkout flows so
+          the user can climb tiers without leaving the Agent tab. */}
+      <QuotaExceededModal
+        isOpen={!!quotaExceededData}
+        onClose={clearQuotaExceeded}
+        data={quotaExceededData || { tier: 'anonymous', used: 0, max: 0 }}
+        onSignUp={onSignUp ? () => { clearQuotaExceeded(); onSignUp(); } : undefined}
+        onUpgrade={onUpgrade ? () => { clearQuotaExceeded(); onUpgrade(); } : undefined}
+        onUpgradePro={onUpgradePro ? () => { clearQuotaExceeded(); onUpgradePro(); } : undefined}
       />
     </div>
   );

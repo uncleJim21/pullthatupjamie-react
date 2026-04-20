@@ -5,6 +5,7 @@ import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_
 import { handleQuoteSearch, handleQuoteSearch3D } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { RegisterModal } from './RegisterModal.tsx';
 import {SignInModal} from './SignInModal.tsx'
 import SignUpSuccessModal from './SignUpSuccessModal.tsx'
@@ -3282,7 +3283,25 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         style={{ position: 'relative', zIndex: 1 }}
       >
         <div className="h-[calc(100vh-3.5rem)]">
-          <JamiePullAgent />
+          <JamiePullAgent
+            onSignUp={() => {
+              // Re-use the main sign-in modal — same flow as the
+              // SearchInterface quota modal (registered free tier).
+              setIsQuotaRecoveryFlow(true);
+              setSignInModalInitialMode('signup');
+              setIsSignInModalOpen(true);
+            }}
+            onUpgrade={() => {
+              setIsQuotaRecoveryFlow(true);
+              setCheckoutProductName('jamie-plus');
+              setIsCheckoutModalOpen(true);
+            }}
+            onUpgradePro={() => {
+              setIsQuotaRecoveryFlow(true);
+              setCheckoutProductName('jamie-pro');
+              setIsCheckoutModalOpen(true);
+            }}
+          />
         </div>
       </div>
     )}
@@ -3390,7 +3409,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         {isClipBatchPage && (
           <div></div>
         )}
-        <SignInModal
+        {/* Portal to document.body so these quota-recovery chain modals stay
+            visible when the Agent tab hides the main body via display:none. */}
+        {createPortal(
+          <SignInModal
         isOpen={isSignInModalOpen}
         onClose={() => {
           setIsSignInModalOpen(false);
@@ -3538,35 +3560,40 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             setIsSignUpSuccessModalOpen(true);
           }
         }}
-      />
-      
+      />,
+          document.body
+        )}
+
       {/* Sign Up Success Modal - prompts upgrade after account creation */}
-      <SignUpSuccessModal
-        isOpen={isSignUpSuccessModalOpen}
-        onClose={() => {
-          setIsSignUpSuccessModalOpen(false);
-          // If user came from quota flow and dismisses, reload to reset UI
-          if (isQuotaRecoveryFlow) {
-            setIsQuotaRecoveryFlow(false);
-            window.location.reload();
-          }
-        }}
-        onUpgrade={() => {
-          setIsSignUpSuccessModalOpen(false);
-          // Keep isQuotaRecoveryFlow true - CheckoutModal will handle reload on close
-          setCheckoutProductName('jamie-plus');
-          setIsCheckoutModalOpen(true);
-        }}
-        onSkip={() => {
-          setIsSignUpSuccessModalOpen(false);
-          // If user came from quota flow and skips upgrade, reload to reset UI
-          if (isQuotaRecoveryFlow) {
-            setIsQuotaRecoveryFlow(false);
-            window.location.reload();
-          }
-        }}
-      />
-      
+      {createPortal(
+        <SignUpSuccessModal
+          isOpen={isSignUpSuccessModalOpen}
+          onClose={() => {
+            setIsSignUpSuccessModalOpen(false);
+            // If user came from quota flow and dismisses, reload to reset UI
+            if (isQuotaRecoveryFlow) {
+              setIsQuotaRecoveryFlow(false);
+              window.location.reload();
+            }
+          }}
+          onUpgrade={() => {
+            setIsSignUpSuccessModalOpen(false);
+            // Keep isQuotaRecoveryFlow true - CheckoutModal will handle reload on close
+            setCheckoutProductName('jamie-plus');
+            setIsCheckoutModalOpen(true);
+          }}
+          onSkip={() => {
+            setIsSignUpSuccessModalOpen(false);
+            // If user came from quota flow and skips upgrade, reload to reset UI
+            if (isQuotaRecoveryFlow) {
+              setIsQuotaRecoveryFlow(false);
+              window.location.reload();
+            }
+          }}
+        />,
+        document.body
+      )}
+
       <RegisterModal 
         isOpen={isRegisterModalOpen} 
         onClose={handleCloseRegisterModal} 
@@ -3574,23 +3601,26 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onSubscribeSelect={handleSubscribeSelect} 
       />
 
-      <CheckoutModal 
-        isOpen={isCheckoutModalOpen} 
-        onClose={() => {
-          setIsCheckoutModalOpen(false);
-          setCheckoutProductName(undefined);
-          // If user bailed out of quota recovery flow, reload to reset UI state
-          if (isQuotaRecoveryFlow) {
-            setIsQuotaRecoveryFlow(false);
-            window.location.reload();
-          }
-        }} 
-        onSuccess={() => {
-          // Keep isQuotaRecoveryFlow - will trigger reload after success modal closes
-          handleUpgradeSuccess();
-        }}
-        productName={checkoutProductName}
-      />
+      {createPortal(
+        <CheckoutModal
+          isOpen={isCheckoutModalOpen}
+          onClose={() => {
+            setIsCheckoutModalOpen(false);
+            setCheckoutProductName(undefined);
+            // If user bailed out of quota recovery flow, reload to reset UI state
+            if (isQuotaRecoveryFlow) {
+              setIsQuotaRecoveryFlow(false);
+              window.location.reload();
+            }
+          }}
+          onSuccess={() => {
+            // Keep isQuotaRecoveryFlow - will trigger reload after success modal closes
+            handleUpgradeSuccess();
+          }}
+          productName={checkoutProductName}
+        />,
+        document.body
+      )}
 
       {/* Quota Exceeded Modal */}
       <QuotaExceededModal

@@ -1,5 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
 import { API_URL, printLog } from '../constants/constants.ts';
+import { getPulseHeader } from '../services/pulseService.ts';
+import { QuotaExceededError, parseQuotaExceededResponse } from '../types/errors.ts';
+import type { QuotaExceededData } from '../components/QuotaExceededModal.tsx';
 import type {
   ChatMessage,
   AgentModel,
@@ -17,12 +20,19 @@ const STREAM_FLUSH_MS = 40;
 const MAX_HISTORY_ENTRIES = 4;
 const TEXT_PAUSE_MS = 3000;
 
+/** Entitlement key reported to the backend — matches the /api/pull server route. */
+const PULL_ENTITLEMENT = 'jamie-pull';
+
 interface UseJamiePullAgentReturn {
   messages: ChatMessage[];
   sendMessage: (task: string, context?: FollowUpContext) => Promise<void>;
   clearMessages: () => void;
   model: AgentModel;
   setModel: (model: AgentModel) => void;
+  /** Populated when the last /api/pull call returned 429 Quota Exceeded. */
+  quotaExceededData: QuotaExceededData | null;
+  /** Dismiss the quota state (hide the modal). */
+  clearQuotaExceeded: () => void;
 }
 
 function generateId(): string {
@@ -36,9 +46,12 @@ function getAuthToken(): string | null {
 export const useJamiePullAgent = (): UseJamiePullAgentReturn => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [model, setModel] = useState<AgentModel>('fast');
+  const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const historyRef = useRef<HistoryEntry[]>([]);
   const sessionIdRef = useRef<string | undefined>(undefined);
+
+  const clearQuotaExceeded = useCallback(() => setQuotaExceededData(null), []);
 
   const updateMessage = useCallback((id: string, patch: Partial<ChatMessage>) => {
     setMessages(prev => prev.map(m => (m.id === id ? { ...m, ...patch } : m)));
@@ -105,11 +118,6 @@ export const useJamiePullAgent = (): UseJamiePullAgentReturn => {
       setMessages(prev => [...prev, userMsg, assistantMsg]);
       const aId = assistantMsg.id;
 
-      if (!token) {
-        updateMessage(aId, { loading: false, error: 'Not authenticated — sign in first.' });
-        return;
-      }
-
       try {
         const reqBody: Record<string, unknown> = { message: task, model };
         if (sessionIdRef.current) reqBody.sessionId = sessionIdRef.current;
@@ -118,16 +126,34 @@ export const useJamiePullAgent = (): UseJamiePullAgentReturn => {
         }
         if (context) reqBody.context = context;
 
+        // Include X-Free-Tier + X-Pulse-Session on every request so the
+        // backend surfaces 429 (with quota metadata) rather than a 402 L402
+        // challenge for anonymous webapp users. Authorization is attached
+        // only when the user is signed in; otherwise the request is made
+        // against the anonymous free tier.
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+          ...getPulseHeader(),
+        };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const res = await fetch(`${API_URL}/api/pull`, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            Accept: 'text/event-stream',
-          },
+          headers,
           body: JSON.stringify(reqBody),
           signal: abortControllerRef.current?.signal,
         });
+
+        // 429 Quota Exceeded — surface the structured QuotaExceededData via
+        // the quota modal. Use a manual parse (rather than
+        // throwIfQuotaExceeded) so we can throw *after* we've constructed
+        // the QuotaExceededError, keeping this branch consistent with
+        // other services while working for SSE responses.
+        if (res.status === 429) {
+          const data = await parseQuotaExceededResponse(res, PULL_ENTITLEMENT);
+          throw new QuotaExceededError(data);
+        }
 
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
         if (!res.body) throw new Error('Response body is null');
@@ -297,6 +323,16 @@ export const useJamiePullAgent = (): UseJamiePullAgentReturn => {
         updateMessage(aId, { loading: false, streamComplete: true });
       } catch (err: any) {
         if (err.name === 'AbortError') return;
+        if (err instanceof QuotaExceededError) {
+          printLog(`[jamie-pull] Quota exceeded: ${JSON.stringify(err.data)}`);
+          setQuotaExceededData(err.data);
+          updateMessage(aId, {
+            loading: false,
+            error: 'You\u2019ve hit your Jamie Pull quota — upgrade or try again later.',
+            streamComplete: true,
+          });
+          return;
+        }
         updateMessage(aId, { loading: false, error: err.message || 'Stream failed' });
       }
     },
@@ -316,5 +352,7 @@ export const useJamiePullAgent = (): UseJamiePullAgentReturn => {
     clearMessages,
     model,
     setModel,
+    quotaExceededData,
+    clearQuotaExceeded,
   };
 };
