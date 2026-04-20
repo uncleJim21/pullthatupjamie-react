@@ -12,7 +12,14 @@ import { createClipShareUrl } from '../../utils/urlUtils.ts';
 // ─── Skill chips ─────────────────────────────────────────────────────────────
 // Flip to `false` to hide the Research / Create / Publish draft row until
 // Create & Publish are actually wired up by their respective devs.
-const SHOW_SKILL_CHIPS = false;
+const SHOW_SKILL_CHIPS = true;
+
+// Injected layout dependency. Flip between:
+//   'slim' — compact single-row pills (icon + title + soon badge + ?). Default.
+//   'grid' — original 2×N chunky card grid with taglines.
+// Kept as a const so individual devs can opt into the old layout locally
+// without touching the chip markup itself.
+const SKILL_CHIP_LAYOUT: 'slim' | 'grid' = 'slim';
 
 type SkillStatus = 'live' | 'coming_soon';
 
@@ -34,13 +41,13 @@ const SKILLS: Skill[] = [
     title: 'Research',
     tagline: 'Ask anything across podcasts',
     description:
-      "Jamie searches ~2M paragraphs from 109+ podcast feeds semantically — not by keyword. Ask in plain English and surface quotes, episodes, and clips that actually answer your question.",
+      "Jamie searches millions of moments from hundreds of podcast feeds with natural language. Ask in plain English and surface quotes, episodes, and clips that actually answer your question.",
     icon: Telescope,
     accent: '#3b6df0',
     status: 'live',
     examples: [
-      'What has Balaji said about CBDCs?',
-      'Find the bull case for gold in 2025',
+      'What has Jeff Booth said about CBDCs?',
+      'Find the bull case for gold in 2026',
       'Best podcast advice on improving attention and focus',
     ],
   },
@@ -104,7 +111,7 @@ interface TaglineVariant {
 const TAGLINES: TaglineVariant[] = [
   {
     id: 'openclaw-plain-english-verbs',
-    headline: 'OpenClaw quality web Agent for podcasts. Zero hassle.',
+    headline: 'OpenClaw style web Agent for podcasts. Zero hassle.',
     subline: 'Plain English finds the quote, cuts the clip, cross posts the thread.',
   },
   // Drop additional variants here to add them to the A/B pool, e.g.:
@@ -647,9 +654,54 @@ const SkillChip: React.FC<{
   skill: Skill;
   animDelay: number;
   onOpenInfo: (skill: Skill) => void;
-}> = ({ skill, animDelay, onOpenInfo }) => {
+  /** Visual layout variant; controlled upstream by SKILL_CHIP_LAYOUT. */
+  variant?: 'slim' | 'grid';
+}> = ({ skill, animDelay, onOpenInfo, variant = 'slim' }) => {
   const Icon = skill.icon;
   const isLive = skill.status === 'live';
+
+  if (variant === 'slim') {
+    return (
+      <div
+        className="animate-fade-in"
+        style={{ animationDelay: `${animDelay}ms`, animationFillMode: 'backwards' }}
+      >
+        <button
+          type="button"
+          onClick={() => onOpenInfo(skill)}
+          className={`skill-chip-neon relative rounded-full overflow-hidden flex items-center gap-1.5 px-2.5 py-1 group whitespace-nowrap ${
+            isLive ? '' : 'skill-chip--coming-soon'
+          }`}
+          style={{ '--neon': skill.accent } as React.CSSProperties}
+        >
+          <Icon
+            className="w-3.5 h-3.5 flex-shrink-0"
+            style={{ color: skill.accent, filter: `drop-shadow(0 0 4px ${skill.accent})` }}
+          />
+          <span className="text-xs font-medium text-gray-100 group-hover:text-white transition-colors">
+            {skill.title}
+          </span>
+          {!isLive && (
+            <span
+              className="text-[8px] uppercase tracking-wide px-1 py-px rounded-full flex-shrink-0 leading-none"
+              style={{
+                color: `${skill.accent}dd`,
+                backgroundColor: `${skill.accent}14`,
+                border: `1px solid ${skill.accent}33`,
+              }}
+            >
+              Soon
+            </span>
+          )}
+          <HelpCircle
+            className="w-3 h-3 flex-shrink-0 text-gray-500 group-hover:text-gray-200 transition-colors"
+            aria-hidden
+          />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       className="animate-fade-in"
@@ -1123,25 +1175,43 @@ export const JamiePullAgent: React.FC = () => {
                   <PromptConveyor onSelect={handlePromptPill} />
                 </div>
 
-                {/* Skill chips — Research / Create / Publish. Toggle
-                    SHOW_SKILL_CHIPS at the top of this file to hide until
-                    Create & Publish are wired up. */}
+                {/* Skill chips — Research / Create / Publish / Worker.
+                    Toggle SHOW_SKILL_CHIPS to hide entirely; flip
+                    SKILL_CHIP_LAYOUT ('slim' | 'grid') at the top of this
+                    file to swap between the compact single-row pill row
+                    and the chunky 2×N grid. */}
                 {SHOW_SKILL_CHIPS && (
                   <div className="w-full flex justify-center mb-10">
-                    {/* 1-col stack on mobile (legible chip content), 2x2
-                        grid at sm+. 2x2 keeps chips chunky enough to read
-                        at the 40rem hero-input width; a 4-across row would
-                        squeeze each chip to ~150px and look cramped. */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 w-full max-w-[40rem]">
-                      {SKILLS.map((s, i) => (
-                        <SkillChip
-                          key={s.id}
-                          skill={s}
-                          animDelay={400 + i * 80}
-                          onOpenInfo={setActiveSkill}
-                        />
-                      ))}
-                    </div>
+                    {SKILL_CHIP_LAYOUT === 'slim' ? (
+                      // Slim: icon + title + optional "Soon" + help icon,
+                      // laid out in a single row. flex-wrap kicks in on
+                      // very narrow viewports so chips don't overflow.
+                      <div className="flex flex-wrap gap-2 justify-center w-full max-w-[40rem]">
+                        {SKILLS.map((s, i) => (
+                          <SkillChip
+                            key={s.id}
+                            skill={s}
+                            animDelay={400 + i * 80}
+                            onOpenInfo={setActiveSkill}
+                            variant="slim"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      // Grid: 1-col stack on mobile, 2×N chunky cards
+                      // with taglines at sm+.
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 w-full max-w-[40rem]">
+                        {SKILLS.map((s, i) => (
+                          <SkillChip
+                            key={s.id}
+                            skill={s}
+                            animDelay={400 + i * 80}
+                            onOpenInfo={setActiveSkill}
+                            variant="grid"
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </>
