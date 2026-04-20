@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { RotateCcw, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, Landmark, Brain, X, Telescope, Film, Send, HelpCircle, Workflow } from 'lucide-react';
-import { useWorkflowChat } from '../../hooks/useWorkflowChat.ts';
-import { WorkflowMessage, clipMetaCache, extractClipIds } from './WorkflowMessage.tsx';
-import type { ClipMeta } from './WorkflowMessage.tsx';
+import { useJamiePullAgent } from '../../hooks/useJamiePullAgent.ts';
+import { JamiePullAgentMessage, clipMetaCache, extractClipIds } from './JamiePullAgentMessage.tsx';
+import type { ClipMeta } from './JamiePullAgentMessage.tsx';
 import { NavGlowButton } from '../NavGlowButton.tsx';
-import type { AgentModel } from '../../types/workflow';
+import type { AgentModel } from '../../types/jamiePullAgent';
 import { useAudioController } from '../../context/AudioControllerContext.tsx';
 import EmbedMiniPlayer from '../EmbedMiniPlayer.tsx';
 import { createClipShareUrl } from '../../utils/urlUtils.ts';
@@ -805,7 +805,7 @@ const SkillInfoModal: React.FC<{
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export const WorkflowChat: React.FC = () => {
+export const JamiePullAgent: React.FC = () => {
   const {
     messages,
     sendMessage,
@@ -814,7 +814,7 @@ export const WorkflowChat: React.FC = () => {
     // the UI toggle is deprecated (2026-04). We still read setModel below to
     // silence the unused-var lint; re-wire here when the toggle returns.
     setModel,
-  } = useWorkflowChat();
+  } = useJamiePullAgent();
 
   const { playTrack, currentTrack } = useAudioController();
   const [input, setInput] = useState('');
@@ -1206,7 +1206,7 @@ export const WorkflowChat: React.FC = () => {
                 !messages.slice(idx + 1).some(m => m.role === 'user');
               return (
                 <div key={msg.id} ref={isLastUserMsg ? lastUserMsgRef : undefined}>
-                  <WorkflowMessage
+                  <JamiePullAgentMessage
                     message={msg}
                     onPlayClip={handlePlayClip}
                     onFollowUp={sendMessage}

@@ -48,7 +48,7 @@ import ContextService from '../services/contextService.ts';
 import HierarchyCache from '../services/hierarchyCache.ts';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
-import { WorkflowChat } from './workflow/WorkflowChat.tsx';
+import { JamiePullAgent } from './jamiePullAgent/JamiePullAgent.tsx';
 import EmbedMiniPlayer from './EmbedMiniPlayer.tsx';
 import PoweredByJamiePill from './PoweredByJamiePill.tsx';
 import FeaturedGalaxiesCarousel from './FeaturedGalaxiesCarousel.tsx';
@@ -332,7 +332,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // Result view style state (List vs Galaxy vs Agent)
   // In embed mode, always use GALAXY view
   // In clip batch page or clip share deeplink, always use LIST view
-  // Agent mode (WorkflowChat) is user-opt-in via the floating top-center segmented control.
+  // Agent mode (JamiePullAgent) is user-opt-in via the floating top-center segmented control.
   const [resultViewStyle, setResultViewStyle] = useState<SearchResultViewStyle>(() => {
     if (isClipBatchPage) return SearchResultViewStyle.LIST;
     if (isSharePage && new URLSearchParams(window.location.search).has('clip')) return SearchResultViewStyle.LIST;
@@ -3268,7 +3268,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       )
     )}
 
-    {/* Agent pane — mounts WorkflowChat when the Agent tab is active.
+    {/* Agent pane — mounts JamiePullAgent when the Agent tab is active.
         Rendered as a sibling of the main search body (not replacing it) so
         switching tabs doesn't destroy Galaxy's 3D canvas or list results.
         The `pt-14` clears the floating segmented control above. */}
@@ -3281,7 +3281,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         style={{ position: 'relative', zIndex: 1 }}
       >
         <div className="h-[calc(100vh-8rem)]">
-          <WorkflowChat />
+          <JamiePullAgent />
         </div>
       </div>
     )}

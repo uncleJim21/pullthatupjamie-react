@@ -16,8 +16,8 @@ import type {
   SubmitOnDemandAction,
   FollowUpMessageAction,
   FollowUpContext,
-} from '../../types/workflow';
-import { ActivityTimeline, ResponseMetadata } from './WorkflowResultCards.tsx';
+} from '../../types/jamiePullAgent';
+import { ActivityTimeline, ResponseMetadata } from './JamiePullAgentResultCards.tsx';
 import { API_URL } from '../../constants/constants.ts';
 import { InlineCardMention, type AnalysisCardJson } from '../UnifiedSidePanel.tsx';
 import { createClipShareUrl } from '../../utils/urlUtils.ts';
@@ -685,7 +685,7 @@ const SuggestedActions: React.FC<{
 
 // ─── Message component ──────────────────────────────────────────────────────
 
-interface WorkflowMessageProps {
+interface JamiePullAgentMessageProps {
   message: ChatMessage;
   onPlayClip?: (meta: ClipMeta) => void;
   onFollowUp?: (message: string, context?: FollowUpContext) => void;
@@ -693,7 +693,7 @@ interface WorkflowMessageProps {
   activeClipId?: string;
 }
 
-export const WorkflowMessage: React.FC<WorkflowMessageProps> = ({ message, onPlayClip, onFollowUp, originalQuery, activeClipId }) => {
+export const JamiePullAgentMessage: React.FC<JamiePullAgentMessageProps> = ({ message, onPlayClip, onFollowUp, originalQuery, activeClipId }) => {
   const { statusMessages, toolCalls, toolResults, suggestedActions, text, donePayload, error, loading } =
     message;
 

@@ -11,13 +11,13 @@ import type {
   AgentDoneEvent,
   HistoryEntry,
   FollowUpContext,
-} from '../types/workflow';
+} from '../types/jamiePullAgent';
 
 const STREAM_FLUSH_MS = 40;
 const MAX_HISTORY_ENTRIES = 4;
 const TEXT_PAUSE_MS = 3000;
 
-interface UseWorkflowChatReturn {
+interface UseJamiePullAgentReturn {
   messages: ChatMessage[];
   sendMessage: (task: string, context?: FollowUpContext) => Promise<void>;
   clearMessages: () => void;
@@ -33,7 +33,7 @@ function getAuthToken(): string | null {
   return localStorage.getItem('auth_token');
 }
 
-export const useWorkflowChat = (): UseWorkflowChatReturn => {
+export const useJamiePullAgent = (): UseJamiePullAgentReturn => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [model, setModel] = useState<AgentModel>('fast');
   const abortControllerRef = useRef<AbortController | null>(null);

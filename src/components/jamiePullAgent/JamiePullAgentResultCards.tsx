@@ -20,7 +20,7 @@ import type {
   AgentToolCallEvent,
   AgentToolResultEvent,
   AgentDoneEvent,
-} from '../../types/workflow';
+} from '../../types/jamiePullAgent';
 
 // ─── Tool label & icon maps ─────────────────────────────────────────────────
 
