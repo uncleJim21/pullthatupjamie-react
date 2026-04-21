@@ -47,44 +47,51 @@ html, body, #root {
   display: none;
 }
 
-/* Prev/Next navigation — breathing pulse glow */
+/* Prev/Next navigation — breathing pulse glow.
+   Glow color is configurable via the CSS variable `--nav-glow-rgb`
+   (default: teal). Consumers can override per-instance by setting
+   `style={{ '--nav-glow-rgb': '255,255,255' }}` for e.g. white. */
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 6px rgba(91, 184, 196, 0.15);
+    box-shadow: 0 0 6px rgba(var(--nav-glow-rgb), 0.15);
   }
   50% {
-    box-shadow: 0 0 18px rgba(91, 184, 196, 0.35),
-                0 0 6px rgba(91, 184, 196, 0.15);
+    box-shadow: 0 0 18px rgba(var(--nav-glow-rgb), 0.35),
+                0 0 6px rgba(var(--nav-glow-rgb), 0.15);
   }
 }
 
 .btn-nav {
+  --nav-glow-rgb: 91, 184, 196;
   padding: 6px 14px;
   border-radius: 9999px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  border: 1.5px solid rgba(91, 184, 196, 0.6);
+  border: 1.5px solid rgba(var(--nav-glow-rgb), 0.6);
   background: transparent;
-  color: #b8dce4;
+  color: rgba(var(--nav-glow-rgb), 0.85);
   transition: all 0.25s ease;
   display: flex;
   align-items: center;
   gap: 4px;
   animation: pulseGlow 3s ease-in-out infinite;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .btn-nav:hover {
-  border-color: #5bb8c4;
+  border-color: rgba(var(--nav-glow-rgb), 1);
   color: #fff;
   animation: none;
-  box-shadow: 0 0 20px rgba(91, 184, 196, 0.4),
-              0 0 6px rgba(91, 184, 196, 0.2);
+  box-shadow: 0 0 20px rgba(var(--nav-glow-rgb), 0.4),
+              0 0 6px rgba(var(--nav-glow-rgb), 0.2);
 }
 
 .btn-nav:active {
   transform: scale(0.97);
-  box-shadow: 0 0 10px rgba(91, 184, 196, 0.3);
+  box-shadow: 0 0 10px rgba(var(--nav-glow-rgb), 0.3);
 }
 
 .btn-nav:disabled {
@@ -99,7 +106,411 @@ html, body, #root {
 @media (prefers-reduced-motion: reduce) {
   .btn-nav {
     animation: none;
-    box-shadow: 0 0 8px rgba(91, 184, 196, 0.2);
+    box-shadow: 0 0 8px rgba(var(--nav-glow-rgb), 0.2);
+  }
+}
+
+/* Active clip pill — white breathing glow to signal what's playing */
+@keyframes clipPillGlow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.18),
+                0 0 2px rgba(255, 255, 255, 0.10);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(255, 255, 255, 0.32),
+                0 0 4px rgba(255, 255, 255, 0.18);
+  }
+}
+
+.clip-pill-active {
+  border-color: rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  animation: clipPillGlow 2.4s ease-in-out infinite;
+}
+
+@keyframes clipPillIconPulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+
+.clip-pill-playing-icon {
+  animation: clipPillIconPulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clip-pill-active {
+    animation: none;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.22);
+  }
+  .clip-pill-playing-icon {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* Blinking cursor on last paragraph while streaming */
+.streaming-cursor > div > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 0.9em;
+  background: rgba(180, 180, 180, 0.8);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: cursor-blink 0.8s steps(2) infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Fade-in for "Still working..." indicator */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+@keyframes logo-glow {
+  0%, 100% { opacity: 0.4; transform: scale(1.5); }
+  50% { opacity: 0.7; transform: scale(1.7); }
+}
+.animate-logo-glow {
+  animation: logo-glow 4s ease-in-out infinite;
+}
+
+/* Category cards are styled inline with per-card accent colors */
+
+/* ─── Category card neon glow (research-session-card tier) ─────────────────── */
+.category-neon {
+  background:
+    radial-gradient(ellipse at 25% 30%, color-mix(in srgb, var(--neon) 12%, transparent), transparent 55%),
+    radial-gradient(ellipse at 75% 70%, color-mix(in srgb, var(--neon) 8%, transparent), transparent 50%),
+    #08080c;
+  border: 3px solid color-mix(in srgb, var(--neon) 18%, transparent);
+  animation: category-breathe 8s ease-in-out infinite;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.category-neon:hover {
+  border-color: color-mix(in srgb, var(--neon) 40%, transparent);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--neon) 38%, transparent),
+    0 0 38px color-mix(in srgb, var(--neon) 16%, transparent),
+    0 0 58px rgba(255, 255, 255, 0.05),
+    inset 0 0 24px color-mix(in srgb, var(--neon) 14%, transparent);
+}
+
+@keyframes category-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 10px color-mix(in srgb, var(--neon) 22%, transparent),
+      0 0 25px color-mix(in srgb, var(--neon) 10%, transparent),
+      0 0 42px rgba(255, 255, 255, 0.03),
+      inset 0 0 16px color-mix(in srgb, var(--neon) 8%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 14px color-mix(in srgb, var(--neon) 32%, transparent),
+      0 0 32px color-mix(in srgb, var(--neon) 14%, transparent),
+      0 0 52px rgba(255, 255, 255, 0.05),
+      inset 0 0 22px color-mix(in srgb, var(--neon) 12%, transparent);
+  }
+}
+
+/* ─── Skill chip (Research / Create / Publish action chips) ──────────────────
+   Same visual family as .category-neon but more compact — used for the
+   4:1 action chips row above the topic grid. */
+.skill-chip-neon {
+  background:
+    radial-gradient(ellipse at 25% 30%, color-mix(in srgb, var(--neon) 12%, transparent), transparent 55%),
+    radial-gradient(ellipse at 75% 70%, color-mix(in srgb, var(--neon) 8%, transparent), transparent 50%),
+    #08080c;
+  border: 2px solid color-mix(in srgb, var(--neon) 22%, transparent);
+  animation: category-breathe 8s ease-in-out infinite;
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.18s;
+  cursor: pointer;
+}
+.skill-chip-neon:hover {
+  border-color: color-mix(in srgb, var(--neon) 45%, transparent);
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--neon) 35%, transparent),
+    0 0 36px color-mix(in srgb, var(--neon) 15%, transparent),
+    inset 0 0 22px color-mix(in srgb, var(--neon) 12%, transparent);
+}
+/* Coming-soon chips: dimmed, no lift on hover, but still clickable for info */
+.skill-chip--coming-soon {
+  opacity: 0.7;
+}
+.skill-chip--coming-soon:hover {
+  opacity: 0.92;
+  transform: none;
+}
+
+/* ─── Subtopic neon (thinner, less bright) ────────────────────────────────── */
+.subtopic-neon {
+  border: 1px solid color-mix(in srgb, var(--neon) 10%, transparent);
+  background: transparent;
+  transition: all 0.25s ease;
+}
+.subtopic-neon:hover {
+  color: rgb(229, 231, 235);
+  background: color-mix(in srgb, var(--neon) 6%, transparent);
+  border-color: color-mix(in srgb, var(--neon) 25%, transparent);
+  box-shadow:
+    0 0 8px color-mix(in srgb, var(--neon) 12%, transparent),
+    0 0 20px color-mix(in srgb, var(--neon) 6%, transparent),
+    inset 0 0 10px color-mix(in srgb, var(--neon) 4%, transparent);
+}
+
+/* ─── Prompt conveyor (horizontal scrolling pills, fade at edges) ─────────── */
+.prompt-conveyor-mask {
+  mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0%,
+    rgb(0, 0, 0) 8%,
+    rgb(0, 0, 0) 92%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0%,
+    rgb(0, 0, 0) 8%,
+    rgb(0, 0, 0) 92%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+/* ─── Template fill-in (pill-style with inline blanks) ────────────────────── */
+@keyframes fill-in-scale {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-fill-in {
+  animation: fill-in-scale 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.fill-blank-input {
+  background: transparent;
+  color: #ffffff;
+  border: none;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.28);
+  outline: none;
+  padding: 0 4px 1px 4px;
+  margin: 0 1px;
+  font: inherit;
+  text-align: left;
+  caret-color: rgba(255, 255, 255, 0.9);
+  transition: border-color 0.2s ease, background 0.2s ease;
+  border-radius: 2px;
+}
+.fill-blank-input:focus {
+  border-bottom-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.fill-kbd {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 10px;
+  padding: 1.5px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1;
+}
+
+/* Chat input glow — subtle white edge glow + focus brightening */
+.chat-input-glow {
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.04), 0 0 4px rgba(255, 255, 255, 0.02);
+  transition: box-shadow 0.3s, border-color 0.3s;
+}
+.chat-input-glow:focus {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.08), 0 0 60px rgba(255, 255, 255, 0.03);
+}
+
+/* Chat input neon (docked bar variant) — same breathing aesthetic as
+   .hero-input-neon but toned down for a permanent docked input so it
+   calls attention without shouting over the conversation. */
+.chat-input-neon {
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  animation: chat-input-breathe 5s ease-in-out infinite;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.chat-input-neon:focus {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+@keyframes chat-input-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 8px rgba(255, 255, 255, 0.18),
+      0 0 20px rgba(255, 255, 255, 0.09),
+      0 0 36px rgba(255, 255, 255, 0.04);
+  }
+  50% {
+    box-shadow:
+      0 0 12px rgba(255, 255, 255, 0.3),
+      0 0 28px rgba(255, 255, 255, 0.14),
+      0 0 44px rgba(255, 255, 255, 0.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-input-neon {
+    animation: none;
+    box-shadow:
+      0 0 10px rgba(255, 255, 255, 0.22),
+      0 0 24px rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Hero-input neon — same aesthetic as .category-neon (grid topic cards)
+   but white, and breathing slightly faster so it draws the eye on the
+   empty state. */
+.hero-input-neon {
+  border: 2px solid rgba(255, 255, 255, 0.38);
+  animation: hero-input-breathe 5s ease-in-out infinite;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.hero-input-neon:focus {
+  border-color: rgba(255, 255, 255, 0.65);
+}
+
+@keyframes hero-input-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 12px rgba(255, 255, 255, 0.3),
+      0 0 28px rgba(255, 255, 255, 0.14),
+      0 0 48px rgba(255, 255, 255, 0.06);
+  }
+  50% {
+    box-shadow:
+      0 0 18px rgba(255, 255, 255, 0.48),
+      0 0 38px rgba(255, 255, 255, 0.22),
+      0 0 60px rgba(255, 255, 255, 0.09);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-input-neon {
+    animation: none;
+    box-shadow:
+      0 0 14px rgba(255, 255, 255, 0.34),
+      0 0 32px rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* Research session card — warm luminescent border glow */
+.research-session-card {
+  animation: session-glow 4s ease-in-out infinite;
+}
+.research-session-card canvas {
+  animation: nebula-pulse 3s ease-in-out infinite;
+}
+.research-session-card:hover {
+  border-color: rgba(240, 139, 71, 0.35) !important;
+  box-shadow:
+    0 0 16px rgba(240, 139, 71, 0.35),
+    0 0 35px rgba(204, 68, 0, 0.15),
+    0 0 55px rgba(255, 255, 255, 0.06),
+    inset 0 0 22px rgba(240, 139, 71, 0.12) !important;
+}
+
+@keyframes session-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(240, 139, 71, 0.2),
+      0 0 25px rgba(204, 68, 0, 0.08),
+      0 0 40px rgba(255, 255, 255, 0.03),
+      inset 0 0 15px rgba(240, 139, 71, 0.07);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(240, 139, 71, 0.3),
+      0 0 32px rgba(204, 68, 0, 0.12),
+      0 0 50px rgba(255, 255, 255, 0.05),
+      inset 0 0 20px rgba(240, 139, 71, 0.1);
+  }
+}
+
+@keyframes nebula-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.88; transform: scale(1.03); }
+}
+
+/* ─── Action chip shared base ─────────────────────────────────────────────── */
+.action-chip {
+  background: radial-gradient(ellipse at 50% 50%, #141416, #0e0e10);
+  border: 3px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.02);
+  transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+}
+
+/* Transcribe — galaxy blue luminescent border */
+.action-chip--transcribe {
+  border-color: rgba(51, 102, 255, 0.25);
+  animation: glow-blue 4s ease-in-out infinite;
+}
+.action-chip--transcribe:hover {
+  border-color: rgba(51, 102, 255, 0.4) !important;
+  box-shadow:
+    0 0 16px rgba(51, 102, 255, 0.35),
+    0 0 35px rgba(51, 102, 255, 0.14),
+    0 0 55px rgba(255, 255, 255, 0.05),
+    inset 0 0 22px rgba(51, 102, 255, 0.1) !important;
+}
+
+/* Follow-up — neutral luminescent border */
+.action-chip--followup {
+  border-color: rgba(255, 255, 255, 0.6);
+  animation: glow-neutral 4s ease-in-out infinite;
+}
+.action-chip--followup:hover {
+  border-color: rgba(255, 255, 255, 0.68) !important;
+  box-shadow:
+    0 0 16px rgba(255, 255, 255, 0.24),
+    0 0 35px rgba(255, 255, 255, 0.096),
+    0 0 55px rgba(255, 255, 255, 0.048),
+    inset 0 0 22px rgba(255, 255, 255, 0.08) !important;
+}
+
+@keyframes glow-blue {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(51, 102, 255, 0.2),
+      0 0 25px rgba(51, 102, 255, 0.08),
+      0 0 40px rgba(255, 255, 255, 0.03),
+      inset 0 0 15px rgba(51, 102, 255, 0.06);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(51, 102, 255, 0.3),
+      0 0 32px rgba(51, 102, 255, 0.12),
+      0 0 50px rgba(255, 255, 255, 0.05),
+      inset 0 0 20px rgba(51, 102, 255, 0.09);
+  }
+}
+
+@keyframes glow-neutral {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(255, 255, 255, 0.14),
+      0 0 25px rgba(255, 255, 255, 0.064),
+      0 0 40px rgba(255, 255, 255, 0.032),
+      inset 0 0 15px rgba(255, 255, 255, 0.048);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(255, 255, 255, 0.224),
+      0 0 32px rgba(255, 255, 255, 0.096),
+      0 0 50px rgba(255, 255, 255, 0.048),
+      inset 0 0 20px rgba(255, 255, 255, 0.072);
   }
 }
 

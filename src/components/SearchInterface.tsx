@@ -5,6 +5,7 @@ import { RequestAuthMethod, AuthConfig, API_URL, DEBUG_MODE, printLog, FRONTEND_
 import { handleQuoteSearch, handleQuoteSearch3D } from '../services/podcastService.ts';
 import { ConversationItem, WebSearchModeItem } from '../types/conversation.ts';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { RegisterModal } from './RegisterModal.tsx';
 import {SignInModal} from './SignInModal.tsx'
 import SignUpSuccessModal from './SignUpSuccessModal.tsx'
@@ -24,7 +25,8 @@ import PodcastLoadingPlaceholder from './PodcastLoadingPlaceholder.tsx';
 import ClipTrackerModal from './ClipTrackerModal.tsx';
 import { getFountainLink } from '../services/fountainService.ts';
 import PodcastFeedService from '../services/podcastFeedService.ts';
-import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Sparkles, Zap, Lightbulb, HelpCircle, CheckCircle, AlertCircle} from 'lucide-react';
+import { Filter, List, Grid3X3, X as XIcon, ChevronUp, ChevronDown, Sparkles, Zap, Lightbulb, HelpCircle, CheckCircle, AlertCircle, Bot } from 'lucide-react';
+import { NavGlowButton } from './NavGlowButton.tsx';
 import SearchModeExplainerModal from './SearchModeExplainerModal.tsx';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
@@ -47,6 +49,7 @@ import ContextService from '../services/contextService.ts';
 import HierarchyCache from '../services/hierarchyCache.ts';
 import { MOCK_GALAXY_DATA } from '../data/mockGalaxyData.ts';
 import { AudioControllerProvider } from '../context/AudioControllerContext.tsx';
+import { JamiePullAgent } from './jamiePullAgent/JamiePullAgent.tsx';
 import EmbedMiniPlayer from './EmbedMiniPlayer.tsx';
 import PoweredByJamiePill from './PoweredByJamiePill.tsx';
 import FeaturedGalaxiesCarousel from './FeaturedGalaxiesCarousel.tsx';
@@ -328,15 +331,24 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   // In embed mode, start as false so warp speed animation plays from the beginning
   const [isDecelerationComplete, setIsDecelerationComplete] = useState(!isEmbedMode);
   
-  // Result view style state (List vs Galaxy)
+  // Result view style state (List vs Galaxy vs Agent)
   // In embed mode, always use GALAXY view
   // In clip batch page or clip share deeplink, always use LIST view
+  // Agent mode (JamiePullAgent) is user-opt-in via the floating top-center segmented control.
   const [resultViewStyle, setResultViewStyle] = useState<SearchResultViewStyle>(() => {
     if (isClipBatchPage) return SearchResultViewStyle.LIST;
     if (isSharePage && new URLSearchParams(window.location.search).has('clip')) return SearchResultViewStyle.LIST;
     if (isEmbedMode) return SearchResultViewStyle.GALAXY;
+    // `?view=agent|list|galaxy` query param wins over localStorage so you can
+    // deep-link directly into a specific tab (e.g. /app?view=agent).
+    const viewParam = new URLSearchParams(window.location.search).get('view')?.toLowerCase();
+    if (viewParam === SearchResultViewStyle.AGENT) return SearchResultViewStyle.AGENT;
+    if (viewParam === SearchResultViewStyle.LIST) return SearchResultViewStyle.LIST;
+    if (viewParam === SearchResultViewStyle.GALAXY) return SearchResultViewStyle.GALAXY;
     const saved = localStorage.getItem('searchResultViewStyle');
-    return saved === SearchResultViewStyle.LIST ? SearchResultViewStyle.LIST : SearchResultViewStyle.GALAXY;
+    if (saved === SearchResultViewStyle.LIST) return SearchResultViewStyle.LIST;
+    if (saved === SearchResultViewStyle.AGENT) return SearchResultViewStyle.AGENT;
+    return SearchResultViewStyle.GALAXY;
   });
 
   const [smartMode, setSmartMode] = useState<boolean>(() => {
@@ -3149,6 +3161,81 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
   const canGoPrev = Boolean(selectedAudioContext && currentResultIndex > 0);
   const canGoNext = Boolean(selectedAudioContext && currentResultIndex < galaxyResults.length - 1);
 
+  // ─── View toggle renderer ─────────────────────────────────────────────
+  // Shared between the floating fixed-position instance (used before
+  // results and in Agent/List modes) and the inline instance nested above
+  // the Galaxy viewport (so it doesn't occlude the 3D scene).
+  const renderViewToggle = () => {
+    // Compact to icons-only once the user has started working: any
+    // search submitted in either mode, or they've jumped to Agent.
+    const isCompact =
+      hasSearchedInMode('podcast-search') ||
+      hasSearchedInMode('web-search') ||
+      resultViewStyle === SearchResultViewStyle.AGENT;
+
+    const switchView = (next: SearchResultViewStyle) => {
+      if (next === resultViewStyle) return;
+      // Stop any audio playing in the outgoing tab so switching tabs
+      // doesn't leave phantom playback behind. Both AudioController
+      // instances (main + Agent) listen for this on window.
+      try { window.dispatchEvent(new Event('stopAllAudio')); } catch {}
+      setResultViewStyle(next);
+      localStorage.setItem('searchResultViewStyle', next);
+    };
+
+    const baseBtn = 'rounded-md text-sm font-medium transition-all flex items-center gap-2';
+    const sizeBtn = isCompact ? 'px-2.5 py-1.5' : 'px-4 py-1.5';
+
+    return (
+      <div className="pointer-events-auto inline-flex rounded-lg border border-white/10 p-0.5 bg-black/40 backdrop-blur-md">
+        <button
+          title="List"
+          aria-label="List view"
+          className={`${baseBtn} ${sizeBtn} ${
+            resultViewStyle === SearchResultViewStyle.LIST
+              ? 'bg-white/10 text-white'
+              : 'text-gray-400 hover:text-white'
+          }`}
+          onClick={() => switchView(SearchResultViewStyle.LIST)}
+        >
+          <List className="w-4 h-4" />
+          {!isCompact && <span>List</span>}
+        </button>
+        <button
+          title="Galaxy"
+          aria-label="Galaxy view"
+          className={`${baseBtn} ${sizeBtn} ${
+            resultViewStyle === SearchResultViewStyle.GALAXY
+              ? 'bg-white/10 text-white'
+              : 'text-gray-400 hover:text-white'
+          }`}
+          onClick={() => switchView(SearchResultViewStyle.GALAXY)}
+        >
+          <Sparkles className="w-4 h-4" />
+          {!isCompact && <span>Galaxy</span>}
+        </button>
+        <button
+          title="Agent (Beta)"
+          aria-label="Agent view (Beta)"
+          className={`${baseBtn} ${sizeBtn} ${
+            resultViewStyle === SearchResultViewStyle.AGENT
+              ? 'bg-white/10 text-white'
+              : 'text-gray-400 hover:text-white'
+          }`}
+          onClick={() => switchView(SearchResultViewStyle.AGENT)}
+        >
+          <Bot className="w-4 h-4" />
+          {!isCompact && <span>Agent</span>}
+          <span
+            className={`${isCompact ? 'px-1 py-px text-[8px]' : 'ml-0.5 px-1.5 py-0.5 text-[9px]'} rounded-full font-semibold uppercase tracking-wide bg-amber-400/15 text-amber-300 border border-amber-400/30`}
+          >
+            Beta
+          </span>
+        </button>
+      </div>
+    );
+  };
+
   return (
     <AudioControllerProvider>
     {/* Nebula background - rendered at root level for proper layering */}
@@ -3164,11 +3251,71 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         <NebulaBackground dimOpacity={LANDING_NEBULA_DIM_OPACITY} />
       </div>
     )}
+
+    {/* Floating top-center view toggle (List / Galaxy / Agent).
+        Always visible unless in embed / clip batch / share modes where the
+        toggle would conflict with dedicated flows. Writes selection to
+        localStorage.searchResultViewStyle so it persists across reloads. */}
+    {/* Floating top-center view toggle — only used in Agent mode, where the
+        main search body is display:none and there's no in-flow content to
+        attach the toggle to. For List and Galaxy modes (pre- and
+        post-search) the toggle is rendered inline at the top of the main
+        content area so it never overlaps landing carousels, list items,
+        or the Galaxy canvas. */}
+    {!isEmbedMode && !isClipBatchPage && !isSharePage && resultViewStyle === SearchResultViewStyle.AGENT && (
+      // Agent mode hides the PageBanner (the main body is display:none),
+      // so the floating control sits close to the viewport top rather
+      // than being pushed below a phantom ~68px banner.
+      <div className="fixed top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+        {renderViewToggle()}
+      </div>
+    )}
+
+    {/* Agent pane — mounts JamiePullAgent when the Agent tab is active.
+        Rendered as a sibling of the main search body (not replacing it) so
+        switching tabs doesn't destroy Galaxy's 3D canvas or list results.
+        The `pt-14` clears the floating segmented control above. */}
+    {resultViewStyle === SearchResultViewStyle.AGENT && (
+      // pt-14 (56px) clears the Agent-mode floating segmented control
+      // (top-3 = 12px + ~40px control height + small gap). No banner in
+      // Agent mode, so no extra padding is needed for it.
+      <div
+        className="min-h-screen bg-black pt-14"
+        style={{ position: 'relative', zIndex: 1 }}
+      >
+        <div className="h-[calc(100vh-3.5rem)]">
+          <JamiePullAgent
+            onSignUp={() => {
+              // Re-use the main sign-in modal — same flow as the
+              // SearchInterface quota modal (registered free tier).
+              setIsQuotaRecoveryFlow(true);
+              setSignInModalInitialMode('signup');
+              setIsSignInModalOpen(true);
+            }}
+            onUpgrade={() => {
+              setIsQuotaRecoveryFlow(true);
+              setCheckoutProductName('jamie-plus');
+              setIsCheckoutModalOpen(true);
+            }}
+            onUpgradePro={() => {
+              setIsQuotaRecoveryFlow(true);
+              setCheckoutProductName('jamie-pro');
+              setIsCheckoutModalOpen(true);
+            }}
+          />
+        </div>
+      </div>
+    )}
+
     <div 
       className="min-h-screen text-white flex relative"
       style={{ 
         zIndex: 1,
         backgroundColor: showNebulaBackground ? 'transparent' : '#000000',
+        // Hide (but keep mounted) while Agent tab is active so that
+        // Galaxy canvas state, list scroll position, and search results
+        // survive tab-switches unchanged.
+        display: resultViewStyle === SearchResultViewStyle.AGENT ? 'none' : undefined,
       }}
       onMouseEnter={() => isEmbedMode && setIsEmbedHovered(true)}
       onMouseLeave={() => isEmbedMode && setIsEmbedHovered(false)}
@@ -3214,6 +3361,17 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           />
         )}
 
+        {/* Inline view toggle (List / Galaxy / Agent) — lives directly
+            below the nav bar for List and Galaxy modes so it never
+            overlaps landing carousels, list items, or the Galaxy canvas.
+            In Agent mode the main body is display:none, so that tab uses
+            the floating fixed variant rendered near the root instead. */}
+        {!isEmbedMode && !isClipBatchPage && !isSharePage && (
+          <div className="w-full flex justify-center pt-3 pb-1 relative z-20">
+            {renderViewToggle()}
+          </div>
+        )}
+
         {/* Web Search Deprecation Banner */}
         {isWebSearchDeprecated && (
           <div className="max-w-3xl mx-auto px-4 mt-4">
@@ -3252,7 +3410,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         {isClipBatchPage && (
           <div></div>
         )}
-        <SignInModal
+        {/* Portal to document.body so these quota-recovery chain modals stay
+            visible when the Agent tab hides the main body via display:none. */}
+        {createPortal(
+          <SignInModal
         isOpen={isSignInModalOpen}
         onClose={() => {
           setIsSignInModalOpen(false);
@@ -3400,35 +3561,40 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             setIsSignUpSuccessModalOpen(true);
           }
         }}
-      />
-      
+      />,
+          document.body
+        )}
+
       {/* Sign Up Success Modal - prompts upgrade after account creation */}
-      <SignUpSuccessModal
-        isOpen={isSignUpSuccessModalOpen}
-        onClose={() => {
-          setIsSignUpSuccessModalOpen(false);
-          // If user came from quota flow and dismisses, reload to reset UI
-          if (isQuotaRecoveryFlow) {
-            setIsQuotaRecoveryFlow(false);
-            window.location.reload();
-          }
-        }}
-        onUpgrade={() => {
-          setIsSignUpSuccessModalOpen(false);
-          // Keep isQuotaRecoveryFlow true - CheckoutModal will handle reload on close
-          setCheckoutProductName('jamie-plus');
-          setIsCheckoutModalOpen(true);
-        }}
-        onSkip={() => {
-          setIsSignUpSuccessModalOpen(false);
-          // If user came from quota flow and skips upgrade, reload to reset UI
-          if (isQuotaRecoveryFlow) {
-            setIsQuotaRecoveryFlow(false);
-            window.location.reload();
-          }
-        }}
-      />
-      
+      {createPortal(
+        <SignUpSuccessModal
+          isOpen={isSignUpSuccessModalOpen}
+          onClose={() => {
+            setIsSignUpSuccessModalOpen(false);
+            // If user came from quota flow and dismisses, reload to reset UI
+            if (isQuotaRecoveryFlow) {
+              setIsQuotaRecoveryFlow(false);
+              window.location.reload();
+            }
+          }}
+          onUpgrade={() => {
+            setIsSignUpSuccessModalOpen(false);
+            // Keep isQuotaRecoveryFlow true - CheckoutModal will handle reload on close
+            setCheckoutProductName('jamie-plus');
+            setIsCheckoutModalOpen(true);
+          }}
+          onSkip={() => {
+            setIsSignUpSuccessModalOpen(false);
+            // If user came from quota flow and skips upgrade, reload to reset UI
+            if (isQuotaRecoveryFlow) {
+              setIsQuotaRecoveryFlow(false);
+              window.location.reload();
+            }
+          }}
+        />,
+        document.body
+      )}
+
       <RegisterModal 
         isOpen={isRegisterModalOpen} 
         onClose={handleCloseRegisterModal} 
@@ -3436,23 +3602,26 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
         onSubscribeSelect={handleSubscribeSelect} 
       />
 
-      <CheckoutModal 
-        isOpen={isCheckoutModalOpen} 
-        onClose={() => {
-          setIsCheckoutModalOpen(false);
-          setCheckoutProductName(undefined);
-          // If user bailed out of quota recovery flow, reload to reset UI state
-          if (isQuotaRecoveryFlow) {
-            setIsQuotaRecoveryFlow(false);
-            window.location.reload();
-          }
-        }} 
-        onSuccess={() => {
-          // Keep isQuotaRecoveryFlow - will trigger reload after success modal closes
-          handleUpgradeSuccess();
-        }}
-        productName={checkoutProductName}
-      />
+      {createPortal(
+        <CheckoutModal
+          isOpen={isCheckoutModalOpen}
+          onClose={() => {
+            setIsCheckoutModalOpen(false);
+            setCheckoutProductName(undefined);
+            // If user bailed out of quota recovery flow, reload to reset UI state
+            if (isQuotaRecoveryFlow) {
+              setIsQuotaRecoveryFlow(false);
+              window.location.reload();
+            }
+          }}
+          onSuccess={() => {
+            // Keep isQuotaRecoveryFlow - will trigger reload after success modal closes
+            handleUpgradeSuccess();
+          }}
+          productName={checkoutProductName}
+        />,
+        document.body
+      )}
 
       {/* Quota Exceeded Modal */}
       <QuotaExceededModal
@@ -3917,41 +4086,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       {/* Conversation History / Galaxy View */}
       {((conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && searchMode === 'podcast-search') && (
         <div>
-          {/* View Toggle - Hidden in embed mode and clip batch page - show during loading in galaxy mode OR when we have results */}
-          {!isEmbedMode && !isClipBatchPage && (conversation.length > 0 || (searchState.isLoading && resultViewStyle === SearchResultViewStyle.GALAXY)) && (
-          <div className="flex justify-center mt-4 mb-3">
-            <div className="inline-flex rounded-lg border border-gray-700 p-0.5 bg-[#111111]">
-              <button
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-                  resultViewStyle === SearchResultViewStyle.LIST
-                    ? 'bg-[#1A1A1A] text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                onClick={() => {
-                  setResultViewStyle(SearchResultViewStyle.LIST);
-                  localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.LIST);
-                }}
-              >
-                <List className="w-4 h-4" />
-                <span>List</span>
-              </button>
-              <button
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-                  resultViewStyle === SearchResultViewStyle.GALAXY
-                    ? 'bg-[#1A1A1A] text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                onClick={() => {
-                  setResultViewStyle(SearchResultViewStyle.GALAXY);
-                  localStorage.setItem('searchResultViewStyle', SearchResultViewStyle.GALAXY);
-                }}
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Galaxy</span>
-              </button>
-            </div>
-          </div>
-          )}
+          {/* (The inline view toggle previously rendered here was hoisted
+              up so it sits directly below PageBanner for both pre- and
+              post-search states — see the renderViewToggle() block near
+              the top of this component's return.) */}
 
           {/* Conditional rendering: List or Galaxy view */}
           {resultViewStyle === SearchResultViewStyle.GALAXY ? (
@@ -3959,7 +4097,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               ref={galaxyViewportRef}
               className="relative w-full transition-all duration-300 ease-in-out"
               style={{
-              height: isEmbedMode ? '100vh' : 'calc(100vh - 150px)' 
+              height: isEmbedMode ? '100vh' : 'calc(100vh - 200px)' /* 200px leaves room for the PageBanner + inline view toggle + bottom player */ 
               }}
             >
               <SemanticGalaxyView
@@ -4351,25 +4489,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             {/* Result navigation strip — galaxy view, when a result is selected */}
             {selectedAudioContext && resultViewStyle === SearchResultViewStyle.GALAXY && galaxyResults.length > 1 && (
               <div className={`relative z-[60] flex items-center justify-between mb-1.5 px-1 ${isNarrowLayout ? 'mr-10' : 'mr-14'}`}>
-                <button
-                  onClick={() => canGoPrev && navigateToResult(currentResultIndex - 1)}
+                <NavGlowButton
+                  direction="prev"
                   disabled={!canGoPrev}
-                  className="btn-nav"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  Prev
-                </button>
+                  onClick={() => canGoPrev && navigateToResult(currentResultIndex - 1)}
+                />
                 <span className="text-[11px] font-mono tabular-nums" style={{ color: 'rgba(184, 220, 228, 0.5)' }}>
                   {currentResultIndex + 1} of {galaxyResults.length}
                 </span>
-                <button
-                  onClick={() => canGoNext && navigateToResult(currentResultIndex + 1)}
+                <NavGlowButton
+                  direction="next"
                   disabled={!canGoNext}
-                  className="btn-nav"
-                >
-                  Next
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
+                  onClick={() => canGoNext && navigateToResult(currentResultIndex + 1)}
+                />
               </div>
             )}
 
@@ -4650,25 +4782,19 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             bottom: 'calc(var(--embed-mini-player-height, 92px) + 4px)',
           }}
         >
-          <button
-            onClick={() => canGoPrev && navigateToResult(currentResultIndex - 1)}
+          <NavGlowButton
+            direction="prev"
             disabled={!canGoPrev}
-            className="btn-nav"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-            Prev
-          </button>
+            onClick={() => canGoPrev && navigateToResult(currentResultIndex - 1)}
+          />
           <span className="text-[11px] font-mono tabular-nums" style={{ color: 'rgba(184, 220, 228, 0.5)' }}>
             {currentResultIndex + 1} of {galaxyResults.length}
           </span>
-          <button
-            onClick={() => canGoNext && navigateToResult(currentResultIndex + 1)}
+          <NavGlowButton
+            direction="next"
             disabled={!canGoNext}
-            className="btn-nav"
-          >
-            Next
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+            onClick={() => canGoNext && navigateToResult(currentResultIndex + 1)}
+          />
         </div>
       )}
 

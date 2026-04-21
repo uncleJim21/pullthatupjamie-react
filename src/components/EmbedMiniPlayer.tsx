@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Play, Podcast, RotateCcw, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Play, Podcast, RotateCcw, RotateCw, Link as LinkIcon, Check } from 'lucide-react';
 import { useAudioController } from '../context/AudioControllerContext.tsx';
 import { HIERARCHY_COLORS } from '../constants/constants.ts';
 
@@ -18,6 +18,9 @@ interface EmbedMiniPlayerProps {
   episodeTitle?: string;
   episodeImage?: string;
   creator?: string;
+  /** Episode publish date — ISO string, timestamp, or any Date-parseable value.
+   *  When provided, rendered as "<creator> | <Month D YYYY>" on the creator line. */
+  publishedDate?: string | number;
   timeContext?: {
     start_time: number;
     end_time: number;
@@ -38,6 +41,8 @@ interface EmbedMiniPlayerProps {
   onExpandChange?: (expanded: boolean) => void;
   // Compact height mode: hide non-essential UI for very short viewports
   isCompactHeight?: boolean;
+  // Optional: copy shareable link to clipboard
+  onCopyLink?: () => void;
 }
 
 const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
@@ -49,6 +54,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   episodeTitle,
   episodeImage,
   creator,
+  publishedDate,
   timeContext,
   quote,
   summary,
@@ -60,6 +66,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   isExpanded,
   onExpandChange,
   isCompactHeight = false,
+  onCopyLink,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -82,6 +89,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
   // Track image errors per episode to prevent hiding on subsequent selections
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const lastEpisodeImageRef = useRef<string | undefined>(undefined);
   
   // Reset image error state when episode image changes
@@ -164,6 +172,29 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
 
   // Determine what text to display
   const displayText = headline || summary || quote || 'No description available';
+
+  // Format publish date as "Month D YYYY" (no comma) for the creator pipe.
+  // Accepts ISO strings, unix seconds, or unix ms. Returns '' if the value
+  // can't be parsed so we silently skip the pipe rather than show "Invalid Date".
+  const formatPublishedDate = (value: string | number | undefined): string => {
+    if (value === undefined || value === null || value === '') return '';
+    let d: Date;
+    if (typeof value === 'number') {
+      d = new Date(value < 1e12 ? value * 1000 : value);
+    } else {
+      const asNum = Number(value);
+      if (!Number.isNaN(asNum) && /^\d+$/.test(value.trim())) {
+        d = new Date(asNum < 1e12 ? asNum * 1000 : asNum);
+      } else {
+        d = new Date(value);
+      }
+    }
+    if (Number.isNaN(d.getTime())) return '';
+    return d
+      .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      .replace(',', '');
+  };
+  const formattedDate = formatPublishedDate(publishedDate);
 
   // Expose the rendered player height as a CSS variable so other overlays (e.g. attribution pill)
   // can position themselves above it without overlapping.
@@ -292,9 +323,11 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
                 {episodeTitle || 'Episode'}
               </h3>
               
-              {creator && (
+              {(creator || formattedDate) && (
                 <p className={`text-gray-500 line-clamp-1 ${isCompactHeight ? 'text-[9px]' : 'text-[10px] sm:text-xs'}`}>
                   {creator}
+                  {creator && formattedDate && <span className="text-gray-600"> | </span>}
+                  {formattedDate}
                 </p>
               )}
               
@@ -309,6 +342,26 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
             <div className={`flex flex-col items-center flex-shrink-0 ${isCompactHeight ? 'gap-0.5' : 'gap-1.5'}`}>
               {/* Play + Time */}
               <div className="flex items-center gap-2">
+                {onCopyLink && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCopyLink();
+                      setLinkCopied(true);
+                      setTimeout(() => setLinkCopied(false), 1500);
+                    }}
+                    className={`flex items-center justify-center rounded-full transition-colors touch-manipulation ${
+                      isCompactHeight ? 'h-6 w-6' : 'h-7 w-7'
+                    } ${linkCopied ? 'text-green-400' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                    title={linkCopied ? 'Copied!' : 'Copy link'}
+                  >
+                    {linkCopied ? (
+                      <Check className={isCompactHeight ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+                    ) : (
+                      <LinkIcon className={isCompactHeight ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+                    )}
+                  </button>
+                )}
                 <button
                   onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
                   disabled={!audioUrl}

@@ -83,6 +83,8 @@ function getAccomplishmentText(type?: string, used?: number): string {
       return `You added ${count} podcast${count !== 1 ? 's' : ''} to your library`;
     case 'twitter-post':
       return `You've posted ${count} tweet${count !== 1 ? 's' : ''} this cycle`;
+    case 'jamie-pull':
+      return `Jamie answered ${count} question${count !== 1 ? 's' : ''} for you`;
     default:
       return `You've been exploring with Jamie`;
   }
@@ -115,7 +117,7 @@ function getContinuationCTA(tier: UserTier, entitlementType?: string): string {
       case 'registered':
         return "Upgrade for more posts";
       case 'subscriber':
-        return "Go unlimited with Jamie Pro";
+        return "Upgrade to Jamie Pro";
       default:
         return "Continue";
     }
@@ -126,7 +128,7 @@ function getContinuationCTA(tier: UserTier, entitlementType?: string): string {
     case 'registered':
       return "Keep exploring with Jamie Plus";
     case 'subscriber':
-      return "Go unlimited with Jamie Pro";
+      return "Upgrade to the most advanced Jamie Pro";
     default:
       return "Continue";
   }

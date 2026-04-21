@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Zap, Brain, Podcast, Check } from 'lucide-react';
+import { Sparkles, Zap, Brain, Podcast, Check, Bot } from 'lucide-react';
 
 interface UpgradeSuccessModalProps {
   isOpen: boolean;
@@ -16,18 +16,20 @@ export const UpgradeSuccessModal: React.FC<UpgradeSuccessModalProps> = ({
 
   const isPro = planName === 'jamie-pro';
 
+  // TODO(jamie-pull-skills): include Create/Publish/Worker once shipped.
   const plusBenefits = [
+    { icon: Bot, text: 'Higher Jamie agent limits' },
     { icon: Zap, text: 'Higher search & clip limits' },
-    { icon: Brain, text: 'AI-powered analysis & summaries' },
     { icon: Sparkles, text: 'Visual concept exploration' },
     { icon: Podcast, text: 'Add your own podcasts' },
   ];
 
+  // TODO(jamie-pull-skills): include Create/Publish/Worker once shipped.
   const proBenefits = [
-    { icon: Zap, text: 'Unlimited usage across all features' },
+    { icon: Bot, text: 'The most advanced Jamie agent' },
+    { icon: Zap, text: 'Highest search & clip limits' },
     { icon: Brain, text: 'Auto-transcription pipeline' },
     { icon: Sparkles, text: 'Curated clips & automation' },
-    { icon: Podcast, text: 'Video editing from browser' },
   ];
 
   const benefits = isPro ? proBenefits : plusBenefits;

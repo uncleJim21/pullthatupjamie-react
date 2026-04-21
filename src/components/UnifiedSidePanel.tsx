@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers, Copy, Check } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Loader, BrainCircuit, AlertCircle, RotateCcw, BookText, History, Bot, Link as LinkIcon, Settings2, TextSearch, Layers, Copy, Check, Mic, AudioLines, ArrowUpRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -13,10 +13,14 @@ import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
 import { QuotaExceededError } from '../types/errors.ts';
 import QuotaExceededModal, { QuotaExceededData } from './QuotaExceededModal.tsx';
 
-type AnalysisCardJson = {
+export type AnalysisCardJson = {
   pineconeId: string;
   episodeImage?: string;
   title?: string;
+  /** Raw transcript text for this clip. When provided the inline pill renders
+   *  an "open in Galaxy" arrow that opens `/app?view=galaxy&q=<quote>` in a
+   *  new tab so the user can explore nearest-neighbor clips. */
+  quote?: string;
 };
 
 type ParsedAnalysisPart =
@@ -216,16 +220,27 @@ const InlineCardMentionLoading: React.FC = () => {
   );
 };
 
-const InlineCardMention: React.FC<{
+export const InlineCardMention: React.FC<{
   card: AnalysisCardJson;
   onClick?: (pineconeId: string) => void;
-}> = ({ card, onClick }) => {
+  onCopyLink?: (pineconeId: string) => void;
+  /** When true, renders a white breathing glow to signal this clip is currently playing. */
+  isActive?: boolean;
+}> = ({ card, onClick, onCopyLink, isActive }) => {
   const title = card.title || 'Open source';
   const imageUrl = card.episodeImage;
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onCopyLink?.(card.pineconeId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
     <span
-      className="inline-flex items-center gap-2 px-2 py-1 rounded-md border border-gray-800 bg-gray-900/40 align-middle cursor-pointer hover:bg-gray-900/70 transition-colors max-w-[420px]"
+      className={`inline-flex items-center gap-2 px-2 py-1 rounded-md border border-gray-800 bg-gray-900/40 align-middle cursor-pointer hover:bg-gray-800/80 hover:border-gray-600 hover:shadow-[0_0_8px_rgba(255,255,255,0.08)] transition-all max-w-[min(100%,420px)] overflow-hidden${isActive ? ' clip-pill-active' : ''}`}
       role="button"
       tabIndex={0}
       onClick={() => onClick?.(card.pineconeId)}
@@ -247,10 +262,50 @@ const InlineCardMention: React.FC<{
         />
       ) : (
         <span className="w-[14px] h-[14px] rounded-sm bg-gray-800 flex items-center justify-center flex-shrink-0">
-          <LinkIcon className="w-3 h-3 text-gray-500" />
+          <Mic className="w-3 h-3 text-gray-500" />
         </span>
       )}
-      <span className="text-xs text-gray-200 truncate">{title}</span>
+      {isActive && (
+        <AudioLines
+          className="w-3.5 h-3.5 text-white flex-shrink-0 clip-pill-playing-icon"
+          aria-label="Now playing"
+        />
+      )}
+      <span className="text-xs text-gray-200 truncate min-w-0">{title}</span>
+      {card.quote && (
+        <a
+          href={`${FRONTEND_URL}/app?view=galaxy&q=${encodeURIComponent(card.quote)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+          }}
+          className="flex-shrink-0 ml-0.5 text-gray-500 hover:text-gray-200 transition-colors"
+          title="Explore similar quotes in Galaxy"
+          aria-label="Explore similar quotes in Galaxy"
+        >
+          <ArrowUpRight className="w-3.5 h-3.5" />
+        </a>
+      )}
+      {onCopyLink && (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={handleCopy}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleCopy(e as any); }
+          }}
+          className="flex-shrink-0 ml-0.5 text-gray-500 hover:text-gray-300 transition-colors"
+          title="Copy link"
+        >
+          {copied ? (
+            <Check className="w-3 h-3 text-green-400" />
+          ) : (
+            <LinkIcon className="w-3 h-3" />
+          )}
+        </span>
+      )}
     </span>
   );
 };
