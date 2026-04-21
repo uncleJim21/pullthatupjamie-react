@@ -82,7 +82,8 @@ When starting from a broad or ambiguous request like "research what people are s
 ## Auth
 
 - Free tier: corpus browsing, basic search (IP-based quota), and shared session viewing — no credentials needed
-- Paid tier: L402 Lightning prepaid credits. Hit any paid endpoint (search-chapters, make-clip, on-demand transcription, /api/pull, etc.) unauthenticated to receive a 402 challenge with a Lightning invoice. After payment, use `Authorization: L402 <macaroon>:<preimage>` for all requests. 500 sats (~$0.33) covers ~150+ searches.
+- Paid tier: L402 Lightning prepaid credits. Hit any paid endpoint (search-chapters, make-clip, on-demand transcription, /api/pull, etc.) unauthenticated to receive a 402 challenge with a Lightning invoice. After payment, use `Authorization: L402 <macaroon>:<preimage>` for all requests. The same macaroon works across every paid endpoint until its prepaid balance is depleted. 500 sats (~$0.33) covers ~150+ searches.
+- Custom prepaid amount: append `?amountSats=N` to the initial unauthenticated request to mint a credential with a custom balance (min 10, max 500,000 sats). Works on any paid endpoint — the 402 challenge returns an invoice for the requested amount, and the returned macaroon carries that balance. Each API call then deducts its USD-equivalent cost.
 
 ## About
 

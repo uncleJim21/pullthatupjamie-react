@@ -321,10 +321,15 @@ This path gets a small free-tier quota and returns 429 (not 402) when exceeded. 
 
 - Send `Authorization: L402 <macaroon>:<preimage>` — the same credential format as the other paid endpoints (`/api/search-chapters`, `/api/make-clip`, on-demand transcription, etc.)
 - Mint the credential by hitting any paid endpoint unauthenticated, paying the Lightning invoice in the 402 challenge, and combining the returned macaroon with your preimage
+- **Same macaroon works across every paid endpoint** — including `/api/pull` — until its prepaid balance is depleted. Each call deducts its USD-equivalent cost. When the balance hits zero, retry the mint flow.
+
+### Custom prepaid amount (`?amountSats`)
+
+The default 402 challenge mints a small credential (enough for ~150 searches). To pre-fund a larger balance in a single payment, append `?amountSats=N` to the **initial unauthenticated request** that triggers the challenge — min 10, max 500,000 sats. The returned 402 invoice will be for that amount and the minted macaroon carries that prepaid balance. Works on any paid endpoint, including `/api/pull`. This is how you make one Lightning payment last weeks of agent calls instead of re-prompting on every session.
 
 ### 402 handling
 
-If a caller omits the `X-Free-Tier` header and sends no `Authorization`, the endpoint returns a standard L402 challenge identical to the other paid endpoints. Parse the `WWW-Authenticate: L402 ...` header, pay the invoice, and retry with the full credential.
+If a caller omits the `X-Free-Tier` header and sends no `Authorization`, the endpoint returns a standard L402 challenge identical to the other paid endpoints. Parse the `WWW-Authenticate: L402 ...` header, pay the invoice, and retry with the full credential. Check the `amountSats` / `amountUsd` fields on the challenge payload to confirm how much balance you're buying.
 
 ### 429 handling
 
