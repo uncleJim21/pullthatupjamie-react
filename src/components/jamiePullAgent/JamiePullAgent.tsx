@@ -1106,23 +1106,30 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
 
   return (
     <div className="relative flex flex-col h-full bg-black text-white">
-      {/* Floating top-right controls (header hidden for now).
+      {/* Floating top-right controls.
+          Uses `fixed` (not `absolute`) so it sits in viewport coordinates
+          and lines up horizontally with the segmented view toggle rendered
+          by SearchInterface (also `fixed top-3`). The pill styling below
+          mirrors the segmented control (same outer container + inner
+          button padding) so the two sit at the exact same height.
           DEPRECATED (2026-04): the fast/quality model toggle used to live
           here alongside the reset button. It's been removed while we
           standardize on 'fast' (Haiku 4.5). Reintroduce here when/if we
           expose model selection to users again. */}
-      <div className="absolute top-3 right-4 z-10 flex items-center gap-2">
-        {hasMessages && (
-          <button
-            onClick={clearMessages}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-200 hover:text-white bg-black/70 backdrop-blur-sm border border-gray-700 rounded-lg hover:border-gray-500 hover:bg-white/5 transition-all"
-            title="Reset conversation"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset</span>
-          </button>
-        )}
-      </div>
+      {hasMessages && (
+        <div className="fixed top-3 right-4 z-30 pointer-events-none">
+          <div className="pointer-events-auto inline-flex rounded-lg border border-white/10 p-0.5 bg-black/40 backdrop-blur-md">
+            <button
+              onClick={clearMessages}
+              className="rounded-md text-sm font-medium transition-all flex items-center gap-2 px-2.5 py-1.5 text-gray-400 hover:text-white"
+              title="Reset conversation"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Reset</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Messages / Empty State */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
@@ -1272,8 +1279,8 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
                 back model selection. */}
           </div>
         ) : (
-          /* Top padding leaves room for the floating Reset button
-             (absolute top-3 right-4) so it never overlaps the first
+          /* Top padding leaves room for the fixed Reset button
+             (fixed top-3 right-4) so it never overlaps the first
              message bubble on narrow viewports. */
           <div className="px-5 pt-14 pb-6 space-y-5">
             {messages.map((msg, idx) => {
