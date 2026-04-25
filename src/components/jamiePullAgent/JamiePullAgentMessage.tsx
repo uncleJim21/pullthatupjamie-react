@@ -761,6 +761,7 @@ export const JamiePullAgentMessage: React.FC<JamiePullAgentMessageProps> = ({ me
             toolCalls={toolCalls}
             toolResults={toolResults}
             hasText={!!text}
+            running={!!loading}
           />
         )}
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   CheckCircle,
   Loader2,
@@ -63,7 +63,61 @@ interface TimelineStep {
   label: string;
   icon: React.FC<{ className?: string }>;
   complete: boolean;
+  /** Result-count chip ("7 results"). Backend-supplied. */
   detail?: string;
+  /** Human-readable description of *what* the tool is acting on, derived
+   *  from the tool_call `input` payload (e.g. the search query, person
+   *  name, episode title). Rendered as a small dim subtitle under the
+   *  title. Path A — synthesized client-side from existing fields. If the
+   *  backend later adds a dedicated `summary` / `subtitle` field on
+   *  tool_call, prefer that here. */
+  subtitle?: string;
+}
+
+const SUBTITLE_MAX_CHARS = 80;
+
+/** Best-effort extraction of a short, human-friendly subtitle from a
+ *  tool_call `input` blob. Backend input shapes are LLM-generated, so we
+ *  defensively try the most common field names per tool, then fall back to
+ *  scanning all string values. Anything we surface gets length-capped. */
+function extractSubtitle(tool: string, input: Record<string, unknown> | undefined): string | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+
+  const get = (key: string): string | undefined => {
+    const v = (input as Record<string, unknown>)[key];
+    return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+  };
+
+  // Per-tool preferred fields. Order matters: first non-empty wins.
+  const PREFERRED: Record<string, string[]> = {
+    search_quotes: ['query', 'q', 'text'],
+    search_chapters: ['query', 'q', 'text'],
+    discover_podcasts: ['query', 'q', 'text'],
+    find_person: ['name', 'search', 'query', 'q'],
+    get_person_episodes: ['name', 'search', 'query'],
+    get_episode: ['title', 'episodeTitle', 'guid', 'episodeGuid'],
+    get_feed: ['title', 'feedTitle', 'feedId'],
+    get_feed_episodes: ['title', 'feedTitle', 'feedId'],
+    list_episode_chapters: ['title', 'episodeTitle', 'guid'],
+    get_adjacent_paragraphs: ['text', 'paragraphId', 'pineconeId'],
+  };
+
+  const keys = PREFERRED[tool] ?? ['query', 'q', 'text', 'name', 'title', 'search'];
+  for (const k of keys) {
+    const v = get(k);
+    if (v) return truncate(v, SUBTITLE_MAX_CHARS);
+  }
+
+  // Last-resort fallback: first non-empty top-level string value.
+  for (const v of Object.values(input)) {
+    if (typeof v === 'string' && v.trim()) return truncate(v.trim(), SUBTITLE_MAX_CHARS);
+  }
+  return undefined;
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return `${s.slice(0, max).trimEnd()}…`;
 }
 
 function buildTimeline(
@@ -112,6 +166,7 @@ function buildTimeline(
         icon: Icon,
         complete: !!tr,
         detail: hasCount ? `${tr!.resultCount} result${tr!.resultCount === 1 ? '' : 's'}` : undefined,
+        subtitle: extractSubtitle(tc.tool, tc.input),
       });
       toolIdx++;
     }
@@ -127,14 +182,16 @@ export const ActivityTimeline: React.FC<{
   toolCalls: AgentToolCallEvent[];
   toolResults: AgentToolResultEvent[];
   hasText: boolean;
-}> = ({ statusMessages, toolCalls, toolResults, hasText }) => {
+  /** True while the agent is actively streaming (drives the inline spinner
+   *  on the latest visible step regardless of step kind). */
+  running?: boolean;
+}> = ({ statusMessages, toolCalls, toolResults, hasText, running = false }) => {
   const steps = buildTimeline(statusMessages, toolCalls, toolResults);
-  const [expanded, setExpanded] = useState(true);
-
-  // Auto-collapse once the response text starts streaming
-  useEffect(() => {
-    if (hasText && steps.length > 1) setExpanded(false);
-  }, [hasText, steps.length]);
+  // Default to collapsed: only the latest step is visible. Users can click
+  // the toggle to see the full history. We previously defaulted to expanded
+  // and auto-collapsed once `hasText` arrived, but most users only care
+  // about the most recent activity, so flip the default.
+  const [expanded, setExpanded] = useState(false);
 
   if (!steps.length) return null;
 
@@ -175,11 +232,18 @@ export const ActivityTimeline: React.FC<{
           const isLast = i === visibleSteps.length - 1;
           const Icon = step.icon;
 
+          // Single source of truth for the "in progress" indicator: the
+          // left-side dot becomes a spinner whenever the overall stream
+          // is running AND this is the latest visible step. This works
+          // for tool steps that haven't received a tool_result yet AND
+          // for status-kind steps (which are always marked complete but
+          // are still "in flight" while the agent is streaming text).
+          const isRunningHere = !!running && isLast;
           return (
             <div key={i} className="relative flex items-start gap-2.5 pb-2 last:pb-0">
-              {/* Dot */}
+              {/* Dot — the only spinner. */}
               <div className="absolute -left-4 top-[3px] flex items-center justify-center">
-                {!step.complete && isLast ? (
+                {isRunningHere ? (
                   <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
                 ) : step.complete && step.kind === 'tool' ? (
                   <div className="w-2 h-2 rounded-full bg-green-500/70" />
@@ -188,14 +252,26 @@ export const ActivityTimeline: React.FC<{
                 )}
               </div>
 
-              {/* Content */}
-              <Icon className="w-3 h-3 text-gray-600 flex-shrink-0 mt-[1px]" />
-              <span className="text-gray-400 text-xs leading-tight">{step.label}</span>
-              {step.detail && (
-                <span className="px-1.5 py-0.5 bg-white/5 text-gray-500 rounded text-[10px] leading-none">
-                  {step.detail}
-                </span>
-              )}
+              <Icon className="w-3 h-3 text-gray-600 flex-shrink-0 mt-[3px]" />
+
+              {/* Title + optional subtitle stack. Subtitle (when present)
+                  describes *what* the tool is acting on, e.g. the actual
+                  search query or person name. */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-gray-400 text-xs leading-tight">{step.label}</span>
+                  {step.detail && (
+                    <span className="px-1.5 py-0.5 bg-white/5 text-gray-500 rounded text-[10px] leading-none">
+                      {step.detail}
+                    </span>
+                  )}
+                </div>
+                {step.subtitle && (
+                  <div className="text-gray-600 text-[10px] leading-tight mt-0.5 truncate">
+                    {step.subtitle}
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
