@@ -1281,14 +1281,15 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
         ) : (
           /* Top padding leaves room for the fixed Reset button
              (fixed top-3 right-4) so it never overlaps the first
-             message bubble on narrow viewports. The max-w-3xl + mx-auto
-             keeps the conversation in a centered, readable column on
-             wide screens — without it, assistant bubbles float at the
-             left edge while user bubbles float at the right, leaving a
-             huge void in the middle. Both roles inherit this column and
-             their existing justify-start / justify-end alignment now
-             reads as left/right within a balanced layout. */
-          <div className="px-5 pt-14 pb-6 space-y-5 max-w-5xl mx-auto">
+             message bubble on narrow viewports.
+
+             Layout: left-anchored conversation column capped at ~70% of
+             viewport width on desktop (md+), with the asymmetric empty
+             space falling on the right. On mobile the cap is removed so
+             the conversation fills the narrow screen edge to edge
+             (visually centered via the px-5 padding). No mx-auto — that
+             would re-center on desktop. */
+          <div className="px-5 pt-14 pb-6 space-y-5 md:max-w-[70%]">
             {messages.map((msg, idx) => {
               let originalQuery: string | undefined;
               if (msg.role === 'assistant') {
