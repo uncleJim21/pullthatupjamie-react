@@ -1283,13 +1283,12 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
              (fixed top-3 right-4) so it never overlaps the first
              message bubble on narrow viewports.
 
-             Layout: left-anchored conversation column capped at ~70% of
-             viewport width on desktop (md+), with the asymmetric empty
-             space falling on the right. On mobile the cap is removed so
-             the conversation fills the narrow screen edge to edge
-             (visually centered via the px-5 padding). No mx-auto — that
-             would re-center on desktop. */
-          <div className="px-5 pt-14 pb-6 space-y-5 md:max-w-[70%]">
+             The parent stays full-width. Per-bubble asymmetry (agent
+             messages anchored left with a large right gutter; user
+             messages anchored right with a large left gutter) is
+             handled inside JamiePullAgentMessage via each bubble's own
+             max-width + justify-start / justify-end. */
+          <div className="px-5 md:pl-24 md:pr-[51px] pt-14 pb-6 space-y-5">
             {messages.map((msg, idx) => {
               let originalQuery: string | undefined;
               if (msg.role === 'assistant') {
