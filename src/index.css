@@ -229,7 +229,18 @@ html, body, #root {
     radial-gradient(ellipse at 75% 70%, color-mix(in srgb, var(--neon) 8%, transparent), transparent 50%),
     #08080c;
   border: 2px solid color-mix(in srgb, var(--neon) 22%, transparent);
-  animation: category-breathe 8s ease-in-out infinite;
+  /* Breathing animation is intentionally NOT applied here — the small
+     pill-sized chips visibly jitter the inner text on every animation
+     tick (the keyframes mutate an `inset` box-shadow which the browser
+     repaints with subpixel-rounding shifts that the tiny labels can't
+     hide). Static box-shadow gives the same neon look without the
+     wiggle. The chunky 4:1 grid variant doesn't have this problem
+     because its text is bigger; if we ever bring breathing back for
+     that variant only, do it via a sibling class, not this base. */
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--neon) 26%, transparent),
+    0 0 28px color-mix(in srgb, var(--neon) 12%, transparent),
+    0 0 46px rgba(255, 255, 255, 0.04);
   transition: border-color 0.25s, box-shadow 0.25s, transform 0.18s;
   cursor: pointer;
 }

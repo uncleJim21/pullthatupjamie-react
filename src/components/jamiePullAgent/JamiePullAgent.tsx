@@ -633,40 +633,55 @@ const ModelToggle: React.FC<{
   const iconCls = isHero ? 'w-4 h-4 shrink-0' : 'w-3.5 h-3.5 shrink-0';
   const labelMax = isHero ? 'max-w-[3.5rem]' : 'max-w-[2.75rem]';
 
+  // Single-button pill (matches the Smart/Speed toggle in SearchInterface
+  // / SemanticGalaxyView): tapping anywhere on the pill — including the
+  // inactive segment, the icon-only side, or the gap between them —
+  // flips the state. The two visual "segments" are rendered as <span>
+  // children, not nested buttons, so the whole pill is one tap target.
+  // This is critical on mobile, where small per-segment buttons are
+  // fiddly to hit accurately.
+  const toggle = () => !disabled && onChange(isDeep ? 'fast' : 'quality');
   return (
     <div className="inline-flex items-center gap-1.5">
-      <div className={containerCls} role="group" aria-label="Agent reasoning depth">
-        <button
-          type="button"
-          onClick={() => !disabled && onChange('quality')}
-          title="Deep — thinks longer for more thorough answers (default)"
-          aria-pressed={isDeep}
-          disabled={disabled}
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={disabled}
+        aria-pressed={isDeep}
+        aria-label={isDeep ? 'Switch to Fast mode' : 'Switch to Deep mode'}
+        title={
+          isDeep
+            ? 'Deep — most capable models, exhaustive answers (~60–90s, default). Tap to switch to Fast.'
+            : 'Fast — lighter models, direct answers (~30–45s). Tap to switch to Deep.'
+        }
+        className={containerCls}
+      >
+        <span
           className={`${segBase} ${
-            isDeep ? `bg-blue-500/15 text-blue-400 ${isHero ? 'pl-2.5 pr-3' : 'pl-2 pr-2.5'}` : `text-gray-500 ${isHero ? 'px-2' : 'px-1.5'}`
+            isDeep
+              ? `bg-blue-500/15 text-blue-400 ${isHero ? 'pl-2.5 pr-3' : 'pl-2 pr-2.5'}`
+              : `text-gray-500 ${isHero ? 'px-2' : 'px-1.5'}`
           }`}
         >
           <Microscope className={iconCls} />
           <span className={`${labelBase} ${isDeep ? `${labelMax} opacity-100` : 'max-w-0 opacity-0'}`}>Deep</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => !disabled && onChange('fast')}
-          title="Fast — quick, cost-efficient answers"
-          aria-pressed={!isDeep}
-          disabled={disabled}
+        </span>
+        <span
           className={`${segBase} ${
-            !isDeep ? `bg-orange-500/15 text-orange-400 ${isHero ? 'pl-2.5 pr-3' : 'pl-2 pr-2.5'}` : `text-gray-500 ${isHero ? 'px-2' : 'px-1.5'}`
+            !isDeep
+              ? `bg-orange-500/15 text-orange-400 ${isHero ? 'pl-2.5 pr-3' : 'pl-2 pr-2.5'}`
+              : `text-gray-500 ${isHero ? 'px-2' : 'px-1.5'}`
           }`}
         >
           <Zap className={iconCls} />
           <span className={`${labelBase} ${!isDeep ? `${labelMax} opacity-100` : 'max-w-0 opacity-0'}`}>Fast</span>
-        </button>
-      </div>
+        </span>
+      </button>
       {onHelpClick && (
         // Small `?` icon to the right of the pill, same chrome as the
         // help button next to the Smart/Speed toggle in SearchInterface
-        // (text-gray-600 → text-gray-400 on hover, w-3.5 h-3.5).
+        // (text-gray-600 → text-gray-400 on hover, w-3.5 h-3.5). Kept
+        // as a sibling button so tapping it doesn't toggle the mode.
         <button
           type="button"
           onClick={onHelpClick}
@@ -1244,7 +1259,9 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
               <p className="text-sm sm:text-base text-gray-200 font-medium">
                 {tagline.headline}
               </p>
-              <p className="text-xs sm:text-sm text-gray-400 mt-1">
+              {/* Subline hidden on mobile to save vertical space — the
+                  headline carries the value prop on its own. */}
+              <p className="hidden sm:block text-xs sm:text-sm text-gray-400 mt-1">
                 {tagline.subline}
               </p>
             </div>
@@ -1269,7 +1286,7 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
                     active-conversation mode keeps the inline-with-input
                     placement (narrower bar input has more room). */}
                 <div
-                  className="w-full flex justify-center mb-8 animate-fade-in"
+                  className="w-full flex justify-center mb-3 sm:mb-8 animate-fade-in"
                   style={{ animationDelay: '250ms', animationFillMode: 'backwards' }}
                 >
                   <ChatInput
@@ -1283,17 +1300,25 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
                 </div>
 
                 {/* Prompt conveyor + Deep/Fast toggle.
-                    Layout: conveyor (max-w-[44rem]) and the toggle sit
-                    side-by-side on sm+ as a single centered group, with
-                    the toggle anchored to the conveyor's right edge. On
-                    mobile they stack so the conveyor keeps full width
-                    and the toggle drops below, right-aligned. */}
+                    Layout: on sm+ the row is capped at the same
+                    max-w-[40rem] as the hero search input above so the
+                    left edge of the conveyor and the right edge of the
+                    toggle align with the input's edges. Conveyor takes
+                    the remaining space (`min-w-0` lets it shrink below
+                    its natural width inside the mask), toggle takes its
+                    natural width on the right. On mobile
+                    (flex-col-reverse) the toggle stacks ABOVE the
+                    conveyor so the conveyor's auto-scrolling pill row
+                    isn't visually interrupted by the toggle below it; the
+                    toggle still right-aligns within its own row. */}
                 <div
-                  className="w-full flex flex-col sm:flex-row sm:justify-center sm:items-center sm:gap-3 mb-6 animate-fade-in"
+                  className="w-full sm:max-w-[40rem] sm:mx-auto flex flex-col-reverse sm:flex-row sm:items-center sm:gap-3 mb-6 animate-fade-in"
                   style={{ animationDelay: '350ms', animationFillMode: 'backwards' }}
                 >
-                  <PromptConveyor onSelect={handlePromptPill} />
-                  <div className="flex justify-end mt-2 sm:mt-0">
+                  <div className="sm:flex-1 sm:min-w-0">
+                    <PromptConveyor onSelect={handlePromptPill} />
+                  </div>
+                  <div className="flex justify-end mb-2 sm:mb-0 sm:flex-shrink-0">
                     <ModelToggle
                       model={model}
                       onChange={setModel}
@@ -1511,7 +1536,7 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
               // row on sm+, stacked on mobile so the input keeps full
               // width on narrow screens.
               <div
-                className={`px-5 py-3 flex flex-col sm:flex-row sm:justify-center sm:items-center sm:gap-3 ${
+                className={`px-5 py-2 sm:py-3 flex flex-col sm:flex-row sm:justify-center sm:items-center sm:gap-3 ${
                   showMiniPlayer ? 'border-t border-white/5' : ''
                 }`}
               >
