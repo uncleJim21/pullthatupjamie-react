@@ -43,9 +43,36 @@ function getAuthToken(): string | null {
   return localStorage.getItem('auth_token');
 }
 
+// localStorage key for the user's model preference (Deep vs Fast). Hydrated
+// once on mount so the user's choice survives reloads. Reads are wrapped in
+// try/catch because some private-browsing modes (e.g. Safari with cookies
+// disabled) throw on access. Anything other than the two valid values falls
+// back to the default ('quality' = Deep) so first-time users get the more
+// thorough mode out of the box; a corrupted/unexpected value can't lock
+// the user into an invalid request shape either.
+const MODEL_STORAGE_KEY = 'jamiePullAgentModel';
+const readStoredModel = (): AgentModel => {
+  try {
+    const raw = localStorage.getItem(MODEL_STORAGE_KEY);
+    return raw === 'quality' || raw === 'fast' ? raw : 'quality';
+  } catch {
+    return 'quality';
+  }
+};
+
 export const useJamiePullAgent = (): UseJamiePullAgentReturn => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [model, setModel] = useState<AgentModel>('fast');
+  const [model, setModelState] = useState<AgentModel>(readStoredModel);
+  // Persist on every change so the user's Deep/Fast pick sticks across
+  // reloads. Same try/catch shield as the reader for private-mode safety.
+  const setModel = useCallback((next: AgentModel) => {
+    setModelState(next);
+    try {
+      localStorage.setItem(MODEL_STORAGE_KEY, next);
+    } catch {
+      /* noop — non-fatal */
+    }
+  }, []);
   const [quotaExceededData, setQuotaExceededData] = useState<QuotaExceededData | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const historyRef = useRef<HistoryEntry[]>([]);

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { RotateCcw, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, Landmark, Brain, X, Telescope, Film, Send, HelpCircle, Workflow } from 'lucide-react';
+import { RotateCcw, ArrowUp, HeartPulse, Globe2, Cpu, TrendingUp, Bitcoin, Rocket, Eye, Landmark, Brain, X, Telescope, Film, Send, HelpCircle, Workflow, Microscope, Zap } from 'lucide-react';
+import JamiePullAgentModelExplainerModal from './JamiePullAgentModelExplainerModal.tsx';
 import { useJamiePullAgent } from '../../hooks/useJamiePullAgent.ts';
 import { JamiePullAgentMessage, clipMetaCache, extractClipIds } from './JamiePullAgentMessage.tsx';
 import type { ClipMeta } from './JamiePullAgentMessage.tsx';
@@ -585,6 +586,101 @@ const ChatInput: React.FC<{
   );
 };
 
+// ─── Deep ↔ Fast model toggle ────────────────────────────────────────────────
+//
+// Two-segment pill switch that mirrors the Smart/Speed toggle in
+// SearchInterface: both segments are always visible (icon-only when
+// inactive), the active segment expands its label via a max-w / opacity
+// animation, and each side has its own brand color — DeepSeek-blue for
+// Deep (nods to the model behind the longer-thinking mode) and Bitcoin
+// orange for Fast (Tailwind orange-500 ≈ #F97316; closer to the
+// Bitcoin-brand #F7931A than amber/cyan and harmonizes with the rest
+// of the Bitcoin-adjacent UI palette in this app).
+//
+// `size` drives padding so the same component fits next to the hero
+// input on the landing page AND the slimmer chat-bar input inside the
+// bottom pill island. `disabled` is set during streaming so the user
+// can't switch models mid-round and end up confused about which model
+// produced the answer.
+
+const ModelToggle: React.FC<{
+  model: AgentModel;
+  onChange: (next: AgentModel) => void;
+  size?: 'hero' | 'bar';
+  disabled?: boolean;
+  /** When provided, renders a small `?` help button to the right of the
+      toggle pill. Mirrors the question-mark next to the Smart/Speed
+      toggle in SearchInterface — clicking it should open a modal that
+      explains the two modes. */
+  onHelpClick?: () => void;
+}> = ({ model, onChange, size = 'bar', disabled = false, onHelpClick }) => {
+  const isHero = size === 'hero';
+  const isDeep = model === 'quality';
+
+  // Container chrome mirrors the segmented view-toggle at the top of the
+  // app so the two controls feel like part of the same kit.
+  const containerCls = `inline-flex rounded-lg border border-white/10 p-0.5 bg-black/40 backdrop-blur-md transition-opacity ${
+    disabled ? 'opacity-40 pointer-events-none' : ''
+  }`;
+
+  // Per-segment classes. The active segment gets the tinted background +
+  // brand color and the label expands; the inactive segment collapses to
+  // icon-only via max-w-0 / opacity-0 (transition-all on the inner span).
+  const segBase = `flex items-center gap-1 rounded-md font-medium transition-all duration-300 ease-out ${
+    isHero ? 'text-sm py-1.5' : 'text-xs py-1'
+  }`;
+  const labelBase = 'inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out';
+  const iconCls = isHero ? 'w-4 h-4 shrink-0' : 'w-3.5 h-3.5 shrink-0';
+  const labelMax = isHero ? 'max-w-[3.5rem]' : 'max-w-[2.75rem]';
+
+  return (
+    <div className="inline-flex items-center gap-1.5">
+      <div className={containerCls} role="group" aria-label="Agent reasoning depth">
+        <button
+          type="button"
+          onClick={() => !disabled && onChange('quality')}
+          title="Deep — thinks longer for more thorough answers (default)"
+          aria-pressed={isDeep}
+          disabled={disabled}
+          className={`${segBase} ${
+            isDeep ? `bg-blue-500/15 text-blue-400 ${isHero ? 'pl-2.5 pr-3' : 'pl-2 pr-2.5'}` : `text-gray-500 ${isHero ? 'px-2' : 'px-1.5'}`
+          }`}
+        >
+          <Microscope className={iconCls} />
+          <span className={`${labelBase} ${isDeep ? `${labelMax} opacity-100` : 'max-w-0 opacity-0'}`}>Deep</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => !disabled && onChange('fast')}
+          title="Fast — quick, cost-efficient answers"
+          aria-pressed={!isDeep}
+          disabled={disabled}
+          className={`${segBase} ${
+            !isDeep ? `bg-orange-500/15 text-orange-400 ${isHero ? 'pl-2.5 pr-3' : 'pl-2 pr-2.5'}` : `text-gray-500 ${isHero ? 'px-2' : 'px-1.5'}`
+          }`}
+        >
+          <Zap className={iconCls} />
+          <span className={`${labelBase} ${!isDeep ? `${labelMax} opacity-100` : 'max-w-0 opacity-0'}`}>Fast</span>
+        </button>
+      </div>
+      {onHelpClick && (
+        // Small `?` icon to the right of the pill, same chrome as the
+        // help button next to the Smart/Speed toggle in SearchInterface
+        // (text-gray-600 → text-gray-400 on hover, w-3.5 h-3.5).
+        <button
+          type="button"
+          onClick={onHelpClick}
+          className="text-gray-600 hover:text-gray-400 transition-colors"
+          title="What is Deep vs Fast mode?"
+          aria-label="What is Deep vs Fast mode?"
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+};
+
 // ─── Category card ───────────────────────────────────────────────────────────
 
 const CategoryCard: React.FC<{
@@ -875,9 +971,10 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
     messages,
     sendMessage,
     clearMessages,
-    // `model` / `setModel` are intentionally kept in the hook API even though
-    // the UI toggle is deprecated (2026-04). We still read setModel below to
-    // silence the unused-var lint; re-wire here when the toggle returns.
+    // Reintroduced 2026-04: Deep ↔ Fast model selector. The hook hydrates
+    // `model` from localStorage (`jamiePullAgentModel`) and persists on
+    // every change via `setModel`, so the user's pick survives reloads.
+    model,
     setModel,
     quotaExceededData,
     clearQuotaExceeded,
@@ -889,6 +986,7 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
   const [activeClip, setActiveClip] = useState<ClipMeta | null>(null);
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeSkill, setActiveSkill] = useState<Skill | null>(null);
+  const [isModelExplainerOpen, setIsModelExplainerOpen] = useState(false);
   // Session-stable tagline A/B pick (see TAGLINES array near the top).
   const tagline = useMemo(() => pickTagline(), []);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1073,15 +1171,6 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
     }
   };
 
-  // DEPRECATED (2026-04): fast/quality model toggle was removed from the UI.
-  // The hook still accepts `setModel` and defaults to 'fast', so we can reintroduce
-  // the toggle later without touching the hook. Leaving this stub commented out
-  // as a reminder of where the UI switch used to live.
-  // const toggleModel = () => {
-  //   setModel(model === 'fast' ? 'quality' : 'fast');
-  // };
-  void setModel; // silence unused-var lint while the toggle is parked
-
   const handlePromptPill = (template: string) => {
     setActiveTemplate(template);
   };
@@ -1106,16 +1195,14 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
 
   return (
     <div className="relative flex flex-col h-full bg-black text-white">
-      {/* Floating top-right controls.
+      {/* Floating top-right Reset control.
           Uses `fixed` (not `absolute`) so it sits in viewport coordinates
           and lines up horizontally with the segmented view toggle rendered
           by SearchInterface (also `fixed top-3`). The pill styling below
           mirrors the segmented control (same outer container + inner
-          button padding) so the two sit at the exact same height.
-          DEPRECATED (2026-04): the fast/quality model toggle used to live
-          here alongside the reset button. It's been removed while we
-          standardize on 'fast' (Haiku 4.5). Reintroduce here when/if we
-          expose model selection to users again. */}
+          button padding) so the two sit at the exact same height. Note:
+          the Deep ↔ Fast model selector now lives next to the chat input
+          (both hero + pill-island variants) — see <ModelToggle/> below. */}
       {hasMessages && (
         <div className="fixed top-3 right-4 z-30 pointer-events-none">
           <div className="pointer-events-auto inline-flex rounded-lg border border-white/10 p-0.5 bg-black/40 backdrop-blur-md">
@@ -1130,6 +1217,7 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
           </div>
         </div>
       )}
+
 
       {/* Messages / Empty State */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
@@ -1174,7 +1262,12 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
             ) : (
               <>
                 {/* Hero input — extra bottom margin so the conveyor doesn't
-                    crowd the input and the eye can land on the search first. */}
+                    crowd the input and the eye can land on the search first.
+                    The Deep/Fast toggle lives on the *conveyor* row below
+                    rather than this one — side-by-side with the wide hero
+                    input looks crowded. The pill-island variant in
+                    active-conversation mode keeps the inline-with-input
+                    placement (narrower bar input has more room). */}
                 <div
                   className="w-full flex justify-center mb-8 animate-fade-in"
                   style={{ animationDelay: '250ms', animationFillMode: 'backwards' }}
@@ -1189,12 +1282,26 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
                   />
                 </div>
 
-                {/* Prompt conveyor */}
+                {/* Prompt conveyor + Deep/Fast toggle.
+                    Layout: conveyor (max-w-[44rem]) and the toggle sit
+                    side-by-side on sm+ as a single centered group, with
+                    the toggle anchored to the conveyor's right edge. On
+                    mobile they stack so the conveyor keeps full width
+                    and the toggle drops below, right-aligned. */}
                 <div
-                  className="w-full flex justify-center mb-6 animate-fade-in"
+                  className="w-full flex flex-col sm:flex-row sm:justify-center sm:items-center sm:gap-3 mb-6 animate-fade-in"
                   style={{ animationDelay: '350ms', animationFillMode: 'backwards' }}
                 >
                   <PromptConveyor onSelect={handlePromptPill} />
+                  <div className="flex justify-end mt-2 sm:mt-0">
+                    <ModelToggle
+                      model={model}
+                      onChange={setModel}
+                      size="bar"
+                      disabled={sending}
+                      onHelpClick={() => setIsModelExplainerOpen(true)}
+                    />
+                  </div>
                 </div>
 
                 {/* Skill chips — Research / Create / Publish / Worker.
@@ -1399,9 +1506,12 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
             {hasMessages && (
               // Hairline divider only when the mini-player sits above; w/o
               // it the chat input is the only child and the island's own
-              // top edge already provides separation.
+              // top edge already provides separation. Layout matches the
+              // landing/hero: input + Deep/Fast toggle as a centered flex
+              // row on sm+, stacked on mobile so the input keeps full
+              // width on narrow screens.
               <div
-                className={`px-5 py-3 flex justify-center ${
+                className={`px-5 py-3 flex flex-col sm:flex-row sm:justify-center sm:items-center sm:gap-3 ${
                   showMiniPlayer ? 'border-t border-white/5' : ''
                 }`}
               >
@@ -1412,6 +1522,15 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
                   onSubmit={handleSubmit}
                   inputRef={inputRef}
                 />
+                <div className="flex justify-end mt-2 sm:mt-0">
+                  <ModelToggle
+                    model={model}
+                    onChange={setModel}
+                    size="bar"
+                    disabled={sending}
+                    onHelpClick={() => setIsModelExplainerOpen(true)}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -1423,6 +1542,14 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
         skill={activeSkill}
         onClose={() => setActiveSkill(null)}
         onExample={handleQuerySelect}
+      />
+
+      {/* Deep ↔ Fast mode explainer modal — opened by the `?` button on
+          the ModelToggle (both landing and pill-island placements share
+          this single instance). */}
+      <JamiePullAgentModelExplainerModal
+        isOpen={isModelExplainerOpen}
+        onClose={() => setIsModelExplainerOpen(false)}
       />
 
       {/* Quota exceeded modal — triggered when /api/pull returns 429.
