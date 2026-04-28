@@ -744,8 +744,13 @@ export const JamiePullAgentMessage: React.FC<JamiePullAgentMessageProps> = ({ me
 
   if (message.role === 'user') {
     return (
+      // User bubble anchored to the right via justify-end. Capped at 70%
+      // on desktop so the bubble is bounded and the left side gets a
+      // generous gutter — symmetric (mirrored) with the agent bubble's
+      // right gutter. Mobile keeps the more generous 80% so short
+      // questions don't look orphaned in the corner of a narrow screen.
       <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl rounded-tr-sm px-4 py-3" style={{ background: 'radial-gradient(ellipse at 50% 50%, #1a1a1c, #111113)', border: '1.5px solid rgba(255,255,255,0.4)' }}>
+        <div className="max-w-[80%] md:max-w-[70%] rounded-2xl rounded-tr-sm px-4 py-3" style={{ background: 'radial-gradient(ellipse at 50% 50%, #1a1a1c, #111113)', border: '1.5px solid rgba(255,255,255,0.4)' }}>
           <p className="text-white text-sm">{message.content}</p>
         </div>
       </div>
@@ -753,14 +758,19 @@ export const JamiePullAgentMessage: React.FC<JamiePullAgentMessageProps> = ({ me
   }
 
   return (
+    // Agent bubble anchored to the left via justify-start. Capped at 70%
+    // on desktop so the bubble is bounded and the right side gets a
+    // generous gutter — symmetric (mirrored) with the user bubble's left
+    // gutter. Mobile keeps 90% so prose has room on narrow screens.
     <div className="flex justify-start">
-      <div className="max-w-[90%] w-full space-y-3">
+      <div className="max-w-[90%] md:max-w-[70%] w-full space-y-3">
         {(statusMessages.length > 0 || toolCalls.length > 0) && (
           <ActivityTimeline
             statusMessages={statusMessages}
             toolCalls={toolCalls}
             toolResults={toolResults}
             hasText={!!text}
+            running={!!loading}
           />
         )}
 

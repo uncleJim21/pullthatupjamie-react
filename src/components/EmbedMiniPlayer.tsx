@@ -248,7 +248,7 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
         </button>
       )}
 
-      <div className={`max-w-screen-xl mx-auto px-4 ${isCompactHeight ? 'py-1.5' : showHandle ? 'pt-0 pb-3' : 'py-3'}`}>
+      <div className={`max-w-screen-xl mx-auto px-4 ${isCompactHeight ? 'py-1.5' : showHandle ? 'pt-0 pb-3' : 'py-2 sm:py-3'}`}>
         {mode === 'embed' && !audioUnlocked ? (
           <div className="flex items-center justify-center gap-3 sm:gap-4 py-2 cursor-pointer hover:bg-white/5 transition-colors rounded-lg">
             {brandImage && (
@@ -305,7 +305,13 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
             {/* Content Info — takes the lion's share */}
             <div className="flex-1 min-w-0">
               {!isCompactHeight && mode !== 'embed' && (
-                <div className="flex items-center gap-2 mb-0.5">
+                /* Hidden on mobile to claw back vertical space inside
+                   the bottom pill island (the colored-dot + uppercase
+                   "paragraph"/"chapter"/etc. label is informational
+                   chrome that the title + creator already imply). The
+                   sm: breakpoint restores it on tablet/desktop where
+                   vertical space isn't at a premium. */
+                <div className="hidden sm:flex items-center gap-2 mb-0.5">
                   <div
                     className="w-2 h-2 rounded-full flex-shrink-0"
                     style={{
@@ -332,9 +338,22 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
               )}
               
               {!isCompactHeight && (
-                <p className="text-[10px] sm:text-xs text-gray-400 line-clamp-2 mt-1">
-                  {displayText}
-                </p>
+                /* Hidden on mobile to claw back ~20px of vertical
+                   chrome inside the bottom pill island — the snippet
+                   is mostly redundant when the user is already
+                   listening to the audio, and the title alone is
+                   enough context for short-screen layouts.
+
+                   Note: the `hidden sm:block` MUST live on the wrapper
+                   div, not the <p>. Putting it on the <p> overrides
+                   `line-clamp-N`'s required `display: -webkit-box` with
+                   plain `display: block`, which silently kills the
+                   clamp and lets the full quote spill out on desktop. */
+                <div className="hidden sm:block mt-1">
+                  <p className="text-[10px] sm:text-xs text-gray-400 line-clamp-2">
+                    {displayText}
+                  </p>
+                </div>
               )}
             </div>
 
@@ -386,8 +405,12 @@ const EmbedMiniPlayer: React.FC<EmbedMiniPlayerProps> = ({
                 </span>
               </div>
 
-              {/* Seek -5s / +5s — always shown, smaller in compact mode */}
-              <div className="flex gap-1">
+              {/* Seek -5s / +5s — hidden on mobile to claw back the
+                  second control row inside the bottom pill island.
+                  Play/pause + scrub via the audio element itself is
+                  enough on phones; full transport controls reappear
+                  on tablet/desktop where vertical space isn't tight. */}
+              <div className="hidden sm:flex gap-1">
                 <button
                   onClick={(e) => { e.stopPropagation(); isTrackActive && seekBy(-5); }}
                   disabled={!isTrackActive || !audioUrl}
