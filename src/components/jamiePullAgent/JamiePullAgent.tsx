@@ -1004,6 +1004,20 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
   const [isModelExplainerOpen, setIsModelExplainerOpen] = useState(false);
   // Session-stable tagline A/B pick (see TAGLINES array near the top).
   const tagline = useMemo(() => pickTagline(), []);
+  // Session-stable shuffled order for the Popular Topics grid. Computed
+  // once per mount so the cards don't re-shuffle on every render (which
+  // would cause animation thrash and disorient anyone mid-scroll), but
+  // every fresh visit / reload sees a different ordering — which keeps
+  // the landing screen feeling alive and gives less-popular categories
+  // a fair shot at the top-left "first read" slot. Fisher–Yates.
+  const shuffledCategories = useMemo(() => {
+    const arr = [...CATEGORIES];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, []);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastUserMsgRef = useRef<HTMLDivElement>(null);
@@ -1202,7 +1216,28 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
 
   const handleQuerySelect = (prompt: string) => {
     setInput(prompt);
-    inputRef.current?.focus();
+    const el = inputRef.current;
+    if (!el) return;
+    // Focus synchronously inside the user-gesture handler — iOS Safari
+    // suppresses the on-screen keyboard for focuses that happen outside
+    // the tap microtask, so calling focus() inside the rAF below is too
+    // late on mobile.
+    el.focus();
+    // setSelectionRange needs the new `value` to be committed in the
+    // DOM; defer one frame for React to flush the setInput update so we
+    // can land the caret at the END of the prompt instead of position 0.
+    // Also scroll the input into view — on mobile the user often taps a
+    // popular topic from below the fold, and without this the input
+    // ends up hidden behind the soon-to-appear keyboard.
+    requestAnimationFrame(() => {
+      try {
+        const end = prompt.length;
+        el.setSelectionRange(end, end);
+      } catch {
+        /* not all input types support setSelectionRange — fail silently */
+      }
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   };
 
   const hasMessages = messages.length > 0;
@@ -1388,7 +1423,7 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
                 bottom last). Assumes desktop 3-col layout; on smaller
                 viewports the delays still cascade monotonically. */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-[56rem]">
-              {CATEGORIES.map((cat, i) => {
+              {shuffledCategories.map((cat, i) => {
                 const row = Math.floor(i / 3);
                 const col = i % 3;
                 // If skill chips are showing, nudge the grid later so the
