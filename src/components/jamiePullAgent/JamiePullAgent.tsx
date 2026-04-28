@@ -1288,7 +1288,11 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
              messages anchored right with a large left gutter) is
              handled inside JamiePullAgentMessage via each bubble's own
              max-width + justify-start / justify-end. */
-          <div className="px-5 md:pl-36 md:pr-[51px] pt-14 pb-6 space-y-5">
+          /* pb-64 (256px) clears the absolutely-positioned bottom island
+             at the worst-case (mini-player + chat input) with extra
+             headroom so the last message can always be scrolled fully
+             above the pill instead of getting clipped behind it. */
+          <div className="px-5 md:pl-36 md:pr-[51px] pt-14 pb-64 space-y-5">
             {messages.map((msg, idx) => {
               let originalQuery: string | undefined;
               if (msg.role === 'assistant') {
@@ -1320,71 +1324,97 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
         )}
       </div>
 
-      {/* Mini-player */}
-      {showMiniPlayer && (
-        <div className="flex-shrink-0">
-          {/* Prev/Next clip nav */}
-          {orderedClipIds.length > 1 && (
-            <div className="flex items-center justify-center gap-2 px-5 py-2 bg-black/80 backdrop-blur-sm">
-              <NavGlowButton
-                direction="prev"
-                size="sm"
-                glowRgb="255,255,255"
-                disabled={!hasPrevClip}
-                onClick={() => gotoClip(-1)}
-                label="Prev"
-                title="Previous clip"
-              />
-              <span className="text-[11px] text-gray-500 tabular-nums min-w-[3.5rem] text-center">
-                {activeClipIndex >= 0 ? `${activeClipIndex + 1} / ${orderedClipIds.length}` : ''}
-              </span>
-              <NavGlowButton
-                direction="next"
-                size="sm"
-                glowRgb="255,255,255"
-                disabled={!hasNextClip}
-                onClick={() => gotoClip(1)}
-                label="Next"
-                title="Next clip"
-              />
-            </div>
-          )}
-          <div className="[&>div]:!relative [&>div]:!inset-auto">
-          <EmbedMiniPlayer
-            mode="app"
-            isHovered={true}
-            audioUnlocked={true}
-            trackId={activeClip.pineconeId}
-            audioUrl={activeClip.audioUrl}
-            episodeTitle={activeClip.episodeTitle}
-            episodeImage={activeClip.episodeImage}
-            creator={activeClip.creator}
-            publishedDate={activeClip.publishedDate}
-            timeContext={{
-              start_time: activeClip.startTime,
-              end_time: activeClip.endTime,
-            }}
-            quote={activeClip.text}
-            hierarchyLevel="paragraph"
-            onCopyLink={() => {
-              const url = createClipShareUrl(activeClip.pineconeId);
-              navigator.clipboard.writeText(url).catch(() => {});
-            }}
-          />
-          </div>
-        </div>
-      )}
+      {/* Bottom "island": unified floating panel that hosts the mini-player
+          (clip nav + audio scrubber) and the chat input. Centered, capped
+          at ~max-w-4xl with horizontal padding so it never touches the
+          viewport edges — looks like a single rounded card hovering above
+          the bottom of the screen instead of two full-bleed strips welded
+          to the sides. The constituent blocks inside used to ship their
+          own borders/backgrounds; those are stripped here so the island's
+          own border + bg + backdrop-blur are the sole visual chrome.
 
-      {/* Bottom input — active conversation */}
-      {hasMessages && (
-        <div className="flex-shrink-0 border-t border-gray-800/40 bg-black/90 backdrop-blur-lg px-5 py-3 flex justify-center">
-          <ChatInput
-            input={input}
-            setInput={setInput}
-            sending={sending}
-            onSubmit={handleSubmit}
-            inputRef={inputRef}
-          />
+          Absolutely positioned (not flex-shrink-0) so the gutters on
+          either side of the pill stay transparent — message text scrolls
+          underneath/behind those gutters instead of being clipped above
+          a black band. The messages scroll container below adds extra
+          bottom padding so the final message can be scrolled clear of
+          the pill. */}
+      {(showMiniPlayer || hasMessages) && (
+        <div className="absolute bottom-0 inset-x-0 px-3 sm:px-6 pb-3 pointer-events-none z-20">
+          <div className="mx-auto w-full max-w-4xl rounded-3xl border border-white/10 bg-black/85 backdrop-blur-lg overflow-hidden shadow-2xl shadow-black/50 pointer-events-auto">
+            {showMiniPlayer && (
+              <>
+                {/* Prev/Next clip nav — bg removed; the island provides it */}
+                {orderedClipIds.length > 1 && (
+                  <div className="flex items-center justify-center gap-2 px-5 py-2">
+                    <NavGlowButton
+                      direction="prev"
+                      size="sm"
+                      glowRgb="255,255,255"
+                      disabled={!hasPrevClip}
+                      onClick={() => gotoClip(-1)}
+                      label="Prev"
+                      title="Previous clip"
+                    />
+                    <span className="text-[11px] text-gray-500 tabular-nums min-w-[3.5rem] text-center">
+                      {activeClipIndex >= 0 ? `${activeClipIndex + 1} / ${orderedClipIds.length}` : ''}
+                    </span>
+                    <NavGlowButton
+                      direction="next"
+                      size="sm"
+                      glowRgb="255,255,255"
+                      disabled={!hasNextClip}
+                      onClick={() => gotoClip(1)}
+                      label="Next"
+                      title="Next clip"
+                    />
+                  </div>
+                )}
+                <div className="[&>div]:!relative [&>div]:!inset-auto">
+                  <EmbedMiniPlayer
+                    mode="app"
+                    isHovered={true}
+                    audioUnlocked={true}
+                    trackId={activeClip.pineconeId}
+                    audioUrl={activeClip.audioUrl}
+                    episodeTitle={activeClip.episodeTitle}
+                    episodeImage={activeClip.episodeImage}
+                    creator={activeClip.creator}
+                    publishedDate={activeClip.publishedDate}
+                    timeContext={{
+                      start_time: activeClip.startTime,
+                      end_time: activeClip.endTime,
+                    }}
+                    quote={activeClip.text}
+                    hierarchyLevel="paragraph"
+                    onCopyLink={() => {
+                      const url = createClipShareUrl(activeClip.pineconeId);
+                      navigator.clipboard.writeText(url).catch(() => {});
+                    }}
+                  />
+                </div>
+              </>
+            )}
+
+            {hasMessages && (
+              // Hairline divider only when the mini-player sits above; w/o
+              // it the chat input is the only child and the island's own
+              // top edge already provides separation.
+              <div
+                className={`px-5 py-3 flex justify-center ${
+                  showMiniPlayer ? 'border-t border-white/5' : ''
+                }`}
+              >
+                <ChatInput
+                  input={input}
+                  setInput={setInput}
+                  sending={sending}
+                  onSubmit={handleSubmit}
+                  inputRef={inputRef}
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
 
