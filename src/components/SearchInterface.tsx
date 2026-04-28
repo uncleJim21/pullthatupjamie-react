@@ -4097,7 +4097,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               ref={galaxyViewportRef}
               className="relative w-full transition-all duration-300 ease-in-out"
               style={{
-              height: isEmbedMode ? '100vh' : 'calc(100vh - 200px)' /* 200px leaves room for the PageBanner + inline view toggle + bottom player */ 
+              height: isEmbedMode ? '100vh' : 'calc(100vh - 150px)' /* 150px = PageBanner (~76px) + inline view toggle (~50px) + small breathing room. Lets the galaxy stretch all the way to the bottom of the viewport (matching pre-Agent-refactor behavior). */ 
               }}
             >
               <SemanticGalaxyView

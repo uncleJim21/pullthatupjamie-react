@@ -1288,7 +1288,7 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
              messages anchored right with a large left gutter) is
              handled inside JamiePullAgentMessage via each bubble's own
              max-width + justify-start / justify-end. */
-          <div className="px-5 md:pl-24 md:pr-[51px] pt-14 pb-6 space-y-5">
+          <div className="px-5 md:pl-36 md:pr-[51px] pt-14 pb-6 space-y-5">
             {messages.map((msg, idx) => {
               let originalQuery: string | undefined;
               if (msg.role === 'assistant') {
