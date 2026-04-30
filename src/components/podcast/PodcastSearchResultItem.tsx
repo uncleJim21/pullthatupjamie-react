@@ -857,9 +857,20 @@ export const PodcastSearchResultItem = ({
               {/* Episode text */}
               <div className="flex-grow pr-0 sm:pr-4 min-w-0 w-full sm:max-w-[calc(100%-220px)]">
                 <h3 className="text-lg font-medium text-white line-clamp-1 sm:line-clamp-2">{episode}</h3>
-                <p className="text-sm text-gray-400 line-clamp-1">{creator}</p>
+                {/* Mobile: creator and date inline with bar separator to save vertical space */}
+                <p className="text-sm text-gray-400 line-clamp-1 sm:hidden">
+                  <span>{creator}</span>
+                  {date && (
+                    <>
+                      <span className="mx-1.5 text-gray-600">|</span>
+                      <span className="text-gray-500">{formatShortDate(date)}</span>
+                    </>
+                  )}
+                </p>
+                {/* Desktop: creator on its own line, date in its own calendar row */}
+                <p className="hidden sm:block text-sm text-gray-400 line-clamp-1">{creator}</p>
                 {date && (
-                  <div className="flex items-center gap-1 mt-1">
+                  <div className="hidden sm:flex items-center gap-1 mt-1">
                     <Calendar className="w-3 h-3 text-gray-500" />
                     <span className="text-xs text-gray-500">{formatShortDate(date)}</span>
                   </div>
@@ -867,16 +878,16 @@ export const PodcastSearchResultItem = ({
               </div>
   
               {/* Action Buttons */}
-              <div className={`mt-4 sm:mt-0 sm:w-[200px] sm:min-w-[200px] sm:flex-shrink-0 grid ${presentationContext === PresentationContext.clipBatch ? 'grid-cols-2 sm:grid-cols-2 grid-rows-2' : 'grid-rows-1 grid-flow-col sm:grid-cols-2 sm:grid-flow-row'} gap-2`}>
+              <div className={`mt-3 sm:mt-0 sm:w-[200px] sm:min-w-[200px] sm:flex-shrink-0 grid ${presentationContext === PresentationContext.clipBatch ? 'grid-cols-2 sm:grid-cols-2 grid-rows-2' : 'grid-rows-1 grid-flow-col sm:grid-cols-2 sm:grid-flow-row'} gap-1.5 sm:gap-2`}>
                 <button
-                  className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                  className="flex items-center justify-start px-1.5 py-1 sm:px-2 sm:py-2 rounded-md text-xs sm:text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                   onClick={handleShare}
                 >
-                  <Link className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <Link className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
                   <span className="truncate">{showCopied ? 'Copied!' : 'Link'}</span>
                 </button>
                 <button
-                  className={`flex items-center justify-start px-2 py-2 rounded-md text-sm ${
+                  className={`flex items-center justify-start px-1.5 py-1 sm:px-2 sm:py-2 rounded-md text-xs sm:text-sm ${
                     listenLink
                       ? 'text-gray-300 hover:bg-gray-800 transition-colors'
                       : 'text-gray-600'
@@ -884,27 +895,27 @@ export const PodcastSearchResultItem = ({
                   onClick={handleListen}
                   disabled={!listenLink}
                 >
-                  <ExternalLink className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
                   <span className="truncate">Listen</span>
                 </button>
                 {onClipProgress && (<button
-                  className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                  className="flex items-center justify-start px-1.5 py-1 sm:px-2 sm:py-2 rounded-md text-xs sm:text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                   onClick={handleClip}
                 >
-                  <Scissors className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <Scissors className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
                   <span className="truncate">Clip</span>
                 </button>
                 )}
                 {presentationContext === PresentationContext.clipBatch && shareable && (
                   <button
-                    className="flex items-center justify-start px-2 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                    className="flex items-center justify-start px-1.5 py-1 sm:px-2 sm:py-2 rounded-md text-xs sm:text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                     onClick={handleShareClip}
                     disabled={isShareProcessing}
                   >
                     {isShareProcessing ? (
-                      <Loader className="h-4 w-4 mr-2 flex-shrink-0 animate-spin" />
+                      <Loader className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0 animate-spin" />
                     ) : (
-                      <Share className="h-4 w-4 mr-2 flex-shrink-0" />
+                      <Share className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
                     )}
                     <span className="truncate">
                       {isShareProcessing ? '' : 'Share'}
