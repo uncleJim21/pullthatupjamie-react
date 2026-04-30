@@ -3788,17 +3788,14 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             {searchMode === 'podcast-search' && (
               <div>
                 {resultViewStyle === SearchResultViewStyle.LIST && !isAnyModalOpen() && (
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <ClipTrackerModal
-                        clipProgress={clipProgress}
-                        isCollapsed={isClipTrackerCollapsed}
-                        onCollapsedChange={setIsClipTrackerCollapsed}
-                        auth={authConfig || undefined}
-                        onShareClick={handleClipShare}
-                      />
-                    </div>
-                    <div className="w-10"></div>
+                  <div className="w-full">
+                    <ClipTrackerModal
+                      clipProgress={clipProgress}
+                      isCollapsed={isClipTrackerCollapsed}
+                      onCollapsedChange={setIsClipTrackerCollapsed}
+                      auth={authConfig || undefined}
+                      onShareClick={handleClipShare}
+                    />
                   </div>
                 )}
                 <form onSubmit={handleSearch}>
@@ -4471,19 +4468,16 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               : null),
           }}
         >
-          <div className={`w-full flex flex-col ${isNarrowLayout ? 'max-w-[22rem]' : 'max-w-[40rem]'}`}>
+          <div className={`w-full flex flex-col ${isNarrowLayout ? '' : 'max-w-[40rem]'}`}>
             {resultViewStyle === SearchResultViewStyle.LIST && searchMode === 'podcast-search' && !isAnyModalOpen() && (
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <ClipTrackerModal
-                    clipProgress={clipProgress}
-                    isCollapsed={isClipTrackerCollapsed}
-                    onCollapsedChange={setIsClipTrackerCollapsed}
-                    auth={authConfig || undefined}
-                    onShareClick={handleClipShare}
-                  />
-                </div>
-                <div className="w-10"></div>
+              <div className="w-full">
+                <ClipTrackerModal
+                  clipProgress={clipProgress}
+                  isCollapsed={isClipTrackerCollapsed}
+                  onCollapsedChange={setIsClipTrackerCollapsed}
+                  auth={authConfig || undefined}
+                  onShareClick={handleClipShare}
+                />
               </div>
             )}
             {/* Result navigation strip — galaxy view, when a result is selected */}
@@ -4508,7 +4502,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             {/* Mobile keyword bar — sandwiched above the search input */}
             {isNarrowLayout && mobileKeywords.length > 0 && selectedParagraphId && (
               <div className="relative -mb-1.5" style={{ marginRight: '3rem' }}>
-                <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pr-6">
+                <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pr-6">
                   {mobileKeywords.map((kw, i) => (
                     <button
                       key={i}
