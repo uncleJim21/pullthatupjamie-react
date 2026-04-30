@@ -44,6 +44,10 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const pendingStartTimeRef = useRef<number | null>(null);
+  // Monotonic counter to bail out of stale playTrack invocations if a newer
+  // call supersedes them (e.g. user taps a second result while the first is
+  // still waiting for metadata to load).
+  const playSequenceRef = useRef(0);
 
   const loadTrack = useCallback((track: AudioTrack) => {
     const audio = audioRef.current;
@@ -91,10 +95,78 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
 
   const playTrack = useCallback(
     async (track: AudioTrack) => {
-      loadTrack(track);
-      await playInternal();
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      const sequence = ++playSequenceRef.current;
+
+      setCurrentTrack(track);
+      setIsPlaying(false);
+      setIsBuffering(true);
+
+      const desiredStart =
+        typeof track.startTime === 'number' ? track.startTime : null;
+      pendingStartTimeRef.current = desiredStart;
+
+      const isNewSrc = audio.src !== track.audioUrl;
+      if (isNewSrc) {
+        audio.src = track.audioUrl;
+        // Some mobile browsers won't begin loading until load() is called,
+        // which delays the loadedmetadata event we need before seeking.
+        try { audio.load(); } catch { /* ignore */ }
+      }
+
+      // Apply the seek BEFORE calling play() so playback always begins at the
+      // requested timestamp. Without this, on slow/mobile networks audio.play()
+      // resolves while readyState < HAVE_METADATA, so playback briefly starts
+      // at currentTime=0 (the start of the podcast) before loadedmetadata fires
+      // and the deferred seek snaps to the clip's start.
+      if (desiredStart !== null) {
+        if (audio.readyState < HTMLMediaElement.HAVE_METADATA) {
+          await new Promise<void>((resolve) => {
+            const cleanup = () => {
+              audio.removeEventListener('loadedmetadata', onLoaded);
+              audio.removeEventListener('error', onError);
+            };
+            const onLoaded = () => { cleanup(); resolve(); };
+            const onError = () => { cleanup(); resolve(); };
+            audio.addEventListener('loadedmetadata', onLoaded);
+            audio.addEventListener('error', onError);
+          });
+        }
+
+        // Bail out if a newer playTrack call superseded this one while we
+        // were awaiting metadata; otherwise we'd seek the wrong track.
+        if (sequence !== playSequenceRef.current) return;
+
+        try {
+          audio.currentTime = desiredStart;
+          setCurrentTime(desiredStart);
+        } catch {
+          // Ignore seek errors; the loadedmetadata handler still has the
+          // pendingStartTimeRef as a backup.
+        }
+        pendingStartTimeRef.current = null;
+      }
+
+      if (sequence !== playSequenceRef.current) return;
+
+      try {
+        await audio.play();
+        if (sequence !== playSequenceRef.current) return;
+        setIsPlaying(true);
+      } catch (err) {
+        console.error('Shared audio play error:', err);
+        if (sequence === playSequenceRef.current) {
+          setIsPlaying(false);
+        }
+      } finally {
+        if (sequence === playSequenceRef.current) {
+          setIsBuffering(false);
+        }
+      }
     },
-    [loadTrack, playInternal]
+    []
   );
 
   const togglePlay = useCallback(async () => {
