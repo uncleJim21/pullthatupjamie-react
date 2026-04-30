@@ -3789,7 +3789,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
               <div>
                 {resultViewStyle === SearchResultViewStyle.LIST && !isAnyModalOpen() && (
                   <div className="flex gap-3">
-                    <div className="flex-1">
+                    <div className="w-10 flex-shrink-0"></div>
+                    <div className="flex-1 min-w-0">
                       <ClipTrackerModal
                         clipProgress={clipProgress}
                         isCollapsed={isClipTrackerCollapsed}
@@ -3798,7 +3799,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                         onShareClick={handleClipShare}
                       />
                     </div>
-                    <div className="w-10"></div>
+                    <div className="w-10 flex-shrink-0"></div>
                   </div>
                 )}
                 <form onSubmit={handleSearch}>
@@ -4474,7 +4475,8 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
           <div className={`w-full flex flex-col ${isNarrowLayout ? 'max-w-[22rem]' : 'max-w-[40rem]'}`}>
             {resultViewStyle === SearchResultViewStyle.LIST && searchMode === 'podcast-search' && !isAnyModalOpen() && (
               <div className="flex gap-3">
-                <div className="flex-1">
+                <div className="w-10 flex-shrink-0"></div>
+                <div className="flex-1 min-w-0">
                   <ClipTrackerModal
                     clipProgress={clipProgress}
                     isCollapsed={isClipTrackerCollapsed}
@@ -4483,7 +4485,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
                     onShareClick={handleClipShare}
                   />
                 </div>
-                <div className="w-10"></div>
+                <div className="w-10 flex-shrink-0"></div>
               </div>
             )}
             {/* Result navigation strip — galaxy view, when a result is selected */}
@@ -4508,7 +4510,7 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
             {/* Mobile keyword bar — sandwiched above the search input */}
             {isNarrowLayout && mobileKeywords.length > 0 && selectedParagraphId && (
               <div className="relative -mb-1.5" style={{ marginRight: '3rem' }}>
-                <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pr-6">
+                <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pr-6">
                   {mobileKeywords.map((kw, i) => (
                     <button
                       key={i}
