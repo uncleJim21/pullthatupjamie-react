@@ -1446,20 +1446,16 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
                 back model selection. */}
           </div>
         ) : (
-          /* Top padding leaves room for the fixed Reset button
-             (fixed top-3 right-4) so it never overlaps the first
-             message bubble on narrow viewports.
-
-             The parent stays full-width. Per-bubble asymmetry (agent
-             messages anchored left with a large right gutter; user
-             messages anchored right with a large left gutter) is
-             handled inside JamiePullAgentMessage via each bubble's own
-             max-width + justify-start / justify-end. */
-          /* pb-64 (256px) clears the absolutely-positioned bottom island
-             at the worst-case (mini-player + chat input) with extra
-             headroom so the last message can always be scrolled fully
-             above the pill instead of getting clipped behind it. */
-          <div className="px-5 md:pl-36 md:pr-[51px] pt-14 pb-64 space-y-5">
+          <>
+            {/* Top padding clears fixed Reset. Thread gutters: px-2.5 on
+                mobile only; md+ keeps pl-36 / pr-[51px]. Bubble width is in
+                JamiePullAgentMessage. pb-64 when mini-player strip is shown,
+                pb-40 when composer-only. */}
+            <div
+              className={`px-2.5 md:pl-36 md:pr-[51px] pt-14 space-y-5 ${
+                showMiniPlayer ? 'pb-64' : 'pb-40'
+              }`}
+            >
             {messages.map((msg, idx) => {
               let originalQuery: string | undefined;
               if (msg.role === 'assistant') {
@@ -1488,6 +1484,7 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
             {/* Viewport slack — dynamic; only exists when anchoring new user msg to top */}
             {slackHeight > 0 && <div style={{ height: slackHeight }} aria-hidden="true" />}
           </div>
+          </>
         )}
       </div>
 
@@ -1508,7 +1505,7 @@ export const JamiePullAgent: React.FC<JamiePullAgentProps> = ({ onSignUp, onUpgr
           the pill. */}
       {(showMiniPlayer || hasMessages) && (
         <div className="absolute bottom-0 inset-x-0 px-3 sm:px-6 pb-3 pointer-events-none z-20">
-          <div className="mx-auto w-full max-w-4xl rounded-3xl border border-white/10 bg-black/85 backdrop-blur-lg overflow-hidden shadow-2xl shadow-black/50 pointer-events-auto">
+          <div className="mx-auto w-full max-w-4xl rounded-3xl border-2 border-white/15 bg-black/85 backdrop-blur-lg overflow-hidden shadow-2xl shadow-black/50 pointer-events-auto">
             {showMiniPlayer && (
               <>
                 {/* Prev/Next clip nav — bg removed; the island provides it */}
