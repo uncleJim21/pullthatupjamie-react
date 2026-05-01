@@ -87,6 +87,11 @@ const INITIAL_RETRY_DELAY_MS = 1000;
 async function fetchClipMeta(pineconeId: string): Promise<ClipMeta | null> {
   return new Promise<ClipMeta | null>(resolve => {
     const run = async () => {
+      const cachedHit = clipMetaCache.get(pineconeId);
+      if (cachedHit) {
+        resolve(cachedHit);
+        return;
+      }
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
           const res = await fetch(
@@ -731,8 +736,15 @@ export const JamiePullAgentMessage: React.FC<JamiePullAgentMessageProps> = ({ me
 
   const handleCardClick = useCallback(
     (pineconeId: string) => {
-      const meta = clipMetaCache.get(pineconeId);
-      if (meta && onPlayClip) onPlayClip(meta);
+      if (!onPlayClip) return;
+      const cached = clipMetaCache.get(pineconeId);
+      if (cached) {
+        onPlayClip(cached);
+        return;
+      }
+      void fetchClipMeta(pineconeId).then((meta) => {
+        if (meta) onPlayClip(meta);
+      });
     },
     [onPlayClip]
   );
@@ -761,9 +773,11 @@ export const JamiePullAgentMessage: React.FC<JamiePullAgentMessageProps> = ({ me
     // Agent bubble anchored to the left via justify-start. Capped at 70%
     // on desktop so the bubble is bounded and the right side gets a
     // generous gutter — symmetric (mirrored) with the user bubble's left
-    // gutter. Mobile keeps 90% so prose has room on narrow screens.
+    // gutter. Mobile uses full width of the padded thread so horizontal
+    // gutters come only from the parent (narrow px-2.5) instead of max-w-[90%]
+    // widening the inset on only one side.
     <div className="flex justify-start">
-      <div className="max-w-[90%] md:max-w-[70%] w-full space-y-3">
+      <div className="w-full md:max-w-[70%] space-y-3">
         {(statusMessages.length > 0 || toolCalls.length > 0) && (
           <ActivityTimeline
             statusMessages={statusMessages}
