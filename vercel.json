@@ -10,6 +10,10 @@
       "destination": "/api/blog/[slug]"
     },
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap.xml"
+    },
+    {
       "source": "/api/rss/:path*",
       "destination": "https://rss-extractor-app-yufbq.ondigitalocean.app/:path*"
     },
@@ -34,6 +38,15 @@
         {
           "key": "Cache-Control",
           "value": "public, s-maxage=600, stale-while-revalidate=120"
+        }
+      ]
+    },
+    {
+      "source": "/api/sitemap.xml",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, s-maxage=600, stale-while-revalidate=3600"
         }
       ]
     }

@@ -210,6 +210,18 @@ const BlogPost: React.FC = () => {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Canonical path is /blog/:slug. The SSR layer at /blog/:slug bounces humans
+  // into /app/blog/:slug to mount this SPA, which leaves the non-canonical path
+  // in the address bar — and that's what users copy into Slack/iMessage/X. Quietly
+  // rewrite it back to the canonical here, with no reload or React re-render.
+  useEffect(() => {
+    if (!slug || typeof window === 'undefined') return;
+    if (window.location.pathname.startsWith('/app/blog/')) {
+      const canonicalPath = `/blog/${slug}${window.location.search}${window.location.hash}`;
+      window.history.replaceState(null, '', canonicalPath);
+    }
+  }, [slug]);
+
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
