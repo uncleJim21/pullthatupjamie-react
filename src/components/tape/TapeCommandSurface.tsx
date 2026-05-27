@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, ArrowRight, Newspaper, GitCompare } from 'lucide-react';
+import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp } from 'lucide-react';
 import { TAPE_NAME } from '../../config/tapeConfig.ts';
 import type { TapeActionId } from '../../services/tape/tapeTypes.ts';
 
@@ -33,6 +33,13 @@ const SECONDARY: SecondaryAction[] = [
     icon: GitCompare,
     example: { label: 'the AI bubble: bulls vs bears', launch: { action: 'split', person: 'The bears', personB: 'The bulls', topic: 'the AI bubble' } },
   },
+  {
+    id: 'arc',
+    title: 'Watch a view evolve',
+    desc: 'How one person’s thesis, and their conviction in it, moved over years, with every call sourced.',
+    icon: TrendingUp,
+    example: { label: 'Gromen: the debt-spiral thesis', launch: { action: 'arc', person: 'Luke Gromen' } },
+  },
 ];
 
 const PERSON_EXAMPLES = ['Mohamed El-Erian', 'Luke Gromen', 'Mike Green'];
@@ -53,10 +60,10 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
           {TAPE_NAME}
         </h1>
         <p className="mt-3 text-lg font-medium sm:text-xl" style={{ color: 'var(--tape-fg)' }}>
-          Read the tape. Skip the prattle. Extract the alpha.
+          Read The Tape. Skip the prattle. Extract the alpha.
         </p>
         <p className="mx-auto mt-2.5 max-w-md text-[14px] leading-relaxed" style={{ color: 'var(--tape-fg-dim)' }}>
-          Bloomberg Surveillance, Real Vision, Macro Voices and the rest of the macro feed, searchable. Condensed alpha without burning hours.
+          Bloomberg, Real Vision, Macro Voices and the rest of the macro feed, searchable. Condensed alpha without burning hours.
         </p>
       </div>
 

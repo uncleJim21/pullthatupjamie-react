@@ -43,9 +43,9 @@ Deep-links (for demo + verification): `/tape?a=dossier&p=Mohamed%20El-Erian`, `/
 
 To refresh the canon: run new `/api/pull` queries, hydrate ids, and re-bake (`/tmp/tape_gen2.py` is the current generator).
 
-### Parked: Timeline → longitudinal study (not mention-counts)
+### Arc (shipped): the longitudinal "how a view evolved" study
 
-The original Timeline (quantitative weekly mention counts) is **removed from the UI** for now. The reimagined version is a **longitudinal study**: "how has *person X* evolved on a view" or "how has the street changed its tune on *topic Y* over N years", rendered as a time axis with **pointillist real quotes** at each inflection, not a bar/area count chart. This needs the same `/pull` + citation primitives plus date-ordered retrieval; revisit after Dossier / Brief / Split are nailed. `TimelineView` + `timelineService` remain in the tree (dormant) and the `/api/tape/timeline` count endpoint in §5 is deferred with it.
+The original Timeline (quantitative weekly mention counts) stays **removed**; its reimagined replacement shipped as **Arc**. Arc traces **one person's thesis over time** as a vertical spine of real, dated quotes pulled from their guest-dominant episodes (`corpus/people/episodes` → `search-quotes` within each), newest beats escalating. The "wow" is a **conviction trajectory**: each quote gets a **1–5 conviction read taken from the LANGUAGE** (hedged "may be beginning" = low → absolute "the only debate is how fast" = high), plotted as a rising line. This is explicitly *not* a market-sentiment score; it's a defensible read of how forcefully the claim is stated, and every point is clickable to the source quote. Arc also carries per-beat **outcomes** ("weeks later the 10-year blew out toward 5%") and a **forward call** ("what he's calling for next"). First Arc: Luke Gromen's sovereign-debt thesis, 2021→2026, all MacroVoices (his own 1-on-1s = high confidence). Files: `actions/ArcView.tsx`, `arcService.ts`, `ArcResult`/`ArcCall` in `tapeTypes.ts`. The dead `TimelineView`/`timelineService` and the `/api/tape/timeline` count endpoint (§5) remain deferred. A topic/consensus-level Arc (multi-person "how the street's tune shifted") is the next parked idea.
 
 ---
 

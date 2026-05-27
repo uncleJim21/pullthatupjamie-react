@@ -8,6 +8,7 @@ import DossierView from './actions/DossierView.tsx';
 import TimelineView from './actions/TimelineView.tsx';
 import BriefView from './actions/BriefView.tsx';
 import SplitView from './actions/SplitView.tsx';
+import ArcView from './actions/ArcView.tsx';
 import '../../styles/tape.css';
 
 const ACTION_TITLES: Record<TapeLaunch['action'], string> = {
@@ -15,6 +16,7 @@ const ACTION_TITLES: Record<TapeLaunch['action'], string> = {
   timeline: 'Timeline',
   brief: 'Brief',
   split: 'Split',
+  arc: 'Arc',
 };
 
 const ActiveView: React.FC<{ launch: TapeLaunch }> = ({ launch }) => {
@@ -27,6 +29,8 @@ const ActiveView: React.FC<{ launch: TapeLaunch }> = ({ launch }) => {
       return <BriefView initialTopic={launch.topic} />;
     case 'split':
       return <SplitView initialA={launch.person} initialB={launch.personB} initialTopic={launch.topic} />;
+    case 'arc':
+      return <ArcView initialPerson={launch.person} />;
     default:
       return null;
   }
@@ -38,7 +42,7 @@ const launchFromUrl = (): TapeLaunch | null => {
   try {
     const sp = new URLSearchParams(window.location.search);
     const a = sp.get('a');
-    if (a === 'dossier' || a === 'brief' || a === 'split' || a === 'timeline') {
+    if (a === 'dossier' || a === 'brief' || a === 'split' || a === 'timeline' || a === 'arc') {
       return {
         action: a,
         person: sp.get('p') || undefined,
@@ -67,7 +71,7 @@ const TapePage: React.FC = () => {
   return (
     <AudioControllerProvider>
       <Helmet>
-        <title>{TAPE_NAME} — macro commentary intelligence</title>
+        <title>{TAPE_NAME}: macro commentary intelligence</title>
         <meta name="description" content="Read the tape, skip the noise. Search what the sharpest macro voices actually said across Bloomberg Surveillance, Odd Lots and the top finance podcasts. Real quotes, timestamped and sourced." />
         <meta name="robots" content="noindex" />
       </Helmet>

@@ -1,14 +1,14 @@
 // Tape skin — fixtures baked from REAL /api/search-quotes + /api/corpus/people output.
 //
-// HIGH-CONFIDENCE attribution despite no diarization: dossier quotes are pulled
-// ONLY from guest-dominant episodes (1-on-1 interviews / keynotes), never panels
-// or rotating anchor desks, and biased to long monologue paragraphs, then read by
-// hand to drop host turns. The Brief uses minDate for fresh (May 2026) coverage.
-// See docs/tape-api.md for the method + the diarization caveat.
+// HIGH-CONFIDENCE attribution despite no diarization: dossier + Arc quotes are
+// pulled ONLY from guest-dominant episodes (1-on-1 interviews / keynotes), never
+// panels or rotating anchor desks. The Arc traces one person's thesis over time
+// with a conviction read taken from the LANGUAGE of each quote (not a market
+// score). See docs/tape-api.md for the method + the diarization caveat.
 
 import type {
   TapeCitation, DossierResult, TimelineResult, TimelineBucket,
-  TimelineDrilldownResult, BriefResult, SplitResult,
+  TimelineDrilldownResult, BriefResult, SplitResult, ArcResult,
 } from '../services/tape/tapeTypes.ts';
 
 const slug = (s: string) => s.trim().toLowerCase();
@@ -330,6 +330,115 @@ const SPLIT_AI: SplitResult = {
   generatedAt: new Date().toISOString(),
 };
 
+const ARC_GROMEN: ArcResult = {
+  person: "Luke Gromen",
+  thesis: "The sovereign-debt endgame: Washington can't fund itself without printing, so the bond market eventually breaks and gold quietly takes the baton from Treasuries.",
+  verdict: "Conviction: rising, and the calls keep landing",
+  calls: [
+    {
+      date: "2021-10-21T21:00:39.000Z",
+      label: "Debt isn't deflationary forever",
+      conviction: 2,
+      citation:       {
+        pineconeId: "macrovoices_podbean_com_d8c720dc-dea5-323b-8efb-19cacc16756a_p65",
+        text: "And so I think right now people say, well, you know, I don't think they're aware of the politics of the situation. And by that, I mean if you are just repeating to yourself that debt is always deflationary, yes, that's true, until the sovereign is where the debt reaches. And that's a different game because once the sovereign gets into too much debt, the question is, are they going to print the money or not? And they always print the money. They always print the money.",
+        episodeTitle: "MacroVoices #294 Luke Gromen: The U.S. Government Cannot Afford Secular Inflation",
+        creator: "Macro Voices",
+        episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancomd8c720dc-dea5-323b-8efb-19cacc16756a.mp3",
+        startTime: 1650.75,
+        endTime: 1676.99,
+        publishedDate: "2021-10-21T21:00:39.000Z",
+      },
+    },
+    {
+      date: "2022-06-09T22:00:56.000Z",
+      label: "Recession AND rising yields",
+      conviction: 3,
+      outcome: "The non-consensus combo almost no one was positioned for.",
+      citation:       {
+        pineconeId: "macrovoices_podbean_com_6f52b14f-3208-39e2-b8f7-573c99b7e40d_p88",
+        text: "going to a recession and treasury yields going up because of the balance of payments problem I just laid out, that is a message to those with the eyes to see it that one of two things is going to happen. The global economy, the U.S. dollar system, is going to go into a debt-death spiral, which is, you know, Brent Johnson's, hey, the dollar goes to 200, DXY goes to 200, and the world collapses. I don't know that that'll happen, but it could if the Fed just stands aside. The more likely outcome, and why I think it is, you know, dollar negative is much more likely as the Fed comes in with some version of yield curve control and actually prints money to contain U.S.",
+        episodeTitle: "MacroVoices #327 Luke Gromen: Recession with Rising Yields is Entirely Possible",
+        creator: "Macro Voices",
+        episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancom6f52b14f-3208-39e2-b8f7-573c99b7e40d.mp3",
+        startTime: 2402.06,
+        endTime: 2439.98,
+        publishedDate: "2022-06-09T22:00:56.000Z",
+      },
+    },
+    {
+      date: "2023-03-16T16:19:51.000Z",
+      label: "A sovereign-debt bubble, named",
+      conviction: 3,
+      citation:       {
+        pineconeId: "macrovoices_podbean_com_501810ee-6f2c-3b75-9108-a5c86c103e5f_p87",
+        text: "First bursting global sovereign debt bubble in 100 years, first peak cheap energy cycle in a long, long time, this rise of another great power competition, all of these, you know, the derivative side. So, the barbell to us is an acknowledgement of, and it's how we're investing our own money. It's an acknowledgement to really I have high conviction in how this game is going to end, which is with inflation. Because once sovereign debt bubbles, sovereign debt crises rarely end in deflation. However, the cash and the short-term treasuries are really a nod to, I have no conviction in the path.",
+        episodeTitle: "MacroVoices #367 Luke Gromen: USD Update in the Wake of SVB Collapse",
+        creator: "Macro Voices",
+        episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancom501810ee-6f2c-3b75-9108-a5c86c103e5f.mp3",
+        startTime: 2615.63,
+        endTime: 2663.55,
+        publishedDate: "2023-03-16T16:19:51.000Z",
+      },
+    },
+    {
+      date: "2023-10-05T16:22:25.000Z",
+      label: "They sell what they can: Treasuries",
+      conviction: 4,
+      outcome: "Weeks later the 10-year blew out toward 5% on a buyers' strike.",
+      citation:       {
+        pineconeId: "macrovoices_podbean_com_cc72dec5-0cf4-318a-a1f7-bdb91fe5f216_p18",
+        text: "And so what do they sell? They sell what they can, not necessarily what they want to. They sell treasuries. So that adds to what is already a very problematic supply-demand dynamic in terms of the U.S. running a two-point, you know, trailing 12-month deficit is about 8.5%, just short of 8.5% to GDP.",
+        episodeTitle: "MacroVoices #396 Luke Gromen: The Dollar Treasury Feedback Loop, Deconstructed",
+        creator: "Macro Voices",
+        episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancomcc72dec5-0cf4-318a-a1f7-bdb91fe5f216.mp3",
+        startTime: 376.8,
+        endTime: 396.96,
+        publishedDate: "2023-10-05T16:22:25.000Z",
+      },
+    },
+    {
+      date: "2024-10-03T14:15:14.000Z",
+      label: "Central banks pick gold over Treasuries",
+      conviction: 4,
+      outcome: "Gold ran to repeated all-time highs through 2025.",
+      citation:       {
+        pineconeId: "macrovoices_podbean_com_adddb25c-9824-3ea7-933e-1f4f6e575d4f_p65",
+        text: "It's that we are issuing more and more debt more and more frequently at the front end because the debt is getting so big and the sort of big, patient, nonprofit-motivated creditor, central banks, haven't bought any U.S. Treasury bonds in 10 years. And so, again, this is fine. This doesn't mean, oh, the world's coming to an end, but this is like payday lending kind of stuff. And it has, again, a very specific set of contextual implications, which is issuing more and more bonds at shorter and shorter durations with more and more fickle creditors in a world where the Fed and Treasury are not allowing Treasury volatility to go above a certain level.",
+        episodeTitle: "MacroVoices #448 Luke Gromen: Why the Gold Recycling Trade is Accelerating",
+        creator: "Macro Voices",
+        episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancomadddb25c-9824-3ea7-933e-1f4f6e575d4f.mp3",
+        startTime: 1682.29,
+        endTime: 1726.45,
+        publishedDate: "2024-10-03T14:15:14.000Z",
+      },
+    },
+    {
+      date: "2026-04-16T16:48:30.000Z",
+      label: "It already started",
+      conviction: 5,
+      citation:       {
+        pineconeId: "macrovoices_podbean_com_38642e0b-b3e7-37f0-9c81-14b0f489cf8e_p98",
+        text: "And so people say, well, when's it going to start? And you go, when's it going to start? Since central banks stopped buying treasuries and started buying gold. You know, long-term treasury bond futures priced in gold are down 90% since 2014. And it's like the dream trade for a macro.",
+        episodeTitle: "MacroVoices #528 Luke Gromen: Hormuz Could Lead To a 1956 US Suez Moment",
+        creator: "Macro Voices",
+        episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancom38642e0b-b3e7-37f0-9c81-14b0f489cf8e.mp3",
+        startTime: 2521.93,
+        endTime: 2539.36,
+        publishedDate: "2026-04-16T16:48:30.000Z",
+      },
+    },
+  ],
+  forwardCall: "What he's calling for next: a forced dollar devaluation against gold this decade, FDR-style, as the only way out of the debt spiral.",
+  generatedAt: new Date().toISOString(),
+};
+
 const findDossier = (person: string): DossierResult | null => {
   const q = slug(person);
   for (const key of Object.keys(DOSSIERS)) {
@@ -349,6 +458,10 @@ export function mockSplit(personA: string, personB: string, topic: string): Spli
   const all = slug(`${personA} ${personB} ${topic}`);
   if (all.includes('ai') || all.includes('bubble') || all.includes('bull') || all.includes('bear')) return SPLIT_AI;
   return { topic: topic.trim(), sideA: { person: personA.trim(), positionSummary: '', citations: [] }, sideB: { person: personB.trim(), positionSummary: '', citations: [] }, generatedAt: new Date().toISOString() };
+}
+export function mockArc(person: string): ArcResult {
+  if (slug(person).includes('gromen')) return ARC_GROMEN;
+  return { person: person.trim(), thesis: '', verdict: '', calls: [], generatedAt: new Date().toISOString() };
 }
 const mondayOf = (d: Date): Date => { const o = new Date(d); o.setDate(o.getDate() - ((o.getDay() + 6) % 7)); o.setHours(0, 0, 0, 0); return o; };
 const isoDate = (d: Date): string => d.toISOString().slice(0, 10);

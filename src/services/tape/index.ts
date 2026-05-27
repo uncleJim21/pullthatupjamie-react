@@ -3,4 +3,5 @@ export { getDossier } from './dossierService.ts';
 export { getTimeline, getTimelineDrilldown } from './timelineService.ts';
 export { getBrief } from './briefService.ts';
 export { getSplit } from './splitService.ts';
+export { getArc } from './arcService.ts';
 export * from './tapeTypes.ts';

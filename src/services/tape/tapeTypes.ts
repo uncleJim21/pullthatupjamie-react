@@ -125,5 +125,31 @@ export interface SplitResult {
   generatedAt: string;
 }
 
-/** The four action verbs, used by the command parser + launcher. */
-export type TapeActionId = 'dossier' | 'timeline' | 'brief' | 'split';
+// ─── 5. Arc — how one person's view on a thesis evolved over time ────────────
+export interface ArcInput {
+  person: string;
+}
+export interface ArcCall {
+  date: string; // ISO of the clip
+  /** Short claim/stance for this beat, e.g. "Recession AND rising yields". */
+  label: string;
+  /** Conviction read from the LANGUAGE of the quote, 1 (hedged) .. 5 (absolute).
+   *  Not a market-sentiment score; a defensible read of how forcefully it's stated. */
+  conviction: number;
+  /** What happened after, if this call landed. Optional. */
+  outcome?: string;
+  citation: TapeCitation;
+}
+export interface ArcResult {
+  person: string;
+  thesis: string;
+  /** One-line verdict chip, e.g. "Conviction: rising — and the calls are landing". */
+  verdict: string;
+  calls: ArcCall[]; // chronological
+  /** "What he's calling for next" — the live forward prediction. */
+  forwardCall?: string;
+  generatedAt: string;
+}
+
+/** The action verbs, used by the command parser + launcher. */
+export type TapeActionId = 'dossier' | 'timeline' | 'brief' | 'split' | 'arc';
