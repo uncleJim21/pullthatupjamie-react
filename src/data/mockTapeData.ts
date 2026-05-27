@@ -1,284 +1,366 @@
-// Tape skin — mock fixtures.
+// Tape skin — fixtures baked from REAL /api/search-quotes + /api/corpus/people output.
 //
-// Mirrors the literal-fixture style of src/data/mockGalaxyData.ts. These power
-// the skin while USE_MOCK_TAPE === true (src/config/tapeConfig.ts) and are
-// shaped to match exactly what the real /pull-backed services will assemble,
-// so the swap to live data is invisible to the views.
-//
-// NOTE: audioUrl values are placeholders — playback wiring is real, but these
-// URLs won't produce sound. Real citations resolve via get-hierarchy.
+// HIGH-CONFIDENCE attribution despite no diarization: dossier quotes are pulled
+// ONLY from guest-dominant episodes (1-on-1 interviews / keynotes), never panels
+// or rotating anchor desks, and biased to long monologue paragraphs, then read by
+// hand to drop host turns. The Brief uses minDate for fresh (May 2026) coverage.
+// See docs/tape-api.md for the method + the diarization caveat.
 
 import type {
-  TapeCitation,
-  DossierResult,
-  TimelineResult,
-  TimelineBucket,
-  TimelineDrilldownResult,
-  BriefResult,
-  SplitResult,
+  TapeCitation, DossierResult, TimelineResult, TimelineBucket,
+  TimelineDrilldownResult, BriefResult, SplitResult,
 } from '../services/tape/tapeTypes.ts';
-
-interface RawQuote {
-  text: string;
-  show: string;
-  episode: string;
-  date: string; // ISO
-  start: number; // seconds
-}
 
 const slug = (s: string) => s.trim().toLowerCase();
 
-// person|topic → quotes. Deliberately small but believable.
-const QUOTE_BANK: Record<string, RawQuote[]> = {
-  'stanley druckenmiller|fed policy': [
-    {
-      text: "I've never seen a situation where the Fed is this far behind the curve and still talking about being data dependent. They should have moved six months ago.",
-      show: 'Forward Guidance',
-      episode: 'Druckenmiller on the Fed’s Credibility Problem',
-      date: '2025-02-18',
-      start: 872,
-    },
-    {
-      text: 'When the cost of capital goes from zero to five in eighteen months, you are going to break something. The only question is what and when.',
-      show: 'Macro Voices',
-      episode: 'The Lag Effect',
-      date: '2024-11-05',
-      start: 1455,
-    },
-  ],
-  'stanley druckenmiller|rate cuts': [
-    {
-      text: "I'm skeptical of the soft-landing narrative. Cutting into a re-accelerating economy is how you get the second wave of inflation.",
-      show: 'The Market Huddle',
-      episode: 'Positioning for 2025',
-      date: '2025-01-14',
-      start: 2103,
-    },
-  ],
-  'stanley druckenmiller|yield-curve inversion': [
-    {
-      text: 'The inversion has been the most reliable recession signal in history. The fact that it un-inverted does not mean we are clear, it usually means we are close.',
-      show: 'Odd Lots',
-      episode: 'Reading the Curve',
-      date: '2025-03-03',
-      start: 640,
-    },
-  ],
-  'lyn alden|fed policy': [
-    {
-      text: 'This is a fiscally dominant environment. The deficits are so large that monetary policy is pushing on a string, and people keep modeling it like it is 2010.',
-      show: 'Forward Guidance',
-      episode: 'Fiscal Dominance, Explained',
-      date: '2025-02-25',
-      start: 980,
-    },
-  ],
-  'lyn alden|bitcoin': [
-    {
-      text: 'Bitcoin is the cleanest expression of the debasement trade. You do not need a price target, you need a denominator that keeps shrinking.',
-      show: 'We Study Billionaires',
-      episode: 'The Debasement Decade',
-      date: '2025-01-29',
-      start: 1820,
-    },
-    {
-      text: 'I treat it as a high-beta liquidity asset over short windows and a monetary hedge over long ones. Both can be true.',
-      show: 'Macro Voices',
-      episode: 'Liquidity and the Cycle',
-      date: '2024-12-10',
-      start: 2440,
-    },
-  ],
-  'lyn alden|the dollar': [
-    {
-      text: 'The dollar wrecking ball is real but it is cyclical. Structural diversification away from Treasuries by central banks is the slower, more important story.',
-      show: 'Odd Lots',
-      episode: 'Dollar Plumbing',
-      date: '2025-02-04',
-      start: 705,
-    },
-  ],
-  'mike green|fed policy': [
-    {
-      text: 'The passive flows dominate price discovery now. The Fed can set the rate, but the marginal buyer is a 401k contribution that does not care about valuation.',
-      show: 'The Market Huddle',
-      episode: 'The Passive Problem',
-      date: '2025-02-11',
-      start: 1330,
-    },
-  ],
-  'mike green|commercial real estate': [
-    {
-      text: 'Regional banks are sitting on commercial real estate marks they have not taken. The maturity wall in 2025 and 2026 is where the denial meets the cash flow.',
-      show: 'Forward Guidance',
-      episode: 'The CRE Maturity Wall',
-      date: '2025-01-21',
-      start: 2010,
-    },
-  ],
-  'mike green|rate cuts': [
-    {
-      text: 'If they cut, it is not because things are fine. It is because something in the plumbing forced their hand. Do not celebrate the pivot.',
-      show: 'Macro Voices',
-      episode: 'Plumbing Risk',
-      date: '2025-03-10',
-      start: 1190,
-    },
-  ],
+const DOSSIERS: Record<string, DossierResult> = {
+  "el-erian": {
+    person: "Mohamed El-Erian",
+    topics: [
+      {
+        topic: "Inflation and the Fed",
+        positionSummary: "El-Erian's core warning: the Fed cannot afford to look through inflation again the way it did in 2021, and the fight against it has stalled rather than ended.",
+        citations: [
+          {
+            pineconeId: "971334dc-fb84-11ef-b10d-5f7c5528ba91_p63",
+            text: "The Fed is not going to look through the inflation problem because last time it looked through it in 2021, it made a major mistake. And you will hear over and over the experience of the 70s, the experience of the 70s. Be careful, because if you don't, if you let the inflation genie out of the bottle, when people have a recent history of inflation, then how inflation-prone the economy is goes up significantly. I want to go one notch deeper on the inflation stalling out situation because, you know, obviously we've seen most of the disinflation has occurred due to goods disinflation. Services have been quite sticky.",
+            episodeTitle: "The US is Risking Stagflation | Mohamed El-Erian",
+            creator: "Forward Guidance",
+            episodeImage: "https://megaphone.imgix.net/podcasts/f398def0-373d-11ec-a51f-8fb207c4cf09/image/a75147ace106f858919e6a202dfa4c94.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+            audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/4502930/971334dc-fb84-11ef-b10d-5f7c5528ba91.mp3",
+            startTime: 1346.95,
+            endTime: 1388.23,
+            publishedDate: "2025-03-07T18:54:00.000Z",
+          },
+          {
+            pineconeId: "8f08fc3e-0522-11f0-b872-8b7fb79b78c4_p18",
+            text: "And there, everybody agrees that the fight against inflation has stalled. That at best we are plateaued. Now that wouldn't be a problem if the Fed had a 2.5% to 3% inflation target. It is a problem because the Fed has a 2% inflation target and it needs to decide does it do something about it or not.",
+            episodeTitle: "The U.S. Debt Crisis: Why Growth Is the Only Solution | Mohamed El-Erian Pt. 2 LIVE @ DAS",
+            creator: "Forward Guidance",
+            episodeImage: "https://megaphone.imgix.net/podcasts/f398def0-373d-11ec-a51f-8fb207c4cf09/image/a75147ace106f858919e6a202dfa4c94.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+            audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/4502930/8f08fc3e-0522-11f0-b872-8b7fb79b78c4.mp3",
+            startTime: 419.24,
+            endTime: 439.71,
+            publishedDate: "2025-03-20T08:00:00.000Z",
+          },
+        ],
+      },
+      {
+        topic: "The growth scare",
+        positionSummary: "At the same time he sees growth getting revised toward stall speed, with markets betting the Fed's jobs worries start to outweigh its inflation worries.",
+        citations: [
+          {
+            pineconeId: "971334dc-fb84-11ef-b10d-5f7c5528ba91_p21",
+            text: "Last year, the US economy grew by 2.8%. Consensus estimates for this year were between 2.3 to 2.5. I think when we see revisions, they're going to be in the 1.5 to 2, and stall speed is anywhere below one. So I want to dig in a little bit deeper. You mentioned how the risk is of a stagflationary situation, which is, I see that, you know, has come out a lot over the past year, but it feels like it's really starting to hit the data.",
+            episodeTitle: "The US is Risking Stagflation | Mohamed El-Erian",
+            creator: "Forward Guidance",
+            episodeImage: "https://megaphone.imgix.net/podcasts/f398def0-373d-11ec-a51f-8fb207c4cf09/image/a75147ace106f858919e6a202dfa4c94.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+            audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/4502930/971334dc-fb84-11ef-b10d-5f7c5528ba91.mp3",
+            startTime: 425.29,
+            endTime: 455.45,
+            publishedDate: "2025-03-07T18:54:00.000Z",
+          },
+          {
+            pineconeId: "971334dc-fb84-11ef-b10d-5f7c5528ba91_p62",
+            text: "You've seen stocks sell off. And that is right now the reason why people believe that the employment side of the Fed mandate is going to dominate the price side, meaning that the Fed is going to worry about what's happening to growth and will have to cut more than it would, given what's happening to inflation, which has stalled in terms of progress. That's possible. I myself don't think you're going to get three cuts. Based on what we know today, I think we get one cut, but I don't think we're going to get three because I think the inflation issue is going to be a challenge to the Fed.",
+            episodeTitle: "The US is Risking Stagflation | Mohamed El-Erian",
+            creator: "Forward Guidance",
+            episodeImage: "https://megaphone.imgix.net/podcasts/f398def0-373d-11ec-a51f-8fb207c4cf09/image/a75147ace106f858919e6a202dfa4c94.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+            audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/4502930/971334dc-fb84-11ef-b10d-5f7c5528ba91.mp3",
+            startTime: 1306.55,
+            endTime: 1346.71,
+            publishedDate: "2025-03-07T18:54:00.000Z",
+          },
+        ],
+      },
+    ],
+    appearances: [
+      { show: "Forward Guidance", episodeTitle: "The US is Risking Stagflation | Mohamed El-Erian", publishedDate: "2025-03-07T18:54:00.000Z", citationCount: 4 },
+    ],
+    generatedAt: new Date().toISOString(),
+  },
+  "gromen": {
+    person: "Luke Gromen",
+    topics: [
+      {
+        topic: "The Treasury market is the constraint",
+        positionSummary: "Gromen's whole framework runs through the bond market: foreign holders and even levered hedge funds become forced sellers of Treasuries when volatility spikes, so the deficit math collides with a shrinking buyer base.",
+        citations: [
+          {
+            pineconeId: "macrovoices_podbean_com_38642e0b-b3e7-37f0-9c81-14b0f489cf8e_p103",
+            text: "U.S. deficits, especially if we have a recession, foreigners selling. Your biggest marginal buyers have been levered hedge funds. And when volatility goes up in equities or anywhere else, they're going to sell treasuries, not buy them. So it is an accelerant, without a doubt, to the stresses we've been talking about for some time in the sovereign bond markets, and particularly Western sovereign bond markets.",
+            episodeTitle: "MacroVoices #528 Luke Gromen: Hormuz Could Lead To a 1956 US Suez Moment",
+            creator: "Macro Voices",
+            episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+            audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancom38642e0b-b3e7-37f0-9c81-14b0f489cf8e.mp3",
+            startTime: 2649.92,
+            endTime: 2669.28,
+            publishedDate: "2026-04-16T16:48:30.000Z",
+          },
+          {
+            pineconeId: "macrovoices_podbean_com_38642e0b-b3e7-37f0-9c81-14b0f489cf8e_p81",
+            text: "Now, to be clear, until they do, that's going to be a market where you can get dollar up rates up, everything else down. And we've seen a number of those markets since 2019. And so there's this very sensitive, okay, inflationary impulse of higher commodities, higher oil, deflationary impulse of those things, and then a deflationary impulse of those things hitting receipts, which are going to create dollar up rates up, slow things down. But then it also is going to raise the question of are they going to print money? Are they going to default on treasury bonds and entitlements?",
+            episodeTitle: "MacroVoices #528 Luke Gromen: Hormuz Could Lead To a 1956 US Suez Moment",
+            creator: "Macro Voices",
+            episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+            audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancom38642e0b-b3e7-37f0-9c81-14b0f489cf8e.mp3",
+            startTime: 2145.9,
+            endTime: 2182.46,
+            publishedDate: "2026-04-16T16:48:30.000Z",
+          },
+        ],
+      },
+      {
+        topic: "Gold is quietly replacing Treasuries",
+        positionSummary: "His tell that the regime has already turned: central banks stopped accumulating Treasuries and started buying gold.",
+        citations: [
+          {
+            pineconeId: "macrovoices_podbean_com_38642e0b-b3e7-37f0-9c81-14b0f489cf8e_p98",
+            text: "And so people say, well, when's it going to start? And you go, when's it going to start? Since central banks stopped buying treasuries and started buying gold. You know, long-term treasury bond futures priced in gold are down 90% since 2014. And it's like the dream trade for a macro.",
+            episodeTitle: "MacroVoices #528 Luke Gromen: Hormuz Could Lead To a 1956 US Suez Moment",
+            creator: "Macro Voices",
+            episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+            audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancom38642e0b-b3e7-37f0-9c81-14b0f489cf8e.mp3",
+            startTime: 2521.93,
+            endTime: 2539.36,
+            publishedDate: "2026-04-16T16:48:30.000Z",
+          },
+        ],
+      },
+    ],
+    appearances: [
+      { show: "Macro Voices", episodeTitle: "MacroVoices #528 Luke Gromen: Hormuz Could Lead To a 1956 US Suez Moment", publishedDate: "2026-04-16T16:48:30.000Z", citationCount: 3 },
+    ],
+    generatedAt: new Date().toISOString(),
+  },
+  "green": {
+    person: "Mike Green",
+    topics: [
+      {
+        topic: "Passive flows and concentration",
+        positionSummary: "Green's market-structure thesis: passive index flows mechanically funnel capital into the largest companies, an extraordinary, built-in concentrating force.",
+        citations: [
+          {
+            pineconeId: "macrovoices_podbean_com_4aa96c07-c349-3879-ba83-acf684c476a2_p14",
+            text: "And then the second component of it is the mechanics of how we invest. This passive factor has a concentrating factor built into it that creates a feedback loop that causes the market to get narrower and narrower. Many people are reporting this as an anomalous outperformance by the size factor. That's not what my research suggests. My research suggests that these are really the stocks that are most positively affected by the passive bid.",
+            episodeTitle: "MacroVoices #506 Mike Green: Volatility, High-Yield, Precious Metals & More",
+            creator: "Macro Voices",
+            episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+            audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancom4aa96c07-c349-3879-ba83-acf684c476a2.mp3",
+            startTime: 415.37,
+            endTime: 441.13,
+            publishedDate: "2025-11-13T18:00:45.000Z",
+          },
+          {
+            pineconeId: "12c2ada2-46af-425d-ac28-b2d600ed5b62_p18",
+            text: "And because what we have seen is just an extraordinary inflow into passive strategies, which now represent about 45% of the market cap of the United States. We've actually just seen a continual upward pressure in valuation and prices that a lot of us unfortunately think is the up and to the right phenomenon in markets. On your commute across the nation on this Fed Day, a lot of good voices coming up. Katie Kaminsky will be with us. The absolute best on trend investing or the shattering of trends right now.",
+            episodeTitle: "Tariff Uncertainty Ahead of Fed Meeting",
+            creator: "Bloomberg Surveillance",
+            episodeImage: "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/8e704079-ca57-4eac-9741-ae27003e2b7f/9739700c-72c3-4176-ae55-ae27003e2b96/image.jpg?t=1705949541&size=Large",
+            audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/4114115/12c2ada2-46af-425d-ac28-b2d600ed5b62.mp3",
+            startTime: 319.91,
+            endTime: 346.31,
+            publishedDate: "2025-05-07T14:29:08.000Z",
+          },
+        ],
+      },
+      {
+        topic: "What is cracking now (May 2026)",
+        positionSummary: "His latest flag: credit spreads keep tightening even as the signs of actual credit deterioration build underneath.",
+        citations: [
+          {
+            pineconeId: "macrovoices_podbean_com_d97b7e41-af5b-378b-9e8f-c18cbe83e306_p95",
+            text: "We've seen credit spreads by and large tighten significantly, even as we're seeing signs of credit deterioration in the broader economy. Part of that is, of course, due to the passive bid as money flows into these strategies. They buy the highest price securities disproportionately. That has driven a bifurcation in the high-yield market, just like it's driven a bifurcation as we've seen in U.S. markets where there's the 493 and the Mag 7.",
+            episodeTitle: "MacroVoices #532 Mike Green: Record Mechanical Flows",
+            creator: "Macro Voices",
+            episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+            audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancomd97b7e41-af5b-378b-9e8f-c18cbe83e306.mp3",
+            startTime: 3231.78,
+            endTime: 3256.58,
+            publishedDate: "2026-05-14T16:45:23.000Z",
+          },
+        ],
+      },
+    ],
+    appearances: [
+      { show: "Macro Voices", episodeTitle: "MacroVoices #506 Mike Green: Volatility, High-Yield, Precious Metals & More", publishedDate: "2025-11-13T18:00:45.000Z", citationCount: 2 },
+      { show: "Bloomberg Surveillance", episodeTitle: "Tariff Uncertainty Ahead of Fed Meeting", publishedDate: "2025-05-07T14:29:08.000Z", citationCount: 1 },
+    ],
+    generatedAt: new Date().toISOString(),
+  },
 };
 
-let idCounter = 0;
-const toCitation = (q: RawQuote, speaker: string): TapeCitation => ({
-  pineconeId: `tape_mock_${(idCounter += 1)}_${slug(speaker).replace(/\s+/g, '_')}`,
-  text: q.text,
-  speaker,
-  episodeTitle: q.episode,
-  creator: q.show,
-  episodeImage: '',
-  audioUrl: `https://example.com/tape/${slug(q.show).replace(/\s+/g, '-')}.mp3`,
-  startTime: q.start,
-  endTime: q.start + 38,
-  publishedDate: q.date,
-});
+const BRIEF_OIL: BriefResult = {
+  topic: 'oil & the Strait of Hormuz',
+  asOfDate: '2026-05-18',
+  headline: 'Two months into the war with Iran, the Strait of Hormuz is still the whole oil story, and the desks are pricing an open-ended supply shock with no clear off-ramp.',
+  sections: [
+    {
+      publisher: "Odd Lots",
+      summary: "Odd Lots looks at the supply response: even with more barrels coming, it leaves a real challenge for Saudi Arabia and the balance of the market.",
+      citations: [
+        {
+          pineconeId: "2cddec97-5995-4812-abea-b44b016dc69f_p82",
+          text: "So they will produce a lot more oil. And I think that that really brings a big challenge to Saudi Arabia. And if and when the Strait of Hormuz reopens, we can have a situation in which for a while there's going to be demand for the extra oil because global inventories are going to need to be replenished because a lot of countries are going to build larger estate inventories. But at some point, you're going to see a raise for market share. And if we have a race for market share, then everyone wants to produce more oil, then the price of oil has to come down.",
+          episodeTitle: "Why the Price of Oil, Beef, Electricity, and Everything Else Makes No Sense",
+          creator: "Odd Lots",
+          episodeImage: "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/8a94442e-5a74-4fa2-8b8d-ae27003a8d6b/982f5071-765c-403d-969d-ae27003a8d83/image.jpg?t=1681322812&size=Large",
+          audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/4114173/2cddec97-5995-4812-abea-b44b016dc69f.mp3",
+          startTime: 1567.81,
+          endTime: 1602.13,
+          publishedDate: "2026-05-18T08:00:00.000Z",
+        },
+      ],
+    },
+    {
+      publisher: "Macro Voices",
+      summary: "MacroVoices weighs the swing variable: whether Iran can credibly claim control of the chokepoint.",
+      citations: [
+        {
+          pineconeId: "macrovoices_podbean_com_d97b7e41-af5b-378b-9e8f-c18cbe83e306_p56",
+          text: "And this is going to be particularly true if Iran is successful in articulating that it is in control of the Straits of Hormuz on an extended period of time. The other reality, though, and this is something I wrote about in 22, and if you remember, the projections were that we were going to see a surge in oil demand and that oil prices were going much higher. And that as China reopened from the COVID events, that we would see an incredible surge of demand that would power us well above the 106 million barrels that were the forecast. My argument was that we actually had multiple demand curves. The developed world was already in decline in terms of its oil usage.",
+          episodeTitle: "MacroVoices #532 Mike Green: Record Mechanical Flows",
+          creator: "Macro Voices",
+          episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+          audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancomd97b7e41-af5b-378b-9e8f-c18cbe83e306.mp3",
+          startTime: 1865.55,
+          endTime: 1906.19,
+          publishedDate: "2026-05-14T16:45:23.000Z",
+        },
+      ],
+    },
+    {
+      publisher: "Bloomberg Surveillance",
+      summary: "Bloomberg goes back to basics on why the Strait matters so much for crude in the first place.",
+      citations: [
+        {
+          pineconeId: "6195ef78-0ecd-4aa3-98be-b43a01000389_p35",
+          text: "Why do we care so much about the Strait of Hormuz? It's a great question. I think when it comes to oil, we still do live in a global oil market. So even though the United States is not buying oil from the Gulf, because the price of oil is set globally, if you reduce the supply and the demand stays the same, the price goes up. And that means the price goes up for the oil exporters in the United States.",
+          episodeTitle: "US Economic Signals and the Latest on Iran Negotiations",
+          creator: "Bloomberg Surveillance",
+          episodeImage: "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/8e704079-ca57-4eac-9741-ae27003e2b7f/9739700c-72c3-4176-ae55-ae27003e2b96/image.jpg?t=1705949541&size=Large",
+          audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/4114115/6195ef78-0ecd-4aa3-98be-b43a01000389.mp3",
+          startTime: 757.96,
+          endTime: 779.48,
+          publishedDate: "2026-04-28T15:44:50.000Z",
+        },
+      ],
+    },
+  ],
+  generatedAt: new Date().toISOString(),
+};
 
-const KNOWN_TOPICS = ['fed policy', 'rate cuts', 'yield-curve inversion', 'bitcoin', 'the dollar', 'commercial real estate'];
+const SPLIT_AI: SplitResult = {
+  topic: 'the AI bubble',
+  sideA: { person: 'The bears',
+    positionSummary: 'Price is the risk. The Mag 7 have burnt through cash flow on an AI buildout they still have to monetize, and the market\u2019s concentration in a few names is the real danger.',
+    citations: [
+      {
+        pineconeId: "ttmygh_podbean_com_d3a2b445-cdfe-300b-8434-8bae320e5d08_p43",
+        text: "And so we're in a situation where the Mag7 have burnt through their cash flow investing in something which they hope to be profitable in the future, but where there is currently no evidence of profitability anywhere in the AI ecosystem, apart from at the very foundation NVIDIA the chip maker. And you might argue, people who provide some training data, like if you provide a service where you've got people in Venezuela to label videos that help you train, they make a bit of money. But broadly speaking, that's it. And everyone else is heavily loss-making. Now, one of your incentives in that situation, having already got yourself into this competitive against the other Mag7 situation where you're trying to invest heavily in AI, is you try and justify it.",
+        episodeTitle: "The Grant Williams Podcast Ep. 109 - Julien Garran",
+        creator: "The Grant Williams Podcast",
+        episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/8087777/PODCAST_THUMBNAIL-80_percent.jpg",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/446935/ttmyghpodbeancomd3a2b445-cdfe-300b-8434-8bae320e5d08.mp3",
+        startTime: 1458.89,
+        endTime: 1507.61,
+        publishedDate: "2025-10-20T05:01:00.000Z",
+      },
+      {
+        pineconeId: "16517d53-7d98-4e84-878e-b3930108e885_p40",
+        text: "We've heard that concentration risk in the marketplace. Are they trying to hedge some of that concentration risk out at all? They're not. I mean, the way they're hedging it is they end up quite concentrated, meaning they probably hold more NVIDIA or more Mag 7 than they would like. You know, that makes them the fully invested bear.",
+        episodeTitle: "Tech Rebound Lifts Stocks Ahead of Shutdown Vote; 10 Years of Odd Lots",
+        creator: "Bloomberg Surveillance",
+        episodeImage: "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/8e704079-ca57-4eac-9741-ae27003e2b7f/9739700c-72c3-4176-ae55-ae27003e2b96/image.jpg?t=1705949541&size=Large",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/4114115/16517d53-7d98-4e84-878e-b3930108e885.mp3",
+        startTime: 769.56,
+        endTime: 788.36,
+        publishedDate: "2025-11-12T16:18:48.000Z",
+      },
+      {
+        pineconeId: "macrovoices_podbean_com_7a9575ec-6bdc-3448-9817-6bb47c112fe5_p89",
+        text: "Now, we still have not seen a legitimate breakdown in NVIDIA, but I do believe that these Mag 7s are going to decide what happens next. There was this huge AI boom, and NVIDIA was the leader in this space. And if we see that Mag 7s in any way start to break, they're just so huge in their market capitalization and their weightings in the main SP index that it would almost certainly spur a sell cycle, irrespective of whether or not Trump is in office or not in office or what policies he has. I think we're setting up for some sort of a market correction here early in the year. And I think that this is going to be the story of the first quarter.",
+        episodeTitle: "MacroVoices #462 Luke Gromen: 2025 Outlook",
+        creator: "Macro Voices",
+        episodeImage: "https://pbcdn1.podbean.com/imglogo/image-logo/6042395/MacroVoicesiTunesLogo-01.png",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/49438/macrovoicespodbeancom7a9575ec-6bdc-3448-9817-6bb47c112fe5.mp3",
+        startTime: 2867.92,
+        endTime: 2913.04,
+        publishedDate: "2025-01-08T23:09:45.000Z",
+      },
+    ] },
+  sideB: { person: 'The bulls',
+    positionSummary: 'Fundamentals justify it. Double-digit profitability across the Mag 7, hyperscaler cloud revenue compounding, and AI-startup revenue going straight up, this is earnings, not hype.',
+    citations: [
+      {
+        pineconeId: "f08f9136-46cb-42ba-9101-b40300fcffc3_p61",
+        text: "You're still seeing extraordinary profitability, double digits across the Mag seven. Hyperscalers seeing cloud revenue growing 37% year over year. Valuations have actually gotten cheaper because of that sell off so far this year, and the technology continues to innovate and get more powerful. And the narrative there has switched from, is AI a bubble? And therefore, are we overestimating I AI to, actually, is AI something we're underestimating?",
+        episodeTitle: "Trump Offers Hormuz Assurances as Iran War Rages On",
+        creator: "Bloomberg Surveillance",
+        episodeImage: "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/8e704079-ca57-4eac-9741-ae27003e2b7f/9739700c-72c3-4176-ae55-ae27003e2b96/image.jpg?t=1705949541&size=Large",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/4114115/f08f9136-46cb-42ba-9101-b40300fcffc3.mp3",
+        startTime: 1491.56,
+        endTime: 1515.94,
+        publishedDate: "2026-03-04T15:31:09.000Z",
+      },
+      {
+        pineconeId: "420f4b3c-48bf-11f0-94f4-b76e4bc899d8_p109",
+        text: "But this is the annualized revenue at 22 of the most mature AI startups, which is up into the right, $15 billion. And this is where I have a hard time. Why would you sell the Mag 7? If this is happening, and well, I guess you could say they're competitors, but if there's if this is a real productivity boom and you can run these giant oligarch businesses with half the people or a quarter of the people is what you used to, it makes them even more efficient. And then they can, it lowers their cost of capital where they can buy back stock.",
+        episodeTitle: "The Unwinding Of The Global U.S Dollar Trade | Weekly Roundup",
+        creator: "Forward Guidance",
+        episodeImage: "https://megaphone.imgix.net/podcasts/f398def0-373d-11ec-a51f-8fb207c4cf09/image/a75147ace106f858919e6a202dfa4c94.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/4502930/420f4b3c-48bf-11f0-94f4-b76e4bc899d8.mp3",
+        startTime: 2522.11,
+        endTime: 2564.46,
+        publishedDate: "2025-06-14T08:51:00.000Z",
+      },
+      {
+        pineconeId: "ebe75ec6-dd4b-11f0-b864-1368af03541c_p57",
+        text: "Dan wants the AI bubble to pop so badly. Maybe. He's not alone. He's not alone, I don't think. I honestly, well, before I answer Ben's question, I am actually, I go on record as saying I don't think there's an AI bubble as measured by the Mag 7, because if you look at the Mag 7 relative to the SP 500 over the past 12 months, it's an inline performer, right?",
+        episodeTitle: "Talk Your Book: A Tactical Strategy That Actually Works",
+        creator: "Animal Spirits Podcast",
+        episodeImage: "https://megaphone.imgix.net/podcasts/50b7643c-0c60-11ee-b6d1-f783f78436de/image/AnimalSpirts-Cover.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+        audioUrl: "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/399817/ebe75ec6-dd4b-11f0-b864-1368af03541c.mp3",
+        startTime: 1282.76,
+        endTime: 1305.16,
+        publishedDate: "2025-12-22T09:00:00.000Z",
+      },
+    ] },
+  contrastSummary: 'Same Mag 7, opposite reads: the bears fixate on concentration and unproven AI capex, the bulls on the cash actually coming in the door.',
+  generatedAt: new Date().toISOString(),
+};
 
-const quotesFor = (person: string, topic: string): RawQuote[] =>
-  QUOTE_BANK[`${slug(person)}|${slug(topic)}`] || [];
-
-const allQuotesForPerson = (person: string): { topic: string; quotes: RawQuote[] }[] =>
-  KNOWN_TOPICS.map(topic => ({ topic, quotes: quotesFor(person, topic) })).filter(t => t.quotes.length > 0);
-
-const titleCase = (s: string) => s.replace(/\b\w/g, c => c.toUpperCase());
-
-// ─── Dossier ─────────────────────────────────────────────────────────────────
+const findDossier = (person: string): DossierResult | null => {
+  const q = slug(person);
+  for (const key of Object.keys(DOSSIERS)) {
+    if (q.includes(key) || q.includes(DOSSIERS[key].person.toLowerCase())) return DOSSIERS[key];
+  }
+  return null;
+};
 export function mockDossier(person: string): DossierResult {
-  const grouped = allQuotesForPerson(person);
-  const topics = grouped.map(({ topic, quotes }) => ({
-    topic,
-    positionSummary: `${titleCase(person)} returns to ${topic} repeatedly, framing it through a top-down macro lens with a consistent, skeptical read on consensus positioning.`,
-    citations: quotes.map(q => toCitation(q, titleCase(person))),
-  }));
-
-  const appearanceMap = new Map<string, { episode: string; date: string; count: number }>();
-  for (const { quotes } of grouped) {
-    for (const q of quotes) {
-      const prev = appearanceMap.get(q.show);
-      if (prev) prev.count += 1;
-      else appearanceMap.set(q.show, { episode: q.episode, date: q.date, count: 1 });
-    }
-  }
-  const appearances = [...appearanceMap.entries()].map(([show, v]) => ({
-    show,
-    episodeTitle: v.episode,
-    publishedDate: v.date,
-    citationCount: v.count,
-  }));
-
-  return { person: titleCase(person), topics, appearances, generatedAt: new Date().toISOString() };
+  return findDossier(person) || { person: person.trim(), topics: [], appearances: [], generatedAt: new Date().toISOString() };
 }
-
-// ─── Timeline ────────────────────────────────────────────────────────────────
-const mondayOf = (d: Date): Date => {
-  const out = new Date(d);
-  const day = (out.getDay() + 6) % 7; // 0 = Monday
-  out.setDate(out.getDate() - day);
-  out.setHours(0, 0, 0, 0);
-  return out;
-};
-const isoDate = (d: Date): string => d.toISOString().slice(0, 10);
-
-export function mockTimeline(topic: string, startDate: string, endDate: string): TimelineResult {
-  const start = mondayOf(new Date(startDate));
-  const end = new Date(endDate);
-  const buckets: TimelineBucket[] = [];
-  // Deterministic-ish pseudo-random from topic + week so the chart is stable per query.
-  const seedBase = [...slug(topic)].reduce((a, c) => a + c.charCodeAt(0), 0);
-  let week = 0;
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 7), week += 1) {
-    const wave = Math.sin((week + seedBase) / 3.3) + Math.sin((week + seedBase) / 1.7);
-    const spike = week % 9 === 4 ? 7 : 0; // periodic "event week" spike
-    const count = Math.max(0, Math.round(5 + wave * 3 + spike + ((seedBase + week) % 3)));
-    buckets.push({ weekStart: isoDate(new Date(d)), count });
-  }
-  const totalMentions = buckets.reduce((a, b) => a + b.count, 0);
-  return { topic, startDate, endDate, buckets, totalMentions };
+export function mockBrief(topic: string, _asOfDate?: string): BriefResult {
+  const q = slug(topic);
+  if (q.includes('oil') || q.includes('hormuz') || q.includes('strait')) return BRIEF_OIL;
+  return { topic: topic.trim(), asOfDate: BRIEF_OIL.asOfDate, headline: '', sections: [], generatedAt: new Date().toISOString() };
 }
-
-export function mockTimelineDrilldown(topic: string, weekStart: string, weekEnd: string): TimelineDrilldownResult {
-  // Pull any quotes on this topic from the bank, regardless of person, as stand-ins.
-  const speakers = ['Stanley Druckenmiller', 'Lyn Alden', 'Mike Green'];
-  const citations: TapeCitation[] = [];
-  for (const sp of speakers) {
-    for (const q of quotesFor(sp, topic)) citations.push(toCitation({ ...q, date: weekStart }, sp));
-  }
-  return {
-    weekStart,
-    summary: citations.length
-      ? `Discussion of ${topic} clustered around the week of ${weekStart}, with the most pointed takes coming from ${speakers.filter(s => quotesFor(s, topic).length).join(', ')}.`
-      : `No corpus mentions of ${topic} resolved for the week of ${weekStart} in this mock dataset.`,
-    citations,
-  };
-}
-
-// ─── Brief ───────────────────────────────────────────────────────────────────
-export function mockBrief(topic: string, asOfDate: string): BriefResult {
-  const speakers = ['Stanley Druckenmiller', 'Lyn Alden', 'Mike Green'];
-  const byPublisher = new Map<string, TapeCitation[]>();
-  for (const sp of speakers) {
-    for (const q of quotesFor(sp, topic)) {
-      const c = toCitation(q, sp);
-      const arr = byPublisher.get(c.creator) || [];
-      arr.push(c);
-      byPublisher.set(c.creator, arr);
-    }
-  }
-  const sections = [...byPublisher.entries()].map(([publisher, citations]) => ({
-    publisher,
-    summary: `On ${publisher}, the week's ${topic} commentary leaned skeptical of consensus, with hosts pressing guests on positioning rather than narrative.`,
-    citations,
-  }));
-  return {
-    topic,
-    asOfDate,
-    headline: sections.length
-      ? `Macro desks converged on a cautious read of ${topic} this week, diverging mainly on timing.`
-      : `No ${topic} commentary surfaced across the corpus for the week ending ${asOfDate}.`,
-    sections,
-    generatedAt: new Date().toISOString(),
-  };
-}
-
-// ─── Split ───────────────────────────────────────────────────────────────────
 export function mockSplit(personA: string, personB: string, topic: string): SplitResult {
-  const side = (person: string) => {
-    const quotes = quotesFor(person, topic);
-    return {
-      person: titleCase(person),
-      positionSummary: quotes.length
-        ? `${titleCase(person)} frames ${topic} through their characteristic lens, anchoring the view to mechanism over narrative.`
-        : `No stated position on ${topic} from ${titleCase(person)} in this mock dataset.`,
-      citations: quotes.map(q => toCitation(q, titleCase(person))),
-    };
-  };
-  const sideA = side(personA);
-  const sideB = side(personB);
-  return {
-    topic,
-    sideA,
-    sideB,
-    contrastSummary:
-      sideA.citations.length && sideB.citations.length
-        ? `Both treat ${topic} as a mechanism question, but ${sideA.person} emphasizes the policy lag while ${sideB.person} emphasizes structural and flow dynamics.`
-        : undefined,
-    generatedAt: new Date().toISOString(),
-  };
+  const all = slug(`${personA} ${personB} ${topic}`);
+  if (all.includes('ai') || all.includes('bubble') || all.includes('bull') || all.includes('bear')) return SPLIT_AI;
+  return { topic: topic.trim(), sideA: { person: personA.trim(), positionSummary: '', citations: [] }, sideB: { person: personB.trim(), positionSummary: '', citations: [] }, generatedAt: new Date().toISOString() };
 }
-
-/** Sample commands surfaced on the launcher. */
-export const TAPE_SAMPLES: string[] = [
-  'dossier Stanley Druckenmiller',
-  'timeline Fed policy',
-  'brief yield-curve inversion',
-  'split Druckenmiller / Mike Green on rate cuts',
-];
+const mondayOf = (d: Date): Date => { const o = new Date(d); o.setDate(o.getDate() - ((o.getDay() + 6) % 7)); o.setHours(0, 0, 0, 0); return o; };
+const isoDate = (d: Date): string => d.toISOString().slice(0, 10);
+export function mockTimeline(topic: string, startDate: string, endDate: string): TimelineResult {
+  const start = mondayOf(new Date(startDate)); const end = new Date(endDate); const buckets: TimelineBucket[] = [];
+  const seed = [...slug(topic)].reduce((a, c) => a + c.charCodeAt(0), 0); let week = 0;
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 7), week += 1) {
+    const wave = Math.sin((week + seed) / 3.3) + Math.sin((week + seed) / 1.7);
+    buckets.push({ weekStart: isoDate(new Date(d)), count: Math.max(0, Math.round(5 + wave * 3 + ((seed + week) % 3))) });
+  }
+  return { topic, startDate, endDate, buckets, totalMentions: buckets.reduce((a, b) => a + b.count, 0) };
+}
+export function mockTimelineDrilldown(topic: string, weekStart: string, _weekEnd?: string): TimelineDrilldownResult {
+  return { weekStart, summary: `Mentions of ${topic} for the week of ${weekStart}.`, citations: [] as TapeCitation[] };
+}

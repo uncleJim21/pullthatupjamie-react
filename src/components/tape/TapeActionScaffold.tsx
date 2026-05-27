@@ -29,7 +29,7 @@ export const RunButton: React.FC<{ disabled?: boolean; loading?: boolean; label?
 export const TapeStatus: React.FC<{ kind: 'loading' | 'empty' | 'error'; message: string }> = ({ kind, message }) => {
   const Icon = kind === 'loading' ? Loader2 : kind === 'empty' ? SearchX : AlertTriangle;
   return (
-    <div className="flex items-center justify-center gap-2.5 px-4 py-16 tape-mono text-xs" style={{ color: kind === 'error' ? 'var(--tape-danger)' : 'var(--tape-fg-faint)' }}>
+    <div className="flex items-center justify-center gap-2.5 px-4 py-16 text-[13px]" style={{ color: kind === 'error' ? 'var(--tape-danger)' : 'var(--tape-fg-faint)' }}>
       <Icon className={`h-4 w-4 ${kind === 'loading' ? 'animate-spin' : ''}`} />
       <span>{message}</span>
     </div>

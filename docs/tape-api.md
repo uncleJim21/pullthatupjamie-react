@@ -6,6 +6,49 @@ Tape is the finance-intelligence "skin" over the existing podcast corpus. It reu
 
 ---
 
+## 0. Potemkin demo (current state)
+
+This build is a **cached demo**: every action is backed by real data captured from the live `/api/pull` + `/api/get-hierarchy` and baked into `src/data/mockTapeData.ts` (`USE_MOCK_TAPE = true`). Quotes, audio URLs, timestamps, shows and dates are all genuine, so audio plays and the content reads true without a live round-trip.
+
+**Capture method** (the right way, not the NL agent): clips come from the structured corpus endpoints, which fixes attribution, freshness, and timestamps at once:
+1. `GET /api/corpus/people?search=NAME&guestsOnly=true` + `POST /api/corpus/people/episodes` → the episodes where a person is the actual **guest** (not just mentioned). This is the attribution fix.
+2. `POST /api/search-quotes` with `guid` set to those episodes (or `feedIds`) → the person's quotes, each with its own `timeContext{start_time,end_time}` where the returned `quote` IS the matched paragraph, so playback lands on the quote (the timestamp fix). `minDate` pulls fresh coverage (the freshness fix; e.g. the Hormuz Brief is post-escalation 2026 war coverage, not stale).
+   - Auth: `search-quotes` is L402 but honors `X-Free-Tier: true` (heavily rate-limited) or a `Bearer` JWT (jamie-pro, no limit). The capture script used a session-only pro token; **it is not stored in the repo**.
+3. Each `search-quotes` result maps directly to a `TapeCitation` (`shareLink` → pineconeId, `quote` → text, `timeContext` → start/end, `creator`/`date`/`audioUrl`/`episodeImage`), so no separate hydration step.
+
+Curation still weights **mainstream** shows (Bloomberg Surveillance, Macro Voices, Forward Guidance, Odd Lots, Prof G Markets, The Daily) over crypto pods, and prefers tighter paragraphs. Timestamps are paragraph-level (the floor the corpus exposes) but now land on the quote's first words.
+
+### Attribution confidence (the diarization problem)
+
+The corpus has **no speaker diarization**: `search-quotes` returns the most relevant *paragraph* in an episode, but it cannot tell you *who* spoke it. So a quote from an episode where a person is a guest may actually be the host or another panelist. This burned us twice: "Druckenmiller" quotes from the All-In **panel** were really David Sacks; "El-Erian" quotes from **Bloomberg Surveillance TV** (a fast rotating-anchor desk) were the anchors.
+
+Until diarization exists, the demo maximizes confidence with three rules, in order:
+1. **Source only from guest-dominant formats** — 1-on-1 interviews, fireside keynotes, or the person's own show. Never panels (All-In) or rotating anchor desks (Bloomberg Surveillance TV). In practice: use `corpus/people/episodes?guestsOnly=true`, then keep only episodes whose **title contains the person's name** (a dedicated sit-down).
+2. **Bias to long paragraphs** — a sustained 30s+ monologue is almost always the guest answering; short paragraphs are usually the host's question.
+3. **Read every candidate** and drop anything that is a question, addresses someone by name, or is a host aside.
+This is why the canon is El-Erian (Forward Guidance 1-on-1s), Mike Green (MacroVoices interviews), Luke Gromen (MacroVoices 1-on-1) — all guest-dominant. Druckenmiller was dropped: his only corpus appearance is the All-In panel, which is unattributable.
+
+### How to make this genuinely better (data/API roadmap)
+
+- **Add diarization.** Speaker-segment each transcript (e.g. pyannote / WhisperX) and tag every paragraph with a `speaker` cluster, then map clusters to the episode's `guests`/host. This is the real fix and unlocks everything below.
+- **`personId`/`speakerId` filter on `search-quotes`.** Once paragraphs carry a speaker, let the query return only segments *spoken by* that person, not just *in an episode featuring* them.
+- **Episode `format` tag** (`solo` | `interview` | `panel` | `news-desk`) and a per-paragraph `speakerConfidence`, so clients can prefer high-confidence attribution automatically instead of hand-curating.
+- **A `dominantSpeaker` flag** per episode (who holds >60% of speaking time) for quick "is this basically one person" filtering.
+- **Interim, no-ML heuristic the API could expose now:** rank paragraphs by length and position within a speaker turn; surface the longest contiguous monologues as "likely guest."
+- For the demo specifically, the highest-fidelity path is a small **hand-verified quote set** (a human confirms the speaker) — which is what the current canon is.
+
+Current canon: Dossier = El-Erian / Druckenmiller / Mike Green; Split = the AI bubble (bulls vs bears); Brief = oil & the Strait of Hormuz. Coverage note: Bloomberg Surveillance is deep in the corpus; Odd Lots is not transcribed yet (don't name it in copy).
+
+Deep-links (for demo + verification): `/tape?a=dossier&p=Mohamed%20El-Erian`, `/tape?a=brief&t=oil`, `/tape?a=split&p=The%20bears&b=The%20bulls&t=the%20AI%20bubble`.
+
+To refresh the canon: run new `/api/pull` queries, hydrate ids, and re-bake (`/tmp/tape_gen2.py` is the current generator).
+
+### Parked: Timeline → longitudinal study (not mention-counts)
+
+The original Timeline (quantitative weekly mention counts) is **removed from the UI** for now. The reimagined version is a **longitudinal study**: "how has *person X* evolved on a view" or "how has the street changed its tune on *topic Y* over N years", rendered as a time axis with **pointillist real quotes** at each inflection, not a bar/area count chart. This needs the same `/pull` + citation primitives plus date-ordered retrieval; revisit after Dossier / Brief / Split are nailed. `TimelineView` + `timelineService` remain in the tree (dormant) and the `/api/tape/timeline` count endpoint in §5 is deferred with it.
+
+---
+
 ## 1. Overview — the four actions (JTBD)
 
 | Action | Input | Output | Job |

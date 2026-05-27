@@ -53,7 +53,7 @@ const TapeCitationRow: React.FC<{ citation: TapeCitation }> = ({ citation }) => 
       </button>
 
       <div className="min-w-0 flex-1">
-        <p className="tape-quote">{citation.text || '(no transcript text)'}</p>
+        <p className="tape-quote line-clamp-5">{citation.text || '(no transcript text)'}</p>
         <div className="tape-num mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>
           {citation.speaker && (
             <span style={{ color: 'var(--tape-fg-dim)' }}>{citation.speaker}</span>

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { CornerDownLeft } from 'lucide-react';
-import { TAPE_NAME, TAPE_TAGLINE } from '../../config/tapeConfig.ts';
-import { TAPE_SAMPLES } from '../../data/mockTapeData.ts';
+import { Search, ArrowRight, Newspaper, GitCompare } from 'lucide-react';
+import { TAPE_NAME } from '../../config/tapeConfig.ts';
 import type { TapeActionId } from '../../services/tape/tapeTypes.ts';
 
 export interface TapeLaunch {
@@ -11,127 +10,115 @@ export interface TapeLaunch {
   topic?: string;
 }
 
-interface ActionMeta {
-  id: TapeActionId;
-  verb: string;
+interface SecondaryAction {
+  id: Exclude<TapeActionId, 'dossier'>;
   title: string;
   desc: string;
-  usage: string;
+  icon: React.FC<{ className?: string }>;
+  example: { label: string; launch: TapeLaunch };
 }
 
-const ACTIONS: ActionMeta[] = [
-  { id: 'dossier', verb: 'dossier', title: 'Dossier', desc: 'Every stated position from one voice, grouped by topic, with timestamps.', usage: 'dossier <person>' },
-  { id: 'timeline', verb: 'timeline', title: 'Timeline', desc: 'Weekly mention counts for a topic. Click a week to read the underlying hits.', usage: 'timeline <topic>' },
-  { id: 'brief', verb: 'brief', title: 'Brief', desc: 'What the desks said this week on a topic, grouped by publisher.', usage: 'brief <topic>' },
-  { id: 'split', verb: 'split', title: 'Split', desc: 'Two voices on one topic, positions placed side by side.', usage: 'split <A> / <B> on <topic>' },
+const SECONDARY: SecondaryAction[] = [
+  {
+    id: 'brief',
+    title: "Get this week's read",
+    desc: 'What the desks actually said this week on one topic, synthesized, with the quotes behind it.',
+    icon: Newspaper,
+    example: { label: 'oil & the Strait of Hormuz', launch: { action: 'brief', topic: 'oil & the Strait of Hormuz' } },
+  },
+  {
+    id: 'split',
+    title: 'Put two camps head to head',
+    desc: 'Where the bulls and bears actually agree and diverge on one debate, side by side, with receipts.',
+    icon: GitCompare,
+    example: { label: 'the AI bubble: bulls vs bears', launch: { action: 'split', person: 'The bears', personB: 'The bulls', topic: 'the AI bubble' } },
+  },
 ];
 
-const VERB_ALIASES: Record<string, TapeActionId> = {
-  dossier: 'dossier', who: 'dossier',
-  timeline: 'timeline', trend: 'timeline', chart: 'timeline',
-  brief: 'brief', summary: 'brief',
-  split: 'split', compare: 'split', vs: 'split',
-};
-
-/** Parse a typed command like "split Druckenmiller / Mike Green on rate cuts". */
-export function parseCommand(raw: string): TapeLaunch | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const [first, ...rest] = trimmed.split(/\s+/);
-  const action = VERB_ALIASES[first.toLowerCase()];
-  if (!action) return null;
-  const remainder = rest.join(' ').trim();
-
-  if (action === 'split') {
-    // "<A> [/ | vs | and] <B> on <topic>"
-    const onIdx = remainder.toLowerCase().lastIndexOf(' on ');
-    const topic = onIdx >= 0 ? remainder.slice(onIdx + 4).trim() : '';
-    const people = (onIdx >= 0 ? remainder.slice(0, onIdx) : remainder).split(/\s*(?:\/|\bvs\b|\band\b)\s*/i);
-    return { action, person: (people[0] || '').trim(), personB: (people[1] || '').trim(), topic };
-  }
-  if (action === 'dossier') return { action, person: remainder };
-  return { action, topic: remainder }; // timeline | brief
-}
+const PERSON_EXAMPLES = ['Mohamed El-Erian', 'Luke Gromen', 'Mike Green'];
 
 const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> = ({ onLaunch }) => {
-  const [command, setCommand] = useState('');
+  const [query, setQuery] = useState('');
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsed = parseCommand(command);
-    if (parsed) onLaunch(parsed);
+  const lookUp = (name: string) => {
+    const person = name.trim();
+    if (person) onLaunch({ action: 'dossier', person });
   };
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:py-16">
-      {/* wordmark */}
-      <div className="tape-fade">
-        <h1 className="tape-serif text-4xl tracking-tight sm:text-5xl" style={{ color: 'var(--tape-fg)' }}>
+    <div className="mx-auto w-full max-w-xl px-5 pb-20 pt-16 sm:pt-24">
+      {/* wordmark + value prop */}
+      <div className="tape-fade text-center">
+        <h1 className="tape-serif text-5xl tracking-tight sm:text-6xl" style={{ color: 'var(--tape-fg)' }}>
           {TAPE_NAME}
         </h1>
-        <p className="tape-mono mt-2 text-xs" style={{ color: 'var(--tape-fg-dim)' }}>
-          {TAPE_TAGLINE}
+        <p className="mt-3 text-lg font-medium sm:text-xl" style={{ color: 'var(--tape-fg)' }}>
+          Read the tape. Skip the prattle. Extract the alpha.
+        </p>
+        <p className="mx-auto mt-2.5 max-w-md text-[14px] leading-relaxed" style={{ color: 'var(--tape-fg-dim)' }}>
+          Bloomberg Surveillance, Real Vision, Macro Voices and the rest of the macro feed, searchable. Condensed alpha without burning hours.
         </p>
       </div>
 
-      {/* command line */}
-      <form onSubmit={submit} className="tape-fade mt-8 flex items-center gap-2 tape-panel px-3 py-2.5" style={{ animationDelay: '60ms' }}>
-        <span className="tape-mono select-none text-base" style={{ color: 'var(--tape-accent)' }}>›</span>
-        <input
-          value={command}
-          onChange={e => setCommand(e.target.value)}
-          placeholder="dossier Stanley Druckenmiller"
-          autoFocus
-          className="tape-mono min-w-0 flex-1 bg-transparent text-sm focus:outline-none"
-          style={{ color: 'var(--tape-fg)' }}
-          spellCheck={false}
-          autoComplete="off"
-        />
-        <button type="submit" className="tape-btn flex items-center gap-1.5 px-2.5 py-1.5" aria-label="Run command">
-          <CornerDownLeft className="h-3.5 w-3.5" />
-        </button>
-      </form>
-
-      {/* action list — rows, deliberately not a card grid */}
-      <div className="tape-fade mt-8" style={{ animationDelay: '120ms' }}>
-        <div className="tape-label mb-1 px-1">Actions</div>
-        <div className="tape-panel">
-          {ACTIONS.map((a, i) => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => onLaunch({ action: a.id })}
-              className="tape-action-row px-4 py-3.5"
-              style={i === 0 ? { borderTop: 'none' } : undefined}
-            >
-              <div className="flex items-baseline gap-3">
-                <span className="tape-action-verb tape-mono w-20 flex-shrink-0 text-xs">{a.verb}</span>
-                <div className="min-w-0">
-                  <div className="tape-serif text-base" style={{ color: 'var(--tape-fg)' }}>{a.title}</div>
-                  <div className="mt-0.5 text-xs leading-relaxed" style={{ color: 'var(--tape-fg-dim)' }}>{a.desc}</div>
-                  <div className="tape-mono mt-1 text-[10px]" style={{ color: 'var(--tape-fg-faint)' }}>{a.usage}</div>
-                </div>
-              </div>
+      {/* hero: look up a person -> Dossier */}
+      <form
+        onSubmit={e => { e.preventDefault(); lookUp(query); }}
+        className="tape-fade mt-10"
+        style={{ animationDelay: '70ms' }}
+      >
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2" style={{ color: 'var(--tape-fg-faint)' }} />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Look up anyone…"
+            autoFocus
+            spellCheck={false}
+            className="tape-search w-full py-3.5 pl-12 pr-28"
+          />
+          <button
+            type="submit"
+            disabled={!query.trim()}
+            className="tape-btn tape-btn--go absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1.5 px-3.5 py-2"
+          >
+            Dossier
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-1">
+          <span className="text-xs" style={{ color: 'var(--tape-fg-faint)' }}>Try</span>
+          {PERSON_EXAMPLES.map(name => (
+            <button key={name} type="button" onClick={() => lookUp(name)} className="tape-pill px-2.5 py-1">
+              {name}
             </button>
           ))}
         </div>
-      </div>
+      </form>
 
-      {/* sample queries */}
-      <div className="tape-fade mt-8" style={{ animationDelay: '180ms' }}>
-        <div className="tape-label mb-2 px-1">Try</div>
-        <div className="flex flex-wrap gap-2">
-          {TAPE_SAMPLES.map(s => {
-            const parsed = parseCommand(s);
+      {/* the other three jobs */}
+      <div className="tape-fade mt-10" style={{ animationDelay: '140ms' }}>
+        <div className="tape-label mb-2.5 pl-1">Or go deeper</div>
+        <div className="tape-panel tape-divide overflow-hidden">
+          {SECONDARY.map(a => {
+            const Icon = a.icon;
             return (
-              <button
-                key={s}
-                type="button"
-                onClick={() => parsed && onLaunch(parsed)}
-                className="tape-btn tape-mono px-2.5 py-1.5 text-[11px]"
-              >
-                {s}
-              </button>
+              <div key={a.id} className="tape-action px-4 py-4">
+                <div className="flex min-w-0 items-start gap-3.5">
+                  <Icon className="mt-0.5 h-[18px] w-[18px] flex-shrink-0" style={{ color: 'var(--tape-accent)' }} />
+                  <div className="min-w-0">
+                    <button type="button" onClick={() => onLaunch({ action: a.id })} className="block text-left">
+                      <span className="tape-serif block text-[17px] leading-snug" style={{ color: 'var(--tape-fg)' }}>{a.title}</span>
+                      <span className="mt-1 block text-[13px] leading-relaxed" style={{ color: 'var(--tape-fg-dim)' }}>{a.desc}</span>
+                    </button>
+                    <button type="button" onClick={() => onLaunch(a.example.launch)} className="tape-pill mt-2.5 inline-block px-2.5 py-1">
+                      {a.example.label}
+                    </button>
+                  </div>
+                </div>
+                <button type="button" onClick={() => onLaunch({ action: a.id })} aria-label={a.title} className="flex-shrink-0">
+                  <ArrowRight className="tape-action-arrow h-4 w-4" />
+                </button>
+              </div>
             );
           })}
         </div>

@@ -114,7 +114,7 @@ const TimelineView: React.FC<{ initialTopic?: string }> = ({ initialTopic }) => 
 
             <div className="px-3 py-4">
               <TapeChart buckets={result.buckets} selectedWeek={selectedWeek} onSelectWeek={selectWeek} />
-              <div className="tape-mono mt-1 text-center text-[10px]" style={{ color: 'var(--tape-fg-faint)' }}>
+              <div className="mt-1 text-center text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>
                 {selectedWeek ? 'click a different week to re-scope' : 'click any week to surface the underlying hits'}
               </div>
             </div>

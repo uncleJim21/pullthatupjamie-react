@@ -32,8 +32,26 @@ const ActiveView: React.FC<{ launch: TapeLaunch }> = ({ launch }) => {
   }
 };
 
+// Deep-link support: /tape?a=dossier&p=El-Erian, /tape?a=brief&t=oil,
+// /tape?a=split&p=The%20bulls&b=The%20bears&t=the%20AI%20bubble.
+const launchFromUrl = (): TapeLaunch | null => {
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const a = sp.get('a');
+    if (a === 'dossier' || a === 'brief' || a === 'split' || a === 'timeline') {
+      return {
+        action: a,
+        person: sp.get('p') || undefined,
+        personB: sp.get('b') || undefined,
+        topic: sp.get('t') || undefined,
+      };
+    }
+  } catch { /* SSR / malformed */ }
+  return null;
+};
+
 const TapePage: React.FC = () => {
-  const [launch, setLaunch] = useState<TapeLaunch | null>(null);
+  const [launch, setLaunch] = useState<TapeLaunch | null>(launchFromUrl);
 
   const goHome = useCallback(() => setLaunch(null), []);
 
@@ -50,7 +68,7 @@ const TapePage: React.FC = () => {
     <AudioControllerProvider>
       <Helmet>
         <title>{TAPE_NAME} — macro commentary intelligence</title>
-        <meta name="description" content="Bloomberg-grade search across the podcast macro and finance commentary universe. Track what every macro thinker said, when, with timestamped citations." />
+        <meta name="description" content="Read the tape, skip the noise. Search what the sharpest macro voices actually said across Bloomberg Surveillance, Odd Lots and the top finance podcasts. Real quotes, timestamped and sourced." />
         <meta name="robots" content="noindex" />
       </Helmet>
 
@@ -71,12 +89,12 @@ const TapePage: React.FC = () => {
               {TAPE_NAME}
             </button>
             {launch && (
-              <span className="tape-mono text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>
+              <span className="text-[12px]" style={{ color: 'var(--tape-fg-faint)' }}>
                 / {ACTION_TITLES[launch.action]}
               </span>
             )}
           </div>
-          <a href="/app" className="tape-mono text-[11px] transition-colors" style={{ color: 'var(--tape-fg-faint)' }}>
+          <a href="/app" className="text-[12px] transition-colors" style={{ color: 'var(--tape-fg-faint)' }}>
             pullthatupjamie ↗
           </a>
         </header>

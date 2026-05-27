@@ -9,4 +9,4 @@ export const USE_MOCK_TAPE = true;
 
 // Working brand name + route for the finance-intelligence skin.
 export const TAPE_NAME = 'Tape';
-export const TAPE_TAGLINE = 'Macro commentary, on the record.';
+export const TAPE_TAGLINE = 'Read the tape. Skip the noise.';
