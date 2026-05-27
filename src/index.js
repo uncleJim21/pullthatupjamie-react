@@ -19,6 +19,7 @@ import BlogIndex from './components/blog/BlogIndex.tsx';
 import BlogPost from './components/blog/BlogPost.tsx';
 import UpgradePage from './components/UpgradePage.tsx';
 import PoastPage from './components/PoastPage.tsx';
+import TapePage from './components/tape/TapePage.tsx';
 import { DEBUG_MODE } from './constants/constants.ts';
 import { inject } from "@vercel/analytics"
 
@@ -143,6 +144,9 @@ const App = () => (
       <Route path="/app/automation-settings" element={<AutomationSettingsPage />} />
       <Route path="/app/poast" element={<PoastPage />} />
       <Route path="/try-jamie" element={<TryJamieWizard />} />
+
+      {/* Tape — finance-intelligence skin (its own brand, separate from /app) */}
+      <Route path="/tape" element={<TapePage />} />
       <Route path="/auth/twitter/complete" element={<TwitterAuthCallback />} />
       {DEBUG_MODE && <Route path="/twitter-test" element={<TwitterTest />} />}
       {DEBUG_MODE && <Route path="/browser-test" element={<BrowserTestInput />} />}

@@ -11,6 +11,12 @@ module.exports = {
         background: "var(--background)",
         foreground: "var(--foreground)",
       },
+      fontFamily: {
+        // Tape skin type roles: editorial serif headers, mono citations.
+        // Body stays on the app-wide Inter default.
+        'tape-serif': ['Newsreader', 'Georgia', 'serif'],
+        'tape-mono': ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
       boxShadow: {
         'white-glow': '0 0 10px rgba(255, 255, 255, 0.8)',
       },

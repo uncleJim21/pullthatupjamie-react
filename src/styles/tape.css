@@ -1,0 +1,169 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Tape skin — scoped institutional theme.
+
+   EVERYTHING here is nested under `.tape-root` so none of it leaks into the
+   rest of the app, and the app's global `*-neon` classes never touch Tape.
+   Color strategy is deliberately RESTRAINED: tinted near-black neutrals plus a
+   single electric-green accent held to a small fraction of the surface (active
+   state, live counts, the chart stroke, the command cursor) — never flooded.
+   Neutrals are tinted toward the green hue (155) at very low chroma so the
+   grayscale reads cohesive rather than dead. OKLCH throughout; no #000/#fff.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.tape-root {
+  /* surfaces */
+  --tape-bg: oklch(0.15 0.006 155);
+  --tape-bg-raised: oklch(0.19 0.007 155);
+  --tape-bg-inset: oklch(0.12 0.006 155);
+  --tape-hairline: oklch(0.28 0.008 155);
+  --tape-hairline-strong: oklch(0.4 0.012 155);
+
+  /* text */
+  --tape-fg: oklch(0.93 0.004 155);
+  --tape-fg-dim: oklch(0.66 0.008 155);
+  --tape-fg-faint: oklch(0.5 0.008 155);
+
+  /* the one accent */
+  --tape-accent: oklch(0.82 0.19 149);
+  --tape-accent-dim: oklch(0.66 0.13 149);
+  --tape-accent-wash: oklch(0.82 0.19 149 / 0.1);
+  --tape-accent-line: oklch(0.82 0.19 149 / 0.28);
+
+  /* semantic */
+  --tape-danger: oklch(0.66 0.16 28);
+
+  position: relative;
+  min-height: 100%;
+  background: var(--tape-bg);
+  color: var(--tape-fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  /* faint baseline grid texture — institutional, not decorative glass */
+  background-image:
+    linear-gradient(oklch(0.99 0 0 / 0.012) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.99 0 0 / 0.012) 1px, transparent 1px);
+  background-size: 100% 28px, 64px 100%;
+}
+
+.tape-root ::selection {
+  background: var(--tape-accent-wash);
+  color: var(--tape-fg);
+}
+
+/* ── type roles ─────────────────────────────────────────────────────────── */
+.tape-serif { font-family: 'Newsreader', Georgia, serif; }
+.tape-mono { font-family: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace; }
+
+/* uppercase mono micro-label used for topic tags, field labels, verbs */
+.tape-label {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 10px;
+  color: var(--tape-fg-faint);
+}
+
+/* ── containers ─────────────────────────────────────────────────────────── */
+.tape-panel {
+  background: var(--tape-bg-raised);
+  border: 1px solid var(--tape-hairline);
+}
+.tape-divide > * + * { border-top: 1px solid var(--tape-hairline); }
+
+/* ── inputs ─────────────────────────────────────────────────────────────── */
+.tape-input {
+  background: var(--tape-bg-inset);
+  border: 1px solid var(--tape-hairline);
+  color: var(--tape-fg);
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  transition: border-color 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tape-input::placeholder { color: var(--tape-fg-faint); }
+.tape-input:focus {
+  outline: none;
+  border-color: var(--tape-accent-dim);
+}
+
+/* ── command prompt ─────────────────────────────────────────────────────── */
+.tape-cursor {
+  display: inline-block;
+  width: 0.5ch;
+  background: var(--tape-accent);
+  animation: tape-blink 1.1s steps(1) infinite;
+}
+@keyframes tape-blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+
+/* ── buttons ────────────────────────────────────────────────────────────── */
+.tape-btn {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--tape-fg);
+  background: var(--tape-bg-inset);
+  border: 1px solid var(--tape-hairline-strong);
+  transition: border-color 0.18s, background 0.18s, color 0.18s;
+}
+.tape-btn:hover:not(:disabled) { border-color: var(--tape-accent-dim); color: var(--tape-accent); }
+.tape-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.tape-btn--go {
+  color: var(--tape-bg);
+  background: var(--tape-accent);
+  border-color: var(--tape-accent);
+}
+.tape-btn--go:hover:not(:disabled) { background: var(--tape-accent-dim); border-color: var(--tape-accent-dim); color: var(--tape-bg); }
+
+/* ── action list rows (launcher) — rows, not cards ─────────────────────── */
+.tape-action-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--tape-hairline);
+  transition: background 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tape-action-row:hover { background: var(--tape-bg-raised); }
+.tape-action-row:hover .tape-action-verb { color: var(--tape-accent); }
+.tape-action-verb { color: var(--tape-fg-dim); transition: color 0.16s; }
+
+/* ── citation row ───────────────────────────────────────────────────────── */
+.tape-cite { transition: background 0.16s; }
+.tape-cite:hover { background: var(--tape-bg-raised); }
+.tape-cite--active { background: var(--tape-accent-wash); }
+.tape-cite__play {
+  border: 1px solid var(--tape-hairline-strong);
+  color: var(--tape-fg-dim);
+  transition: color 0.16s, border-color 0.16s;
+}
+.tape-cite__play:hover { color: var(--tape-accent); border-color: var(--tape-accent-dim); }
+.tape-cite--active .tape-cite__play { color: var(--tape-accent); border-color: var(--tape-accent); }
+
+/* the verbatim quote: mono, signals exact transcription */
+.tape-quote {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tape-fg);
+}
+
+/* topic / position tag */
+.tape-tag {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 10px;
+  color: var(--tape-accent);
+  border: 1px solid var(--tape-accent-line);
+  background: var(--tape-accent-wash);
+}
+
+/* monospace timestamp + counts */
+.tape-num { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+/* ── entrance motion (ease-out only, no layout-prop animation) ──────────── */
+.tape-fade { animation: tape-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes tape-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.tape-scrollbar::-webkit-scrollbar { width: 10px; height: 10px; }
+.tape-scrollbar::-webkit-scrollbar-thumb { background: var(--tape-hairline-strong); }
+.tape-scrollbar::-webkit-scrollbar-track { background: transparent; }
