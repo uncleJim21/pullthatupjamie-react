@@ -4,4 +4,5 @@ export { getTimeline, getTimelineDrilldown } from './timelineService.ts';
 export { getBrief } from './briefService.ts';
 export { getSplit } from './splitService.ts';
 export { getArc } from './arcService.ts';
+export { getReadIn } from './readInService.ts';
 export * from './tapeTypes.ts';

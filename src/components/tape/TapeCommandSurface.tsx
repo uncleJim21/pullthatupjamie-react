@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
-import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp } from 'lucide-react';
+import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp, FileSearch } from 'lucide-react';
 import { TAPE_NAME } from '../../config/tapeConfig.ts';
-import type { TapeActionId } from '../../services/tape/tapeTypes.ts';
+import type { TapeActionId, TapeDepth } from '../../services/tape/tapeTypes.ts';
 
 export interface TapeLaunch {
   action: TapeActionId;
   person?: string;
   personB?: string;
   topic?: string;
+  /** Read In input. */
+  ticker?: string;
+  /** Read In starting depth. */
+  depth?: TapeDepth;
 }
 
 interface SecondaryAction {
@@ -39,6 +43,13 @@ const SECONDARY: SecondaryAction[] = [
     desc: 'How one person’s thesis, and their conviction in it, moved over years, with every call sourced.',
     icon: TrendingUp,
     example: { label: 'Gromen: the debt-spiral thesis', launch: { action: 'arc', person: 'Luke Gromen' } },
+  },
+  {
+    id: 'readin',
+    title: 'Read in on a name',
+    desc: 'A fast company brief that scales from a 30-second pulse to a deep read: what they do, the smart-money case, peers, risks.',
+    icon: FileSearch,
+    example: { label: 'APP — AppLovin', launch: { action: 'readin', ticker: 'APP' } },
   },
 ];
 

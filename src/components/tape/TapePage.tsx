@@ -9,6 +9,8 @@ import TimelineView from './actions/TimelineView.tsx';
 import BriefView from './actions/BriefView.tsx';
 import SplitView from './actions/SplitView.tsx';
 import ArcView from './actions/ArcView.tsx';
+import ReadInView from './actions/ReadInView.tsx';
+import type { TapeDepth } from '../../services/tape/tapeTypes.ts';
 import '../../styles/tape.css';
 
 const ACTION_TITLES: Record<TapeLaunch['action'], string> = {
@@ -17,6 +19,7 @@ const ACTION_TITLES: Record<TapeLaunch['action'], string> = {
   brief: 'Brief',
   split: 'Split',
   arc: 'Arc',
+  readin: 'Read in',
 };
 
 const ActiveView: React.FC<{ launch: TapeLaunch }> = ({ launch }) => {
@@ -31,23 +34,29 @@ const ActiveView: React.FC<{ launch: TapeLaunch }> = ({ launch }) => {
       return <SplitView initialA={launch.person} initialB={launch.personB} initialTopic={launch.topic} />;
     case 'arc':
       return <ArcView initialPerson={launch.person} />;
+    case 'readin':
+      return <ReadInView initialTicker={launch.ticker} initialDepth={launch.depth} />;
     default:
       return null;
   }
 };
 
 // Deep-link support: /tape?a=dossier&p=El-Erian, /tape?a=brief&t=oil,
-// /tape?a=split&p=The%20bulls&b=The%20bears&t=the%20AI%20bubble.
+// /tape?a=split&p=The%20bulls&b=The%20bears&t=the%20AI%20bubble,
+// /tape?a=readin&t=APP&depth=brief.
 const launchFromUrl = (): TapeLaunch | null => {
   try {
     const sp = new URLSearchParams(window.location.search);
     const a = sp.get('a');
-    if (a === 'dossier' || a === 'brief' || a === 'split' || a === 'timeline' || a === 'arc') {
+    if (a === 'dossier' || a === 'brief' || a === 'split' || a === 'timeline' || a === 'arc' || a === 'readin') {
+      const depth = sp.get('depth');
       return {
         action: a,
         person: sp.get('p') || undefined,
         personB: sp.get('b') || undefined,
         topic: sp.get('t') || undefined,
+        ticker: sp.get('t') || undefined,
+        depth: (depth === 'quick' || depth === 'brief' || depth === 'deep') ? (depth as TapeDepth) : undefined,
       };
     }
   } catch { /* SSR / malformed */ }

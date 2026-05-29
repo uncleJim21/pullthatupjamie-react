@@ -151,5 +151,68 @@ export interface ArcResult {
   generatedAt: string;
 }
 
+// ─── 6. Read in — fast company research scaling Quick / Brief / Deep ─────────
+export type TapeDepth = 'quick' | 'brief' | 'deep';
+
+export interface ReadInInput {
+  ticker: string;
+  depth?: TapeDepth;
+}
+/** Dated catalyst bullet (S&P inclusion, short-report release, earnings, etc.). */
+export interface ReadInCatalyst {
+  date: string; // ISO or 'YYYY-MM' for soft dates
+  label: string;
+}
+/** The 30-second answer surfaced at Quick depth. */
+export interface ReadInPulse {
+  bullLine: string;
+  bearLine: string;
+  /** One line about the recent price action (uses live Yahoo data on render). */
+  priceAction: string;
+  /** Strongest single quote to lead with. */
+  marqueeCitation: TapeCitation;
+}
+/** Hybrid pattern shared by UVP / Strategy / Leadership: analyst synthesis + optional supporting clips. */
+export interface ReadInThesisSection {
+  /** 2-3 sentence analyst-style synthesis (hand-written, defensible). */
+  summary: string;
+  /** 0-2 supporting clips from the corpus. */
+  citations?: TapeCitation[];
+}
+/** Generic label/value pair used by Leadership facts strip and Financials grid. */
+export interface ReadInFact { label: string; value: string }
+/** Leadership extends ThesisSection with a structured facts strip (CEO, tenure, ownership, etc.). */
+export interface ReadInLeadership extends ReadInThesisSection {
+  facts: ReadInFact[];
+}
+/** Headline numbers block; deliberately small (not a financials terminal). */
+export interface ReadInFinancials {
+  headline: ReadInFact[];
+  /** One-line analyst gloss. */
+  note?: string;
+}
+
+export interface ReadInResult {
+  ticker: string;             // e.g. 'APP'
+  name: string;               // 'AppLovin Corp'
+  sectorTag: string;          // 'SOFTWARE · ADTECH'
+  /** Yahoo URL slug for the live-price fetch + click-through. */
+  yahoo: string;              // 'APP'
+  /** 2-3 paragraph plain-English primer. Rendered at Brief depth and below. */
+  whatTheyDo: string;
+  pulse: ReadInPulse;
+  /** v2: investment-thesis pillars at Brief depth. Optional so non-baked tickers still type-check. */
+  uvp?: ReadInThesisSection;
+  strategy?: ReadInThesisSection;
+  leadership?: ReadInLeadership;
+  financials?: ReadInFinancials;
+  smartMoney: { bulls: TapeCitation[]; bears: TapeCitation[] };
+  catalysts: ReadInCatalyst[];
+  /** Peer ticker symbols for the Deep peer strip. */
+  peers: string[];
+  risks: string[];
+  generatedAt: string;
+}
+
 /** The action verbs, used by the command parser + launcher. */
-export type TapeActionId = 'dossier' | 'timeline' | 'brief' | 'split' | 'arc';
+export type TapeActionId = 'dossier' | 'timeline' | 'brief' | 'split' | 'arc' | 'readin';
