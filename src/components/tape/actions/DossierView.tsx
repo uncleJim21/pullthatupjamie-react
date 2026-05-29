@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getDossier } from '../../../services/tape/index.ts';
 import type { DossierResult } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
+import TapeTickerStrip from '../TapeTickerStrip.tsx';
 import { TapeField, RunButton, TapeStatus } from '../TapeActionScaffold.tsx';
+import { tickersForDossier } from '../../../data/mockTapeTickers.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 
@@ -74,6 +76,9 @@ const DossierView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) =>
                 {result.topics.reduce((a, t) => a + t.citations.length, 0)} cites · {result.topics.length} topics · {result.appearances.length} shows
               </span>
             </div>
+
+            {/* on the tape */}
+            <TapeTickerStrip tickers={tickersForDossier(result.person)} />
 
             {/* appearance map */}
             {result.appearances.length > 0 && (

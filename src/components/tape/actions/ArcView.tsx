@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getArc } from '../../../services/tape/index.ts';
 import type { ArcResult, ArcCall } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
+import TapeTickerStrip from '../TapeTickerStrip.tsx';
 import { TapeField, RunButton, TapeStatus } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
+import { TICKERS_ARC_GROMEN } from '../../../data/mockTapeTickers.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 
@@ -165,6 +167,9 @@ const ArcView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) => {
               </div>
               <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--tape-fg-dim)' }}>{result.thesis}</p>
             </div>
+
+            {/* on the tape */}
+            <TapeTickerStrip tickers={TICKERS_ARC_GROMEN} />
 
             {/* conviction trajectory */}
             <div className="border-b px-3 py-4" style={{ borderColor: 'var(--tape-hairline)' }}>

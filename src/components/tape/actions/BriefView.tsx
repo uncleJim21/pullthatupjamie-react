@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getBrief } from '../../../services/tape/index.ts';
 import type { BriefResult } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
+import TapeTickerStrip from '../TapeTickerStrip.tsx';
 import { TapeField, RunButton, TapeStatus } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
+import { TICKERS_BRIEF_OIL } from '../../../data/mockTapeTickers.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -70,6 +72,9 @@ const BriefView: React.FC<{ initialTopic?: string }> = ({ initialTopic }) => {
               </div>
               <p className="tape-serif mt-2 text-xl leading-snug" style={{ color: 'var(--tape-fg)' }}>{result.headline}</p>
             </div>
+
+            {/* on the tape */}
+            <TapeTickerStrip tickers={TICKERS_BRIEF_OIL} />
 
             {result.sections.map(s => (
               <section key={s.publisher} className="border-b last:border-b-0" style={{ borderColor: 'var(--tape-hairline)' }}>

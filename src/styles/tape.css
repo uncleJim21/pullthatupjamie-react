@@ -135,6 +135,16 @@
 }
 .tape-pill:hover { color: var(--tape-fg); border-color: var(--tape-accent-dim); background: var(--tape-bg-raised); }
 
+/* ── ticker card (the carousel) ─────────────────────────────────────────── */
+.tape-ticker {
+  background: var(--tape-bg-raised);
+  border: 1px solid var(--tape-hairline);
+  border-radius: 10px;
+  text-decoration: none;
+  transition: border-color 0.16s cubic-bezier(0.22, 1, 0.36, 1), transform 0.16s;
+}
+.tape-ticker:hover { border-color: var(--tape-accent-dim); transform: translateY(-1px); }
+
 /* ── action rows (launcher) ─────────────────────────────────────────────── */
 .tape-action {
   display: flex;

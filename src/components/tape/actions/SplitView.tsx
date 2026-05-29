@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getSplit } from '../../../services/tape/index.ts';
 import type { SplitResult, SplitSide } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
+import TapeTickerStrip from '../TapeTickerStrip.tsx';
 import { TapeField, RunButton, TapeStatus } from '../TapeActionScaffold.tsx';
+import { TICKERS_SPLIT_AI } from '../../../data/mockTapeTickers.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 
@@ -83,6 +85,8 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
             <div className="border-b px-4 py-3" style={{ borderColor: 'var(--tape-hairline)' }}>
               <span className="tape-tag px-1.5 py-0.5">{result.topic}</span>
             </div>
+            {/* on the tape */}
+            <TapeTickerStrip tickers={TICKERS_SPLIT_AI} />
             <div className="flex flex-col md:flex-row">
               <SideColumn side={result.sideA} />
               <div className="border-t md:border-t-0 md:border-l" style={{ borderColor: 'var(--tape-hairline)' }} />
