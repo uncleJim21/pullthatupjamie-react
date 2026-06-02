@@ -3,7 +3,7 @@ import { getArc } from '../../../services/tape/index.ts';
 import type { ArcResult, ArcCall } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
 import { TICKERS_ARC_GROMEN } from '../../../data/mockTapeTickers.ts';
 
@@ -122,12 +122,12 @@ const ArcView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) => {
   const [result, setResult] = useState<ArcResult | null>(null);
   const autoRan = useRef(false);
 
-  const run = useCallback(async (name: string) => {
+  const run = useCallback(async (name: string, refresh = false) => {
     if (!name.trim()) return;
     setStatus('loading');
     setError('');
     try {
-      setResult(await getArc({ person: name.trim() }));
+      setResult(await getArc({ person: name.trim(), refresh }));
       setStatus('idle');
     } catch (e: any) {
       setError(e?.message || 'Failed to trace the arc.');
@@ -203,6 +203,7 @@ const ArcView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) => {
                 <p className="tape-serif text-lg leading-snug" style={{ color: 'var(--tape-fg)' }}>{result.forwardCall}</p>
               </div>
             )}
+            <TapeResultFooter meta={result._meta} onRefresh={result._meta ? () => run(result.person, true) : undefined} />
           </div>
         )}
       </div>

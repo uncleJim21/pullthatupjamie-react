@@ -3,7 +3,7 @@ import { getDossier } from '../../../services/tape/index.ts';
 import type { DossierResult } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter } from '../TapeActionScaffold.tsx';
 import { tickersForDossier } from '../../../data/mockTapeTickers.ts';
 
 type Status = 'idle' | 'loading' | 'error';
@@ -15,12 +15,12 @@ const DossierView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) =>
   const [result, setResult] = useState<DossierResult | null>(null);
   const autoRan = useRef(false);
 
-  const run = useCallback(async (name: string) => {
+  const run = useCallback(async (name: string, refresh = false) => {
     if (!name.trim()) return;
     setStatus('loading');
     setError('');
     try {
-      setResult(await getDossier({ person: name.trim() }));
+      setResult(await getDossier({ person: name.trim(), refresh }));
       setStatus('idle');
     } catch (e: any) {
       setError(e?.message || 'Failed to build dossier.');
@@ -109,6 +109,7 @@ const DossierView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) =>
                 </div>
               </section>
             ))}
+            <TapeResultFooter meta={result._meta} onRefresh={result._meta ? () => run(result.person, true) : undefined} />
           </div>
         )}
       </div>

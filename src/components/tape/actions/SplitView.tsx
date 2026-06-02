@@ -3,7 +3,7 @@ import { getSplit } from '../../../services/tape/index.ts';
 import type { SplitResult, SplitSide } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter } from '../TapeActionScaffold.tsx';
 import { TICKERS_SPLIT_AI } from '../../../data/mockTapeTickers.ts';
 
 type Status = 'idle' | 'loading' | 'error';
@@ -33,12 +33,12 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
   const [result, setResult] = useState<SplitResult | null>(null);
   const autoRan = useRef(false);
 
-  const run = useCallback(async (a: string, b: string, t: string) => {
+  const run = useCallback(async (a: string, b: string, t: string, refresh = false) => {
     if (!a.trim() || !b.trim() || !t.trim()) return;
     setStatus('loading');
     setError('');
     try {
-      setResult(await getSplit({ personA: a.trim(), personB: b.trim(), topic: t.trim() }));
+      setResult(await getSplit({ personA: a.trim(), personB: b.trim(), topic: t.trim(), refresh }));
       setStatus('idle');
     } catch (e: any) {
       setError(e?.message || 'Failed to compare positions.');
@@ -98,6 +98,7 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--tape-fg-dim)' }}>{result.contrastSummary}</p>
               </div>
             )}
+            <TapeResultFooter meta={result._meta} onRefresh={result._meta ? () => run(result.sideA.person, result.sideB.person, result.topic, true) : undefined} />
           </div>
         )}
       </div>

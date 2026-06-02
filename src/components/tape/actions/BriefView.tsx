@@ -3,7 +3,7 @@ import { getBrief } from '../../../services/tape/index.ts';
 import type { BriefResult } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
 import { TICKERS_BRIEF_OIL } from '../../../data/mockTapeTickers.ts';
 
@@ -18,12 +18,12 @@ const BriefView: React.FC<{ initialTopic?: string }> = ({ initialTopic }) => {
   const [result, setResult] = useState<BriefResult | null>(null);
   const autoRan = useRef(false);
 
-  const run = useCallback(async (t: string, asOf: string) => {
+  const run = useCallback(async (t: string, asOf: string, refresh = false) => {
     if (!t.trim()) return;
     setStatus('loading');
     setError('');
     try {
-      setResult(await getBrief({ topic: t.trim(), asOfDate: asOf }));
+      setResult(await getBrief({ topic: t.trim(), asOfDate: asOf, refresh }));
       setStatus('idle');
     } catch (e: any) {
       setError(e?.message || 'Failed to compile brief.');
@@ -89,6 +89,7 @@ const BriefView: React.FC<{ initialTopic?: string }> = ({ initialTopic }) => {
                 </div>
               </section>
             ))}
+            <TapeResultFooter meta={result._meta} onRefresh={result._meta ? () => run(result.topic, result.asOfDate, true) : undefined} />
           </div>
         )}
       </div>

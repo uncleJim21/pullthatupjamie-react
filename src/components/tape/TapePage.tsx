@@ -10,6 +10,8 @@ import BriefView from './actions/BriefView.tsx';
 import SplitView from './actions/SplitView.tsx';
 import ArcView from './actions/ArcView.tsx';
 import ReadInView from './actions/ReadInView.tsx';
+import TapeAuthGate from './TapeAuthGate.tsx';
+import { signOut } from '../../services/tape/tapeAuth.ts';
 import type { TapeDepth } from '../../services/tape/tapeTypes.ts';
 import '../../styles/tape.css';
 
@@ -78,6 +80,7 @@ const TapePage: React.FC = () => {
   }, [launch, goHome]);
 
   return (
+    <TapeAuthGate>
     <AudioControllerProvider>
       <Helmet>
         <title>{TAPE_NAME}: macro commentary intelligence</title>
@@ -107,14 +110,26 @@ const TapePage: React.FC = () => {
               </span>
             )}
           </div>
-          <a href="/app" className="text-[12px] transition-colors" style={{ color: 'var(--tape-fg-faint)' }}>
-            pullthatupjamie ↗
-          </a>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={signOut}
+              className="text-[12px] transition-colors hover:opacity-80"
+              style={{ color: 'var(--tape-fg-faint)' }}
+              title="Sign out of the Tape demo"
+            >
+              sign out
+            </button>
+            <a href="/app" className="text-[12px] transition-colors" style={{ color: 'var(--tape-fg-faint)' }}>
+              pullthatupjamie ↗
+            </a>
+          </div>
         </header>
 
         {launch ? <ActiveView launch={launch} /> : <TapeCommandSurface onLaunch={setLaunch} />}
       </div>
     </AudioControllerProvider>
+    </TapeAuthGate>
   );
 };
 

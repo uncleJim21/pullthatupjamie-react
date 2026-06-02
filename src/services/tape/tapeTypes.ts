@@ -7,6 +7,7 @@
 // audio / share / time utilities work on it unchanged.
 
 import type { ClipMeta } from '../../components/jamiePullAgent/JamiePullAgentMessage.tsx';
+import type { TapeResponseMeta } from './tapeClient.ts';
 
 /** Atomic cited evidence unit. One quoted paragraph + everything the UI needs
  *  to play it, time-link it, and attribute it. */
@@ -41,6 +42,9 @@ export const clipMetaToCitation = (m: ClipMeta, speaker?: string): TapeCitation 
 // ─── 1. Dossier ──────────────────────────────────────────────────────────────
 export interface DossierInput {
   person: string;
+  /** Force re-synthesis on the backend (bypass cache). Set when the user
+   *  hits the Refresh affordance under a result. */
+  refresh?: boolean;
 }
 export interface DossierTopicGroup {
   topic: string;
@@ -58,6 +62,8 @@ export interface DossierResult {
   topics: DossierTopicGroup[];
   appearances: DossierAppearance[];
   generatedAt: string; // ISO
+  /** Backend `_meta` from the synthesize call. Absent on canon-only results. */
+  _meta?: TapeResponseMeta;
 }
 
 // ─── 2. Timeline ─────────────────────────────────────────────────────────────
@@ -92,6 +98,7 @@ export interface TimelineDrilldownResult {
 export interface BriefInput {
   topic: string;
   asOfDate: string; // ISO; "this week" = the 7 days ending asOfDate
+  refresh?: boolean;
 }
 export interface BriefPublisherSection {
   publisher: string;
@@ -104,6 +111,7 @@ export interface BriefResult {
   headline: string;
   sections: BriefPublisherSection[];
   generatedAt: string;
+  _meta?: TapeResponseMeta;
 }
 
 // ─── 4. Split ────────────────────────────────────────────────────────────────
@@ -111,6 +119,7 @@ export interface SplitInput {
   personA: string;
   personB: string;
   topic: string;
+  refresh?: boolean;
 }
 export interface SplitSide {
   person: string;
@@ -123,11 +132,13 @@ export interface SplitResult {
   sideB: SplitSide;
   contrastSummary?: string;
   generatedAt: string;
+  _meta?: TapeResponseMeta;
 }
 
 // ─── 5. Arc — how one person's view on a thesis evolved over time ────────────
 export interface ArcInput {
   person: string;
+  refresh?: boolean;
 }
 export interface ArcCall {
   date: string; // ISO of the clip
@@ -149,6 +160,7 @@ export interface ArcResult {
   /** "What he's calling for next" — the live forward prediction. */
   forwardCall?: string;
   generatedAt: string;
+  _meta?: TapeResponseMeta;
 }
 
 // ─── 6. Read in — fast company research scaling Quick / Brief / Deep ─────────
@@ -157,6 +169,7 @@ export type TapeDepth = 'quick' | 'brief' | 'deep';
 export interface ReadInInput {
   ticker: string;
   depth?: TapeDepth;
+  refresh?: boolean;
 }
 /** Dated catalyst bullet (S&P inclusion, short-report release, earnings, etc.). */
 export interface ReadInCatalyst {
@@ -212,6 +225,7 @@ export interface ReadInResult {
   peers: string[];
   risks: string[];
   generatedAt: string;
+  _meta?: TapeResponseMeta;
 }
 
 /** The action verbs, used by the command parser + launcher. */

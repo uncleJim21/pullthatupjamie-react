@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowUp, ArrowDown, ExternalLink } from 'lucide-react';
 import type { TapeTicker } from '../../data/mockTapeTickers.ts';
+import { useLiveTickers } from '../../services/tape/useLiveTickers.ts';
 
 /** Tiny inline sparkline; colored by direction. */
 const Sparkline: React.FC<{ data: number[]; up: boolean }> = ({ data, up }) => {
@@ -51,14 +52,49 @@ const TickerCard: React.FC<{ t: TapeTicker }> = ({ t }) => {
   );
 };
 
-const TapeTickerStrip: React.FC<{ tickers: TapeTicker[]; label?: string }> = ({ tickers, label = 'On the tape' }) => {
-  if (!tickers.length) return null;
+/**
+ * Renders a horizontal carousel of TickerCards.
+ *
+ * - Pass `tickers={baked}` to use static data only (no network).
+ * - Pass `symbols={['APP', '%5ETNX', ...]}` for live data via /api/tape/quote/:slug.
+ * - Pass BOTH (the common path) and the strip uses baked data instantly, then
+ *   swaps in live prices for any symbol the proxy resolves. Symbols that don't
+ *   resolve fall back to the baked entry. Best of both: instant render, live
+ *   numbers when authenticated and the backend is reachable.
+ */
+const TapeTickerStrip: React.FC<{
+  tickers?: TapeTicker[];
+  symbols?: string[];
+  label?: string;
+}> = ({ tickers, symbols, label = 'On the tape' }) => {
+  // Default: derive the live-fetch slugs from the baked yahoo field if no
+  // explicit `symbols` prop was given.
+  const liveSlugs = symbols ?? (tickers ? tickers.map(t => t.yahoo) : []);
+  const live = useLiveTickers(liveSlugs);
+
+  // Render order follows the input list. For each slug we prefer live data;
+  // fall back to the baked entry if the proxy didn't resolve it.
+  const display: TapeTicker[] = liveSlugs.map(slug => {
+    const liveT = live.tickers.find(t => t.yahoo === slug);
+    const bakedT = tickers?.find(t => t.yahoo === slug);
+    if (liveT) {
+      // Live price/change/spark wins. Name often comes through; fall back to baked name.
+      return { ...liveT, name: liveT.name || bakedT?.name || liveT.symbol };
+    }
+    return bakedT || null;
+  }).filter((t): t is TapeTicker => t !== null);
+
+  if (display.length === 0) return null;
+
   return (
     <div className="border-b py-3" style={{ borderColor: 'var(--tape-hairline)' }}>
-      <div className="tape-label mb-2 px-4">{label}</div>
+      <div className="tape-label mb-2 flex items-center gap-2 px-4">
+        <span>{label}</span>
+        {live.isStale && <span className="text-[10px] normal-case tracking-normal" style={{ color: 'var(--tape-fg-faint)' }}>(stale)</span>}
+      </div>
       <div className="tape-scrollbar overflow-x-auto">
         <div className="flex gap-2 px-4 pb-1" style={{ minWidth: 'min-content' }}>
-          {tickers.map(t => <TickerCard key={t.symbol} t={t} />)}
+          {display.map(t => <TickerCard key={`${t.yahoo}:${t.symbol}`} t={t} />)}
         </div>
       </div>
     </div>

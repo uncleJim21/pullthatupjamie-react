@@ -4,10 +4,11 @@ import { getReadIn } from '../../../services/tape/index.ts';
 import type { ReadInResult, ReadInThesisSection, TapeDepth } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
 import { TICKER_READIN_APP_HEADER, TICKERS_READIN_APP_PEERS } from '../../../data/mockTapeAppTickers.ts';
 import type { TapeTicker } from '../../../data/mockTapeTickers.ts';
+import { useLiveTickers } from '../../../services/tape/useLiveTickers.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 
@@ -122,12 +123,12 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth }>
   const [result, setResult] = useState<ReadInResult | null>(null);
   const autoRan = useRef(false);
 
-  const run = useCallback(async (t: string) => {
+  const run = useCallback(async (t: string, refresh = false) => {
     if (!t.trim()) return;
     setStatus('loading');
     setError('');
     try {
-      setResult(await getReadIn({ ticker: t.trim().toUpperCase() }));
+      setResult(await getReadIn({ ticker: t.trim().toUpperCase(), refresh }));
       setStatus('idle');
     } catch (e: any) {
       setError(e?.message || 'Failed to read in on this name.');
@@ -147,9 +148,17 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth }>
     void run(ticker);
   };
 
-  // For the demo, the header price card is the baked APP entry. For non-APP
-  // tickers we just don't show a header card (mock has no data anyway).
-  const headerTicker: TapeTicker | null = result && result.ticker === 'APP' ? TICKER_READIN_APP_HEADER : null;
+  // For the demo, the header price card uses the baked APP entry as a
+  // fallback and swaps in the live Yahoo quote via useLiveTickers when the
+  // proxy resolves. For non-APP tickers we just don't show a header card
+  // (mock has no data anyway).
+  const liveApp = useLiveTickers(result?.ticker === 'APP' ? ['APP'] : []);
+  const liveAppTicker = liveApp.tickers.find(t => t.yahoo === 'APP') || null;
+  const headerTicker: TapeTicker | null = result && result.ticker === 'APP'
+    ? (liveAppTicker
+        ? { ...liveAppTicker, name: liveAppTicker.name || TICKER_READIN_APP_HEADER.name }
+        : TICKER_READIN_APP_HEADER)
+    : null;
   const empty = result && !result.name;
   const showBrief = depth === 'brief' || depth === 'deep';
   const showDeep = depth === 'deep';
@@ -331,6 +340,7 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth }>
                 </ul>
               </section>
             )}
+            <TapeResultFooter meta={result._meta} onRefresh={result._meta ? () => run(result.ticker, true) : undefined} />
           </div>
         )}
       </div>
