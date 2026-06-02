@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { ArrowLeft } from 'lucide-react';
 import { AudioControllerProvider } from '../../context/AudioControllerContext.tsx';
 import { TAPE_NAME } from '../../config/tapeConfig.ts';
 import TapeCommandSurface, { type TapeLaunch } from './TapeCommandSurface.tsx';
@@ -24,20 +23,20 @@ const ACTION_TITLES: Record<TapeLaunch['action'], string> = {
   readin: 'Read in',
 };
 
-const ActiveView: React.FC<{ launch: TapeLaunch }> = ({ launch }) => {
+const ActiveView: React.FC<{ launch: TapeLaunch; onBack: () => void }> = ({ launch, onBack }) => {
   switch (launch.action) {
     case 'dossier':
-      return <DossierView initialPerson={launch.person} />;
+      return <DossierView initialPerson={launch.person} onBack={onBack} />;
     case 'timeline':
-      return <TimelineView initialTopic={launch.topic} />;
+      return <TimelineView initialTopic={launch.topic} onBack={onBack} />;
     case 'brief':
-      return <BriefView initialTopic={launch.topic} />;
+      return <BriefView initialTopic={launch.topic} onBack={onBack} />;
     case 'split':
-      return <SplitView initialA={launch.person} initialB={launch.personB} initialTopic={launch.topic} />;
+      return <SplitView initialA={launch.person} initialB={launch.personB} initialTopic={launch.topic} onBack={onBack} />;
     case 'arc':
-      return <ArcView initialPerson={launch.person} />;
+      return <ArcView initialPerson={launch.person} onBack={onBack} />;
     case 'readin':
-      return <ReadInView initialTicker={launch.ticker} initialDepth={launch.depth} />;
+      return <ReadInView initialTicker={launch.ticker} initialDepth={launch.depth} onBack={onBack} />;
     default:
       return null;
   }
@@ -95,12 +94,6 @@ const TapePage: React.FC = () => {
           style={{ borderColor: 'var(--tape-hairline)', background: 'var(--tape-bg)' }}
         >
           <div className="flex items-center gap-3">
-            {launch ? (
-              <button type="button" onClick={goHome} className="tape-btn flex items-center gap-1.5 px-2 py-1 text-[11px]" title="Back to launcher (Esc)">
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Back
-              </button>
-            ) : null}
             <button type="button" onClick={goHome} className="tape-serif text-base tracking-tight" style={{ color: 'var(--tape-fg)' }}>
               {TAPE_NAME}
             </button>
@@ -126,7 +119,7 @@ const TapePage: React.FC = () => {
           </div>
         </header>
 
-        {launch ? <ActiveView launch={launch} /> : <TapeCommandSurface onLaunch={setLaunch} />}
+        {launch ? <ActiveView launch={launch} onBack={goHome} /> : <TapeCommandSurface onLaunch={setLaunch} />}
       </div>
     </AudioControllerProvider>
     </TapeAuthGate>

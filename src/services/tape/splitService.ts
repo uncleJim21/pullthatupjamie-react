@@ -94,5 +94,6 @@ export async function getSplit(input: SplitInput): Promise<SplitResult> {
 
   const result = parseSplitMarkers(input.topic, input.personA, input.personB, syn.text, candidates);
   result._meta = syn._meta;
+  result.tickers = syn.tickers;
   return result;
 }

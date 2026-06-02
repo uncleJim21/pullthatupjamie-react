@@ -10,6 +10,19 @@ import type {
   TapeCitation, DossierResult, TimelineResult, TimelineBucket,
   TimelineDrilldownResult, BriefResult, SplitResult, ArcResult,
 } from '../services/tape/tapeTypes.ts';
+import {
+  TICKERS_ARC_GROMEN, TICKERS_DOSSIER_ELERIAN, TICKERS_DOSSIER_GREEN,
+  TICKERS_BRIEF_OIL, TICKERS_SPLIT_AI,
+} from './mockTapeTickers.ts';
+
+// Symbol-only views of each baked ticker set, matching the backend's
+// `synthesize.tickers: string[]` shape. Canon fixtures use these so canon-hit
+// results render the strip without an extra round trip.
+const SYM_ARC_GROMEN = TICKERS_ARC_GROMEN.map(t => t.yahoo);
+const SYM_DOSSIER_ELERIAN = TICKERS_DOSSIER_ELERIAN.map(t => t.yahoo);
+const SYM_DOSSIER_GREEN = TICKERS_DOSSIER_GREEN.map(t => t.yahoo);
+const SYM_BRIEF_OIL = TICKERS_BRIEF_OIL.map(t => t.yahoo);
+const SYM_SPLIT_AI = TICKERS_SPLIT_AI.map(t => t.yahoo);
 
 const slug = (s: string) => s.trim().toLowerCase();
 
@@ -78,6 +91,7 @@ const DOSSIERS: Record<string, DossierResult> = {
       { show: "Forward Guidance", episodeTitle: "The US is Risking Stagflation | Mohamed El-Erian", publishedDate: "2025-03-07T18:54:00.000Z", citationCount: 4 },
     ],
     generatedAt: new Date().toISOString(),
+    tickers: SYM_DOSSIER_ELERIAN,
   },
   "gromen": {
     person: "Luke Gromen",
@@ -132,6 +146,7 @@ const DOSSIERS: Record<string, DossierResult> = {
       { show: "Macro Voices", episodeTitle: "MacroVoices #528 Luke Gromen: Hormuz Could Lead To a 1956 US Suez Moment", publishedDate: "2026-04-16T16:48:30.000Z", citationCount: 3 },
     ],
     generatedAt: new Date().toISOString(),
+    tickers: SYM_ARC_GROMEN,
   },
   "green": {
     person: "Mike Green",
@@ -187,6 +202,7 @@ const DOSSIERS: Record<string, DossierResult> = {
       { show: "Bloomberg Surveillance", episodeTitle: "Tariff Uncertainty Ahead of Fed Meeting", publishedDate: "2025-05-07T14:29:08.000Z", citationCount: 1 },
     ],
     generatedAt: new Date().toISOString(),
+    tickers: SYM_DOSSIER_GREEN,
   },
 };
 
@@ -248,6 +264,7 @@ const BRIEF_OIL: BriefResult = {
     },
   ],
   generatedAt: new Date().toISOString(),
+  tickers: SYM_BRIEF_OIL,
 };
 
 const SPLIT_AI: SplitResult = {
@@ -328,6 +345,7 @@ const SPLIT_AI: SplitResult = {
     ] },
   contrastSummary: 'Same Mag 7, opposite reads: the bears fixate on concentration and unproven AI capex, the bulls on the cash actually coming in the door.',
   generatedAt: new Date().toISOString(),
+  tickers: SYM_SPLIT_AI,
 };
 
 const ARC_GROMEN: ArcResult = {
@@ -437,6 +455,7 @@ const ARC_GROMEN: ArcResult = {
   ],
   forwardCall: "What he's calling for next: a forced dollar devaluation against gold this decade, FDR-style, as the only way out of the debt spiral.",
   generatedAt: new Date().toISOString(),
+  tickers: SYM_ARC_GROMEN,
 };
 
 const findDossier = (person: string): DossierResult | null => {
@@ -455,8 +474,12 @@ export function mockBrief(topic: string, _asOfDate?: string): BriefResult {
   return { topic: topic.trim(), asOfDate: BRIEF_OIL.asOfDate, headline: '', sections: [], generatedAt: new Date().toISOString() };
 }
 export function mockSplit(personA: string, personB: string, topic: string): SplitResult {
-  const all = slug(`${personA} ${personB} ${topic}`);
-  if (all.includes('ai') || all.includes('bubble') || all.includes('bull') || all.includes('bear')) return SPLIT_AI;
+  // Canon match is TOPIC-only and intentionally narrow. "bulls" / "bears" are
+  // universal camp labels for any debate; if we keyed on side names we'd
+  // force-return SPLIT_AI for every "bulls vs bears on X" query.
+  const t = slug(topic);
+  const isAiBubble = (t.includes('ai') && t.includes('bubble')) || t.includes('mag 7') || t.includes('mag7') || t.includes('magnificent 7');
+  if (isAiBubble) return SPLIT_AI;
   return { topic: topic.trim(), sideA: { person: personA.trim(), positionSummary: '', citations: [] }, sideB: { person: personB.trim(), positionSummary: '', citations: [] }, generatedAt: new Date().toISOString() };
 }
 export function mockArc(person: string): ArcResult {

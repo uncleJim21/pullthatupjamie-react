@@ -4,9 +4,9 @@ import { getReadIn } from '../../../services/tape/index.ts';
 import type { ReadInResult, ReadInThesisSection, TapeDepth } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
-import { TICKER_READIN_APP_HEADER, TICKERS_READIN_APP_PEERS } from '../../../data/mockTapeAppTickers.ts';
+import { TICKER_READIN_APP_HEADER } from '../../../data/mockTapeAppTickers.ts';
 import type { TapeTicker } from '../../../data/mockTapeTickers.ts';
 import { useLiveTickers } from '../../../services/tape/useLiveTickers.ts';
 
@@ -115,7 +115,7 @@ const HeaderCard: React.FC<{ ticker: TapeTicker; name: string; sectorTag: string
 };
 
 // ── The view ────────────────────────────────────────────────────────────────
-const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth }> = ({ initialTicker, initialDepth }) => {
+const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth; onBack: () => void }> = ({ initialTicker, initialDepth, onBack }) => {
   const [ticker, setTicker] = useState((initialTicker || '').toUpperCase());
   const [depth, setDepth] = useState<TapeDepth>(initialDepth || 'quick');
   const [status, setStatus] = useState<Status>('idle');
@@ -165,6 +165,11 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth }>
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      <TapeActionBar
+        onBack={onBack}
+        onRefresh={result?._meta ? () => run(result.ticker, true) : undefined}
+        refreshLoading={status === 'loading'}
+      />
       <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
         <TapeField label="Ticker" className="flex-1 min-w-[14rem]">
           <input
@@ -322,7 +327,7 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth }>
             {/* DEEP: peers */}
             {showDeep && result.peers.length > 0 && (
               <div className="tape-fade">
-                <TapeTickerStrip tickers={TICKERS_READIN_APP_PEERS} label="Peers" />
+                <TapeTickerStrip symbols={result.peers} label="Peers" />
               </div>
             )}
 
@@ -340,7 +345,7 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth }>
                 </ul>
               </section>
             )}
-            <TapeResultFooter meta={result._meta} onRefresh={result._meta ? () => run(result.ticker, true) : undefined} />
+            <TapeResultFooter meta={result._meta} />
           </div>
         )}
       </div>

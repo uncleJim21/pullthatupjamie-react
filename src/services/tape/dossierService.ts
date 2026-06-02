@@ -88,6 +88,7 @@ export async function getDossier(input: DossierInput): Promise<DossierResult> {
 
   const result = parseDossierMarkers(input.person, syn.text, pq.candidates);
   result._meta = syn._meta;
+  result.tickers = syn.tickers;
 
   // Backfill appearances from person-quotes when synthesis omitted any (more
   // reliable than the model emitting "## APPEARANCES" with consistent format).

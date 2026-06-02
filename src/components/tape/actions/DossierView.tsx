@@ -3,12 +3,11 @@ import { getDossier } from '../../../services/tape/index.ts';
 import type { DossierResult } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter } from '../TapeActionScaffold.tsx';
-import { tickersForDossier } from '../../../data/mockTapeTickers.ts';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
 
 type Status = 'idle' | 'loading' | 'error';
 
-const DossierView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) => {
+const DossierView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({ initialPerson, onBack }) => {
   const [person, setPerson] = useState(initialPerson || '');
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
@@ -44,6 +43,11 @@ const DossierView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) =>
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      <TapeActionBar
+        onBack={onBack}
+        onRefresh={result?._meta ? () => run(result.person, true) : undefined}
+        refreshLoading={status === 'loading'}
+      />
       <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
         <TapeField label="Person" className="flex-1 min-w-[16rem]">
           <input
@@ -77,8 +81,8 @@ const DossierView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) =>
               </span>
             </div>
 
-            {/* on the tape */}
-            <TapeTickerStrip tickers={tickersForDossier(result.person)} />
+            {/* on the tape — backend-curated per Dossier subject */}
+            {result.tickers && result.tickers.length > 0 && <TapeTickerStrip symbols={result.tickers} />}
 
             {/* appearance map */}
             {result.appearances.length > 0 && (
@@ -109,7 +113,7 @@ const DossierView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) =>
                 </div>
               </section>
             ))}
-            <TapeResultFooter meta={result._meta} onRefresh={result._meta ? () => run(result.person, true) : undefined} />
+            <TapeResultFooter meta={result._meta} />
           </div>
         )}
       </div>

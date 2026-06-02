@@ -191,6 +191,11 @@ export interface SynthesizeRequest {
 export interface SynthesizeResponse {
   kind: SynthesizeKind;
   text: string;
+  /** Backend-curated relevant tickers, ordered by relevance (4-8 typical).
+   *  For readin, these are PEERS (not the queried ticker). For all other kinds
+   *  they're the names a finance pro would put on the tape for this story.
+   *  Empty array when nothing confident — render an empty strip (i.e. hide). */
+  tickers: string[];
   tokens?: { input: number; output: number };
   model?: string;
   elapsedMs?: number;

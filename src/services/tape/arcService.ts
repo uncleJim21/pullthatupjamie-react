@@ -89,5 +89,6 @@ export async function getArc(input: ArcInput): Promise<ArcResult> {
 
   const result = parseArcMarkers(input.person, syn.text, pq.candidates);
   result._meta = syn._meta;
+  result.tickers = syn.tickers;
   return result;
 }

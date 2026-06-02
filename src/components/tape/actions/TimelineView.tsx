@@ -3,7 +3,7 @@ import { getTimeline, getTimelineDrilldown } from '../../../services/tape/index.
 import type { TimelineResult, TimelineDrilldownResult } from '../../../services/tape/index.ts';
 import TapeChart from '../TapeChart.tsx';
 import TapeCitationRow from '../TapeCitationRow.tsx';
-import { TapeField, RunButton, TapeStatus } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeActionBar } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
 
 type Status = 'idle' | 'loading' | 'error';
@@ -21,7 +21,7 @@ const addDays = (isoStr: string, n: number) => {
   return iso(d);
 };
 
-const TimelineView: React.FC<{ initialTopic?: string }> = ({ initialTopic }) => {
+const TimelineView: React.FC<{ initialTopic?: string; onBack: () => void }> = ({ initialTopic, onBack }) => {
   const [topic, setTopic] = useState(initialTopic || '');
   const [startDate, setStartDate] = useState(defaultStart());
   const [endDate, setEndDate] = useState(defaultEnd());
@@ -80,6 +80,7 @@ const TimelineView: React.FC<{ initialTopic?: string }> = ({ initialTopic }) => 
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      <TapeActionBar onBack={onBack} />
       <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
         <TapeField label="Topic" className="flex-1 min-w-[14rem]">
           <input className="tape-input px-3 py-2" value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. Fed policy" autoFocus />

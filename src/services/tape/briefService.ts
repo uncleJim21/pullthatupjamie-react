@@ -71,5 +71,6 @@ export async function getBrief(input: BriefInput): Promise<BriefResult> {
 
   const result = parseBriefMarkers(input.topic, input.asOfDate, syn.text, tq.candidates);
   result._meta = syn._meta;
+  result.tickers = syn.tickers;
   return result;
 }

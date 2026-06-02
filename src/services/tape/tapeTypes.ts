@@ -64,6 +64,10 @@ export interface DossierResult {
   generatedAt: string; // ISO
   /** Backend `_meta` from the synthesize call. Absent on canon-only results. */
   _meta?: TapeResponseMeta;
+  /** Backend-curated relevant tickers for the "On the tape" strip. Canon
+   *  results populate this from hand-curated constants; live results inherit
+   *  from `SynthesizeResponse.tickers`. Empty/undefined → hide the strip. */
+  tickers?: string[];
 }
 
 // ─── 2. Timeline ─────────────────────────────────────────────────────────────
@@ -112,6 +116,7 @@ export interface BriefResult {
   sections: BriefPublisherSection[];
   generatedAt: string;
   _meta?: TapeResponseMeta;
+  tickers?: string[];
 }
 
 // ─── 4. Split ────────────────────────────────────────────────────────────────
@@ -133,6 +138,7 @@ export interface SplitResult {
   contrastSummary?: string;
   generatedAt: string;
   _meta?: TapeResponseMeta;
+  tickers?: string[];
 }
 
 // ─── 5. Arc — how one person's view on a thesis evolved over time ────────────
@@ -161,6 +167,7 @@ export interface ArcResult {
   forwardCall?: string;
   generatedAt: string;
   _meta?: TapeResponseMeta;
+  tickers?: string[];
 }
 
 // ─── 6. Read in — fast company research scaling Quick / Brief / Deep ─────────

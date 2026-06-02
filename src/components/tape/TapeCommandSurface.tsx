@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp, FileSearch } from 'lucide-react';
+import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp } from 'lucide-react';
 import { TAPE_NAME } from '../../config/tapeConfig.ts';
 import type { TapeActionId, TapeDepth } from '../../services/tape/tapeTypes.ts';
 
@@ -14,8 +14,10 @@ export interface TapeLaunch {
   depth?: TapeDepth;
 }
 
+type HeroMode = 'ticker' | 'person';
+
 interface SecondaryAction {
-  id: Exclude<TapeActionId, 'dossier'>;
+  id: Exclude<TapeActionId, 'dossier' | 'readin'>;
   title: string;
   desc: string;
   icon: React.FC<{ className?: string }>;
@@ -44,24 +46,58 @@ const SECONDARY: SecondaryAction[] = [
     icon: TrendingUp,
     example: { label: 'Gromen: the debt-spiral thesis', launch: { action: 'arc', person: 'Luke Gromen' } },
   },
-  {
-    id: 'readin',
-    title: 'Read in on a name',
-    desc: 'A fast company brief that scales from a 30-second pulse to a deep read: what they do, the smart-money case, peers, risks.',
-    icon: FileSearch,
-    example: { label: 'APP — AppLovin', launch: { action: 'readin', ticker: 'APP' } },
-  },
 ];
 
+const TICKER_EXAMPLES = ['APP', 'NVDA', 'CRWV'];
 const PERSON_EXAMPLES = ['Mohamed El-Erian', 'Luke Gromen', 'Mike Green'];
 
+/** Two-segment pill that flips the hero between Read-in (ticker) and Dossier (person). */
+const HeroModeToggle: React.FC<{ mode: HeroMode; onChange: (m: HeroMode) => void }> = ({ mode, onChange }) => (
+  <div className="inline-flex items-center gap-0 rounded-full border p-0.5 text-[11px]" style={{ borderColor: 'var(--tape-hairline-strong)' }}>
+    {([['ticker', 'Ticker'], ['person', 'Person']] as const).map(([id, label]) => {
+      const active = mode === id;
+      return (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onChange(id)}
+          className="tape-mono rounded-full px-3 py-1 uppercase tracking-wide transition-colors"
+          style={{
+            background: active ? 'var(--tape-accent)' : 'transparent',
+            color: active ? 'var(--tape-bg)' : 'var(--tape-fg-dim)',
+          }}
+        >
+          {label}
+        </button>
+      );
+    })}
+  </div>
+);
+
 const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> = ({ onLaunch }) => {
+  const [mode, setMode] = useState<HeroMode>('ticker');
   const [query, setQuery] = useState('');
 
-  const lookUp = (name: string) => {
-    const person = name.trim();
-    if (person) onLaunch({ action: 'dossier', person });
+  const submit = (raw: string) => {
+    const v = raw.trim();
+    if (!v) return;
+    if (mode === 'ticker') {
+      onLaunch({ action: 'readin', ticker: v.toUpperCase() });
+    } else {
+      onLaunch({ action: 'dossier', person: v });
+    }
   };
+
+  // Reset the typed value when switching modes — a ticker isn't a name and vice versa.
+  const switchMode = (next: HeroMode) => {
+    setMode(next);
+    setQuery('');
+  };
+
+  const isTicker = mode === 'ticker';
+  const placeholder = isTicker ? 'Read in on any ticker…' : 'Build a dossier on anyone…';
+  const ctaLabel = isTicker ? 'Read in' : 'Dossier';
+  const examples = isTicker ? TICKER_EXAMPLES : PERSON_EXAMPLES;
 
   return (
     <div className="mx-auto w-full max-w-xl px-5 pb-20 pt-16 sm:pt-24">
@@ -78,36 +114,39 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
         </p>
       </div>
 
-      {/* hero: look up a person -> Dossier */}
+      {/* hero: ticker (read-in) or person (dossier), toggle-driven */}
       <form
-        onSubmit={e => { e.preventDefault(); lookUp(query); }}
+        onSubmit={e => { e.preventDefault(); submit(query); }}
         className="tape-fade mt-10"
         style={{ animationDelay: '70ms' }}
       >
+        <div className="mb-3 flex justify-center">
+          <HeroModeToggle mode={mode} onChange={switchMode} />
+        </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2" style={{ color: 'var(--tape-fg-faint)' }} />
           <input
             value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Look up anyone…"
+            onChange={e => setQuery(isTicker ? e.target.value.toUpperCase() : e.target.value)}
+            placeholder={placeholder}
             autoFocus
             spellCheck={false}
-            className="tape-search w-full py-3.5 pl-12 pr-28"
+            className={`tape-search w-full py-3.5 pl-12 pr-28 ${isTicker ? 'uppercase' : ''}`}
           />
           <button
             type="submit"
             disabled={!query.trim()}
             className="tape-btn tape-btn--go absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1.5 px-3.5 py-2"
           >
-            Dossier
+            {ctaLabel}
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
         <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-1">
           <span className="text-xs" style={{ color: 'var(--tape-fg-faint)' }}>Try</span>
-          {PERSON_EXAMPLES.map(name => (
-            <button key={name} type="button" onClick={() => lookUp(name)} className="tape-pill px-2.5 py-1">
-              {name}
+          {examples.map(label => (
+            <button key={label} type="button" onClick={() => submit(label)} className="tape-pill px-2.5 py-1">
+              {label}
             </button>
           ))}
         </div>

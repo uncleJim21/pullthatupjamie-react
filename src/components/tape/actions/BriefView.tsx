@@ -3,14 +3,13 @@ import { getBrief } from '../../../services/tape/index.ts';
 import type { BriefResult } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
-import { TICKERS_BRIEF_OIL } from '../../../data/mockTapeTickers.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-const BriefView: React.FC<{ initialTopic?: string }> = ({ initialTopic }) => {
+const BriefView: React.FC<{ initialTopic?: string; onBack: () => void }> = ({ initialTopic, onBack }) => {
   const [topic, setTopic] = useState(initialTopic || '');
   const [asOfDate, setAsOfDate] = useState(iso(new Date()));
   const [status, setStatus] = useState<Status>('idle');
@@ -47,6 +46,11 @@ const BriefView: React.FC<{ initialTopic?: string }> = ({ initialTopic }) => {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      <TapeActionBar
+        onBack={onBack}
+        onRefresh={result?._meta ? () => run(result.topic, result.asOfDate, true) : undefined}
+        refreshLoading={status === 'loading'}
+      />
       <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
         <TapeField label="Topic" className="flex-1 min-w-[14rem]">
           <input className="tape-input px-3 py-2" value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. yield-curve inversion" autoFocus />
@@ -73,8 +77,8 @@ const BriefView: React.FC<{ initialTopic?: string }> = ({ initialTopic }) => {
               <p className="tape-serif mt-2 text-xl leading-snug" style={{ color: 'var(--tape-fg)' }}>{result.headline}</p>
             </div>
 
-            {/* on the tape */}
-            <TapeTickerStrip tickers={TICKERS_BRIEF_OIL} />
+            {/* on the tape — backend-curated for the topic */}
+            {result.tickers && result.tickers.length > 0 && <TapeTickerStrip symbols={result.tickers} />}
 
             {result.sections.map(s => (
               <section key={s.publisher} className="border-b last:border-b-0" style={{ borderColor: 'var(--tape-hairline)' }}>
@@ -89,7 +93,7 @@ const BriefView: React.FC<{ initialTopic?: string }> = ({ initialTopic }) => {
                 </div>
               </section>
             ))}
-            <TapeResultFooter meta={result._meta} onRefresh={result._meta ? () => run(result.topic, result.asOfDate, true) : undefined} />
+            <TapeResultFooter meta={result._meta} />
           </div>
         )}
       </div>

@@ -3,8 +3,7 @@ import { getSplit } from '../../../services/tape/index.ts';
 import type { SplitResult, SplitSide } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter } from '../TapeActionScaffold.tsx';
-import { TICKERS_SPLIT_AI } from '../../../data/mockTapeTickers.ts';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
 
 type Status = 'idle' | 'loading' | 'error';
 
@@ -24,7 +23,7 @@ const SideColumn: React.FC<{ side: SplitSide }> = ({ side }) => (
   </div>
 );
 
-const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?: string }> = ({ initialA, initialB, initialTopic }) => {
+const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?: string; onBack: () => void }> = ({ initialA, initialB, initialTopic, onBack }) => {
   const [personA, setPersonA] = useState(initialA || '');
   const [personB, setPersonB] = useState(initialB || '');
   const [topic, setTopic] = useState(initialTopic || '');
@@ -62,6 +61,11 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6">
+      <TapeActionBar
+        onBack={onBack}
+        onRefresh={result?._meta ? () => run(result.sideA.person, result.sideB.person, result.topic, true) : undefined}
+        refreshLoading={status === 'loading'}
+      />
       <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
         <TapeField label="Person A" className="flex-1 min-w-[12rem]">
           <input className="tape-input px-3 py-2" value={personA} onChange={e => setPersonA(e.target.value)} placeholder="e.g. Druckenmiller" autoFocus />
@@ -86,7 +90,7 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
               <span className="tape-tag px-1.5 py-0.5">{result.topic}</span>
             </div>
             {/* on the tape */}
-            <TapeTickerStrip tickers={TICKERS_SPLIT_AI} />
+            {result.tickers && result.tickers.length > 0 && <TapeTickerStrip symbols={result.tickers} />}
             <div className="flex flex-col md:flex-row">
               <SideColumn side={result.sideA} />
               <div className="border-t md:border-t-0 md:border-l" style={{ borderColor: 'var(--tape-hairline)' }} />
@@ -98,7 +102,7 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--tape-fg-dim)' }}>{result.contrastSummary}</p>
               </div>
             )}
-            <TapeResultFooter meta={result._meta} onRefresh={result._meta ? () => run(result.sideA.person, result.sideB.person, result.topic, true) : undefined} />
+            <TapeResultFooter meta={result._meta} />
           </div>
         )}
       </div>

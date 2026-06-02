@@ -116,5 +116,8 @@ export async function getReadIn(input: ReadInInput): Promise<ReadInResult> {
 
   const result = parseReadInMarkers(input.ticker, syn.text, tq.candidates);
   result._meta = syn._meta;
+  // Backend `tickers` for readin are peers per the spec; populate the existing
+  // peers slot the View already renders.
+  if (syn.tickers && syn.tickers.length > 0) result.peers = syn.tickers;
   return result;
 }

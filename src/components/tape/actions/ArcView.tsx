@@ -3,9 +3,8 @@ import { getArc } from '../../../services/tape/index.ts';
 import type { ArcResult, ArcCall } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
-import { TICKERS_ARC_GROMEN } from '../../../data/mockTapeTickers.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 
@@ -115,7 +114,7 @@ const Pips: React.FC<{ n: number }> = ({ n }) => (
   </span>
 );
 
-const ArcView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) => {
+const ArcView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({ initialPerson, onBack }) => {
   const [person, setPerson] = useState(initialPerson || '');
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
@@ -144,6 +143,11 @@ const ArcView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) => {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      <TapeActionBar
+        onBack={onBack}
+        onRefresh={result?._meta ? () => run(result.person, true) : undefined}
+        refreshLoading={status === 'loading'}
+      />
       <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
         <TapeField label="Person" className="flex-1 min-w-[16rem]">
           <input className="tape-input px-3 py-2" value={person} onChange={e => setPerson(e.target.value)} placeholder="e.g. Luke Gromen" autoFocus />
@@ -169,7 +173,7 @@ const ArcView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) => {
             </div>
 
             {/* on the tape */}
-            <TapeTickerStrip tickers={TICKERS_ARC_GROMEN} />
+            {result.tickers && result.tickers.length > 0 && <TapeTickerStrip symbols={result.tickers} />}
 
             {/* conviction trajectory */}
             <div className="border-b px-3 py-4" style={{ borderColor: 'var(--tape-hairline)' }}>
@@ -203,7 +207,7 @@ const ArcView: React.FC<{ initialPerson?: string }> = ({ initialPerson }) => {
                 <p className="tape-serif text-lg leading-snug" style={{ color: 'var(--tape-fg)' }}>{result.forwardCall}</p>
               </div>
             )}
-            <TapeResultFooter meta={result._meta} onRefresh={result._meta ? () => run(result.person, true) : undefined} />
+            <TapeResultFooter meta={result._meta} />
           </div>
         )}
       </div>
