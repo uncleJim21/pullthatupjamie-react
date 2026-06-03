@@ -7,7 +7,7 @@ import DossierView from './actions/DossierView.tsx';
 import TimelineView from './actions/TimelineView.tsx';
 import BriefView from './actions/BriefView.tsx';
 import SplitView from './actions/SplitView.tsx';
-import ArcView from './actions/ArcView.tsx';
+import NarrativeView from './actions/NarrativeView.tsx';
 import ReadInView from './actions/ReadInView.tsx';
 import TapeAuthGate from './TapeAuthGate.tsx';
 import { signOut } from '../../services/tape/tapeAuth.ts';
@@ -19,7 +19,7 @@ const ACTION_TITLES: Record<TapeLaunch['action'], string> = {
   timeline: 'Timeline',
   brief: 'Brief',
   split: 'Split',
-  arc: 'Arc',
+  narrative: 'Narrative',
   readin: 'Read in',
 };
 
@@ -33,8 +33,8 @@ const ActiveView: React.FC<{ launch: TapeLaunch; onBack: () => void }> = ({ laun
       return <BriefView initialTopic={launch.topic} onBack={onBack} />;
     case 'split':
       return <SplitView initialA={launch.person} initialB={launch.personB} initialTopic={launch.topic} onBack={onBack} />;
-    case 'arc':
-      return <ArcView initialPerson={launch.person} onBack={onBack} />;
+    case 'narrative':
+      return <NarrativeView initialTopic={launch.topic} initialGroup={launch.person} onBack={onBack} />;
     case 'readin':
       return <ReadInView initialTicker={launch.ticker} initialDepth={launch.depth} onBack={onBack} />;
     default:
@@ -49,7 +49,7 @@ const launchFromUrl = (): TapeLaunch | null => {
   try {
     const sp = new URLSearchParams(window.location.search);
     const a = sp.get('a');
-    if (a === 'dossier' || a === 'brief' || a === 'split' || a === 'timeline' || a === 'arc' || a === 'readin') {
+    if (a === 'dossier' || a === 'brief' || a === 'split' || a === 'timeline' || a === 'narrative' || a === 'readin') {
       const depth = sp.get('depth');
       return {
         action: a,

@@ -109,6 +109,10 @@ export interface PersonQuotesFilters {
   episodesLimit?: number;
   quotesPerEpisode?: number;
   candidatesLimit?: number;
+  /** Pass `true` to suppress the per-kind recency weighting (Narrative uses
+   *  this — the time dimension IS the point). See
+   *  docs/tape-backend-recency-weighting.md. */
+  disableRecencyWeighting?: boolean;
 }
 
 export interface PersonQuotesRequest {
@@ -145,6 +149,10 @@ export interface TopicQuotesFilters {
   feedIds?: string[];
   minSpan?: number;
   candidatesLimit?: number;
+  /** Pass `true` to suppress the per-kind recency weighting (Narrative uses
+   *  this — the time dimension IS the point). See
+   *  docs/tape-backend-recency-weighting.md. */
+  disableRecencyWeighting?: boolean;
 }
 
 export interface TopicQuotesRequest {
@@ -171,7 +179,7 @@ export async function topicQuotes(req: TopicQuotesRequest): Promise<TopicQuotesR
   return tapeFetch<TopicQuotesResponse>('/api/tape/topic-quotes', { method: 'POST', json: req });
 }
 
-export type SynthesizeKind = 'dossier' | 'brief' | 'split' | 'arc' | 'readin';
+export type SynthesizeKind = 'dossier' | 'brief' | 'split' | 'narrative' | 'readin';
 
 export interface SynthesizeRequest {
   kind: SynthesizeKind;
@@ -181,6 +189,10 @@ export interface SynthesizeRequest {
     topic?: string | null;
     ticker?: string | null;
     depth?: 'quick' | 'brief' | 'deep';
+    /** Narrative group filter — `bulls` / `bears` / `<named person>` /
+     *  empty-or-null = consensus. Sent so the backend's narrative prompt
+     *  can frame the synthesis around the right population. */
+    group?: string | null;
   };
   candidates: TapeCandidate[];
   model?: 'fast' | 'quality';

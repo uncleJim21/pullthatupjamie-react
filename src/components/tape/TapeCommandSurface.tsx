@@ -41,11 +41,11 @@ const SECONDARY: SecondaryAction[] = [
     example: { label: 'the AI bubble: bulls vs bears', launch: { action: 'split', person: 'The bears', personB: 'The bulls', topic: 'the AI bubble' } },
   },
   {
-    id: 'arc',
-    title: 'Watch a view evolve',
-    desc: 'How one person’s thesis, and their conviction in it, moved over years, with every call sourced.',
+    id: 'narrative',
+    title: 'Watch the narrative drift',
+    desc: 'How the prevailing view on one topic moved over years — with the bucketed quotes behind it and the inflection points called out.',
     icon: TrendingUp,
-    example: { label: 'Gromen: the debt-spiral thesis', launch: { action: 'arc', person: 'Luke Gromen' } },
+    example: { label: 'the sovereign debt endgame (Gromen)', launch: { action: 'narrative', topic: 'the sovereign debt endgame', person: 'Luke Gromen' } },
   },
 ];
 

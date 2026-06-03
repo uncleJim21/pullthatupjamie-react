@@ -3,6 +3,6 @@ export { getDossier } from './dossierService.ts';
 export { getTimeline, getTimelineDrilldown } from './timelineService.ts';
 export { getBrief } from './briefService.ts';
 export { getSplit } from './splitService.ts';
-export { getArc } from './arcService.ts';
+export { getNarrative } from './narrativeService.ts';
 export { getReadIn } from './readInService.ts';
 export * from './tapeTypes.ts';

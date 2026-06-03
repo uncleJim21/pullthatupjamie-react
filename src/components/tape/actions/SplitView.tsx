@@ -61,6 +61,28 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
 
   const ready = personA.trim() && personB.trim() && topic.trim();
 
+  // Color-coded Easy chips: just bulls/bears. Click fills the input; user
+  // can still type a name. Hawks/Doves removed to reduce clutter — most
+  // analyst debates frame as bull/bear anyway, and the split service's
+  // isCampMode still accepts them for power users typing manually.
+  const renderCampChip = (target: 'A' | 'B', label: 'Bulls' | 'Bears') => {
+    const setter = target === 'A' ? setPersonA : setPersonB;
+    const isBull = label === 'Bulls';
+    return (
+      <button
+        type="button"
+        onClick={() => setter(label)}
+        className="tape-pill px-2 py-0.5 text-[10px]"
+        style={{
+          borderColor: isBull ? 'var(--tape-accent)' : 'var(--tape-danger)',
+          color: isBull ? 'var(--tape-accent)' : 'var(--tape-danger)',
+        }}
+      >
+        {label}
+      </button>
+    );
+  };
+
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6">
       <TapeActionBar
@@ -71,9 +93,17 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
       <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
         <TapeField label="Person A" className="flex-1 min-w-[12rem]">
           <input className="tape-input px-3 py-2" value={personA} onChange={e => setPersonA(e.target.value)} placeholder="e.g. Druckenmiller" autoFocus />
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {renderCampChip('A', 'Bulls')}
+            {renderCampChip('A', 'Bears')}
+          </div>
         </TapeField>
         <TapeField label="Person B" className="flex-1 min-w-[12rem]">
           <input className="tape-input px-3 py-2" value={personB} onChange={e => setPersonB(e.target.value)} placeholder="e.g. Mike Green" />
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {renderCampChip('B', 'Bulls')}
+            {renderCampChip('B', 'Bears')}
+          </div>
         </TapeField>
         <TapeField label="Topic" className="flex-1 min-w-[12rem]">
           <input className="tape-input px-3 py-2" value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. rate cuts" />

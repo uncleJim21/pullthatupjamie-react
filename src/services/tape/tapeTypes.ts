@@ -155,32 +155,52 @@ export interface SplitResult {
   tickers?: string[];
 }
 
-// ─── 5. Arc — how one person's view on a thesis evolved over time ────────────
-export interface ArcInput {
-  person: string;
+// ─── 5. Narrative — how consensus (or a group's view) on a topic drifted ────
+//
+// Reshape of the old Arc action. Topic-first instead of person-first;
+// `group` optional filter lets the same UI cover "the bulls' narrative on
+// AAPL," "central banks' narrative on Treasuries," or — preserving the old
+// canon use — "Luke Gromen's narrative on the debt-spiral thesis."
+export interface NarrativeInput {
+  topic: string;
+  /** Optional group filter. Recognized shorthands: 'bulls' / 'bears' /
+   *  'hawks' / 'doves' (sentiment camps); 'all' or empty = consensus across
+   *  mainstream; any other string is treated as a named-person filter. */
+  group?: string;
   refresh?: boolean;
   /** Synthesis tier override. Defaults to the user's persisted preference
    *  (`quality` if unset). Plumbed through to `SynthesizeRequest.model`. */
   model?: TapeModel;
 }
-export interface ArcCall {
-  date: string; // ISO of the clip
-  /** Short claim/stance for this beat, e.g. "Recession AND rising yields". */
-  label: string;
-  /** Conviction read from the LANGUAGE of the quote, 1 (hedged) .. 5 (absolute).
-   *  Not a market-sentiment score; a defensible read of how forcefully it's stated. */
-  conviction: number;
-  /** What happened after, if this call landed. Optional. */
-  outcome?: string;
-  citation: TapeCitation;
+/** One chronological window. Cadence (monthly / quarterly / yearly) is chosen
+ *  by the backend based on the date range available. */
+export interface NarrativeBucket {
+  start: string; // ISO date — bucket start inclusive
+  end: string;   // ISO date — bucket end inclusive
+  /** 2-3 sentence prevailing stance summary for this window. */
+  stance: string;
+  /** 1-4 supporting clips from this bucket. */
+  citations: TapeCitation[];
+  /** Signed conviction-on-the-thesis score, -5 (strongly against) to +5
+   *  (strongly for). Drives the trajectory chart. Sign-flip across the zero
+   *  line IS a reversal. Magnitude reflects how forcefully the prevailing
+   *  voices in this window were stating the position. */
+  sentiment?: number;
 }
-export interface ArcResult {
-  person: string;
+/** A point in time where the narrative materially shifted. */
+export interface NarrativeInflection {
+  date: string;        // ISO date or 'YYYY-Qn' for quarter labels
+  description: string; // one-sentence what changed and (briefly) why
+}
+export interface NarrativeResult {
+  topic: string;
+  /** Echoed back so the View can show "Filter: Luke Gromen" etc. */
+  group?: string;
+  /** Current consensus position on the topic (or the group's current view). */
   thesis: string;
-  /** One-line verdict chip, e.g. "Conviction: rising — and the calls are landing". */
-  verdict: string;
-  calls: ArcCall[]; // chronological
-  /** "What he's calling for next" — the live forward prediction. */
+  buckets: NarrativeBucket[];     // chronological, oldest → newest
+  inflections: NarrativeInflection[];
+  /** Optional forward-looking gloss — "where this trajectory is heading." */
   forwardCall?: string;
   generatedAt: string;
   _meta?: TapeResponseMeta;
@@ -256,4 +276,4 @@ export interface ReadInResult {
 }
 
 /** The action verbs, used by the command parser + launcher. */
-export type TapeActionId = 'dossier' | 'timeline' | 'brief' | 'split' | 'arc' | 'readin';
+export type TapeActionId = 'dossier' | 'timeline' | 'brief' | 'split' | 'narrative' | 'readin';
