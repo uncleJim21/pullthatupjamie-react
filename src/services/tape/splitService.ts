@@ -88,7 +88,7 @@ export async function getSplit(input: SplitInput): Promise<SplitResult> {
     kind: 'split',
     input: { person: input.personA, personB: input.personB, topic: input.topic },
     candidates,
-    model: 'fast',
+    model: input.model || 'quality',
     refresh: input.refresh,
   });
 

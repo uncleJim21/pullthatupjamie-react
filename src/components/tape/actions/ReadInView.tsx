@@ -9,6 +9,7 @@ import { formatShortDate } from '../../../utils/time.ts';
 import { TICKER_READIN_APP_HEADER } from '../../../data/mockTapeAppTickers.ts';
 import type { TapeTicker } from '../../../data/mockTapeTickers.ts';
 import { useLiveTickers } from '../../../services/tape/useLiveTickers.ts';
+import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 
@@ -123,18 +124,19 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth; o
   const [result, setResult] = useState<ReadInResult | null>(null);
   const autoRan = useRef(false);
 
+  const [model] = useTapeModel();
   const run = useCallback(async (t: string, refresh = false) => {
     if (!t.trim()) return;
     setStatus('loading');
     setError('');
     try {
-      setResult(await getReadIn({ ticker: t.trim().toUpperCase(), refresh }));
+      setResult(await getReadIn({ ticker: t.trim().toUpperCase(), refresh, model }));
       setStatus('idle');
     } catch (e: any) {
       setError(e?.message || 'Failed to read in on this name.');
       setStatus('error');
     }
-  }, []);
+  }, [model]);
 
   useEffect(() => {
     if (initialTicker && !autoRan.current) {

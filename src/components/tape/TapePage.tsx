@@ -64,10 +64,26 @@ const launchFromUrl = (): TapeLaunch | null => {
   return null;
 };
 
+/** Tell the AudioControllerProvider to stop whatever's playing.
+ *  Used on navigate-away (Back / New search / Esc), sign-out, and the SPA
+ *  beforeunload path. Minimizes the "I left the page but a clip is still
+ *  playing" memory + UX leak. */
+const stopAllTapeAudio = () => {
+  window.dispatchEvent(new Event('stopAllAudio'));
+};
+
 const TapePage: React.FC = () => {
   const [launch, setLaunch] = useState<TapeLaunch | null>(launchFromUrl);
 
-  const goHome = useCallback(() => setLaunch(null), []);
+  const goHome = useCallback(() => {
+    stopAllTapeAudio();
+    setLaunch(null);
+  }, []);
+
+  const handleSignOut = useCallback(() => {
+    stopAllTapeAudio();
+    signOut();
+  }, []);
 
   useEffect(() => {
     if (!launch) return;
@@ -77,6 +93,13 @@ const TapePage: React.FC = () => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [launch, goHome]);
+
+  // Belt-and-suspenders: any time the active launch changes (including unmount
+  // / route change away from /tape), kill any audio that was playing under the
+  // previous launch. Future global player will replace this.
+  useEffect(() => {
+    return () => { stopAllTapeAudio(); };
+  }, [launch]);
 
   return (
     <TapeAuthGate>
@@ -106,7 +129,7 @@ const TapePage: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={signOut}
+              onClick={handleSignOut}
               className="text-[12px] transition-colors hover:opacity-80"
               style={{ color: 'var(--tape-fg-faint)' }}
               title="Sign out of the Tape demo"

@@ -5,6 +5,7 @@ import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
 import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
+import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -17,18 +18,19 @@ const BriefView: React.FC<{ initialTopic?: string; onBack: () => void }> = ({ in
   const [result, setResult] = useState<BriefResult | null>(null);
   const autoRan = useRef(false);
 
+  const [model] = useTapeModel();
   const run = useCallback(async (t: string, asOf: string, refresh = false) => {
     if (!t.trim()) return;
     setStatus('loading');
     setError('');
     try {
-      setResult(await getBrief({ topic: t.trim(), asOfDate: asOf, refresh }));
+      setResult(await getBrief({ topic: t.trim(), asOfDate: asOf, refresh, model }));
       setStatus('idle');
     } catch (e: any) {
       setError(e?.message || 'Failed to compile brief.');
       setStatus('error');
     }
-  }, []);
+  }, [model]);
 
   useEffect(() => {
     if (initialTopic && !autoRan.current) {

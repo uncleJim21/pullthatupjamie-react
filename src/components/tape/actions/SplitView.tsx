@@ -4,6 +4,7 @@ import type { SplitResult, SplitSide } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
 import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
+import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 
@@ -32,18 +33,19 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
   const [result, setResult] = useState<SplitResult | null>(null);
   const autoRan = useRef(false);
 
+  const [model] = useTapeModel();
   const run = useCallback(async (a: string, b: string, t: string, refresh = false) => {
     if (!a.trim() || !b.trim() || !t.trim()) return;
     setStatus('loading');
     setError('');
     try {
-      setResult(await getSplit({ personA: a.trim(), personB: b.trim(), topic: t.trim(), refresh }));
+      setResult(await getSplit({ personA: a.trim(), personB: b.trim(), topic: t.trim(), refresh, model }));
       setStatus('idle');
     } catch (e: any) {
       setError(e?.message || 'Failed to compare positions.');
       setStatus('error');
     }
-  }, []);
+  }, [model]);
 
   useEffect(() => {
     if (initialA && initialB && initialTopic && !autoRan.current) {

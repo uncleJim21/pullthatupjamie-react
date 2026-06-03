@@ -4,6 +4,7 @@ import type { DossierResult } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
 import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
+import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 
@@ -14,18 +15,19 @@ const DossierView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({
   const [result, setResult] = useState<DossierResult | null>(null);
   const autoRan = useRef(false);
 
+  const [model] = useTapeModel();
   const run = useCallback(async (name: string, refresh = false) => {
     if (!name.trim()) return;
     setStatus('loading');
     setError('');
     try {
-      setResult(await getDossier({ person: name.trim(), refresh }));
+      setResult(await getDossier({ person: name.trim(), refresh, model }));
       setStatus('idle');
     } catch (e: any) {
       setError(e?.message || 'Failed to build dossier.');
       setStatus('error');
     }
-  }, []);
+  }, [model]);
 
   useEffect(() => {
     if (initialPerson && !autoRan.current) {

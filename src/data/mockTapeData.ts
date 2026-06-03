@@ -468,10 +468,12 @@ const findDossier = (person: string): DossierResult | null => {
 export function mockDossier(person: string): DossierResult {
   return findDossier(person) || { person: person.trim(), topics: [], appearances: [], generatedAt: new Date().toISOString() };
 }
-export function mockBrief(topic: string, _asOfDate?: string): BriefResult {
+export function mockBrief(topic: string, asOfDate?: string): BriefResult {
   const q = slug(topic);
   if (q.includes('oil') || q.includes('hormuz') || q.includes('strait')) return BRIEF_OIL;
-  return { topic: topic.trim(), asOfDate: BRIEF_OIL.asOfDate, headline: '', sections: [], generatedAt: new Date().toISOString() };
+  // Empty fallback: honor the user's asOfDate so the "no commentary" message
+  // reflects the window they asked about, not the canon fixture's stale date.
+  return { topic: topic.trim(), asOfDate: asOfDate || BRIEF_OIL.asOfDate, headline: '', sections: [], generatedAt: new Date().toISOString() };
 }
 export function mockSplit(personA: string, personB: string, topic: string): SplitResult {
   // Canon match is TOPIC-only and intentionally narrow. "bulls" / "bears" are

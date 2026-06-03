@@ -9,6 +9,11 @@
 import type { ClipMeta } from '../../components/jamiePullAgent/JamiePullAgentMessage.tsx';
 import type { TapeResponseMeta } from './tapeClient.ts';
 
+/** Synthesis tier the user picked. `quality` is the recommended default (Deep
+ *  mode in the UI — most capable model, ~60-90s, materially more depth).
+ *  `fast` is the lighter tier (~30-45s) for when speed matters. */
+export type TapeModel = 'quality' | 'fast';
+
 /** Atomic cited evidence unit. One quoted paragraph + everything the UI needs
  *  to play it, time-link it, and attribute it. */
 export interface TapeCitation {
@@ -45,6 +50,9 @@ export interface DossierInput {
   /** Force re-synthesis on the backend (bypass cache). Set when the user
    *  hits the Refresh affordance under a result. */
   refresh?: boolean;
+  /** Synthesis tier override. Defaults to the user's persisted preference
+   *  (`quality` if unset). Plumbed through to `SynthesizeRequest.model`. */
+  model?: TapeModel;
 }
 export interface DossierTopicGroup {
   topic: string;
@@ -103,6 +111,9 @@ export interface BriefInput {
   topic: string;
   asOfDate: string; // ISO; "this week" = the 7 days ending asOfDate
   refresh?: boolean;
+  /** Synthesis tier override. Defaults to the user's persisted preference
+   *  (`quality` if unset). Plumbed through to `SynthesizeRequest.model`. */
+  model?: TapeModel;
 }
 export interface BriefPublisherSection {
   publisher: string;
@@ -125,6 +136,9 @@ export interface SplitInput {
   personB: string;
   topic: string;
   refresh?: boolean;
+  /** Synthesis tier override. Defaults to the user's persisted preference
+   *  (`quality` if unset). Plumbed through to `SynthesizeRequest.model`. */
+  model?: TapeModel;
 }
 export interface SplitSide {
   person: string;
@@ -145,6 +159,9 @@ export interface SplitResult {
 export interface ArcInput {
   person: string;
   refresh?: boolean;
+  /** Synthesis tier override. Defaults to the user's persisted preference
+   *  (`quality` if unset). Plumbed through to `SynthesizeRequest.model`. */
+  model?: TapeModel;
 }
 export interface ArcCall {
   date: string; // ISO of the clip
@@ -177,6 +194,9 @@ export interface ReadInInput {
   ticker: string;
   depth?: TapeDepth;
   refresh?: boolean;
+  /** Synthesis tier override. Defaults to the user's persisted preference
+   *  (`quality` if unset). Plumbed through to `SynthesizeRequest.model`. */
+  model?: TapeModel;
 }
 /** Dated catalyst bullet (S&P inclusion, short-report release, earnings, etc.). */
 export interface ReadInCatalyst {

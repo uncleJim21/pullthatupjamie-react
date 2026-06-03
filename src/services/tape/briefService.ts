@@ -65,7 +65,7 @@ export async function getBrief(input: BriefInput): Promise<BriefResult> {
     kind: 'brief',
     input: { topic: input.topic },
     candidates: tq.candidates,
-    model: 'fast',
+    model: input.model || 'quality',
     refresh: input.refresh,
   });
 

@@ -83,7 +83,7 @@ export async function getArc(input: ArcInput): Promise<ArcResult> {
     kind: 'arc',
     input: { person: input.person },
     candidates: pq.candidates,
-    model: 'fast',
+    model: input.model || 'quality',
     refresh: input.refresh,
   });
 

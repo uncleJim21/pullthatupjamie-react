@@ -5,6 +5,7 @@ import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
 import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
+import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 
@@ -121,18 +122,19 @@ const ArcView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({ ini
   const [result, setResult] = useState<ArcResult | null>(null);
   const autoRan = useRef(false);
 
+  const [model] = useTapeModel();
   const run = useCallback(async (name: string, refresh = false) => {
     if (!name.trim()) return;
     setStatus('loading');
     setError('');
     try {
-      setResult(await getArc({ person: name.trim(), refresh }));
+      setResult(await getArc({ person: name.trim(), refresh, model }));
       setStatus('idle');
     } catch (e: any) {
       setError(e?.message || 'Failed to trace the arc.');
       setStatus('error');
     }
-  }, []);
+  }, [model]);
 
   useEffect(() => {
     if (initialPerson && !autoRan.current) { autoRan.current = true; void run(initialPerson); }

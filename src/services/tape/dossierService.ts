@@ -82,7 +82,7 @@ export async function getDossier(input: DossierInput): Promise<DossierResult> {
     kind: 'dossier',
     input: { person: input.person },
     candidates: pq.candidates,
-    model: 'fast',
+    model: input.model || 'quality',
     refresh: input.refresh,
   });
 

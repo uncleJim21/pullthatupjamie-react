@@ -110,7 +110,7 @@ export async function getReadIn(input: ReadInInput): Promise<ReadInResult> {
     kind: 'readin',
     input: { ticker: input.ticker, depth: input.depth || 'quick' },
     candidates: tq.candidates,
-    model: 'fast',
+    model: input.model || 'quality',
     refresh: input.refresh,
   });
 

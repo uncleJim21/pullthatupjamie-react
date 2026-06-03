@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp } from 'lucide-react';
+import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp, Info } from 'lucide-react';
 import { TAPE_NAME } from '../../config/tapeConfig.ts';
-import type { TapeActionId, TapeDepth } from '../../services/tape/tapeTypes.ts';
+import type { TapeActionId, TapeDepth, TapeModel } from '../../services/tape/tapeTypes.ts';
+import { useTapeModel } from '../../services/tape/useTapeModel.ts';
 
 export interface TapeLaunch {
   action: TapeActionId;
@@ -20,7 +21,7 @@ interface SecondaryAction {
   id: Exclude<TapeActionId, 'dossier' | 'readin'>;
   title: string;
   desc: string;
-  icon: React.FC<{ className?: string }>;
+  icon: React.FC<{ className?: string; style?: React.CSSProperties }>;
   example: { label: string; launch: TapeLaunch };
 }
 
@@ -51,6 +52,71 @@ const SECONDARY: SecondaryAction[] = [
 const TICKER_EXAMPLES = ['APP', 'NVDA', 'CRWV'];
 const PERSON_EXAMPLES = ['Mohamed El-Erian', 'Luke Gromen', 'Mike Green'];
 
+/** Synthesis-tier toggle (global, persisted via useTapeModel). Quiet by
+ *  design — Deep is the recommended default and most users won't touch it.
+ *  The (i) button reveals a short explainer popover. */
+const SynthesisModeToggle: React.FC<{ model: TapeModel; onChange: (m: TapeModel) => void }> = ({ model, onChange }) => {
+  const [showInfo, setShowInfo] = useState(false);
+  return (
+    <div className="relative flex items-center justify-center gap-2">
+      <span className="tape-label">Synthesis</span>
+      <div className="inline-flex items-center rounded-full border p-0.5 text-[11px]" style={{ borderColor: 'var(--tape-hairline-strong)' }}>
+        {([['quality', 'Deep'], ['fast', 'Fast']] as const).map(([id, label]) => {
+          const active = model === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onChange(id)}
+              className="tape-mono rounded-full px-3 py-1 uppercase tracking-wide transition-colors"
+              style={{
+                background: active ? 'var(--tape-accent)' : 'transparent',
+                color: active ? 'var(--tape-bg)' : 'var(--tape-fg-dim)',
+              }}
+              title={id === 'quality' ? 'Recommended. Most capable models.' : 'Lighter models, faster turnaround.'}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={() => setShowInfo(v => !v)}
+        aria-label="Explain synthesis modes"
+        className="rounded-full p-1 transition-opacity hover:opacity-100"
+        style={{ color: 'var(--tape-fg-faint)', opacity: showInfo ? 1 : 0.7 }}
+      >
+        <Info className="h-3.5 w-3.5" />
+      </button>
+      {showInfo && (
+        <div
+          className="absolute left-1/2 top-full z-30 mt-2 w-80 -translate-x-1/2 rounded border p-3.5 text-[12px] leading-relaxed shadow-lg"
+          style={{ background: 'var(--tape-bg)', borderColor: 'var(--tape-hairline-strong)', color: 'var(--tape-fg-dim)' }}
+        >
+          <p>
+            <span className="tape-mono uppercase tracking-wide" style={{ color: 'var(--tape-accent)' }}>Deep</span>
+            <span className="ml-1.5 text-[10px] uppercase tracking-wider" style={{ color: 'var(--tape-fg-faint)' }}>recommended</span>
+          </p>
+          <p className="mt-1">Most capable models. Exhaustive synthesis. ~60–90 seconds per novel query. Cached results return instantly.</p>
+          <p className="mt-3">
+            <span className="tape-mono uppercase tracking-wide" style={{ color: 'var(--tape-fg)' }}>Fast</span>
+          </p>
+          <p className="mt-1">Lighter models. Direct answers. ~30–45 seconds. Choose this when speed matters more than depth.</p>
+          <button
+            type="button"
+            onClick={() => setShowInfo(false)}
+            className="mt-3 text-[10px] uppercase tracking-wide opacity-60 hover:opacity-100"
+            style={{ color: 'var(--tape-fg-faint)' }}
+          >
+            close
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 /** Two-segment pill that flips the hero between Read-in (ticker) and Dossier (person). */
 const HeroModeToggle: React.FC<{ mode: HeroMode; onChange: (m: HeroMode) => void }> = ({ mode, onChange }) => (
   <div className="inline-flex items-center gap-0 rounded-full border p-0.5 text-[11px]" style={{ borderColor: 'var(--tape-hairline-strong)' }}>
@@ -77,6 +143,7 @@ const HeroModeToggle: React.FC<{ mode: HeroMode; onChange: (m: HeroMode) => void
 const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> = ({ onLaunch }) => {
   const [mode, setMode] = useState<HeroMode>('ticker');
   const [query, setQuery] = useState('');
+  const [synthModel, setSynthModel] = useTapeModel();
 
   const submit = (raw: string) => {
     const v = raw.trim();
@@ -152,8 +219,15 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
         </div>
       </form>
 
+      {/* Global synthesis mode — set once, applies to every action. Placed
+          above the "Or go deeper" list so users see it before drilling in.
+          `relative z-40` ensures the (i) popover layers over the panel below. */}
+      <div className="tape-fade relative z-40 mt-8" style={{ animationDelay: '120ms' }}>
+        <SynthesisModeToggle model={synthModel} onChange={setSynthModel} />
+      </div>
+
       {/* the other three jobs */}
-      <div className="tape-fade mt-10" style={{ animationDelay: '140ms' }}>
+      <div className="tape-fade mt-8" style={{ animationDelay: '140ms' }}>
         <div className="tape-label mb-2.5 pl-1">Or go deeper</div>
         <div className="tape-panel tape-divide overflow-hidden">
           {SECONDARY.map(a => {
@@ -180,6 +254,7 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
           })}
         </div>
       </div>
+
     </div>
   );
 };
