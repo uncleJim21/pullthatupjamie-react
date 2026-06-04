@@ -15,11 +15,11 @@ import type { TapeDepth } from '../../services/tape/tapeTypes.ts';
 import '../../styles/tape.css';
 
 const ACTION_TITLES: Record<TapeLaunch['action'], string> = {
-  dossier: 'Dossier',
+  dossier: 'Dossier (preview)',
   timeline: 'Timeline',
   brief: 'Brief',
   split: 'Split',
-  narrative: 'Narrative',
+  narrative: 'Narrative (preview)',
   readin: 'Read in',
 };
 

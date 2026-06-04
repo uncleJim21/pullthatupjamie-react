@@ -258,8 +258,14 @@ export interface ReadInResult {
   sectorTag: string;          // 'SOFTWARE · ADTECH'
   /** Yahoo URL slug for the live-price fetch + click-through. */
   yahoo: string;              // 'APP'
-  /** 2-3 paragraph plain-English primer. Rendered at Brief depth and below. */
+  /** 2-3 paragraph plain-English primer. Rendered at Brief depth and below.
+   *  May contain `{{clip:id}}` tokens; resolve them against
+   *  `whatTheyDoCitations` below to render inline playable pills. */
   whatTheyDo: string;
+  /** Citations referenced inline in `whatTheyDo` prose. Populated from the
+   *  candidate pool by the parser. Empty for canon results that don't
+   *  inline-cite. */
+  whatTheyDoCitations?: TapeCitation[];
   pulse: ReadInPulse;
   /** v2: investment-thesis pillars at Brief depth. Optional so non-baked tickers still type-check. */
   uvp?: ReadInThesisSection;

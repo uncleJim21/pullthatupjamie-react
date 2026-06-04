@@ -53,6 +53,12 @@ export async function tapeFetch<T = unknown>(
   return res.json() as Promise<T>;
 }
 
+/** Confidence tier returned by every `synthesize` response. Unified across
+ *  all kinds. Backend's editorial judgment of how well-supported the result
+ *  is by the candidate pool. See
+ *  docs/tape-backend-confidence-and-cadence-memo.md. */
+export type TapeConfidence = 'strong' | 'partial' | 'thin' | 'empty';
+
 /** Uniform _meta block the backend attaches to most /api/tape/* responses. */
 export interface TapeResponseMeta {
   cached?: boolean;
@@ -66,6 +72,19 @@ export interface TapeResponseMeta {
   staleReason?: string;
   source?: string;
   forced?: boolean;
+  /** Synthesizer's confidence judgment. Absent on canon-only / non-synthesize
+   *  responses. See TapeConfidence for tiers + client pill rendering. */
+  confidence?: TapeConfidence;
+  /** Short (≤100 char) explanation of WHY the confidence is what it is.
+   *  Rendered verbatim in the pill popover and/or empty-state message. */
+  confidenceReason?: string;
+  /** Exact count of candidates the synthesizer worked over. */
+  candidateCount?: number;
+  /** Brief-only: actual lookback (in days) the backend used after auto-
+   *  expanding. 7 = default, 30/90 = widened. */
+  windowDays?: number;
+  /** Brief-only: true when backend widened past the requested 7-day window. */
+  windowExpanded?: boolean;
 }
 
 /** Normalized response from GET /api/tape/quote/:slug (Yahoo / Finnhub proxy). */
@@ -120,6 +139,10 @@ export interface PersonQuotesRequest {
   themes?: string[];
   filters?: PersonQuotesFilters;
   refresh?: boolean;
+  /** Calling kind. Same purpose as on TopicQuotesRequest — lets backend
+   *  pick the right window/policy per kind. When set, the client should
+   *  not pin `filters.minDate`. */
+  kind?: SynthesizeKind;
 }
 
 export interface PersonAppearance {
@@ -161,6 +184,11 @@ export interface TopicQuotesRequest {
   filters?: TopicQuotesFilters;
   groupBy?: 'creator' | 'bull-bear' | null;
   refresh?: boolean;
+  /** Calling kind. Lets backend pick the right time window / cadence /
+   *  auto-expand policy per kind (Brief: 7d → 30d → 90d auto-expand,
+   *  Narrative: wide multi-year window, etc.). When set, the client should
+   *  NOT pin `filters.minDate` — backend owns window selection. */
+  kind?: SynthesizeKind;
 }
 
 export interface TopicQuotesGroup {
@@ -245,11 +273,13 @@ export function resolveCitationsFromCandidates(text: string, candidates: TapeCan
   return out;
 }
 
-/** Citation token convention shared with the agent UI. */
-const CLIP_TOKEN_RE = /\{\{clip:([^}]+)\}\}/g;
+/** Citation token convention shared with the agent UI.
+ *  Tolerant to both `{{clip:id}}` (canonical) and `{{clip=id}}` (equals-sign
+ *  variant some synths emit). Captured ids are trimmed. */
+const CLIP_TOKEN_RE = /\{\{clip\s*[:=]\s*([^}]+)\}\}/g;
 export const extractCitationIds = (text: string): string[] => {
   const ids: string[] = [];
-  for (const m of text.matchAll(CLIP_TOKEN_RE)) ids.push(m[1]);
+  for (const m of text.matchAll(CLIP_TOKEN_RE)) ids.push(m[1].trim());
   return [...new Set(ids)];
 };
 export const stripCitationTokens = (text: string): string => text.replace(CLIP_TOKEN_RE, '').trim();

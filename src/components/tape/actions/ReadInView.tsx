@@ -4,7 +4,7 @@ import { getReadIn } from '../../../services/tape/index.ts';
 import type { ReadInResult, ReadInThesisSection, TapeDepth } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, renderProseWithClips } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
 import { TICKER_READIN_APP_HEADER } from '../../../data/mockTapeAppTickers.ts';
 import type { TapeTicker } from '../../../data/mockTapeTickers.ts';
@@ -190,13 +190,21 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth; o
         {status === 'loading' && <TapeStatus kind="loading" message={`Reading in on ${ticker}…`} />}
         {status === 'error' && <TapeStatus kind="error" message={error} />}
         {status === 'idle' && !result && <TapeStatus kind="empty" message="Enter a ticker to pull a fast brief: pulse, smart money, peers, risks." />}
-        {status === 'idle' && empty && <TapeStatus kind="empty" message={`No baked read-in for ${result?.ticker}. The Potemkin currently ships APP only.`} />}
+        {status === 'idle' && empty && (
+          <TapeStatus
+            kind="empty"
+            message={result?._meta?.confidenceReason || `No read-in assembled for ${result?.ticker} yet.`}
+          />
+        )}
 
         {status === 'idle' && result && !empty && (
           <div className="tape-fade">
-            {/* depth toggle */}
-            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--tape-hairline)' }}>
-              <div className="tape-label">Depth</div>
+            {/* depth toggle + confidence pill */}
+            <div className="flex items-center justify-between gap-2 border-b px-4 py-3" style={{ borderColor: 'var(--tape-hairline)' }}>
+              <div className="flex items-center gap-2.5">
+                <span className="tape-label">Depth</span>
+                <ConfidencePill meta={result._meta} />
+              </div>
               <DepthToggle depth={depth} onChange={setDepth} />
             </div>
 
@@ -207,40 +215,62 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth; o
               </div>
             )}
 
-            {/* PULSE (always) */}
-            <section className="border-b px-4 py-4" style={{ borderColor: 'var(--tape-hairline)' }}>
-              <div className="tape-label mb-2">Pulse</div>
-              <ul className="space-y-1.5 text-[14px] leading-relaxed">
-                <li className="flex items-start gap-2.5">
-                  <span className="tape-num mt-0.5 text-[11px]" style={{ color: 'var(--tape-accent)' }}>BULL</span>
-                  <span style={{ color: 'var(--tape-fg)' }}>{result.pulse.bullLine}</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <span className="tape-num mt-0.5 text-[11px]" style={{ color: 'var(--tape-danger)' }}>BEAR</span>
-                  <span style={{ color: 'var(--tape-fg)' }}>{result.pulse.bearLine}</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <span className="tape-num mt-0.5 text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>TAPE</span>
-                  <span style={{ color: 'var(--tape-fg-dim)' }}>{result.pulse.priceAction}</span>
-                </li>
-              </ul>
-            </section>
+            {/* PULSE — render only when at least one line has content. Each
+                line individually hides if empty. Policy: never render an
+                empty labeled slot. */}
+            {(() => {
+              const hasBull = !!result.pulse.bullLine?.trim();
+              const hasBear = !!result.pulse.bearLine?.trim();
+              const hasTape = !!result.pulse.priceAction?.trim();
+              if (!hasBull && !hasBear && !hasTape) return null;
+              return (
+                <section className="border-b px-4 py-4" style={{ borderColor: 'var(--tape-hairline)' }}>
+                  <div className="tape-label mb-2">Pulse</div>
+                  <ul className="space-y-1.5 text-[14px] leading-relaxed">
+                    {hasBull && (
+                      <li className="flex items-start gap-2.5">
+                        <span className="tape-num mt-0.5 text-[11px]" style={{ color: 'var(--tape-accent)' }}>BULL</span>
+                        <span style={{ color: 'var(--tape-fg)' }}>{result.pulse.bullLine}</span>
+                      </li>
+                    )}
+                    {hasBear && (
+                      <li className="flex items-start gap-2.5">
+                        <span className="tape-num mt-0.5 text-[11px]" style={{ color: 'var(--tape-danger)' }}>BEAR</span>
+                        <span style={{ color: 'var(--tape-fg)' }}>{result.pulse.bearLine}</span>
+                      </li>
+                    )}
+                    {hasTape && (
+                      <li className="flex items-start gap-2.5">
+                        <span className="tape-num mt-0.5 text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>TAPE</span>
+                        <span style={{ color: 'var(--tape-fg-dim)' }}>{result.pulse.priceAction}</span>
+                      </li>
+                    )}
+                  </ul>
+                </section>
+              );
+            })()}
 
-            {/* MARQUEE QUOTE (always) */}
-            <section className="border-b" style={{ borderColor: 'var(--tape-hairline)' }}>
-              <div className="px-4 pt-4 pb-1">
-                <div className="tape-label">Marquee</div>
-              </div>
-              <TapeCitationRow citation={result.pulse.marqueeCitation} />
-            </section>
+            {/* MARQUEE — hide if no actual citation came back. */}
+            {result.pulse.marqueeCitation?.pineconeId && (
+              <section className="border-b" style={{ borderColor: 'var(--tape-hairline)' }}>
+                <div className="px-4 pt-4 pb-1">
+                  <div className="tape-label">Marquee</div>
+                </div>
+                <TapeCitationRow citation={result.pulse.marqueeCitation} />
+              </section>
+            )}
 
-            {/* BRIEF: what they actually do */}
-            {showBrief && (
+            {/* BRIEF: what they actually do — hide if no primer text. Prose
+                may contain `{{clip:id}}` tokens (from the live backend);
+                renderProseWithClips swaps them for inline playable pills
+                using the resolved whatTheyDoCitations. Canon results have
+                no tokens so this is a no-op for them. */}
+            {showBrief && !!result.whatTheyDo?.trim() && (
               <section className="tape-fade border-b px-4 py-4" style={{ borderColor: 'var(--tape-hairline)' }}>
                 <div className="tape-label mb-2">What they actually do</div>
                 {result.whatTheyDo.split('\n\n').map((p, i) => (
                   <p key={i} className="text-[14px] leading-relaxed" style={{ color: 'var(--tape-fg-dim)', marginTop: i === 0 ? 0 : '0.75rem' }}>
-                    {p}
+                    {renderProseWithClips(p, result.whatTheyDoCitations)}
                   </p>
                 ))}
               </section>
@@ -280,8 +310,8 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth; o
               </section>
             )}
 
-            {/* BRIEF: smart money */}
-            {showBrief && (
+            {/* BRIEF: smart money — hide section entirely if neither side has clips. */}
+            {showBrief && (result.smartMoney.bulls.length > 0 || result.smartMoney.bears.length > 0) && (
               <section className="tape-fade border-b" style={{ borderColor: 'var(--tape-hairline)' }}>
                 <div className="px-4 pt-4 pb-2">
                   <div className="tape-label">The smart money on this</div>

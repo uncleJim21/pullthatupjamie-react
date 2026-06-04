@@ -4,24 +4,42 @@ import { getNarrative } from '../../../services/tape/index.ts';
 import type { NarrativeResult, NarrativeBucket, NarrativeInflection } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
-import { formatShortDate } from '../../../utils/time.ts';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, PreviewPanel, PreviewBanner } from '../TapeActionScaffold.tsx';
 import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
 type Status = 'idle' | 'loading' | 'error';
 
-/** Compact bucket-window label, e.g. "2023" or "Mar – Oct 2024". */
+// Gate Narrative behind a "preview / coming soon" surface until live
+// reliability catches up to canon quality. Click an example below to load
+// the canon result through the normal pipeline; free-text input is hidden
+// in this mode.
+const PREVIEW_ONLY = true;
+
+/** Compact bucket-window label. Handles month / quarter / year / arbitrary
+ *  spans now that backend may emit variable-width buckets per the
+ *  adaptive-cadence memo. */
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const fmtMonth = (d: Date) => `${MONTH_ABBR[d.getMonth()]} ${d.getFullYear()}`;
 const windowLabel = (start: string, end: string): string => {
   const s = new Date(start);
   const e = new Date(end);
   if (isNaN(s.getTime()) || isNaN(e.getTime())) return `${start} – ${end}`;
   const sameYear = s.getFullYear() === e.getFullYear();
+  const sameMonth = sameYear && s.getMonth() === e.getMonth();
+  // Single month: "Oct 2025"
+  if (sameMonth) return fmtMonth(s);
   if (sameYear) {
+    // Whole year: "2025"
+    if (s.getMonth() === 0 && e.getMonth() === 11) return String(s.getFullYear());
+    // Clean single quarter: "2025 Q4"
     const sQ = Math.floor(s.getMonth() / 3) + 1;
     const eQ = Math.floor(e.getMonth() / 3) + 1;
-    return sQ === 1 && eQ === 4 ? String(s.getFullYear()) : `${s.getFullYear()} Q${sQ}${sQ === eQ ? '' : `–Q${eQ}`}`;
+    if (s.getMonth() % 3 === 0 && e.getMonth() % 3 === 2 && sQ === eQ) return `${s.getFullYear()} Q${sQ}`;
+    // Arbitrary intra-year span: "Jan – Sep 2025"
+    return `${MONTH_ABBR[s.getMonth()]} – ${MONTH_ABBR[e.getMonth()]} ${s.getFullYear()}`;
   }
-  return `${formatShortDate(start)} – ${formatShortDate(end)}`;
+  // Cross-year span: "Mar 2024 – Sep 2025"
+  return `${fmtMonth(s)} – ${fmtMonth(e)}`;
 };
 
 /** Bucket midpoint timestamp — used to position points on the trajectory chart. */
@@ -290,6 +308,9 @@ const NarrativeView: React.FC<{ initialTopic?: string; initialGroup?: string; on
 
   const onSubmit = (e: React.FormEvent) => { e.preventDefault(); void run(topic, group); };
   const empty = result && result.buckets.length === 0;
+  // Preview gate: hide the free-text form when previewing. Canon-example
+  // clicks still run() normally → canon hits → full result renders.
+  const showPreview = PREVIEW_ONLY && !result && status === 'idle';
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
@@ -298,6 +319,37 @@ const NarrativeView: React.FC<{ initialTopic?: string; initialGroup?: string; on
         onRefresh={result?._meta ? () => run(result.topic, result.group || '', true) : undefined}
         refreshLoading={status === 'loading'}
       />
+      {PREVIEW_ONLY && (
+        <PreviewBanner
+          note="Curated canon only — live retrieval still hardening."
+          examples={[
+            {
+              label: 'Luke Gromen — the sovereign debt endgame',
+              onClick: () => {
+                setTopic('the sovereign debt endgame');
+                setGroup('Luke Gromen');
+                void run('the sovereign debt endgame', 'Luke Gromen');
+              },
+            },
+          ]}
+        />
+      )}
+      {showPreview ? (
+        <PreviewPanel
+          title="Narrative"
+          description={`Track how the prevailing view on a topic drifts over time — chronological buckets, sentiment trajectory chart, and inflection points called out. Live retrieval still hardening; try the curated canon below.`}
+          examples={[
+            {
+              label: 'Luke Gromen — the sovereign debt endgame',
+              onClick: () => {
+                setTopic('the sovereign debt endgame');
+                setGroup('Luke Gromen');
+                void run('the sovereign debt endgame', 'Luke Gromen');
+              },
+            },
+          ]}
+        />
+      ) : (
       <form onSubmit={onSubmit}>
         {/* Row 1: Topic + Group + Run — all share a single baseline. */}
         <div className="flex flex-wrap items-end gap-3">
@@ -317,22 +369,32 @@ const NarrativeView: React.FC<{ initialTopic?: string; initialGroup?: string; on
           <GroupChip label="All voices" tone="neutral" onClick={() => setGroup('')} />
         </div>
       </form>
+      )}
 
+      {!showPreview && (
       <div className="mt-6 tape-panel">
         {status === 'loading' && <TapeStatus kind="loading" message={`Tracing how the narrative on ${topic} has moved…`} />}
         {status === 'error' && <TapeStatus kind="error" message={error} />}
         {status === 'idle' && !result && <TapeStatus kind="empty" message="Pick a topic to see how the prevailing view on it has drifted over time." />}
-        {status === 'idle' && empty && <TapeStatus kind="empty" message={`No narrative drift assembled for ${result?.topic} yet.`} />}
+        {status === 'idle' && empty && (
+          <TapeStatus
+            kind="empty"
+            message={result?._meta?.confidenceReason || `No narrative drift assembled for ${result?.topic} yet.`}
+          />
+        )}
 
         {status === 'idle' && result && !empty && (
           <div className="tape-fade">
-            {/* header — topic + group + current thesis */}
+            {/* header — topic + group + confidence pill + current thesis */}
             <div className="border-b px-4 py-4" style={{ borderColor: 'var(--tape-hairline)' }}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="tape-serif text-2xl" style={{ color: 'var(--tape-fg)' }}>{result.topic}</h2>
-                {result.group && (
-                  <span className="tape-tag px-1.5 py-0.5">filter: {result.group}</span>
-                )}
+                <div className="flex items-center gap-2">
+                  {result.group && (
+                    <span className="tape-tag px-1.5 py-0.5">filter: {result.group}</span>
+                  )}
+                  <ConfidencePill meta={result._meta} />
+                </div>
               </div>
               <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--tape-fg-dim)' }}>{result.thesis}</p>
             </div>
@@ -399,6 +461,7 @@ const NarrativeView: React.FC<{ initialTopic?: string; initialGroup?: string; on
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

@@ -3,7 +3,7 @@ import { getBrief } from '../../../services/tape/index.ts';
 import type { BriefResult } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, WindowExpandedPill } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
 import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
@@ -67,14 +67,28 @@ const BriefView: React.FC<{ initialTopic?: string; onBack: () => void }> = ({ in
         {status === 'loading' && <TapeStatus kind="loading" message={`Synthesizing the week on ${topic}…`} />}
         {status === 'error' && <TapeStatus kind="error" message={error} />}
         {status === 'idle' && !result && <TapeStatus kind="empty" message="Enter a topic to synthesize what was said across the corpus this week." />}
-        {status === 'idle' && empty && <TapeStatus kind="empty" message={`No ${result?.topic} commentary surfaced for the week ending ${result ? formatShortDate(result.asOfDate) : ''}.`} />}
+        {status === 'idle' && empty && (
+          <TapeStatus
+            kind="empty"
+            message={
+              result?._meta?.confidenceReason
+              || `No ${result?.topic} commentary surfaced for the week ending ${result ? formatShortDate(result.asOfDate) : ''}.`
+            }
+          />
+        )}
 
         {status === 'idle' && result && !empty && (
           <div className="tape-fade">
             <div className="border-b px-4 py-4" style={{ borderColor: 'var(--tape-hairline)' }}>
-              <div className="flex items-baseline gap-2.5">
-                <span className="tape-tag px-1.5 py-0.5">{result.topic}</span>
-                <span className="tape-num text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>week ending {formatShortDate(result.asOfDate)}</span>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <div className="flex items-baseline gap-2.5">
+                  <span className="tape-tag px-1.5 py-0.5">{result.topic}</span>
+                  <span className="tape-num text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>week ending {formatShortDate(result.asOfDate)}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <WindowExpandedPill meta={result._meta} />
+                  <ConfidencePill meta={result._meta} />
+                </div>
               </div>
               <p className="tape-serif mt-2 text-xl leading-snug" style={{ color: 'var(--tape-fg)' }}>{result.headline}</p>
             </div>

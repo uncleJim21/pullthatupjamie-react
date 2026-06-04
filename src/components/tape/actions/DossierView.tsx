@@ -3,10 +3,15 @@ import { getDossier } from '../../../services/tape/index.ts';
 import type { DossierResult } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, PreviewPanel, PreviewBanner } from '../TapeActionScaffold.tsx';
 import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
 type Status = 'idle' | 'loading' | 'error';
+
+// Gate Dossier behind a preview surface until live person-resolution is
+// reliable across novel names. Canon-example clicks still hit the normal
+// pipeline and render the full result.
+const PREVIEW_ONLY = true;
 
 const DossierView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({ initialPerson, onBack }) => {
   const [person, setPerson] = useState(initialPerson || '');
@@ -42,6 +47,9 @@ const DossierView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({
   };
 
   const empty = result && result.topics.length === 0;
+  // Preview gate: hide free-text input. Canon example clicks still
+  // invoke run() normally → canon hits → full Dossier renders.
+  const showPreview = PREVIEW_ONLY && !result && status === 'idle';
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
@@ -50,6 +58,27 @@ const DossierView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({
         onRefresh={result?._meta ? () => run(result.person, true) : undefined}
         refreshLoading={status === 'loading'}
       />
+      {PREVIEW_ONLY && (
+        <PreviewBanner
+          note="Curated canon only — live person-resolution still hardening."
+          examples={[
+            { label: 'Mohamed El-Erian', onClick: () => { setPerson('Mohamed El-Erian'); void run('Mohamed El-Erian'); } },
+            { label: 'Luke Gromen', onClick: () => { setPerson('Luke Gromen'); void run('Luke Gromen'); } },
+            { label: 'Mike Green', onClick: () => { setPerson('Mike Green'); void run('Mike Green'); } },
+          ]}
+        />
+      )}
+      {showPreview ? (
+        <PreviewPanel
+          title="Dossier"
+          description={`Compile a person's stated positions across podcast appearances — grouped by topic, every quote sourced and playable. Currently in preview; try one of the curated canon examples.`}
+          examples={[
+            { label: 'Mohamed El-Erian', onClick: () => { setPerson('Mohamed El-Erian'); void run('Mohamed El-Erian'); } },
+            { label: 'Luke Gromen', onClick: () => { setPerson('Luke Gromen'); void run('Luke Gromen'); } },
+            { label: 'Mike Green', onClick: () => { setPerson('Mike Green'); void run('Mike Green'); } },
+          ]}
+        />
+      ) : (
       <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
         <TapeField label="Person" className="flex-1 min-w-[16rem]">
           <input
@@ -62,7 +91,9 @@ const DossierView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({
         </TapeField>
         <RunButton loading={status === 'loading'} disabled={!person.trim()} label="Build dossier" />
       </form>
+      )}
 
+      {!showPreview && (
       <div className="mt-6 tape-panel">
         {status === 'loading' && <TapeStatus kind="loading" message={`Assembling dossier on ${person}…`} />}
         {status === 'error' && <TapeStatus kind="error" message={error} />}
@@ -70,7 +101,10 @@ const DossierView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({
           <TapeStatus kind="empty" message="Enter a finance personality to compile their stated positions." />
         )}
         {status === 'idle' && empty && (
-          <TapeStatus kind="empty" message={`No corpus positions resolved for ${result?.person}.`} />
+          <TapeStatus
+            kind="empty"
+            message={result?._meta?.confidenceReason || `No corpus positions resolved for ${result?.person}.`}
+          />
         )}
 
         {status === 'idle' && result && !empty && (
@@ -78,9 +112,12 @@ const DossierView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({
             {/* header */}
             <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-4" style={{ borderColor: 'var(--tape-hairline)' }}>
               <h2 className="tape-serif text-2xl" style={{ color: 'var(--tape-fg)' }}>{result.person}</h2>
-              <span className="tape-num text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>
-                {result.topics.reduce((a, t) => a + t.citations.length, 0)} cites · {result.topics.length} topics · {result.appearances.length} shows
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="tape-num text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>
+                  {result.topics.reduce((a, t) => a + t.citations.length, 0)} cites · {result.topics.length} topics · {result.appearances.length} shows
+                </span>
+                <ConfidencePill meta={result._meta} />
+              </div>
             </div>
 
             {/* on the tape — backend-curated per Dossier subject */}
@@ -119,6 +156,7 @@ const DossierView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

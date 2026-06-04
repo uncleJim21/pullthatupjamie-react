@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Pause, Link2, Check } from 'lucide-react';
+import { Play, Pause, Link2, Check, Loader2 } from 'lucide-react';
 import { useAudioController } from '../../context/AudioControllerContext.tsx';
 import { createClipShareUrl } from '../../utils/urlUtils.ts';
 import { formatTime, formatShortDate } from '../../utils/time.ts';
@@ -11,11 +11,15 @@ import type { TapeCitation } from '../../services/tape/tapeTypes.ts';
  * shared AudioControllerContext and exposes a copy-link affordance.
  */
 const TapeCitationRow: React.FC<{ citation: TapeCitation }> = ({ citation }) => {
-  const { playTrack, togglePlay, currentTrack, isPlaying } = useAudioController();
+  const { playTrack, togglePlay, currentTrack, isPlaying, isBuffering } = useAudioController();
   const [copied, setCopied] = useState(false);
 
   const isActive = currentTrack?.id === citation.pineconeId;
   const isThisPlaying = isActive && isPlaying;
+  // Show the spinner while the AudioController is between play-pressed and
+  // first-byte-playing for THIS clip. Prevents "I clicked but nothing's
+  // happening" confusion on slow networks / cold audio fetches.
+  const isThisLoading = isActive && isBuffering && !isPlaying;
 
   const onPlay = () => {
     if (isActive) {
@@ -45,11 +49,16 @@ const TapeCitationRow: React.FC<{ citation: TapeCitation }> = ({ citation }) => 
       <button
         type="button"
         onClick={onPlay}
+        disabled={isThisLoading}
         className="tape-cite__play mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center"
-        aria-label={isThisPlaying ? 'Pause clip' : 'Play clip'}
-        title={isThisPlaying ? 'Pause' : 'Play from timestamp'}
+        aria-label={isThisLoading ? 'Loading clip' : isThisPlaying ? 'Pause clip' : 'Play clip'}
+        title={isThisLoading ? 'Loading…' : isThisPlaying ? 'Pause' : 'Play from timestamp'}
       >
-        {isThisPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+        {isThisLoading
+          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          : isThisPlaying
+            ? <Pause className="h-3.5 w-3.5" />
+            : <Play className="h-3.5 w-3.5" />}
       </button>
 
       <div className="min-w-0 flex-1">

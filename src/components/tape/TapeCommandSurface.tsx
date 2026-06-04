@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp, Info } from 'lucide-react';
+import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp, FileUser, Info } from 'lucide-react';
 import { TAPE_NAME } from '../../config/tapeConfig.ts';
 import type { TapeActionId, TapeDepth, TapeModel } from '../../services/tape/tapeTypes.ts';
 import { useTapeModel } from '../../services/tape/useTapeModel.ts';
@@ -15,14 +15,15 @@ export interface TapeLaunch {
   depth?: TapeDepth;
 }
 
-type HeroMode = 'ticker' | 'person';
-
 interface SecondaryAction {
-  id: Exclude<TapeActionId, 'dossier' | 'readin'>;
+  id: Exclude<TapeActionId, 'readin' | 'timeline'>;
   title: string;
   desc: string;
   icon: React.FC<{ className?: string; style?: React.CSSProperties }>;
   example: { label: string; launch: TapeLaunch };
+  /** When true, render a "PREVIEW" pill next to the title. The action is
+   *  reachable but the user knows it's curated demo content only. */
+  preview?: boolean;
 }
 
 const SECONDARY: SecondaryAction[] = [
@@ -41,16 +42,35 @@ const SECONDARY: SecondaryAction[] = [
     example: { label: 'the AI bubble: bulls vs bears', launch: { action: 'split', person: 'The bears', personB: 'The bulls', topic: 'the AI bubble' } },
   },
   {
+    id: 'dossier',
+    title: "Compile a person's positions",
+    desc: 'A research dossier on a finance voice — every stated position grouped by topic, every quote sourced and playable.',
+    icon: FileUser,
+    example: { label: 'Mohamed El-Erian', launch: { action: 'dossier', person: 'Mohamed El-Erian' } },
+    preview: true,
+  },
+  {
     id: 'narrative',
     title: 'Watch the narrative drift',
     desc: 'How the prevailing view on one topic moved over years — with the bucketed quotes behind it and the inflection points called out.',
     icon: TrendingUp,
     example: { label: 'the sovereign debt endgame (Gromen)', launch: { action: 'narrative', topic: 'the sovereign debt endgame', person: 'Luke Gromen' } },
+    preview: true,
   },
 ];
 
 const TICKER_EXAMPLES = ['APP', 'NVDA', 'CRWV'];
-const PERSON_EXAMPLES = ['Mohamed El-Erian', 'Luke Gromen', 'Mike Green'];
+
+/** Small mono PREVIEW pill — used in the launcher next to surfaces we've
+ *  marked as canon-only for v1 (Dossier, Narrative). */
+const PreviewPill: React.FC = () => (
+  <span
+    className="tape-mono inline-flex items-center rounded-full border px-1.5 py-px text-[9px] uppercase tracking-wider"
+    style={{ borderColor: 'var(--tape-accent)', color: 'var(--tape-accent)' }}
+  >
+    Preview
+  </span>
+);
 
 /** Synthesis-tier toggle (global, persisted via useTapeModel). Quiet by
  *  design — Deep is the recommended default and most users won't touch it.
@@ -117,54 +137,15 @@ const SynthesisModeToggle: React.FC<{ model: TapeModel; onChange: (m: TapeModel)
   );
 };
 
-/** Two-segment pill that flips the hero between Read-in (ticker) and Dossier (person). */
-const HeroModeToggle: React.FC<{ mode: HeroMode; onChange: (m: HeroMode) => void }> = ({ mode, onChange }) => (
-  <div className="inline-flex items-center gap-0 rounded-full border p-0.5 text-[11px]" style={{ borderColor: 'var(--tape-hairline-strong)' }}>
-    {([['ticker', 'Ticker'], ['person', 'Person']] as const).map(([id, label]) => {
-      const active = mode === id;
-      return (
-        <button
-          key={id}
-          type="button"
-          onClick={() => onChange(id)}
-          className="tape-mono rounded-full px-3 py-1 uppercase tracking-wide transition-colors"
-          style={{
-            background: active ? 'var(--tape-accent)' : 'transparent',
-            color: active ? 'var(--tape-bg)' : 'var(--tape-fg-dim)',
-          }}
-        >
-          {label}
-        </button>
-      );
-    })}
-  </div>
-);
-
 const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> = ({ onLaunch }) => {
-  const [mode, setMode] = useState<HeroMode>('ticker');
   const [query, setQuery] = useState('');
   const [synthModel, setSynthModel] = useTapeModel();
 
   const submit = (raw: string) => {
     const v = raw.trim();
     if (!v) return;
-    if (mode === 'ticker') {
-      onLaunch({ action: 'readin', ticker: v.toUpperCase() });
-    } else {
-      onLaunch({ action: 'dossier', person: v });
-    }
+    onLaunch({ action: 'readin', ticker: v.toUpperCase() });
   };
-
-  // Reset the typed value when switching modes — a ticker isn't a name and vice versa.
-  const switchMode = (next: HeroMode) => {
-    setMode(next);
-    setQuery('');
-  };
-
-  const isTicker = mode === 'ticker';
-  const placeholder = isTicker ? 'Read in on any ticker…' : 'Build a dossier on anyone…';
-  const ctaLabel = isTicker ? 'Read in' : 'Dossier';
-  const examples = isTicker ? TICKER_EXAMPLES : PERSON_EXAMPLES;
 
   return (
     <div className="mx-auto w-full max-w-xl px-5 pb-20 pt-16 sm:pt-24">
@@ -174,44 +155,41 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
           {TAPE_NAME}
         </h1>
         <p className="mt-3 text-lg font-medium sm:text-xl" style={{ color: 'var(--tape-fg)' }}>
-          Read The Tape. Skip the prattle. Extract the alpha.
+          Skip the prattle. Extract the alpha.
         </p>
         <p className="mx-auto mt-2.5 max-w-md text-[14px] leading-relaxed" style={{ color: 'var(--tape-fg-dim)' }}>
-          Bloomberg, Real Vision, Macro Voices and the rest of the macro feed, searchable. Condensed alpha without burning hours.
+          Citations from podcast voices you already trust. Condensed for alpha - Bloomberg, Real Vision, Macro Voices and the rest of the macro feed, searchable. 
         </p>
       </div>
 
-      {/* hero: ticker (read-in) or person (dossier), toggle-driven */}
+      {/* hero: ticker → Read-in */}
       <form
         onSubmit={e => { e.preventDefault(); submit(query); }}
         className="tape-fade mt-10"
         style={{ animationDelay: '70ms' }}
       >
-        <div className="mb-3 flex justify-center">
-          <HeroModeToggle mode={mode} onChange={switchMode} />
-        </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2" style={{ color: 'var(--tape-fg-faint)' }} />
           <input
             value={query}
-            onChange={e => setQuery(isTicker ? e.target.value.toUpperCase() : e.target.value)}
-            placeholder={placeholder}
+            onChange={e => setQuery(e.target.value.toUpperCase())}
+            placeholder="Read in on any ticker…"
             autoFocus
             spellCheck={false}
-            className={`tape-search w-full py-3.5 pl-12 pr-28 ${isTicker ? 'uppercase' : ''}`}
+            className="tape-search w-full py-3.5 pl-12 pr-28 uppercase"
           />
           <button
             type="submit"
             disabled={!query.trim()}
             className="tape-btn tape-btn--go absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1.5 px-3.5 py-2"
           >
-            {ctaLabel}
+            Read in
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
         <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-1">
           <span className="text-xs" style={{ color: 'var(--tape-fg-faint)' }}>Try</span>
-          {examples.map(label => (
+          {TICKER_EXAMPLES.map(label => (
             <button key={label} type="button" onClick={() => submit(label)} className="tape-pill px-2.5 py-1">
               {label}
             </button>
@@ -226,7 +204,7 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
         <SynthesisModeToggle model={synthModel} onChange={setSynthModel} />
       </div>
 
-      {/* the other three jobs */}
+      {/* the other actions */}
       <div className="tape-fade mt-8" style={{ animationDelay: '140ms' }}>
         <div className="tape-label mb-2.5 pl-1">Or go deeper</div>
         <div className="tape-panel tape-divide overflow-hidden">
@@ -238,7 +216,10 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
                   <Icon className="mt-0.5 h-[18px] w-[18px] flex-shrink-0" style={{ color: 'var(--tape-accent)' }} />
                   <div className="min-w-0">
                     <button type="button" onClick={() => onLaunch({ action: a.id })} className="block text-left">
-                      <span className="tape-serif block text-[17px] leading-snug" style={{ color: 'var(--tape-fg)' }}>{a.title}</span>
+                      <span className="tape-serif inline-flex items-baseline gap-2 text-[17px] leading-snug" style={{ color: 'var(--tape-fg)' }}>
+                        <span>{a.title}</span>
+                        {a.preview && <PreviewPill />}
+                      </span>
                       <span className="mt-1 block text-[13px] leading-relaxed" style={{ color: 'var(--tape-fg-dim)' }}>{a.desc}</span>
                     </button>
                     <button type="button" onClick={() => onLaunch(a.example.launch)} className="tape-pill mt-2.5 inline-block px-2.5 py-1">
@@ -254,7 +235,6 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
           })}
         </div>
       </div>
-
     </div>
   );
 };

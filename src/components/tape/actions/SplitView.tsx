@@ -3,7 +3,7 @@ import { getSplit } from '../../../services/tape/index.ts';
 import type { SplitResult, SplitSide } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill } from '../TapeActionScaffold.tsx';
 import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
 type Status = 'idle' | 'loading' | 'error';
@@ -61,17 +61,31 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
 
   const ready = personA.trim() && personB.trim() && topic.trim();
 
-  // Color-coded Easy chips: just bulls/bears. Click fills the input; user
-  // can still type a name. Hawks/Doves removed to reduce clutter — most
-  // analyst debates frame as bull/bear anyway, and the split service's
-  // isCampMode still accepts them for power users typing manually.
+  // Color-coded Easy chips: just bulls/bears. Click fills the input AND
+  // auto-fills the opposite camp on the OTHER side — but only when that
+  // other field is empty or already a known camp value (so an explicit name
+  // like "Druckenmiller" isn't clobbered). Hawks/Doves removed to reduce
+  // clutter; isCampMode still accepts them for power users typing manually.
+  const isKnownCamp = (v: string) => {
+    const t = v.trim().toLowerCase();
+    return t === 'bulls' || t === 'bears';
+  };
+  const opposite = (label: 'Bulls' | 'Bears'): 'Bulls' | 'Bears' => (label === 'Bulls' ? 'Bears' : 'Bulls');
   const renderCampChip = (target: 'A' | 'B', label: 'Bulls' | 'Bears') => {
-    const setter = target === 'A' ? setPersonA : setPersonB;
     const isBull = label === 'Bulls';
+    const handleClick = () => {
+      if (target === 'A') {
+        setPersonA(label);
+        if (!personB.trim() || isKnownCamp(personB)) setPersonB(opposite(label));
+      } else {
+        setPersonB(label);
+        if (!personA.trim() || isKnownCamp(personA)) setPersonA(opposite(label));
+      }
+    };
     return (
       <button
         type="button"
-        onClick={() => setter(label)}
+        onClick={handleClick}
         className="tape-pill px-2 py-0.5 text-[10px]"
         style={{
           borderColor: isBull ? 'var(--tape-accent)' : 'var(--tape-danger)',
@@ -118,8 +132,9 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
 
         {status === 'idle' && result && (
           <div className="tape-fade">
-            <div className="border-b px-4 py-3" style={{ borderColor: 'var(--tape-hairline)' }}>
+            <div className="flex items-center justify-between gap-2 border-b px-4 py-3" style={{ borderColor: 'var(--tape-hairline)' }}>
               <span className="tape-tag px-1.5 py-0.5">{result.topic}</span>
+              <ConfidencePill meta={result._meta} />
             </div>
             {/* on the tape */}
             {result.tickers && result.tickers.length > 0 && <TapeTickerStrip symbols={result.tickers} />}
