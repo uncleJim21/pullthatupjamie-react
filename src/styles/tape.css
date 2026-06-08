@@ -1,0 +1,207 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Tape skin — scoped theme.
+
+   Direction: plain-language premium. Reads like a confident, expensive product
+   a non-technical principal would demo proudly, NOT a developer terminal. The
+   institutional gravitas stays (serif headers, density, real timestamps); the
+   "nerdy" tells are gone (no command-line prompt, no man-page <syntax>, no
+   graph-paper grid). Monospace is reserved for the one place it earns its keep:
+   the verbatim quote + its timestamp, where it signals exact transcription.
+
+   Accent is a TAMED green: deepened and desaturated so it reads like a market
+   up-tick, not phosphor. Held to data + active states only. OKLCH; no #000/#fff;
+   neutrals tinted a hair warm so the dark feels premium, not void.
+
+   Everything is nested under `.tape-root` so it never collides with the app's
+   global neon classes.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.tape-root {
+  /* surfaces — warm-neutral charcoal, premium not terminal */
+  --tape-bg: oklch(0.17 0.004 160);
+  --tape-bg-raised: oklch(0.21 0.005 160);
+  --tape-bg-inset: oklch(0.14 0.004 160);
+  --tape-hairline: oklch(0.3 0.006 160);
+  --tape-hairline-strong: oklch(0.42 0.008 160);
+
+  /* text */
+  --tape-fg: oklch(0.95 0.003 160);
+  --tape-fg-dim: oklch(0.7 0.006 160);
+  --tape-fg-faint: oklch(0.55 0.006 160);
+
+  /* the one accent — tamed "money" green */
+  --tape-accent: oklch(0.66 0.1 156);
+  --tape-accent-dim: oklch(0.55 0.08 156);
+  --tape-accent-wash: oklch(0.66 0.1 156 / 0.12);
+  --tape-accent-line: oklch(0.66 0.1 156 / 0.3);
+
+  /* semantic */
+  --tape-danger: oklch(0.64 0.15 28);
+
+  position: relative;
+  min-height: 100%;
+  background: var(--tape-bg);
+  color: var(--tape-fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.tape-root ::selection {
+  background: var(--tape-accent-wash);
+  color: var(--tape-fg);
+}
+
+/* ── type roles ─────────────────────────────────────────────────────────── */
+.tape-serif { font-family: 'Newsreader', Georgia, serif; }
+.tape-mono { font-family: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace; }
+
+/* uppercase micro-label — sans (not mono) so it reads as a quiet label, not code */
+.tape-label {
+  font-family: 'Inter', system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--tape-fg-faint);
+}
+
+/* ── containers ─────────────────────────────────────────────────────────── */
+.tape-panel {
+  background: var(--tape-bg-raised);
+  border: 1px solid var(--tape-hairline);
+  border-radius: 10px;
+}
+.tape-divide > * + * { border-top: 1px solid var(--tape-hairline); }
+
+/* ── search field (hero) ────────────────────────────────────────────────── */
+.tape-search {
+  background: var(--tape-bg-inset);
+  border: 1px solid var(--tape-hairline-strong);
+  border-radius: 12px;
+  color: var(--tape-fg);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 16px;
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s;
+}
+.tape-search::placeholder { color: var(--tape-fg-faint); }
+.tape-search:focus {
+  outline: none;
+  border-color: var(--tape-accent-dim);
+  box-shadow: 0 0 0 3px var(--tape-accent-wash);
+}
+
+/* ── inputs (action forms) ──────────────────────────────────────────────── */
+.tape-input {
+  background: var(--tape-bg-inset);
+  border: 1px solid var(--tape-hairline);
+  border-radius: 8px;
+  color: var(--tape-fg);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  transition: border-color 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tape-input::placeholder { color: var(--tape-fg-faint); }
+.tape-input:focus { outline: none; border-color: var(--tape-accent-dim); }
+
+/* ── buttons ────────────────────────────────────────────────────────────── */
+.tape-btn {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  color: var(--tape-fg);
+  background: var(--tape-bg-inset);
+  border: 1px solid var(--tape-hairline-strong);
+  transition: border-color 0.18s, background 0.18s, color 0.18s;
+}
+.tape-btn:hover:not(:disabled) { border-color: var(--tape-accent-dim); color: var(--tape-accent); }
+.tape-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.tape-btn--go {
+  color: var(--tape-bg);
+  background: var(--tape-accent);
+  border-color: var(--tape-accent);
+  font-weight: 600;
+}
+.tape-btn--go:hover:not(:disabled) { background: var(--tape-accent-dim); border-color: var(--tape-accent-dim); color: var(--tape-bg); }
+
+/* example pill — plain language, not a command */
+.tape-pill {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  border-radius: 999px;
+  color: var(--tape-fg-dim);
+  background: transparent;
+  border: 1px solid var(--tape-hairline-strong);
+  transition: border-color 0.16s, color 0.16s, background 0.16s;
+}
+.tape-pill:hover { color: var(--tape-fg); border-color: var(--tape-accent-dim); background: var(--tape-bg-raised); }
+
+/* ── ticker card (the carousel) ─────────────────────────────────────────── */
+.tape-ticker {
+  background: var(--tape-bg-raised);
+  border: 1px solid var(--tape-hairline);
+  border-radius: 10px;
+  text-decoration: none;
+  transition: border-color 0.16s cubic-bezier(0.22, 1, 0.36, 1), transform 0.16s;
+}
+.tape-ticker:hover { border-color: var(--tape-accent-dim); transform: translateY(-1px); }
+
+/* ── action rows (launcher) ─────────────────────────────────────────────── */
+.tape-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  transition: background 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tape-action:hover { background: var(--tape-bg-raised); }
+.tape-action:hover .tape-action-arrow { transform: translateX(3px); color: var(--tape-accent); }
+.tape-action-arrow { transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), color 0.18s; color: var(--tape-fg-faint); }
+
+/* ── citation row ───────────────────────────────────────────────────────── */
+.tape-cite { transition: background 0.16s; }
+.tape-cite:hover { background: var(--tape-bg-raised); }
+.tape-cite--active { background: var(--tape-accent-wash); }
+.tape-cite__play {
+  border: 1px solid var(--tape-hairline-strong);
+  border-radius: 999px;
+  color: var(--tape-fg-dim);
+  transition: color 0.16s, border-color 0.16s;
+}
+.tape-cite__play:hover { color: var(--tape-accent); border-color: var(--tape-accent-dim); }
+.tape-cite--active .tape-cite__play { color: var(--tape-accent); border-color: var(--tape-accent); }
+
+/* the verbatim quote: mono — the one earned use, signals exact transcription */
+.tape-quote {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tape-fg);
+}
+
+/* topic / position tag — sans now (was mono) */
+.tape-tag {
+  font-family: 'Inter', system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 600;
+  font-size: 10px;
+  border-radius: 4px;
+  color: var(--tape-accent);
+  border: 1px solid var(--tape-accent-line);
+  background: var(--tape-accent-wash);
+}
+
+/* tabular numerals for timestamps + counts (data, stays mono) */
+.tape-num { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+/* ── entrance motion (ease-out only) ────────────────────────────────────── */
+.tape-fade { animation: tape-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes tape-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.tape-scrollbar::-webkit-scrollbar { width: 10px; height: 10px; }
+.tape-scrollbar::-webkit-scrollbar-thumb { background: var(--tape-hairline-strong); border-radius: 6px; }
+.tape-scrollbar::-webkit-scrollbar-track { background: transparent; }
