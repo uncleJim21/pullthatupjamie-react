@@ -7,7 +7,8 @@
 // src/components/jamiePullAgent/JamiePullAgentMessage.tsx (get-hierarchy
 // hydration), kept self-contained so Tape has no runtime dep on the agent UI.
 
-import { API_URL, printLog } from '../../constants/constants.ts';
+import { printLog } from '../../constants/constants.ts';
+import { TAPE_API_URL } from '../../config/tapeConfig.ts';
 import { getPulseHeader } from '../pulseService.ts';
 import { QuotaExceededError, parseQuotaExceededResponse } from '../../types/errors.ts';
 import { attachAuthHeader, emitAuthEvent } from './tapeAuth.ts';
@@ -15,6 +16,13 @@ import type { TapeCitation } from './tapeTypes.ts';
 
 const PULL_ENTITLEMENT = 'jamie-pull';
 const TAPE_ENTITLEMENT = 'tape';
+
+/** Base URL for every Tape backend call. Kept separate from the app's main
+ *  `API_URL` so Tape can target a different environment (alpha / staging)
+ *  without disturbing the rest of the app. Trailing slash trimmed so
+ *  callers can always concatenate paths starting with `/`. Do not import
+ *  `API_URL` for Tape traffic — use this. */
+const API_URL = TAPE_API_URL.replace(/\/+$/, '');
 
 const getAuthToken = (): string | null => localStorage.getItem('auth_token');
 

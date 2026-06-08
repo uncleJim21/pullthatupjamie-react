@@ -6,7 +6,6 @@ import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
 import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, renderProseWithClips } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
-import { TICKER_READIN_APP_HEADER } from '../../../data/mockTapeAppTickers.ts';
 import type { TapeTicker } from '../../../data/mockTapeTickers.ts';
 import { useLiveTickers } from '../../../services/tape/useLiveTickers.ts';
 import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
@@ -82,7 +81,7 @@ const ThesisSection: React.FC<{ label: string; data?: ReadInThesisSection; child
 };
 
 // ── The big company header card (ticker + name + sector + price + sparkline) ──
-const HeaderCard: React.FC<{ ticker: TapeTicker; name: string; sectorTag: string }> = ({ ticker, name, sectorTag }) => {
+const HeaderCard: React.FC<{ ticker: TapeTicker; name: string; sectorTag?: string }> = ({ ticker, name, sectorTag }) => {
   const up = ticker.change >= 0;
   const color = up ? 'var(--tape-accent)' : 'var(--tape-danger)';
   return (
@@ -99,7 +98,7 @@ const HeaderCard: React.FC<{ ticker: TapeTicker; name: string; sectorTag: string
           <span className="tape-serif text-[18px]" style={{ color: 'var(--tape-fg)' }}>{name}</span>
           <ExternalLink className="h-3.5 w-3.5" style={{ color: 'var(--tape-fg-faint)' }} />
         </div>
-        <div className="tape-label mt-1">{sectorTag}</div>
+        {sectorTag && <div className="tape-label mt-1">{sectorTag}</div>}
       </div>
       <div className="flex items-center gap-5 flex-shrink-0">
         <Sparkline data={ticker.spark} up={up} w={120} h={36} />
@@ -150,20 +149,40 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth; o
     void run(ticker);
   };
 
-  // For the demo, the header price card uses the baked APP entry as a
-  // fallback and swaps in the live Yahoo quote via useLiveTickers when the
-  // proxy resolves. For non-APP tickers we just don't show a header card
-  // (mock has no data anyway).
-  const liveApp = useLiveTickers(result?.ticker === 'APP' ? ['APP'] : []);
-  const liveAppTicker = liveApp.tickers.find(t => t.yahoo === 'APP') || null;
-  const headerTicker: TapeTicker | null = result && result.ticker === 'APP'
-    ? (liveAppTicker
-        ? { ...liveAppTicker, name: liveAppTicker.name || TICKER_READIN_APP_HEADER.name }
-        : TICKER_READIN_APP_HEADER)
+  // Header price card — runs for EVERY result, not just APP. Fetches live
+  // Yahoo data via useLiveTickers and prefers backend's resolved company
+  // name; falls back to the live-feed name, then the ticker symbol. If the
+  // live fetch doesn't resolve (e.g. Yahoo / Finnhub can't find the slug)
+  // we just don't render the header card.
+  const tickerSlug = result?.yahoo || result?.ticker;
+  const liveQuote = useLiveTickers(tickerSlug ? [tickerSlug] : []);
+  const liveQuoteTicker = liveQuote.tickers.find(t => t.yahoo === tickerSlug) || null;
+  const headerTicker: TapeTicker | null = result && liveQuoteTicker
+    ? { ...liveQuoteTicker, name: liveQuoteTicker.name || result.name || liveQuoteTicker.symbol }
     : null;
   const empty = result && !result.name;
   const showBrief = depth === 'brief' || depth === 'deep';
   const showDeep = depth === 'deep';
+
+  // "Hollow" result: backend echoed the ticker back but every content
+  // section is empty (no whatTheyDo, no pulse, no marquee, no smartMoney,
+  // no risks, no peers, no catalysts). Without an explicit empty-state, the
+  // user sees only the depth toggle floating in space and assumes the app
+  // broke. Detect it here and render a helpful surface below.
+  const hasAnyContent = !!(result && (
+    result.whatTheyDo?.trim() ||
+    result.pulse?.marqueeCitation?.pineconeId ||
+    result.pulse?.bullLine?.trim() ||
+    result.pulse?.bearLine?.trim() ||
+    result.pulse?.priceAction?.trim() ||
+    result.smartMoney?.bulls?.length ||
+    result.smartMoney?.bears?.length ||
+    result.risks?.length ||
+    result.peers?.length ||
+    result.catalysts?.length
+  ));
+  const isHollow = !!result && !empty && !hasAnyContent;
+  const SUGGESTED_TICKERS = ['APP', 'NVDA', 'CRWV', 'MSFT', 'AAPL', 'ORCL'];
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
@@ -197,7 +216,41 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth; o
           />
         )}
 
-        {status === 'idle' && result && !empty && (
+        {status === 'idle' && isHollow && (
+          <div className="tape-fade mx-auto w-full max-w-xl px-6 py-12 text-center">
+            <div className="tape-label mb-2" style={{ color: 'var(--tape-fg-faint)' }}>
+              Ticker · {result!.ticker}
+            </div>
+            <h3 className="tape-serif mb-3 text-2xl" style={{ color: 'var(--tape-fg)' }}>
+              Coverage too thin to summarize
+            </h3>
+            <p className="mx-auto max-w-md text-[13px] leading-relaxed" style={{ color: 'var(--tape-fg-dim)' }}>
+              {result!._meta?.confidenceReason
+                || `We didn't find enough mainstream podcast material on ${result!.ticker} to build a Read-in. Micro-caps and OTC names often slip through the editorial allowlist (Bloomberg Surveillance, Macro Voices, Real Vision, Forward Guidance, etc.).`}
+            </p>
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-2">
+              <span className="tape-label">Try a widely-covered ticker</span>
+              {SUGGESTED_TICKERS
+                .filter(t => t !== result!.ticker?.toUpperCase())
+                .slice(0, 5)
+                .map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => { setTicker(t); void run(t); }}
+                    className="tape-pill px-2.5 py-1"
+                  >
+                    {t}
+                  </button>
+                ))}
+            </div>
+            <div className="mt-6">
+              <TapeResultFooter meta={result!._meta} />
+            </div>
+          </div>
+        )}
+
+        {status === 'idle' && result && !empty && !isHollow && (
           <div className="tape-fade">
             {/* depth toggle + confidence pill */}
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3" style={{ borderColor: 'var(--tape-hairline)' }}>
