@@ -5,7 +5,13 @@
 // persistence). Any /api/tape/* 401 emits an `unauthorized` event; the
 // TapeAuthGate listens and re-shows the password card without a page reload.
 
-import { API_URL } from '../../constants/constants.ts';
+import { TAPE_API_URL } from '../../config/tapeConfig.ts';
+
+// Tape auth must target the Tape-specific backend (alpha / staging / etc.),
+// NOT the app's shared `API_URL`. Otherwise the password POST goes to a
+// host that doesn't serve `/api/tape/*` and 404s. Trailing slash trimmed
+// for safe path concatenation.
+const API_URL = TAPE_API_URL.replace(/\/+$/, '');
 
 const STORAGE_KEY = 'tape.jwt';
 const STORAGE_EXP_KEY = 'tape.jwt.exp';
