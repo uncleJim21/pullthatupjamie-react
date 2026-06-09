@@ -124,7 +124,7 @@ const ForAgentsPage: React.FC = () => {
       <style>
         {`
           .fa-wrap { max-width: 880px; margin: 0 auto; padding: 0 clamp(24px, 5vw, 48px); }
-          .fa-section { padding: clamp(40px, 6vw, 72px) 0; border-top: 1px solid ${T.hairlineSoft}; }
+          .fa-section { padding-top: clamp(40px, 6vw, 72px); padding-bottom: clamp(40px, 6vw, 72px); border-top: 1px solid ${T.hairlineSoft}; }
           .fa-resource {
             display: grid;
             grid-template-columns: minmax(0, 240px) 1fr auto;
