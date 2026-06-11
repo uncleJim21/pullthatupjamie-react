@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp, FileUser, Info } from 'lucide-react';
+import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp, FileUser, Info, Sparkles, Zap } from 'lucide-react';
 import { TAPE_NAME } from '../../config/tapeConfig.ts';
 import type { TapeActionId, TapeDepth, TapeModel } from '../../services/tape/tapeTypes.ts';
 import { useTapeModel } from '../../services/tape/useTapeModel.ts';
+import { useTapeFeed } from '../../services/tape/tapeFeed.ts';
 
 export interface TapeLaunch {
   action: TapeActionId;
@@ -59,7 +60,10 @@ const SECONDARY: SecondaryAction[] = [
   },
 ];
 
-const TICKER_EXAMPLES = ['APP', 'NVDA', 'CRWV'];
+/** Fallback ticker pills shown while the personalized feed loads or if the
+ *  /api/tape/feed call fails. Lets the launcher always have something to
+ *  click. */
+const FALLBACK_TICKERS = ['APP', 'NVDA', 'CRWV'];
 
 /** Small mono PREVIEW pill — used in the launcher next to surfaces we've
  *  marked as canon-only for v1 (Dossier, Narrative). */
@@ -140,12 +144,23 @@ const SynthesisModeToggle: React.FC<{ model: TapeModel; onChange: (m: TapeModel)
 const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> = ({ onLaunch }) => {
   const [query, setQuery] = useState('');
   const [synthModel, setSynthModel] = useTapeModel();
+  const { state: feedState } = useTapeFeed();
 
   const submit = (raw: string) => {
     const v = raw.trim();
     if (!v) return;
     onLaunch({ action: 'readin', ticker: v.toUpperCase() });
   };
+
+  // Feed-derived ticker chips. Always render *something*: when the feed is
+  // loading or errored, fall back to the hardcoded sampler so the launcher
+  // doesn't look empty.
+  const feed = feedState.kind === 'ready' ? feedState.feed : null;
+  const tickers = feed && feed.tickers.length > 0
+    ? feed.tickers
+    : FALLBACK_TICKERS.map(t => ({ ticker: t, reason: 'generic' as const, ready: false, name: undefined }));
+  const briefs = feed?.briefs ?? [];
+  const personaApplied = feed?.personaApplied ?? false;
 
   return (
     <div className="mx-auto w-full max-w-xl px-5 pb-20 pt-16 sm:pt-24">
@@ -188,14 +203,66 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
           </button>
         </div>
         <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-1">
-          <span className="text-xs" style={{ color: 'var(--tape-fg-faint)' }}>Try</span>
-          {TICKER_EXAMPLES.map(label => (
-            <button key={label} type="button" onClick={() => submit(label)} className="tape-pill px-2.5 py-1">
-              {label}
+          <span className="text-xs" style={{ color: 'var(--tape-fg-faint)' }}>
+            {personaApplied ? 'For you' : 'Try'}
+          </span>
+          {tickers.map(t => (
+            <button
+              key={t.ticker}
+              type="button"
+              onClick={() => submit(t.ticker)}
+              className="tape-pill flex items-center gap-1.5 px-2.5 py-1"
+              title={
+                [t.name, t.reason === 'persona' ? 'from your persona' : null, t.ready ? 'cached — instant' : null]
+                  .filter(Boolean)
+                  .join(' · ') || undefined
+              }
+            >
+              {t.reason === 'persona' && (
+                <Sparkles className="h-3 w-3" style={{ color: 'var(--tape-accent)' }} />
+              )}
+              <span>{t.ticker}</span>
+              {t.ready && (
+                <Zap className="h-3 w-3" style={{ color: 'var(--tape-accent)', opacity: 0.7 }} />
+              )}
             </button>
           ))}
         </div>
       </form>
+
+      {/* Personalized brief recommendations. Hidden when backend returns
+          nothing — no point in an empty section header. */}
+      {briefs.length > 0 && (
+        <div className="tape-fade mt-8" style={{ animationDelay: '100ms' }}>
+          <div className="tape-label mb-2.5 flex items-center gap-2 pl-1">
+            <span>{personaApplied ? 'Briefs for you' : 'On the desks'}</span>
+            {personaApplied && (
+              <Sparkles className="h-3 w-3" style={{ color: 'var(--tape-accent)' }} />
+            )}
+          </div>
+          <div className="tape-panel tape-divide overflow-hidden">
+            {briefs.map((b, i) => (
+              <button
+                key={`${b.query}-${i}`}
+                type="button"
+                onClick={() => onLaunch({ action: 'brief', topic: b.query })}
+                className="tape-action flex w-full items-center justify-between px-4 py-3 text-left"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <Newspaper className="h-[16px] w-[16px] flex-shrink-0" style={{ color: 'var(--tape-accent)' }} />
+                  <span className="tape-serif text-[15px] leading-snug" style={{ color: 'var(--tape-fg)' }}>
+                    {b.title}
+                  </span>
+                  {b.personalized && (
+                    <Sparkles className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--tape-accent)', opacity: 0.7 }} />
+                  )}
+                </div>
+                <ArrowRight className="tape-action-arrow h-4 w-4 flex-shrink-0" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Global synthesis mode — set once, applies to every action. Placed
           above the "Or go deeper" list so users see it before drilling in.

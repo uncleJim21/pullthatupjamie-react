@@ -11,7 +11,6 @@ import { printLog } from '../../constants/constants.ts';
 import { TAPE_API_URL } from '../../config/tapeConfig.ts';
 import { getPulseHeader } from '../pulseService.ts';
 import { QuotaExceededError, parseQuotaExceededResponse } from '../../types/errors.ts';
-import { attachAuthHeader, emitAuthEvent } from './tapeAuth.ts';
 import type { TapeCitation } from './tapeTypes.ts';
 
 const PULL_ENTITLEMENT = 'jamie-pull';
@@ -24,15 +23,52 @@ const TAPE_ENTITLEMENT = 'tape';
  *  `API_URL` for Tape traffic — use this. */
 const API_URL = TAPE_API_URL.replace(/\/+$/, '');
 
+/** Tape rides the main-app session: it reads the same `auth_token` written by
+ *  AuthService and dispatches a window event on 401 that TapeAccessGate
+ *  listens for. No Tape-specific token, no sessionStorage. */
 const getAuthToken = (): string | null => localStorage.getItem('auth_token');
+
+const attachAuthHeader = (headers: Record<string, string> = {}): Record<string, string> => {
+  const t = getAuthToken();
+  return t ? { ...headers, Authorization: `Bearer ${t}` } : headers;
+};
+
+/** Event name TapeAccessGate listens for. Dispatched on any 401 from a
+ *  /api/tape/* call so mid-session expiry kicks the user back to sign-in
+ *  without a page reload. */
+export const TAPE_UNAUTHORIZED_EVENT = 'tape:unauthorized';
 
 export const delay = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms));
 
+/** RFC-7807 problem body backend returns on 403 (not entitled). Exposed
+ *  so TapeAccessGate's 403 branch can render `detail` + `requestAccessUrl`
+ *  verbatim. Status / type are validated by the caller. */
+export interface TapeProblem {
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  requestAccessUrl?: string;
+}
+
+/** Error thrown by `tapeFetch` on a 403 carrying an RFC-7807 body. Caught
+ *  by TapeAccessGate's entitlement probe so the not-entitled UX can render
+ *  the server-supplied detail / request-access link. */
+export class TapeNotEntitledError extends Error {
+  problem: TapeProblem;
+  constructor(problem: TapeProblem) {
+    super(problem.detail || problem.title || 'Not entitled');
+    this.name = 'TapeNotEntitledError';
+    this.problem = problem;
+  }
+}
+
 /**
- * Single fetch helper for every /api/tape/* call. Attaches the Tape demo
- * Bearer JWT, surfaces 401 via `emitAuthEvent('unauthorized')` (the
- * TapeAuthGate listens), and converts 429 into the project-standard
- * QuotaExceededError so existing handling reuses.
+ * Single fetch helper for every /api/tape/* call. Attaches the main-app
+ * Bearer token, dispatches a `tape:unauthorized` window event on 401 (the
+ * TapeAccessGate listens), surfaces 403 as a `TapeNotEntitledError`, and
+ * converts 429 into the project-standard QuotaExceededError so existing
+ * handling reuses.
  *
  * Pass `json` to send a JSON body; otherwise use `body` for raw streams.
  */
@@ -49,8 +85,13 @@ export async function tapeFetch<T = unknown>(
     body: json !== undefined ? JSON.stringify(json) : body,
   });
   if (res.status === 401) {
-    emitAuthEvent('unauthorized');
+    window.dispatchEvent(new Event(TAPE_UNAUTHORIZED_EVENT));
     throw new Error('Unauthorized');
+  }
+  if (res.status === 403) {
+    let problem: TapeProblem = { status: 403 };
+    try { problem = { ...problem, ...(await res.json() as TapeProblem) }; } catch { /* non-JSON body */ }
+    throw new TapeNotEntitledError(problem);
   }
   if (res.status === 429) {
     throw new QuotaExceededError(await parseQuotaExceededResponse(res, TAPE_ENTITLEMENT));
@@ -58,7 +99,52 @@ export async function tapeFetch<T = unknown>(
   if (!res.ok) {
     throw new Error(`${path}: ${res.status} ${res.statusText}`);
   }
-  return res.json() as Promise<T>;
+  // 204 No Content / empty body — callers that don't need a payload (e.g.
+  // request-access POST) get `undefined` instead of a JSON-parse crash.
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
+}
+
+/** POST /api/tape/request-access — body carries the user's free-text intent
+ *  ("what I'd use The Tape for"). Backend identifies the user via the
+ *  attached auth token; client doesn't need to repeat email/identity in the
+ *  body. Returns silently on success (200 / 204); throws on non-2xx. */
+export async function requestTapeAccess(intent: string): Promise<void> {
+  await tapeFetch('/api/tape/request-access', {
+    method: 'POST',
+    json: { intent },
+  });
+}
+
+/** Result of the entitlement probe TapeAccessGate runs on mount and after a
+ *  fresh sign-in. The probe rides the existing /api/tape/feed endpoint —
+ *  cheap (60s TTL cache on the backend) and returns useful payload for the
+ *  feed UI in Module 3, so the response isn't wasted. */
+export type TapeProbeResult =
+  | { state: 'entitled' }
+  | { state: 'unauthenticated' }
+  | { state: 'not-entitled'; problem: TapeProblem }
+  | { state: 'error'; error: Error };
+
+/** Hit GET /api/tape/feed and classify the response into the gate's three
+ *  branches (plus a transient `error` state for network blips). Callers
+ *  short-circuit to `unauthenticated` themselves when no auth_token is
+ *  present, so this is only invoked once we have a token to probe with. */
+export async function probeTapeEntitlement(): Promise<TapeProbeResult> {
+  try {
+    await tapeFetch('/api/tape/feed');
+    return { state: 'entitled' };
+  } catch (err) {
+    if (err instanceof TapeNotEntitledError) {
+      return { state: 'not-entitled', problem: err.problem };
+    }
+    if (err instanceof Error && err.message === 'Unauthorized') {
+      return { state: 'unauthenticated' };
+    }
+    return { state: 'error', error: err instanceof Error ? err : new Error(String(err)) };
+  }
 }
 
 /** Confidence tier returned by every `synthesize` response. Unified across

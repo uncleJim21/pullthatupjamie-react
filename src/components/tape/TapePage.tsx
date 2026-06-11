@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { UserCircle2 } from 'lucide-react';
 import { AudioControllerProvider } from '../../context/AudioControllerContext.tsx';
 import { TAPE_NAME } from '../../config/tapeConfig.ts';
 import TapeCommandSurface, { type TapeLaunch } from './TapeCommandSurface.tsx';
@@ -9,10 +10,21 @@ import BriefView from './actions/BriefView.tsx';
 import SplitView from './actions/SplitView.tsx';
 import NarrativeView from './actions/NarrativeView.tsx';
 import ReadInView from './actions/ReadInView.tsx';
-import TapeAuthGate from './TapeAuthGate.tsx';
-import { signOut } from '../../services/tape/tapeAuth.ts';
+import TapeAccessGate from './TapeAccessGate.tsx';
+import TapePersonaDrawer from './TapePersonaDrawer.tsx';
+import { TAPE_UNAUTHORIZED_EVENT } from '../../services/tape/tapeClient.ts';
+import { TAPE_FEED_INVALIDATE_EVENT } from '../../services/tape/tapeFeed.ts';
+import { useTapePersona } from '../../services/tape/tapePersona.ts';
+import { clearUserData } from '../../utils/signOut.ts';
+import { notifyAuthStateChanged } from '../../hooks/useSubscriptionStatus.ts';
 import type { TapeDepth } from '../../services/tape/tapeTypes.ts';
 import '../../styles/tape.css';
+
+/** Tracks whether the persona drawer has been auto-opened for this user
+ *  already, so we don't re-prompt on every reload. Cleared by clearUserData
+ *  on sign-out (it's a USER_SPECIFIC_KEY pattern but we manage it locally
+ *  since main-app sign-out util doesn't know about Tape keys). */
+const PERSONA_PROMPT_KEY = 'tape.persona.promptShown';
 
 const ACTION_TITLES: Record<TapeLaunch['action'], string> = {
   dossier: 'Dossier (preview)',
@@ -74,6 +86,8 @@ const stopAllTapeAudio = () => {
 
 const TapePage: React.FC = () => {
   const [launch, setLaunch] = useState<TapeLaunch | null>(launchFromUrl);
+  const [personaOpen, setPersonaOpen] = useState(false);
+  const { state: personaState } = useTapePersona();
 
   const goHome = useCallback(() => {
     stopAllTapeAudio();
@@ -82,7 +96,28 @@ const TapePage: React.FC = () => {
 
   const handleSignOut = useCallback(() => {
     stopAllTapeAudio();
-    signOut();
+    try { localStorage.removeItem(PERSONA_PROMPT_KEY); } catch { /* noop */ }
+    clearUserData();
+    notifyAuthStateChanged();
+    window.dispatchEvent(new Event(TAPE_UNAUTHORIZED_EVENT));
+  }, []);
+
+  // Auto-open the persona drawer the FIRST time a signed-in user lands on
+  // /tape with an empty persona. Subsequent loads don't re-prompt — the
+  // user can still open it from the top bar. Cleared on sign-out so a new
+  // user sees the prompt.
+  useEffect(() => {
+    if (personaState.kind !== 'ready') return;
+    if (personaState.value.trim().length > 0) return;
+    try {
+      if (localStorage.getItem(PERSONA_PROMPT_KEY)) return;
+      localStorage.setItem(PERSONA_PROMPT_KEY, '1');
+    } catch { /* private-browsing — skip the once-only guard, accept re-prompts */ }
+    setPersonaOpen(true);
+  }, [personaState]);
+
+  const handlePersonaSaved = useCallback(() => {
+    window.dispatchEvent(new Event(TAPE_FEED_INVALIDATE_EVENT));
   }, []);
 
   useEffect(() => {
@@ -102,7 +137,7 @@ const TapePage: React.FC = () => {
   }, [launch]);
 
   return (
-    <TapeAuthGate>
+    <TapeAccessGate>
     <AudioControllerProvider>
       <Helmet>
         <title>{TAPE_NAME}: macro commentary intelligence</title>
@@ -129,10 +164,20 @@ const TapePage: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               type="button"
+              onClick={() => setPersonaOpen(true)}
+              className="inline-flex items-center gap-1.5 text-[12px] transition-colors hover:opacity-80"
+              style={{ color: 'var(--tape-fg-faint)' }}
+              title="Edit your persona"
+            >
+              <UserCircle2 className="h-3.5 w-3.5" />
+              persona
+            </button>
+            <button
+              type="button"
               onClick={handleSignOut}
               className="text-[12px] transition-colors hover:opacity-80"
               style={{ color: 'var(--tape-fg-faint)' }}
-              title="Sign out of the Tape demo"
+              title="Sign out"
             >
               sign out
             </button>
@@ -144,8 +189,13 @@ const TapePage: React.FC = () => {
 
         {launch ? <ActiveView launch={launch} onBack={goHome} /> : <TapeCommandSurface onLaunch={setLaunch} />}
       </div>
+      <TapePersonaDrawer
+        isOpen={personaOpen}
+        onClose={() => setPersonaOpen(false)}
+        onSaved={handlePersonaSaved}
+      />
     </AudioControllerProvider>
-    </TapeAuthGate>
+    </TapeAccessGate>
   );
 };
 
