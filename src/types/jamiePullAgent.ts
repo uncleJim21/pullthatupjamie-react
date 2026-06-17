@@ -77,6 +77,10 @@ export interface AgentTextEvent {
 export interface AgentDoneEvent {
   sessionId: string;
   model: string;
+  /** ISO 639-1 language Jamie answered in (e.g. "en", "de"). Additive field —
+   *  may be absent on older backends. Used to decide whether a clip's audio
+   *  language differs from the answer language (source-language badge). */
+  responseLanguage?: string;
   rounds: number;
   toolCalls: { name: string; resultCount: number; latencyMs: number }[];
   tokens: { input: number; output: number };

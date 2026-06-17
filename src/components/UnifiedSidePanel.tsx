@@ -12,6 +12,7 @@ import { FRONTEND_URL } from '../config/urls.js';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
 import { QuotaExceededError } from '../types/errors.ts';
 import QuotaExceededModal, { QuotaExceededData } from './QuotaExceededModal.tsx';
+import { getLanguageBadge, shouldShowLanguageBadge } from '../utils/languageBadge.ts';
 
 export type AnalysisCardJson = {
   pineconeId: string;
@@ -21,6 +22,10 @@ export type AnalysisCardJson = {
    *  an "open in Galaxy" arrow that opens `/app?view=galaxy&q=<quote>` in a
    *  new tab so the user can explore nearest-neighbor clips. */
   quote?: string;
+  /** ISO 639-1 source/audio language of the clip (from the podcast feed
+   *  metadata), e.g. "de". When it differs from the answer language the pill
+   *  renders a "Translated from <language>" badge. Absent → no badge. */
+  language?: string;
 };
 
 type ParsedAnalysisPart =
@@ -226,10 +231,22 @@ export const InlineCardMention: React.FC<{
   onCopyLink?: (pineconeId: string) => void;
   /** When true, renders a white breathing glow to signal this clip is currently playing. */
   isActive?: boolean;
-}> = ({ card, onClick, onCopyLink, isActive }) => {
+  /** ISO 639-1 language the surrounding answer is shown in. When it differs
+   *  from `card.language`, the pill shows a "Translated from <language>" chip. */
+  answerLang?: string;
+}> = ({ card, onClick, onCopyLink, isActive, answerLang }) => {
   const title = card.title || 'Open source';
   const imageUrl = card.episodeImage;
   const [copied, setCopied] = React.useState(false);
+
+  // Source-language badge: only when both languages are known and differ, so a
+  // same-language read or an unlabeled (English-default) feed never mislabels.
+  const showLangBadge = shouldShowLanguageBadge(card.language, answerLang);
+  const clipBadge = showLangBadge ? getLanguageBadge(card.language) : undefined;
+  const answerBadge = showLangBadge ? getLanguageBadge(answerLang) : undefined;
+  const langTooltip = clipBadge
+    ? `Audio is in ${clipBadge.name}; quote shown translated${answerBadge ? ` to ${answerBadge.name}` : ''}.`
+    : undefined;
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -272,6 +289,16 @@ export const InlineCardMention: React.FC<{
         />
       )}
       <span className="text-xs text-gray-200 truncate min-w-0">{title}</span>
+      {clipBadge && (
+        <span
+          className="inline-flex items-center gap-1 flex-shrink-0 ml-0.5 px-1.5 py-0.5 rounded-sm bg-white/[0.06] border border-white/10 text-[10px] text-gray-400 whitespace-nowrap"
+          title={langTooltip}
+          aria-label={langTooltip}
+        >
+          {clipBadge.flag && <span aria-hidden="true">{clipBadge.flag}</span>}
+          <span>Translated from {clipBadge.name}</span>
+        </span>
+      )}
       {card.quote && (
         <a
           href={`${FRONTEND_URL}/app?view=galaxy&q=${encodeURIComponent(card.quote)}`}
