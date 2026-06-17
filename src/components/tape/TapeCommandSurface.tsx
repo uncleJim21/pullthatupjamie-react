@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp, FileUser, Info, Sparkles, Zap } from 'lucide-react';
+import { Search, ArrowRight, Newspaper, GitCompare, TrendingUp, FileUser, Info } from 'lucide-react';
 import { TAPE_NAME } from '../../config/tapeConfig.ts';
 import type { TapeActionId, TapeDepth, TapeModel } from '../../services/tape/tapeTypes.ts';
 import { useTapeModel } from '../../services/tape/useTapeModel.ts';
@@ -206,27 +206,32 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
           <span className="text-xs" style={{ color: 'var(--tape-fg-faint)' }}>
             {personaApplied ? 'For you' : 'Try'}
           </span>
-          {tickers.map(t => (
-            <button
-              key={t.ticker}
-              type="button"
-              onClick={() => submit(t.ticker)}
-              className="tape-pill flex items-center gap-1.5 px-2.5 py-1"
-              title={
-                [t.name, t.reason === 'persona' ? 'from your persona' : null, t.ready ? 'cached — instant' : null]
-                  .filter(Boolean)
-                  .join(' · ') || undefined
-              }
-            >
-              {t.reason === 'persona' && (
-                <Sparkles className="h-3 w-3" style={{ color: 'var(--tape-accent)' }} />
-              )}
-              <span>{t.ticker}</span>
-              {t.ready && (
-                <Zap className="h-3 w-3" style={{ color: 'var(--tape-accent)', opacity: 0.7 }} />
-              )}
-            </button>
-          ))}
+          {tickers.map(t => {
+            const isPersona = t.reason === 'persona';
+            return (
+              <button
+                key={t.ticker}
+                type="button"
+                onClick={() => submit(t.ticker)}
+                className="tape-pill px-2.5 py-1"
+                style={isPersona ? {
+                  // Subtle accent tint for persona-driven picks. No icon —
+                  // the styling does the signaling.
+                  borderColor: 'var(--tape-accent-line)',
+                  color: 'var(--tape-fg)',
+                } : undefined}
+                // "cached — instant" stays in the tooltip for power users
+                // but doesn't earn a visible badge on every pill.
+                title={
+                  [t.name, isPersona ? 'from your brief' : null, t.ready ? 'cached — instant' : null]
+                    .filter(Boolean)
+                    .join(' · ') || undefined
+                }
+              >
+                {t.ticker}
+              </button>
+            );
+          })}
         </div>
       </form>
 
@@ -234,11 +239,8 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
           nothing — no point in an empty section header. */}
       {briefs.length > 0 && (
         <div className="tape-fade mt-8" style={{ animationDelay: '100ms' }}>
-          <div className="tape-label mb-2.5 flex items-center gap-2 pl-1">
-            <span>{personaApplied ? 'Briefs for you' : 'On the desks'}</span>
-            {personaApplied && (
-              <Sparkles className="h-3 w-3" style={{ color: 'var(--tape-accent)' }} />
-            )}
+          <div className="tape-label mb-2.5 pl-1">
+            {personaApplied ? 'Briefs for you' : 'On the desks'}
           </div>
           <div className="tape-panel tape-divide overflow-hidden">
             {briefs.map((b, i) => (
@@ -246,16 +248,19 @@ const TapeCommandSurface: React.FC<{ onLaunch: (launch: TapeLaunch) => void }> =
                 key={`${b.query}-${i}`}
                 type="button"
                 onClick={() => onLaunch({ action: 'brief', topic: b.query })}
-                className="tape-action flex w-full items-center justify-between px-4 py-3 text-left"
+                className="tape-action relative flex w-full items-center justify-between px-4 py-3 text-left"
+                style={b.personalized ? {
+                  // Tiny accent rail on the left edge signals "this one's
+                  // yours" without resorting to an icon.
+                  boxShadow: 'inset 3px 0 0 0 var(--tape-accent-line)',
+                } : undefined}
+                title={b.personalized ? 'From your read' : undefined}
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <Newspaper className="h-[16px] w-[16px] flex-shrink-0" style={{ color: 'var(--tape-accent)' }} />
                   <span className="tape-serif text-[15px] leading-snug" style={{ color: 'var(--tape-fg)' }}>
                     {b.title}
                   </span>
-                  {b.personalized && (
-                    <Sparkles className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--tape-accent)', opacity: 0.7 }} />
-                  )}
                 </div>
                 <ArrowRight className="tape-action-arrow h-4 w-4 flex-shrink-0" />
               </button>

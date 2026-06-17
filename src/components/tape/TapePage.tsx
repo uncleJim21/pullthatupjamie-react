@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { UserCircle2 } from 'lucide-react';
 import { AudioControllerProvider } from '../../context/AudioControllerContext.tsx';
 import { TAPE_NAME } from '../../config/tapeConfig.ts';
 import TapeCommandSurface, { type TapeLaunch } from './TapeCommandSurface.tsx';
@@ -165,12 +164,11 @@ const TapePage: React.FC = () => {
             <button
               type="button"
               onClick={() => setPersonaOpen(true)}
-              className="inline-flex items-center gap-1.5 text-[12px] transition-colors hover:opacity-80"
+              className="text-[12px] transition-colors hover:opacity-80"
               style={{ color: 'var(--tape-fg-faint)' }}
-              title="Edit your persona"
+              title="Brief the tape"
             >
-              <UserCircle2 className="h-3.5 w-3.5" />
-              persona
+              briefing
             </button>
             <button
               type="button"
