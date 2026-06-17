@@ -3,7 +3,7 @@ import { getDossier } from '../../../services/tape/index.ts';
 import type { DossierResult } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, PreviewPanel, PreviewBanner } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, WebSourcesNote, PreviewPanel, PreviewBanner } from '../TapeActionScaffold.tsx';
 import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
 type Status = 'idle' | 'loading' | 'error';
@@ -112,10 +112,11 @@ const DossierView: React.FC<{ initialPerson?: string; onBack: () => void }> = ({
             {/* header */}
             <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-4" style={{ borderColor: 'var(--tape-hairline)' }}>
               <h2 className="tape-serif text-2xl" style={{ color: 'var(--tape-fg)' }}>{result.person}</h2>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <span className="tape-num text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>
                   {result.topics.reduce((a, t) => a + t.citations.length, 0)} cites · {result.topics.length} topics · {result.appearances.length} shows
                 </span>
+                <WebSourcesNote meta={result._meta} />
                 <ConfidencePill meta={result._meta} />
               </div>
             </div>

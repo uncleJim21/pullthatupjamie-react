@@ -15,19 +15,43 @@ import type { TapeResponseMeta } from './tapeClient.ts';
 export type TapeModel = 'quality' | 'fast';
 
 /** Atomic cited evidence unit. One quoted paragraph + everything the UI needs
- *  to play it, time-link it, and attribute it. */
+ *  to play it, time-link it, and attribute it.
+ *
+ *  Two kinds:
+ *  - `sourceType: 'podcast'` (default when absent — back-compat) → carries
+ *    `audioUrl` + `startTime` + `endTime`; rendered as an audio clip.
+ *  - `sourceType: 'web'` → carries `url` + optional `favicon` instead;
+ *    rendered as a link card (opens in a new tab). No audio fields.
+ *
+ *  Audio fields are marked optional so the web shape type-checks; renderers
+ *  branch on `sourceType` before reading them. See
+ *  `docs/tape-backend-*` (web-search blending memo) for the contract. */
 export interface TapeCitation {
   pineconeId: string;
   text: string;
   /** Resolved person attribution. May be empty when the corpus can't resolve a speaker. */
   speaker?: string;
+  /** Title — podcast: episode title; web: page title. Always present. */
   episodeTitle: string;
-  creator: string; // publisher / show name
-  episodeImage: string;
-  audioUrl: string;
-  startTime: number; // seconds
-  endTime: number;
+  /** Display name — podcast: show/creator; web: domain (e.g. "bloomberg.com"). */
+  creator: string;
+  /** Episode artwork. Web citations don't have one — fall back to `favicon`. */
+  episodeImage?: string;
+  /** Podcast-only. Absent for `sourceType === 'web'`. */
+  audioUrl?: string;
+  /** Podcast-only. Absent for `sourceType === 'web'`. */
+  startTime?: number;
+  /** Podcast-only. Absent for `sourceType === 'web'`. */
+  endTime?: number;
   publishedDate?: string; // ISO
+
+  /** Discriminator. `undefined` is treated as `'podcast'` for back-compat —
+   *  every citation the backend has emitted to date is implicitly podcast. */
+  sourceType?: 'podcast' | 'web';
+  /** Web-only. Always present and non-empty for `sourceType === 'web'`. */
+  url?: string;
+  /** Web-only. Favicon URL for the source domain. May be absent or unreachable. */
+  favicon?: string;
 }
 
 /** A ClipMeta (from get-hierarchy) maps cleanly into a TapeCitation. */
@@ -218,11 +242,10 @@ export interface ReadInInput {
    *  (`quality` if unset). Plumbed through to `SynthesizeRequest.model`. */
   model?: TapeModel;
 }
-/** Dated catalyst bullet (S&P inclusion, short-report release, earnings, etc.). */
-export interface ReadInCatalyst {
-  date: string; // ISO or 'YYYY-MM' for soft dates
-  label: string;
-}
+/** Dated catalyst bullet (S&P inclusion, short-report release, earnings, etc.).
+ *  Backend currently sends either a structured `{date, label}` object or a
+ *  plain string when the catalyst is dateless. Renderer handles both. */
+export type ReadInCatalyst = string | { date: string; label: string };
 /** The 30-second answer surfaced at Quick depth. */
 export interface ReadInPulse {
   bullLine: string;

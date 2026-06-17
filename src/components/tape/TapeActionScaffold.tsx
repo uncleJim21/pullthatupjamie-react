@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Loader2, SearchX, AlertTriangle, RefreshCw, ArrowLeft, Play, Pause, Info } from 'lucide-react';
+import { Loader2, SearchX, AlertTriangle, RefreshCw, ArrowLeft, Play, Pause, Info, ExternalLink, Globe } from 'lucide-react';
 // Loader2 doubles as the audio-loading spinner for TapeInlineClip — already
 // imported for TapeStatus.
 import type { TapeResponseMeta } from '../../services/tape/tapeClient.ts';
@@ -199,14 +199,89 @@ export const ConfidencePill: React.FC<{ meta?: TapeResponseMeta }> = ({ meta }) 
 };
 
 /**
- * Inline playable clip pill — Tape-aesthetic counterpart to JamiePullAgent's
+ * Subtle "Includes web sources" header note. Rendered next to
+ * `ConfidencePill` whenever `meta.webAugmented === true` — backend sets
+ * that flag when the podcast corpus was thin/stale on the query and the
+ * synthesis blended in web search results. Quiet on purpose: web is
+ * lower-trust by design and the note is informational, not alarming.
+ *
+ * Renders nothing when the flag isn't set (back-compat with older
+ * responses).
+ */
+export const WebSourcesNote: React.FC<{ meta?: TapeResponseMeta }> = ({ meta }) => {
+  if (!meta?.webAugmented) return null;
+  return (
+    <span
+      className="tape-mono inline-flex items-center gap-1 text-[10px] uppercase tracking-wide"
+      style={{ color: 'var(--tape-fg-faint)' }}
+      title="Web results were blended in to fill gaps in the podcast corpus. Confidence may be downgraded — web is less vetted than the corpus."
+      aria-label="This result includes web sources"
+    >
+      <Globe className="h-3 w-3" aria-hidden />
+      Includes web sources
+    </span>
+  );
+};
+
+/**
+ * Inline citation pill — Tape-aesthetic counterpart to JamiePullAgent's
  * InlineCardMention. Sits inline in prose, replacing a `{{clip:id}}` token.
- * Click toggles play via the shared AudioController; visually shifts to the
- * accent color when this clip is the active track.
+ *
+ * Two kinds, branched on `citation.sourceType`:
+ *   - 'web' → renders an anchor with an ExternalLink icon (or favicon if
+ *     present); clicking opens the source URL in a new tab. No audio.
+ *   - 'podcast' (default when absent) → renders a button that toggles
+ *     play via the shared AudioController; visually shifts to the accent
+ *     color when this clip is the active track.
  */
 export const TapeInlineClip: React.FC<{ citation: TapeCitation }> = ({ citation }) => {
+  const isWeb = citation.sourceType === 'web';
   const { playTrack, togglePlay, currentTrack, isPlaying, isBuffering } = useAudioController();
   const { setActive } = useTapeNowPlaying();
+  const [faviconFailed, setFaviconFailed] = useState(false);
+
+  // Short label for inline density. Prefer the publisher / domain (most
+  // users recognize "Bloomberg" / "Macro Voices" / "bloomberg.com"); fall
+  // back to a clipped title; final fallback is generic.
+  const label = citation.creator || citation.episodeTitle?.slice(0, 28) || (isWeb ? 'source' : 'clip');
+
+  // ─── Web branch — anchor opens URL in a new tab. ──────────────────
+  if (isWeb) {
+    if (!citation.url) return null; // backend guarantees url for web; safety.
+    return (
+      <a
+        href={citation.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="tape-mono mx-0.5 inline-flex items-baseline gap-1 rounded-full border px-1.5 py-px text-[10px] align-baseline transition-colors"
+        style={{
+          borderColor: 'var(--tape-hairline-strong)',
+          color: 'var(--tape-fg-dim)',
+          background: 'transparent',
+          verticalAlign: 'baseline',
+          textDecoration: 'none',
+        }}
+        title={`Open ${citation.episodeTitle || citation.creator || 'source'} in a new tab`}
+        aria-label={`Open source in a new tab: ${label}`}
+      >
+        {citation.favicon && !faviconFailed ? (
+          <img
+            src={citation.favicon}
+            alt=""
+            loading="lazy"
+            onError={() => setFaviconFailed(true)}
+            className="h-2.5 w-2.5 translate-y-[1px] object-contain"
+          />
+        ) : (
+          <Globe className="h-2.5 w-2.5 translate-y-[1px]" aria-hidden />
+        )}
+        <span>{label}</span>
+        <ExternalLink className="h-2.5 w-2.5 translate-y-[1px] opacity-70" aria-hidden />
+      </a>
+    );
+  }
+
+  // ─── Podcast branch — existing audio-clip behavior. ───────────────
   const isActive = currentTrack?.id === citation.pineconeId;
   const isThisPlaying = isActive && isPlaying;
   const isThisLoading = isActive && isBuffering && !isPlaying;
@@ -216,6 +291,7 @@ export const TapeInlineClip: React.FC<{ citation: TapeCitation }> = ({ citation 
     e.stopPropagation();
     if (isThisLoading) return;
     if (isActive) { void togglePlay(); return; }
+    if (!citation.audioUrl) return; // defensive; podcast citations always have one
     setActive(citation);
     void playTrack({
       id: citation.pineconeId,
@@ -225,10 +301,6 @@ export const TapeInlineClip: React.FC<{ citation: TapeCitation }> = ({ citation 
     });
   };
 
-  // Short label for inline density. Prefer the publisher (most users
-  // recognize "Bloomberg" / "Macro Voices"); fall back to a clipped episode
-  // title; final fallback is just "clip".
-  const label = citation.creator || citation.episodeTitle?.slice(0, 28) || 'clip';
   return (
     <button
       type="button"

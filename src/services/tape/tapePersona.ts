@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import PreferencesService from '../preferencesService.ts';
+import { TAPE_USING_LOCAL_BACKEND } from '../../config/tapeConfig.ts';
 import { tapeFetch } from './tapeClient.ts';
 
 const TAPE_PERSONA_FIELD = 'tapePersona';
@@ -96,7 +97,11 @@ export function useTapePersona(): UseTapePersonaResult {
     }
     setState({ kind: 'loading' });
     try {
-      const res = await PreferencesService.getPreferences(token);
+      // Route persona preferences traffic to the same backend Tape is
+      // talking to whenever we're on a local-dev override — closes the
+      // write/read loop without prod. Prod / merge: TAPE_USING_LOCAL_BACKEND
+      // is false and these calls fall through to the main-app API_URL.
+      const res = await PreferencesService.getPreferences(token, TAPE_USING_LOCAL_BACKEND);
       const value = (res.preferences?.[TAPE_PERSONA_FIELD] as string | undefined) || '';
       setState({ kind: 'ready', value, updatedAt: Date.now() });
     } catch (err) {
@@ -115,12 +120,12 @@ export function useTapePersona(): UseTapePersonaResult {
       // Read-modify-write: PreferencesService PUTs the entire preferences
       // object, so we must merge into the current snapshot or non-Tape
       // keys (scheduled slots, signatures, etc.) get clobbered.
-      const current = await PreferencesService.getPreferences(token);
+      const current = await PreferencesService.getPreferences(token, TAPE_USING_LOCAL_BACKEND);
       const merged: Record<string, any> = { ...current.preferences, [TAPE_PERSONA_FIELD]: trimmed };
       if (structured !== undefined) {
         merged[TAPE_PERSONA_STRUCTURED_FIELD] = structured;
       }
-      const updated = await PreferencesService.updatePreferences(token, merged);
+      const updated = await PreferencesService.updatePreferences(token, merged, TAPE_USING_LOCAL_BACKEND);
       const saved = (updated.preferences?.[TAPE_PERSONA_FIELD] as string | undefined) || trimmed;
       setState({ kind: 'ready', value: saved, updatedAt: Date.now() });
       return saved;

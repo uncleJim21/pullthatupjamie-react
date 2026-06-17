@@ -1,4 +1,5 @@
 import { API_URL } from '../constants/constants.ts';
+import { TAPE_API_URL } from '../config/tapeConfig.ts';
 
 export interface UserPreferences {
   jamieFullAutoEnabled?: boolean;
@@ -73,12 +74,25 @@ export function generateDefaultScheduledSlots(): ScheduledSlot[] {
 class PreferencesService {
   private static readonly BASE_URL = API_URL;
 
+  /** Resolve the base URL for a single call. Default routes to the
+   *  main-app `API_URL`. When the optional `useTapeBackend` flag is
+   *  true (only Tape persona traffic sets this, and only while
+   *  `TAPE_USING_LOCAL_BACKEND` is on), the call goes to the Tape
+   *  backend instead — so a local Tape server can read the persona
+   *  it just wrote without round-tripping prod. */
+  private static resolveBaseUrl(useTapeBackend?: boolean): string {
+    return useTapeBackend ? TAPE_API_URL : this.BASE_URL;
+  }
+
   /**
-   * Get user preferences from the backend
+   * Get user preferences from the backend.
+   * @param useTapeBackend Optional. When true, hits `TAPE_API_URL`
+   * instead of the main-app `API_URL`. Tape persona reads set this
+   * during local-dev so the same backend that writes prefs reads them.
    */
-  static async getPreferences(authToken: string): Promise<PreferencesResponse> {
+  static async getPreferences(authToken: string, useTapeBackend = false): Promise<PreferencesResponse> {
     try {
-      const response = await fetch(`${this.BASE_URL}/api/preferences`, {
+      const response = await fetch(`${this.resolveBaseUrl(useTapeBackend)}/api/preferences`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -112,11 +126,15 @@ class PreferencesService {
   }
 
   /**
-   * Update user preferences in the backend
+   * Update user preferences in the backend.
+   * @param useTapeBackend Optional. When true, hits `TAPE_API_URL`
+   * instead of the main-app `API_URL`. Tape persona writes set this
+   * during local-dev so the local Tape backend can read its own writes.
    */
   static async updatePreferences(
-    authToken: string, 
-    preferences: UserPreferences
+    authToken: string,
+    preferences: UserPreferences,
+    useTapeBackend = false
   ): Promise<PreferencesResponse> {
     try {
       const requestData: PreferencesRequest = {
@@ -124,7 +142,7 @@ class PreferencesService {
         schemaVersion: CURRENT_SCHEMA_VERSION
       };
 
-      const response = await fetch(`${this.BASE_URL}/api/preferences`, {
+      const response = await fetch(`${this.resolveBaseUrl(useTapeBackend)}/api/preferences`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${authToken}`,

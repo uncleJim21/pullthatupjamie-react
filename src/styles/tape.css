@@ -41,6 +41,10 @@
 
   /* semantic */
   --tape-danger: oklch(0.64 0.15 28);
+
+  /* row hover — a few stops brighter than `--tape-bg-raised` so the
+     hover state actually reads on a quick scan. Used by `.tape-cite`. */
+  --tape-bg-hover: oklch(0.25 0.008 160);
 }
 
 .tape-root {
@@ -169,7 +173,7 @@
 
 /* ── citation row ───────────────────────────────────────────────────────── */
 .tape-cite { transition: background 0.16s; }
-.tape-cite:hover { background: var(--tape-bg-raised); }
+.tape-cite:hover { background: var(--tape-bg-hover); }
 .tape-cite--active { background: var(--tape-accent-wash); }
 .tape-cite__play {
   border: 1px solid var(--tape-hairline-strong);
@@ -179,6 +183,39 @@
 }
 .tape-cite__play:hover { color: var(--tape-accent); border-color: var(--tape-accent-dim); }
 .tape-cite--active .tape-cite__play { color: var(--tape-accent); border-color: var(--tape-accent); }
+
+/* Whole-row click targets. Both kinds (web and podcast) get:
+   - cursor: pointer (set inline on the elements)
+   - a brighter bg-lift on hover (above)
+   - a focus-visible ring for keyboard users
+   - one element on the row that shifts color on hover so the eye
+     locks onto the affordance, not just the surface. */
+.tape-cite--web:focus-visible,
+.tape-cite--podcast:focus-visible {
+  outline: 1px solid var(--tape-accent-line);
+  outline-offset: -1px;
+}
+
+/* Web chevron — slides up-and-out plus picks up accent green on hover.
+   Matches the up-right arrow's implied "go" direction. */
+.tape-cite__chevron {
+  transition: color 0.16s, transform 0.16s;
+}
+.tape-cite--web:hover .tape-cite__chevron {
+  color: var(--tape-accent);
+  transform: translate(2px, -2px);
+}
+
+/* Podcast play button — glow accent green when the user hovers the
+   row body (not just the button itself). The play icon is the visual
+   anchor of "this clip will play" — making it bloom on row hover is
+   the same conversation we have with the web chevron. No slide on the
+   play icon: it's on the left, and translating it would feel
+   directionless ("play" isn't a direction). */
+.tape-cite--podcast:hover .tape-cite__play {
+  color: var(--tape-accent);
+  border-color: var(--tape-accent-dim);
+}
 
 /* the verbatim quote: mono — the one earned use, signals exact transcription */
 .tape-quote {

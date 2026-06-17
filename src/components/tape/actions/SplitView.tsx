@@ -3,7 +3,7 @@ import { getSplit } from '../../../services/tape/index.ts';
 import type { SplitResult, SplitSide } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, WebSourcesNote } from '../TapeActionScaffold.tsx';
 import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
 type Status = 'idle' | 'loading' | 'error';
@@ -134,7 +134,10 @@ const SplitView: React.FC<{ initialA?: string; initialB?: string; initialTopic?:
           <div className="tape-fade">
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3" style={{ borderColor: 'var(--tape-hairline)' }}>
               <span className="tape-tag px-1.5 py-0.5">{result.topic}</span>
-              <ConfidencePill meta={result._meta} />
+              <div className="flex items-center gap-2.5">
+                <WebSourcesNote meta={result._meta} />
+                <ConfidencePill meta={result._meta} />
+              </div>
             </div>
             {/* on the tape */}
             {result.tickers && result.tickers.length > 0 && <TapeTickerStrip symbols={result.tickers} />}

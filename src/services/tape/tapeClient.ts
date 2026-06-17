@@ -179,6 +179,12 @@ export interface TapeResponseMeta {
   windowDays?: number;
   /** Brief-only: true when backend widened past the requested 7-day window. */
   windowExpanded?: boolean;
+  /** True when web search results were blended into the citation arrays
+   *  (because the podcast corpus was thin / stale / bear-starved on this
+   *  query). Surfaces an "Includes web sources" note in the result header.
+   *  Confidence may also be downgraded — web is less vetted than the
+   *  corpus. See the web-citations backend memo. */
+  webAugmented?: boolean;
 }
 
 /** Normalized response from GET /api/tape/quote/:slug (Yahoo / Finnhub proxy). */

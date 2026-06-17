@@ -4,7 +4,7 @@ import { getReadIn } from '../../../services/tape/index.ts';
 import type { ReadInResult, ReadInThesisSection, TapeDepth } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, renderProseWithClips } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, WebSourcesNote, renderProseWithClips } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
 import type { TapeTicker } from '../../../data/mockTapeTickers.ts';
 import { useLiveTickers } from '../../../services/tape/useLiveTickers.ts';
@@ -257,6 +257,7 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth; o
               <div className="flex items-center gap-2.5">
                 <span className="tape-label">Depth</span>
                 <ConfidencePill meta={result._meta} />
+                <WebSourcesNote meta={result._meta} />
               </div>
               <DepthToggle depth={depth} onChange={setDepth} />
             </div>
@@ -399,12 +400,27 @@ const ReadInView: React.FC<{ initialTicker?: string; initialDepth?: TapeDepth; o
               <section className="tape-fade border-b px-4 py-4" style={{ borderColor: 'var(--tape-hairline)' }}>
                 <div className="tape-label mb-2">Recent catalysts</div>
                 <ul className="space-y-1.5">
-                  {result.catalysts.map((c, i) => (
-                    <li key={i} className="flex items-start gap-3 text-[13px] leading-relaxed">
-                      <span className="tape-num flex-shrink-0 pt-px text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>{c.date.length >= 10 ? formatShortDate(c.date) : c.date}</span>
-                      <span style={{ color: 'var(--tape-fg-dim)' }}>{c.label}</span>
-                    </li>
-                  ))}
+                  {result.catalysts.map((c, i) => {
+                    // Backend currently sends either a structured
+                    // `{date, label}` or a plain string when the
+                    // catalyst is dateless. Normalize at render time
+                    // rather than throwing on `c.date` of a string.
+                    const date = typeof c === 'string' ? '' : c.date;
+                    const label = typeof c === 'string' ? c : c.label;
+                    return (
+                      <li key={i} className="flex items-start gap-3 text-[13px] leading-relaxed">
+                        {date && (
+                          <span
+                            className="tape-num flex-shrink-0 pt-px text-[11px]"
+                            style={{ color: 'var(--tape-fg-faint)' }}
+                          >
+                            {date.length >= 10 ? formatShortDate(date) : date}
+                          </span>
+                        )}
+                        <span style={{ color: 'var(--tape-fg-dim)' }}>{label}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             )}

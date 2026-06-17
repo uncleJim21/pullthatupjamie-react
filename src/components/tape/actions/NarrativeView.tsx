@@ -4,7 +4,7 @@ import { getNarrative } from '../../../services/tape/index.ts';
 import type { NarrativeResult, NarrativeBucket, NarrativeInflection } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, PreviewPanel, PreviewBanner } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, WebSourcesNote, PreviewPanel, PreviewBanner } from '../TapeActionScaffold.tsx';
 import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
 type Status = 'idle' | 'loading' | 'error';
@@ -389,10 +389,11 @@ const NarrativeView: React.FC<{ initialTopic?: string; initialGroup?: string; on
             <div className="border-b px-4 py-4" style={{ borderColor: 'var(--tape-hairline)' }}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="tape-serif text-2xl" style={{ color: 'var(--tape-fg)' }}>{result.topic}</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   {result.group && (
                     <span className="tape-tag px-1.5 py-0.5">filter: {result.group}</span>
                   )}
+                  <WebSourcesNote meta={result._meta} />
                   <ConfidencePill meta={result._meta} />
                 </div>
               </div>

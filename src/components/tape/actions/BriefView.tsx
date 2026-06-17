@@ -3,7 +3,7 @@ import { getBrief } from '../../../services/tape/index.ts';
 import type { BriefResult } from '../../../services/tape/index.ts';
 import TapeCitationRow from '../TapeCitationRow.tsx';
 import TapeTickerStrip from '../TapeTickerStrip.tsx';
-import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, WindowExpandedPill } from '../TapeActionScaffold.tsx';
+import { TapeField, RunButton, TapeStatus, TapeResultFooter, TapeActionBar, ConfidencePill, WindowExpandedPill, WebSourcesNote } from '../TapeActionScaffold.tsx';
 import { formatShortDate } from '../../../utils/time.ts';
 import { useTapeModel } from '../../../services/tape/useTapeModel.ts';
 
@@ -85,7 +85,8 @@ const BriefView: React.FC<{ initialTopic?: string; onBack: () => void }> = ({ in
                   <span className="tape-tag px-1.5 py-0.5">{result.topic}</span>
                   <span className="tape-num text-[11px]" style={{ color: 'var(--tape-fg-faint)' }}>week ending {formatShortDate(result.asOfDate)}</span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2.5">
+                  <WebSourcesNote meta={result._meta} />
                   <WindowExpandedPill meta={result._meta} />
                   <ConfidencePill meta={result._meta} />
                 </div>
