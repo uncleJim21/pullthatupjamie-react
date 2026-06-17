@@ -11,9 +11,13 @@ import NarrativeView from './actions/NarrativeView.tsx';
 import ReadInView from './actions/ReadInView.tsx';
 import TapeAccessGate from './TapeAccessGate.tsx';
 import TapePersonaDrawer from './TapePersonaDrawer.tsx';
+import EmbedMiniPlayer from '../EmbedMiniPlayer.tsx';
+import FloatingMiniPlayerIsland from '../FloatingMiniPlayerIsland.tsx';
 import { TAPE_UNAUTHORIZED_EVENT } from '../../services/tape/tapeClient.ts';
 import { TAPE_FEED_INVALIDATE_EVENT } from '../../services/tape/tapeFeed.ts';
 import { useTapePersona } from '../../services/tape/tapePersona.ts';
+import { TapeNowPlayingProvider, useTapeNowPlaying } from '../../services/tape/tapeNowPlaying.tsx';
+import { createClipShareUrl } from '../../utils/urlUtils.ts';
 import { clearUserData } from '../../utils/signOut.ts';
 import { notifyAuthStateChanged } from '../../hooks/useSubscriptionStatus.ts';
 import type { TapeDepth } from '../../services/tape/tapeTypes.ts';
@@ -83,23 +87,29 @@ const stopAllTapeAudio = () => {
   window.dispatchEvent(new Event('stopAllAudio'));
 };
 
-const TapePage: React.FC = () => {
+/** Inner component — needs to live inside both the AudioController and
+ *  TapeNowPlaying providers so it can wire the global player. The outer
+ *  TapePage wraps it in the providers. */
+const TapePageContent: React.FC = () => {
   const [launch, setLaunch] = useState<TapeLaunch | null>(launchFromUrl);
   const [personaOpen, setPersonaOpen] = useState(false);
   const { state: personaState } = useTapePersona();
+  const { active: nowPlaying, clear: clearNowPlaying } = useTapeNowPlaying();
 
   const goHome = useCallback(() => {
     stopAllTapeAudio();
+    clearNowPlaying();
     setLaunch(null);
-  }, []);
+  }, [clearNowPlaying]);
 
   const handleSignOut = useCallback(() => {
     stopAllTapeAudio();
+    clearNowPlaying();
     try { localStorage.removeItem(PERSONA_PROMPT_KEY); } catch { /* noop */ }
     clearUserData();
     notifyAuthStateChanged();
     window.dispatchEvent(new Event(TAPE_UNAUTHORIZED_EVENT));
-  }, []);
+  }, [clearNowPlaying]);
 
   // Auto-open the persona drawer the FIRST time a signed-in user lands on
   // /tape with an empty persona. Subsequent loads don't re-prompt — the
@@ -136,15 +146,21 @@ const TapePage: React.FC = () => {
   }, [launch]);
 
   return (
-    <TapeAccessGate>
-    <AudioControllerProvider>
+    <>
       <Helmet>
         <title>{TAPE_NAME}: macro commentary intelligence</title>
         <meta name="description" content="Read the tape, skip the noise. Search what the sharpest macro voices actually said across Bloomberg Surveillance, Odd Lots and the top finance podcasts. Real quotes, timestamped and sourced." />
         <meta name="robots" content="noindex" />
       </Helmet>
 
-      <div className="tape-root tape-scrollbar min-h-screen">
+      <div
+        className="tape-root tape-scrollbar min-h-screen"
+        // When the global player is mounted, the floating island sits over
+        // the bottom edge. Pad so the final row of content can scroll clear
+        // of it. Tuned to roughly the player's intrinsic height + the
+        // wrapper's pb-3 + a touch of breathing room.
+        style={{ paddingBottom: nowPlaying ? 'calc(var(--tape-mini-player-height, 140px) + 16px)' : undefined }}
+      >
         {/* top bar */}
         <header
           className="sticky top-0 z-20 flex h-12 items-center justify-between border-b px-4"
@@ -187,14 +203,58 @@ const TapePage: React.FC = () => {
 
         {launch ? <ActiveView launch={launch} onBack={goHome} /> : <TapeCommandSurface onLaunch={setLaunch} />}
       </div>
+
       <TapePersonaDrawer
         isOpen={personaOpen}
         onClose={() => setPersonaOpen(false)}
         onSaved={handlePersonaSaved}
       />
-    </AudioControllerProvider>
-    </TapeAccessGate>
+
+      {/* Global mini-player. Reuses JPA's "floating island" wrapper via
+          the shared FloatingMiniPlayerIsland (variant='tape'), so the
+          gutters stay transparent (content scrolls behind), the surface
+          is one centered rounded card, and the look matches JPA exactly
+          except for the border tone. Mounted only while a citation is
+          active so the page stays clean on first load. */}
+      <FloatingMiniPlayerIsland variant="tape" visible={!!nowPlaying} position="fixed" zIndex={30}>
+        {nowPlaying && (
+          <div className="tape-player-skin [&>div]:!relative [&>div]:!inset-auto">
+            <EmbedMiniPlayer
+              mode="app"
+              isHovered={true}
+              audioUnlocked={true}
+              trackId={nowPlaying.pineconeId}
+              audioUrl={nowPlaying.audioUrl}
+              episodeTitle={nowPlaying.episodeTitle}
+              episodeImage={nowPlaying.episodeImage}
+              creator={nowPlaying.creator}
+              publishedDate={nowPlaying.publishedDate}
+              timeContext={{ start_time: nowPlaying.startTime, end_time: nowPlaying.endTime }}
+              quote={nowPlaying.text}
+              hierarchyLevel="paragraph"
+              onCopyLink={() => {
+                navigator.clipboard.writeText(createClipShareUrl(nowPlaying.pineconeId)).catch(() => {});
+              }}
+            />
+          </div>
+        )}
+      </FloatingMiniPlayerIsland>
+    </>
   );
 };
+
+/** Outer wrapper — composes the gate + the two providers around the body.
+ *  Keeping the inner `TapePageContent` inside both providers lets it use
+ *  `useTapeNowPlaying()` to drive the global mini-player without any
+ *  prop-drilling. */
+const TapePage: React.FC = () => (
+  <TapeAccessGate>
+    <AudioControllerProvider>
+      <TapeNowPlayingProvider>
+        <TapePageContent />
+      </TapeNowPlayingProvider>
+    </AudioControllerProvider>
+  </TapeAccessGate>
+);
 
 export default TapePage;

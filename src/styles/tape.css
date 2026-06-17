@@ -16,7 +16,11 @@
    global neon classes.
    ────────────────────────────────────────────────────────────────────────── */
 
-.tape-root {
+/* Tape design tokens — promoted to :root so anything in the document
+   (including portaled drawers, the FloatingMiniPlayerIsland that sits
+   as a sibling of .tape-root, etc.) can resolve `var(--tape-*)`
+   without being a DOM descendant of .tape-root. */
+:root {
   /* surfaces — warm-neutral charcoal, premium not terminal */
   --tape-bg: oklch(0.17 0.004 160);
   --tape-bg-raised: oklch(0.21 0.005 160);
@@ -37,7 +41,9 @@
 
   /* semantic */
   --tape-danger: oklch(0.64 0.15 28);
+}
 
+.tape-root {
   position: relative;
   min-height: 100%;
   background: var(--tape-bg);
@@ -205,3 +211,72 @@
 .tape-scrollbar::-webkit-scrollbar { width: 10px; height: 10px; }
 .tape-scrollbar::-webkit-scrollbar-thumb { background: var(--tape-hairline-strong); border-radius: 6px; }
 .tape-scrollbar::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Mini-player re-skin ──────────────────────────────────────────────
+   EmbedMiniPlayer is shared with JPA, so its internals ship in the JPA
+   palette (bg-black, text-white, text-gray-*, bg-white play button,
+   text-green-400 link confirm). When mounted inside `.tape-player-skin`
+   we rewire those Tailwind atomics to Tape tokens so the floating
+   island reads as part of the Tape system — not a graft.
+
+   `!important` everywhere because: (a) Tailwind utilities + arbitrary
+   variants (`[&>*]:!relative` etc.) can land later in the CSS bundle
+   than this file, and (b) HIERARCHY_COLORS / a few inline-style
+   touches inside the player can only be defeated with `!important`. */
+
+/* Outer container — kill bg-black/95 + border-gray-700 so the
+   FloatingMiniPlayerIsland's tape-toned surface shows through. */
+.tape-player-skin > div {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Text — primary / dim / faint */
+.tape-player-skin .text-white,
+.tape-player-skin .text-gray-300 { color: var(--tape-fg) !important; }
+.tape-player-skin .text-gray-400 { color: var(--tape-fg-dim) !important; }
+.tape-player-skin .text-gray-500 { color: var(--tape-fg-faint) !important; }
+.tape-player-skin .text-gray-600 { color: var(--tape-fg-faint) !important; opacity: 0.75; }
+
+/* "Link copied" tick + any other accent glyph */
+.tape-player-skin .text-green-400 { color: var(--tape-accent) !important; }
+
+/* Image placeholder / disabled-state buttons */
+.tape-player-skin .bg-gray-800 { background-color: var(--tape-bg-inset) !important; }
+.tape-player-skin .bg-gray-700 { background-color: var(--tape-bg-raised) !important; }
+
+/* Big circular play button: white-on-black → tape-bg-on-accent */
+.tape-player-skin .bg-white { background-color: var(--tape-accent) !important; }
+.tape-player-skin .text-black { color: var(--tape-bg) !important; }
+.tape-player-skin .border-black { border-color: var(--tape-bg) !important; }
+.tape-player-skin .hover\:bg-gray-200:hover { background-color: var(--tape-accent-dim) !important; }
+
+/* Hover affordances on icon buttons */
+.tape-player-skin .hover\:text-white:hover { color: var(--tape-fg) !important; }
+.tape-player-skin .hover\:bg-white\/10:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
+
+/* Hierarchy dot — EmbedMiniPlayer paints this inline via
+   HIERARCHY_COLORS, including a glowing box-shadow in the same hue.
+   Both the dot fill AND the glow need to be re-toned, or we get a
+   tape-green dot with an orange halo (which is what was happening).
+   Inline-style specificity (1,0,0,0) needs `!important` here. */
+.tape-player-skin .w-2.h-2.rounded-full {
+  background-color: var(--tape-accent) !important;
+  box-shadow: 0 0 4px 1px var(--tape-accent) !important;
+}
+
+/* Fonts — Newsreader for the title row, IBM Plex Mono for the
+   hierarchy label and numeric timestamps so the player echoes the
+   typography used in the rest of /tape. */
+.tape-player-skin h3 {
+  font-family: 'Newsreader', Georgia, serif !important;
+  letter-spacing: 0.005em;
+}
+.tape-player-skin .uppercase.tracking-wider {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace !important;
+  letter-spacing: 0.18em !important;
+}
+.tape-player-skin .font-mono {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace !important;
+  font-variant-numeric: tabular-nums;
+}

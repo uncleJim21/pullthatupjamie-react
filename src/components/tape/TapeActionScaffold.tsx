@@ -5,6 +5,7 @@ import { Loader2, SearchX, AlertTriangle, RefreshCw, ArrowLeft, Play, Pause, Inf
 import type { TapeResponseMeta } from '../../services/tape/tapeClient.ts';
 import type { TapeCitation } from '../../services/tape/tapeTypes.ts';
 import { useAudioController } from '../../context/AudioControllerContext.tsx';
+import { useTapeNowPlaying } from '../../services/tape/tapeNowPlaying.tsx';
 
 /** Labelled field wrapper — mono uppercase micro-label above a control. */
 export const TapeField: React.FC<{ label: string; className?: string; children: React.ReactNode }> = ({
@@ -205,6 +206,7 @@ export const ConfidencePill: React.FC<{ meta?: TapeResponseMeta }> = ({ meta }) 
  */
 export const TapeInlineClip: React.FC<{ citation: TapeCitation }> = ({ citation }) => {
   const { playTrack, togglePlay, currentTrack, isPlaying, isBuffering } = useAudioController();
+  const { setActive } = useTapeNowPlaying();
   const isActive = currentTrack?.id === citation.pineconeId;
   const isThisPlaying = isActive && isPlaying;
   const isThisLoading = isActive && isBuffering && !isPlaying;
@@ -214,6 +216,7 @@ export const TapeInlineClip: React.FC<{ citation: TapeCitation }> = ({ citation 
     e.stopPropagation();
     if (isThisLoading) return;
     if (isActive) { void togglePlay(); return; }
+    setActive(citation);
     void playTrack({
       id: citation.pineconeId,
       audioUrl: citation.audioUrl,
