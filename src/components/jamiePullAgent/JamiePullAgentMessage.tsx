@@ -21,6 +21,7 @@ import { ActivityTimeline, ResponseMetadata } from './JamiePullAgentResultCards.
 import { API_URL } from '../../constants/constants.ts';
 import { InlineCardMention, type AnalysisCardJson } from '../UnifiedSidePanel.tsx';
 import { createClipShareUrl } from '../../utils/urlUtils.ts';
+import { normalizeLang } from '../../utils/languageBadge.ts';
 import TryJamieService from '../../services/tryJamieService.ts';
 
 
@@ -36,6 +37,10 @@ export interface ClipMeta {
   endTime: number;
   text: string;
   publishedDate?: string;
+  /** ISO 639-1 source/audio language from the podcast feed metadata (e.g. "de").
+   *  Drives the "Translated from <language>" badge when it differs from the
+   *  answer language. Undefined when the feed is unlabeled. */
+  language?: string;
 }
 
 const CACHE_STORAGE_KEY = 'workflow_clip_meta_cache';
@@ -102,6 +107,7 @@ async function fetchClipMeta(pineconeId: string): Promise<ClipMeta | null> {
           const h = data.hierarchy;
           const para = h?.paragraph?.metadata;
           const ep = h?.episode?.metadata;
+          const feed = h?.feed?.metadata;
           const meta: ClipMeta = {
             pineconeId,
             episodeTitle: ep?.title || para?.episode || 'Unknown episode',
@@ -112,6 +118,9 @@ async function fetchClipMeta(pineconeId: string): Promise<ClipMeta | null> {
             endTime: para?.end_time ?? 0,
             text: para?.text || '',
             publishedDate: ep?.publishedDate || para?.publishedDate || undefined,
+            // Source/audio language comes from the feed metadata; normalize to a
+            // bare ISO 639-1 code ("de-DE" → "de"). Undefined when unlabeled.
+            language: normalizeLang(feed?.language || para?.language || ep?.language),
           };
           clipMetaCache.set(pineconeId, meta);
           persistCache(clipMetaCache);
@@ -303,7 +312,8 @@ function injectClipCards(
   metaCache: Map<string, ClipMeta>,
   onCardClick: (pineconeId: string) => void,
   onCopyLink: (pineconeId: string) => void,
-  activeClipId?: string
+  activeClipId?: string,
+  answerLang?: string
 ): React.ReactNode {
   const tokenRe = /\[\[CLIP:(\d+)\]\]/g;
 
@@ -326,6 +336,7 @@ function injectClipCards(
           // Transcript text powers the "explore in Galaxy" arrow — opens
           // /app?view=galaxy&q=<quote> so the user can see neighbors.
           quote: meta?.text,
+          language: meta?.language,
         };
         out.push(
           <InlineCardMention
@@ -334,6 +345,7 @@ function injectClipCards(
             onClick={onCardClick}
             onCopyLink={onCopyLink}
             isActive={activeClipId === pineconeId}
+            answerLang={answerLang}
           />
         );
       } else {
@@ -347,7 +359,7 @@ function injectClipCards(
 
   if (Array.isArray(node)) {
     return node.map((child) =>
-      injectClipCards(child, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId)
+      injectClipCards(child, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId, answerLang)
     );
   }
 
@@ -356,7 +368,7 @@ function injectClipCards(
     if (!children) return node;
     return React.cloneElement(node as any, {
       ...(node.props as any),
-      children: injectClipCards(children, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId),
+      children: injectClipCards(children, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId, answerLang),
     });
   }
 
@@ -393,11 +405,12 @@ const MarkdownWithClips: React.FC<{
   onCardClick: (pineconeId: string) => void;
   onCopyLink: (pineconeId: string) => void;
   activeClipId?: string;
-}> = ({ text, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId }) => {
+  answerLang?: string;
+}> = ({ text, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId, answerLang }) => {
   const inject = useCallback(
     (children: React.ReactNode) =>
-      injectClipCards(children, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId),
-    [clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId]
+      injectClipCards(children, clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId, answerLang),
+    [clipsByIndex, metaCache, onCardClick, onCopyLink, activeClipId, answerLang]
   );
 
   const components = useMemo(
@@ -798,6 +811,7 @@ export const JamiePullAgentMessage: React.FC<JamiePullAgentMessageProps> = ({ me
                 onCardClick={handleCardClick}
                 onCopyLink={handleCopyLink}
                 activeClipId={activeClipId}
+                answerLang={donePayload?.responseLanguage}
               />
             </div>
             {message.textPaused && !message.streamComplete && (
