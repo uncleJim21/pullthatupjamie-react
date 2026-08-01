@@ -48,4 +48,41 @@ module.exports = {
       return webpackConfig;
     },
   },
+  // Dev-server (react-scripts start) overlay filter. troika-three-text (drei's
+  // <Text>, used for the galaxy axis labels) generates glyph SDFs via WebGL and
+  // blits them with ANGLE_instanced_arrays. On GPUs/contexts where that
+  // extension is unavailable it throws "ANGLE_instanced_arrays not supported";
+  // troika still renders labels via its JS fallback, so the error is benign —
+  // but webpack-dev-server's runtime-error overlay pops a full-screen red box
+  // over the app. Suppress that ONE error class in the overlay while keeping it
+  // for every other runtime error. Dev-only; production has no such overlay.
+  //
+  // NOTE: `runtimeErrors` is stringified and shipped to the browser client, so
+  // this function must be self-contained (no outer-scope references).
+  devServer: (devServerConfig) => {
+    const client =
+      devServerConfig.client && typeof devServerConfig.client === 'object'
+        ? devServerConfig.client
+        : {};
+    const overlay =
+      client.overlay && typeof client.overlay === 'object' ? client.overlay : {};
+    devServerConfig.client = {
+      ...client,
+      overlay: {
+        ...overlay,
+        runtimeErrors: (error) => {
+          const msg = error && error.message ? error.message : String(error || '');
+          if (
+            /ANGLE_instanced_arrays not supported|WebGL (SDF )?generation not supported/.test(
+              msg
+            )
+          ) {
+            return false;
+          }
+          return true;
+        },
+      },
+    };
+    return devServerConfig;
+  },
 };

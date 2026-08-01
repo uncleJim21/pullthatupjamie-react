@@ -33,13 +33,16 @@ export function attachContextLossRecovery(
   };
 }
 
-// troika-three-text (drei's <Text>) tries to generate glyph SDFs on the GPU via
-// its own throwaway WebGL context. When the page is out of GL contexts that
-// fails with "ANGLE_instanced_arrays not supported". troika already falls back
-// to CPU/JS generation (labels still render), but the rejection leaks as an
-// "Uncaught (in promise)" error. Swallow that one specific, known-benign
-// rejection so it doesn't spam the console or trip error monitoring. Idempotent
-// and a no-op outside the browser.
+// troika-three-text (drei's <Text>) generates glyph SDFs via WebGL and blits
+// them with ANGLE_instanced_arrays. When that extension is unavailable it
+// fails with "ANGLE_instanced_arrays not supported" — sometimes as a rejected
+// promise (GPU generate path), sometimes as a synchronous throw (the JS
+// fallback's WebGL blit). troika still renders labels, so it's benign, but it
+// pollutes the console and (in prod) can trip error monitoring. Swallow that
+// one specific, known-benign error on both channels. Idempotent; no-op on the
+// server. The dev-server overlay is handled separately via craco.config.js.
+const BENIGN_SDF_ERROR = /ANGLE_instanced_arrays not supported|WebGL (SDF )?generation not supported/;
+
 let troikaGuardInstalled = false;
 
 export function installTroikaSdfRejectionGuard(): void {
@@ -47,8 +50,10 @@ export function installTroikaSdfRejectionGuard(): void {
   troikaGuardInstalled = true;
   window.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => {
     const msg = String((e.reason && e.reason.message) || e.reason || '');
-    if (/ANGLE_instanced_arrays not supported|WebGL (SDF )?generation not supported/.test(msg)) {
-      e.preventDefault();
-    }
+    if (BENIGN_SDF_ERROR.test(msg)) e.preventDefault();
+  });
+  window.addEventListener('error', (e: ErrorEvent) => {
+    const msg = String((e.error && e.error.message) || e.message || '');
+    if (BENIGN_SDF_ERROR.test(msg)) e.preventDefault();
   });
 }
