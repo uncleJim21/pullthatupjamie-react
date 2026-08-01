@@ -28,3 +28,27 @@ export function toCachedAudioUrl(url: string): string {
   }
   return url;
 }
+
+/** True when the URL points at our cached audio host. */
+export function isCachedAudioUrl(url: string): boolean {
+  return !!url && url.includes(CACHED_AUDIO_HOST);
+}
+
+// Source audio is being re-encoded from .mp3 to .m4a. During that transition an
+// API response's extension can briefly disagree with the object actually in the
+// bucket (metadata says .mp3, object is already .m4a, or vice versa), which
+// 404/403s on play. swapAudioExtension() gives the player one alternate to try.
+const AUDIO_EXT_SWAP: Record<string, string> = { '.mp3': '.m4a', '.m4a': '.mp3' };
+
+/** Swap a playback URL's audio extension to the other of .mp3/.m4a, preserving
+ *  any query string and `#t=` fragment. Returns null when there's no known
+ *  audio extension to swap (so callers can skip the retry). */
+export function swapAudioExtension(url: string): string | null {
+  if (!url) return null;
+  // Isolate the path's extension from any ?query or #fragment tail.
+  const m = url.match(/^([^?#]*?)(\.[a-z0-9]+)([?#].*)?$/i);
+  if (!m) return null;
+  const [, base, ext, tail = ''] = m;
+  const next = AUDIO_EXT_SWAP[ext.toLowerCase()];
+  return next ? `${base}${next}${tail}` : null;
+}
