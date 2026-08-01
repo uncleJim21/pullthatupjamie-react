@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { toCachedAudioUrl, isCachedAudioUrl, swapAudioExtension } from '../utils/audioUrl.ts';
 
 export interface AudioTrack {
   id: string;
@@ -48,19 +49,34 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
   // call supersedes them (e.g. user taps a second result while the first is
   // still waiting for metadata to load).
   const playSequenceRef = useRef(0);
+  // Latest track (for its seek target on an error-fallback reload) and whether
+  // the user intends playback (so a fallback resumes only when they were
+  // playing, not on a passive loadTrack).
+  const currentTrackRef = useRef<AudioTrack | null>(null);
+  const wantsPlayRef = useRef(false);
+  // Guards the one-shot .mp3/.m4a extension fallback: set true when we retry
+  // the alternate extension, reset only when a new track src is set
+  // deliberately — so a genuinely-missing object fails after one retry instead
+  // of ping-ponging between extensions forever.
+  const didExtFallbackRef = useRef(false);
 
   const loadTrack = useCallback((track: AudioTrack) => {
     const audio = audioRef.current;
     if (!audio) return;
 
     setCurrentTrack(track);
+    currentTrackRef.current = track;
+    wantsPlayRef.current = false;
     setIsPlaying(false);
     setIsBuffering(false);
     pendingStartTimeRef.current =
       typeof track.startTime === 'number' ? track.startTime : null;
 
-    if (audio.src !== track.audioUrl) {
-      audio.src = track.audioUrl;
+    // Route playback through the cached Cloudflare host (see toCachedAudioUrl).
+    const src = toCachedAudioUrl(track.audioUrl);
+    if (audio.src !== src) {
+      didExtFallbackRef.current = false;
+      audio.src = src;
     }
 
     // If metadata is already available, apply start time immediately
@@ -82,6 +98,7 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
     const audio = audioRef.current;
     if (!audio) return;
     try {
+      wantsPlayRef.current = true;
       setIsBuffering(true);
       await audio.play();
       setIsPlaying(true);
@@ -101,6 +118,8 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
       const sequence = ++playSequenceRef.current;
 
       setCurrentTrack(track);
+      currentTrackRef.current = track;
+      wantsPlayRef.current = true;
       setIsPlaying(false);
       setIsBuffering(true);
 
@@ -108,9 +127,12 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
         typeof track.startTime === 'number' ? track.startTime : null;
       pendingStartTimeRef.current = desiredStart;
 
-      const isNewSrc = audio.src !== track.audioUrl;
+      // Route playback through the cached Cloudflare host (see toCachedAudioUrl).
+      const src = toCachedAudioUrl(track.audioUrl);
+      const isNewSrc = audio.src !== src;
       if (isNewSrc) {
-        audio.src = track.audioUrl;
+        didExtFallbackRef.current = false;
+        audio.src = src;
         // Some mobile browsers won't begin loading until load() is called,
         // which delays the loadedmetadata event we need before seeking.
         try { audio.load(); } catch { /* ignore */ }
@@ -183,6 +205,7 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
   const pause = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    wantsPlayRef.current = false;
     audio.pause();
     setIsPlaying(false);
   }, []);
@@ -218,6 +241,9 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
       // ignore
     }
     pendingStartTimeRef.current = null;
+    currentTrackRef.current = null;
+    wantsPlayRef.current = false;
+    didExtFallbackRef.current = false;
     setCurrentTrack(null);
     setIsPlaying(false);
     setIsBuffering(false);
@@ -278,6 +304,35 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
     setIsPlaying(false);
   };
 
+  // Media failed to load (e.g. a transition-period extension mismatch: metadata
+  // says .mp3 but the object was re-encoded to .m4a). Try the alternate audio
+  // extension exactly once — only for our own cached host, so external
+  // enclosures aren't touched. See swapAudioExtension / didExtFallbackRef.
+  const handleError = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const failed = audio.src;
+    if (didExtFallbackRef.current || !isCachedAudioUrl(failed)) return;
+    const alt = swapAudioExtension(failed);
+    if (!alt) return;
+
+    didExtFallbackRef.current = true;
+    // Restore the clip's seek target; playTrack may have cleared it after the
+    // failed load. handleLoadedMetadata re-applies it once the alt src loads.
+    const startTime = currentTrackRef.current?.startTime;
+    if (typeof startTime === 'number') pendingStartTimeRef.current = startTime;
+
+    audio.src = alt;
+    try { audio.load(); } catch { /* ignore */ }
+    if (wantsPlayRef.current) {
+      setIsBuffering(true);
+      audio.play()
+        .then(() => setIsPlaying(true))
+        .catch(() => setIsPlaying(false))
+        .finally(() => setIsBuffering(false));
+    }
+  };
+
   const value: AudioController = {
     currentTrack,
     isPlaying,
@@ -301,6 +356,7 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
         onLoadedMetadata={handleLoadedMetadata}
         onTimeUpdate={handleTimeUpdate}
         onEnded={handleEnded}
+        onError={handleError}
       />
     </AudioControllerContext.Provider>
   );

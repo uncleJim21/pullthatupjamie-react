@@ -1,11 +1,12 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS, printLog } from '../constants/constants.ts';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
 import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Layers, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle, Loader, Crosshair, ScanSearch } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
+import { attachContextLossRecovery, installTroikaSdfRejectionGuard } from '../utils/webglContext.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
 import { KeywordTooltip } from './KeywordTooltip.tsx';
@@ -608,68 +609,37 @@ interface AxisLabelWithBackgroundProps {
   label: string;
 }
 
+// Axis labels render as DOM overlays via drei's <Html>, NOT troika <Text>.
+// troika generates each glyph's SDF by spinning up its own WebGL context and
+// retries on failure — inside the embed iframe (a tight WebGL-context budget)
+// that cascades into dozens of contexts, evicting the galaxy's own renderer and
+// blacking out the scene. DOM labels need zero WebGL, so the galaxy keeps its
+// single context. <Html> billboards (screen-space) and projects the 3D point
+// for us, so the manual camera-facing group + text-measured background quad are
+// no longer needed.
 const AxisLabelWithBackground: React.FC<AxisLabelWithBackgroundProps> = ({ position, label }) => {
-  const [bgSize, setBgSize] = useState<{ width: number; height: number }>({
-    width: 3,
-    height: 1,
-  });
-  const groupRef = useRef<THREE.Group>(null);
-  const { camera } = useThree();
-
-  // Make the label always face the camera (billboarding)
-  useFrame(() => {
-    if (groupRef.current) {
-      groupRef.current.quaternion.copy(camera.quaternion);
-    }
-  });
-
-  const handleSync = (text: any) => {
-    if (!text?.geometry?.boundingBox) return;
-
-    const boundingBox = text.geometry.boundingBox as THREE.Box3;
-    const width = boundingBox.max.x - boundingBox.min.x;
-    const height = boundingBox.max.y - boundingBox.min.y;
-
-    const paddingX = 0.6;
-    const paddingY = 0.3;
-
-    const newWidth = width + paddingX;
-    const newHeight = height + paddingY;
-
-    // Avoid unnecessary state updates every frame
-    if (
-      Math.abs(newWidth - bgSize.width) > 0.01 ||
-      Math.abs(newHeight - bgSize.height) > 0.01
-    ) {
-      setBgSize({ width: newWidth, height: newHeight });
-    }
-  };
-
   return (
-    <group ref={groupRef} position={position}>
-      {/* Background quad for label readability */}
-      <mesh position={[0, 0, -0.01]}>
-        <planeGeometry args={[bgSize.width, bgSize.height]} />
-        <meshBasicMaterial
-          color="black"
-          opacity={0.6}
-          transparent
-          depthWrite={false}
-        />
-      </mesh>
-
-      <Text
-        fontSize={0.5}
-        color="white"
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.02}
-        outlineColor="#000000"
-        onSync={handleSync}
+    <Html
+      position={position}
+      center
+      zIndexRange={[10, 0]}
+      style={{ pointerEvents: 'none' }}
+    >
+      <div
+        style={{
+          padding: '2px 8px',
+          borderRadius: '4px',
+          background: 'rgba(0, 0, 0, 0.6)',
+          color: '#ffffff',
+          font: '600 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          whiteSpace: 'nowrap',
+          textShadow: '0 0 2px #000, 0 0 2px #000',
+          userSelect: 'none',
+        }}
       >
         {label}
-      </Text>
-    </group>
+      </div>
+    </Html>
   );
 };
 
@@ -1849,6 +1819,17 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   isNarrowLayout = false,
   onKeywordSearch,
 }) => {
+  // Swallow troika-three-text's benign "ANGLE_instanced_arrays not supported"
+  // rejection (it falls back to JS SDF generation; labels still render).
+  useEffect(() => { installTroikaSdfRejectionGuard(); }, []);
+
+  // Inside the iframe embed (?embed=true) we suppress the axis labels like the
+  // rest of the app chrome — the compact embed viewport is too small for them
+  // and they overlap the stars and the mini-player.
+  const isEmbedMode =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('embed') === 'true';
+
   const [isTouchLikePointer, setIsTouchLikePointer] = useState(false);
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -2991,7 +2972,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         // cause OrbitControls to receive inconsistent touch state and crash on mobile.
         style={{ width: '100%', height: '100%', touchAction: 'none' }}
         resize={{ scroll: false, debounce: 0 }}
-        onCreated={({ gl }) => {
+        onCreated={({ gl, invalidate }) => {
           // Belt + suspenders: ensure the actual canvas element disables default touch actions.
           try {
             (gl.domElement as any).style.touchAction = 'none';
@@ -2999,6 +2980,9 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           } catch {
             // ignore
           }
+          // Recover instead of dying if the GL context is lost (common in the
+          // landing-page embed iframe where GL contexts are scarce).
+          attachContextLossRecovery(gl, invalidate);
         }}
       >
         <PerspectiveCamera
@@ -3058,7 +3042,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           onStarRightClick={handleStarRightClick}
           onHover={setHoveredResult}
           axisLabels={axisLabels || null}
-          showAxisLabels={showAxisLabels}
+          showAxisLabels={showAxisLabels && !isEmbedMode}
           isAnimatingCamera={isAnimatingCamera}
           isSpotlightActive={isSpotlightActive}
           nebulaDimOpacity={nebulaDimOpacity}

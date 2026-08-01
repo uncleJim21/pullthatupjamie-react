@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { attachContextLossRecovery } from '../utils/webglContext.ts';
 
 // Nebula background shaders (ported from Jared Berghold's Shadertoy "Nebula" shader)
 const NEBULA_VERTEX_SHADER = `
@@ -285,6 +286,11 @@ export const NebulaBackground: React.FC<NebulaBackgroundProps> = ({
         camera={{ position: [0, 0, 15], fov: 75 }}
         gl={{ antialias: false, alpha: false }}
         frameloop="demand"
+        onCreated={({ gl, invalidate }) => {
+          // Recover (and redraw this demand-driven scene) if the GL context is
+          // lost — e.g. when GL contexts are scarce in the embed iframe.
+          attachContextLossRecovery(gl, invalidate);
+        }}
       >
         <NebulaCanvasContent dimOpacity={dimOpacity} />
       </Canvas>
