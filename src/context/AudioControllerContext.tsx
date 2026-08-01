@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { toCachedAudioUrl } from '../utils/audioUrl.ts';
 
 export interface AudioTrack {
   id: string;
@@ -59,8 +60,10 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
     pendingStartTimeRef.current =
       typeof track.startTime === 'number' ? track.startTime : null;
 
-    if (audio.src !== track.audioUrl) {
-      audio.src = track.audioUrl;
+    // Route playback through the cached Cloudflare host (see toCachedAudioUrl).
+    const src = toCachedAudioUrl(track.audioUrl);
+    if (audio.src !== src) {
+      audio.src = src;
     }
 
     // If metadata is already available, apply start time immediately
@@ -108,9 +111,11 @@ export const AudioControllerProvider: React.FC<{ children: React.ReactNode }> = 
         typeof track.startTime === 'number' ? track.startTime : null;
       pendingStartTimeRef.current = desiredStart;
 
-      const isNewSrc = audio.src !== track.audioUrl;
+      // Route playback through the cached Cloudflare host (see toCachedAudioUrl).
+      const src = toCachedAudioUrl(track.audioUrl);
+      const isNewSrc = audio.src !== src;
       if (isNewSrc) {
-        audio.src = track.audioUrl;
+        audio.src = src;
         // Some mobile browsers won't begin loading until load() is called,
         // which delays the loadedmetadata event we need before seeking.
         try { audio.load(); } catch { /* ignore */ }
