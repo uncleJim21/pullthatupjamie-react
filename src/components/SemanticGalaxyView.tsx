@@ -6,6 +6,7 @@ import { HIERARCHY_COLORS, printLog } from '../constants/constants.ts';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
 import { Calendar, RotateCcw, SlidersHorizontal, Check, Search, Plus, Layers, ChevronDown, ChevronUp, X, Podcast, Save, BrainCircuit, Share2, CheckCircle, AlertCircle, Loader, Crosshair, ScanSearch } from 'lucide-react';
 import { formatShortDate } from '../utils/time.ts';
+import { attachContextLossRecovery, installTroikaSdfRejectionGuard } from '../utils/webglContext.ts';
 import WarpSpeedLoadingOverlay from './WarpSpeedLoadingOverlay.tsx';
 import { ContextMenu, ContextMenuOption } from './ContextMenu.tsx';
 import { KeywordTooltip } from './KeywordTooltip.tsx';
@@ -1849,6 +1850,10 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   isNarrowLayout = false,
   onKeywordSearch,
 }) => {
+  // Swallow troika-three-text's benign "ANGLE_instanced_arrays not supported"
+  // rejection (it falls back to JS SDF generation; labels still render).
+  useEffect(() => { installTroikaSdfRejectionGuard(); }, []);
+
   const [isTouchLikePointer, setIsTouchLikePointer] = useState(false);
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -2991,7 +2996,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
         // cause OrbitControls to receive inconsistent touch state and crash on mobile.
         style={{ width: '100%', height: '100%', touchAction: 'none' }}
         resize={{ scroll: false, debounce: 0 }}
-        onCreated={({ gl }) => {
+        onCreated={({ gl, invalidate }) => {
           // Belt + suspenders: ensure the actual canvas element disables default touch actions.
           try {
             (gl.domElement as any).style.touchAction = 'none';
@@ -2999,6 +3004,9 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           } catch {
             // ignore
           }
+          // Recover instead of dying if the GL context is lost (common in the
+          // landing-page embed iframe where GL contexts are scarce).
+          attachContextLossRecovery(gl, invalidate);
         }}
       >
         <PerspectiveCamera
