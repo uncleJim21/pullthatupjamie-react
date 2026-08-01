@@ -1823,6 +1823,13 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
   // rejection (it falls back to JS SDF generation; labels still render).
   useEffect(() => { installTroikaSdfRejectionGuard(); }, []);
 
+  // Inside the iframe embed (?embed=true) we suppress the axis labels like the
+  // rest of the app chrome — the compact embed viewport is too small for them
+  // and they overlap the stars and the mini-player.
+  const isEmbedMode =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('embed') === 'true';
+
   const [isTouchLikePointer, setIsTouchLikePointer] = useState(false);
   const [hoveredResult, setHoveredResult] = useState<QuoteResult | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -3035,7 +3042,7 @@ export const SemanticGalaxyView: React.FC<SemanticGalaxyViewProps> = ({
           onStarRightClick={handleStarRightClick}
           onHover={setHoveredResult}
           axisLabels={axisLabels || null}
-          showAxisLabels={showAxisLabels}
+          showAxisLabels={showAxisLabels && !isEmbedMode}
           isAnimatingCamera={isAnimatingCamera}
           isSpotlightActive={isSpotlightActive}
           nebulaDimOpacity={nebulaDimOpacity}
