@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { HIERARCHY_COLORS, printLog } from '../constants/constants.ts';
 import { extractImageFromAny } from '../utils/hierarchyImageUtils.ts';
@@ -609,68 +609,37 @@ interface AxisLabelWithBackgroundProps {
   label: string;
 }
 
+// Axis labels render as DOM overlays via drei's <Html>, NOT troika <Text>.
+// troika generates each glyph's SDF by spinning up its own WebGL context and
+// retries on failure — inside the embed iframe (a tight WebGL-context budget)
+// that cascades into dozens of contexts, evicting the galaxy's own renderer and
+// blacking out the scene. DOM labels need zero WebGL, so the galaxy keeps its
+// single context. <Html> billboards (screen-space) and projects the 3D point
+// for us, so the manual camera-facing group + text-measured background quad are
+// no longer needed.
 const AxisLabelWithBackground: React.FC<AxisLabelWithBackgroundProps> = ({ position, label }) => {
-  const [bgSize, setBgSize] = useState<{ width: number; height: number }>({
-    width: 3,
-    height: 1,
-  });
-  const groupRef = useRef<THREE.Group>(null);
-  const { camera } = useThree();
-
-  // Make the label always face the camera (billboarding)
-  useFrame(() => {
-    if (groupRef.current) {
-      groupRef.current.quaternion.copy(camera.quaternion);
-    }
-  });
-
-  const handleSync = (text: any) => {
-    if (!text?.geometry?.boundingBox) return;
-
-    const boundingBox = text.geometry.boundingBox as THREE.Box3;
-    const width = boundingBox.max.x - boundingBox.min.x;
-    const height = boundingBox.max.y - boundingBox.min.y;
-
-    const paddingX = 0.6;
-    const paddingY = 0.3;
-
-    const newWidth = width + paddingX;
-    const newHeight = height + paddingY;
-
-    // Avoid unnecessary state updates every frame
-    if (
-      Math.abs(newWidth - bgSize.width) > 0.01 ||
-      Math.abs(newHeight - bgSize.height) > 0.01
-    ) {
-      setBgSize({ width: newWidth, height: newHeight });
-    }
-  };
-
   return (
-    <group ref={groupRef} position={position}>
-      {/* Background quad for label readability */}
-      <mesh position={[0, 0, -0.01]}>
-        <planeGeometry args={[bgSize.width, bgSize.height]} />
-        <meshBasicMaterial
-          color="black"
-          opacity={0.6}
-          transparent
-          depthWrite={false}
-        />
-      </mesh>
-
-      <Text
-        fontSize={0.5}
-        color="white"
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.02}
-        outlineColor="#000000"
-        onSync={handleSync}
+    <Html
+      position={position}
+      center
+      zIndexRange={[10, 0]}
+      style={{ pointerEvents: 'none' }}
+    >
+      <div
+        style={{
+          padding: '2px 8px',
+          borderRadius: '4px',
+          background: 'rgba(0, 0, 0, 0.6)',
+          color: '#ffffff',
+          font: '600 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          whiteSpace: 'nowrap',
+          textShadow: '0 0 2px #000, 0 0 2px #000',
+          userSelect: 'none',
+        }}
       >
         {label}
-      </Text>
-    </group>
+      </div>
+    </Html>
   );
 };
 
