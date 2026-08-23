@@ -168,6 +168,20 @@ export default function SharedClipView({ clipId, presentation }: Props) {
           .jamie-share-rise { animation: none; }
           .jamie-share-skeleton { animation: none; opacity: 0.8; }
         }
+        /* Sized to keep all three actions on one row: the desktop text column
+           bottoms out around 456px and the previous size totalled ~464px. */
+        .jamie-share-primary, .jamie-share-action {
+          font-size: 0.8125rem;
+          padding: 10px 15px;
+        }
+        @media (max-width: 859px) {
+          /* Full size on touch, where the row stacks anyway and 44px targets
+             matter more than fitting on one line. */
+          .jamie-share-primary, .jamie-share-action {
+            font-size: 0.875rem;
+            padding: 12px 18px;
+          }
+        }
         .jamie-share-action:hover { background: rgba(248,246,242,0.07); color: ${T.textHi}; }
         .jamie-share-primary:hover { background: ${T.accentBright}; }
         .jamie-share-stage :focus-visible {
@@ -364,11 +378,10 @@ export default function SharedClipView({ clipId, presentation }: Props) {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 8,
-                      padding: '11px 18px',
                       borderRadius: 999,
                       background: T.accent,
+                      border: '1px solid transparent',
                       color: T.surface0,
-                      fontSize: '0.875rem',
                       fontWeight: 600,
                       textDecoration: 'none',
                       transition: `background 180ms ${EASE}`,
@@ -417,12 +430,10 @@ const secondaryAction: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: 8,
-  padding: '11px 16px',
   borderRadius: 999,
   background: 'transparent',
   border: `1px solid ${T.hairline}`,
   color: T.textMid,
-  fontSize: '0.875rem',
   fontWeight: 500,
   fontFamily: 'inherit',
   cursor: 'pointer',
