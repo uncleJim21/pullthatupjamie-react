@@ -30,6 +30,8 @@ import { NavGlowButton } from './NavGlowButton.tsx';
 import SearchModeExplainerModal from './SearchModeExplainerModal.tsx';
 import PodcastSourceFilterModal, { PodcastSearchFilters } from './PodcastSourceFilterModal.tsx';
 import { createClipShareUrl } from '../utils/urlUtils.ts';
+import SharedClipView from './share/SharedClipView.tsx';
+import { ClipPresentationStyle } from '../constants/constants.ts';
 import PageBanner from './PageBanner.tsx';
 import ShareModal from './ShareModal.tsx';
 import TutorialModal from './TutorialModal.tsx';
@@ -1981,9 +1983,10 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       }
     };
 
-    if (isSharePage && clipId) {
-      loadSharedClip();
-    }
+    // Intentionally not called for share links any more: SharedClipView owns
+    // that fetch, and running this too would double-request every clip.
+    // loadSharedClip stays defined for the non-share callers below.
+    void loadSharedClip;
   }, [isSharePage, clipId]);
 
   // Load shared research session from URL parameter with warp speed animation
@@ -3235,6 +3238,13 @@ export default function SearchInterface({ isSharePage = false, isClipBatchPage =
       </div>
     );
   };
+
+  // Share links get their own standalone surface rather than the search shell
+  // with a single result in it. Rendered after every hook above so hook order
+  // stays stable, and it owns its own fetch, audio, and states.
+  if (isSharePage && clipId) {
+    return <SharedClipView clipId={clipId} presentation={ClipPresentationStyle.SHARE} />;
+  }
 
   return (
     <AudioControllerProvider>

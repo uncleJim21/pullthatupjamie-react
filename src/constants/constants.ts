@@ -54,6 +54,17 @@ export enum SearchResultViewStyle {
   AGENT = 'agent'
 }
 
+// How a single clip is being presented. Injected into the clip surfaces so a
+// component decides its treatment from an explicit prop rather than sniffing
+// the URL, which keeps the surfaces testable and reusable. Only SHARE gets the
+// standalone "disc" treatment in SharedClipView; the other styles keep the
+// existing inline result / embed rendering.
+export enum ClipPresentationStyle {
+  SHARE = 'share',
+  RESULT = 'result',
+  EMBED = 'embed'
+}
+
 // Numerical hierarchy levels (higher = broader scope)
 export const HIERARCHY_LEVEL_FEED = 3;
 export const HIERARCHY_LEVEL_EPISODE = 2;
