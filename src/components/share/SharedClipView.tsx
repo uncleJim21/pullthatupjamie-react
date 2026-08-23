@@ -166,6 +166,13 @@ export default function SharedClipView({ clipId, presentation }: Props) {
         @media (min-width: 1200px) {
           .jamie-share-stage { grid-template-columns: minmax(300px, 440px) 1fr; }
         }
+        @media (max-width: 859px) {
+          .jamie-share-text { display: flex; flex-direction: column; }
+          .jamie-share-notice { order: 1; }
+          .jamie-share-actions { order: 2; margin-top: 8px; margin-bottom: 30px; }
+          .jamie-share-quote { order: 3; }
+          .jamie-share-episode { order: 4; margin-bottom: 0; }
+        }
         @media (prefers-reduced-motion: reduce) {
           .jamie-share-rise { animation: none; }
           .jamie-share-skeleton { animation: none; opacity: 0.8; }
@@ -246,7 +253,7 @@ export default function SharedClipView({ clipId, presentation }: Props) {
             )}
           </div>
 
-          <div className={state.phase === 'ready' ? 'jamie-share-rise' : undefined}>
+          <div className={`jamie-share-text${state.phase === 'ready' ? ' jamie-share-rise' : ''}`}>
             {state.phase === 'loading' ? (
               <TextSkeleton />
             ) : (
@@ -276,6 +283,7 @@ export default function SharedClipView({ clipId, presentation }: Props) {
                 </p>
 
                 <blockquote
+                  className="jamie-share-quote"
                   style={{
                     margin: '0 0 20px',
                     fontSize: q.fontSize,
@@ -291,6 +299,7 @@ export default function SharedClipView({ clipId, presentation }: Props) {
                 </blockquote>
 
                 <p
+                  className="jamie-share-episode"
                   style={{
                     margin: '0 0 clamp(28px, 4vw, 40px)',
                     fontSize: '0.9375rem',
@@ -305,6 +314,7 @@ export default function SharedClipView({ clipId, presentation }: Props) {
                 {audio.status === 'error' && (
                   <p
                     role="status"
+                    className="jamie-share-notice"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -322,6 +332,7 @@ export default function SharedClipView({ clipId, presentation }: Props) {
                 {audio.isExtended && (
                   <p
                     role="status"
+                    className="jamie-share-notice"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -339,7 +350,7 @@ export default function SharedClipView({ clipId, presentation }: Props) {
                   </p>
                 )}
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+                <div className="jamie-share-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
                   {/* Offered only once the excerpt has actually run out. Before
                       that it is an answer to a question the listener has not
                       asked yet, and it competes with the transport. */}
