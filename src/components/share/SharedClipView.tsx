@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link2, Check, Share2, Search, AlertCircle, FastForward, Radio } from 'lucide-react';
+import { Link2, Check, Bot, Search, AlertCircle, FastForward, Radio } from 'lucide-react';
 import { ClipPresentationStyle } from '../../constants/constants.ts';
 import { fetchClipById } from '../../services/clipService.ts';
 import { QuoteResult } from '../../types/quote.ts';
@@ -98,15 +98,6 @@ export default function SharedClipView({ clipId, presentation }: Props) {
       // is the fallback path and the URL bar always works.
     }
   }, [shareUrl]);
-
-  const nativeShare = useCallback(() => {
-    const title = clip?.episode || 'A moment from Pull That Up Jamie';
-    if (navigator.share) {
-      navigator.share({ title, text: clip?.quote?.slice(0, 180), url: shareUrl }).catch(() => {});
-    } else {
-      copyLink();
-    }
-  }, [clip, shareUrl, copyLink]);
 
   if (!isShare || !clipId) return null;
 
@@ -384,7 +375,18 @@ export default function SharedClipView({ clipId, presentation }: Props) {
                     }}
                   >
                     <Search size={15} strokeWidth={2.25} />
-                    Search 1.9M moments
+                    Search 135K episodes
+                  </a>
+
+                  {/* Deep-links straight into the agent tab, which reads
+                      ?view=agent ahead of localStorage. */}
+                  <a
+                    className="jamie-share-action"
+                    href="/app?view=agent"
+                    style={{ ...secondaryAction, textDecoration: 'none' }}
+                  >
+                    <Bot size={15} />
+                    Put the agent on 150k+ hours
                   </a>
 
                   <button
@@ -397,15 +399,6 @@ export default function SharedClipView({ clipId, presentation }: Props) {
                     {copied ? 'Copied' : 'Copy link'}
                   </button>
 
-                  <button
-                    type="button"
-                    className="jamie-share-action"
-                    onClick={nativeShare}
-                    style={secondaryAction}
-                  >
-                    <Share2 size={15} />
-                    Share
-                  </button>
                 </div>
 
                 <p aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
@@ -517,7 +510,7 @@ function ErrorState({ message }: { message: string }) {
           {message}
         </h1>
         <p style={{ fontSize: '0.9375rem', lineHeight: 1.6, color: T.textLo, margin: '0 0 28px' }}>
-          The corpus is still here: 1.9 million indexed paragraphs across 7,000 episodes.
+          The corpus is still here: 25.7 million indexed paragraphs across 135,000 episodes.
         </p>
         <a
           className="jamie-share-primary"
