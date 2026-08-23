@@ -375,7 +375,7 @@ export default function SharedClipView({ clipId, presentation }: Props) {
                     }}
                   >
                     <Search size={15} strokeWidth={2.25} />
-                    Search 135K episodes
+                    Search 150k+ hrs
                   </a>
 
                   {/* Deep-links straight into the agent tab, which reads
@@ -386,7 +386,7 @@ export default function SharedClipView({ clipId, presentation }: Props) {
                     style={{ ...secondaryAction, textDecoration: 'none' }}
                   >
                     <Bot size={15} />
-                    Put the agent on 150k+ hours
+                    Ask the Agent
                   </a>
 
                   <button
