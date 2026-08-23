@@ -28,9 +28,17 @@ export const DISC = {
   artworkShadow: '0 24px 70px -20px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(248, 246, 242, 0.08)',
   fallbackA: 'rgba(248, 246, 242, 0.10)',
   fallbackB: 'rgba(248, 246, 242, 0.02)',
-  transportScrim: 'rgba(12, 11, 9, 0.34)',
-  transportFill: 'rgba(12, 11, 9, 0.55)',
-  transportEdge: 'rgba(248, 246, 242, 0.28)',
+  // The transport is the page's primary action, so at rest it is a solid
+  // light disc with a dark glyph — the highest-contrast thing on the surface,
+  // and the iPod centre button the whole composition is quoting. Once playback
+  // starts it steps back to a translucent dark pill so it stops covering the
+  // artwork.
+  transportScrim: 'rgba(12, 11, 9, 0.22)',
+  transportFill: 'rgba(248, 246, 242, 0.95)',
+  transportGlyph: '#0d0c0a',
+  transportEdge: 'rgba(248, 246, 242, 0.30)',
+  transportFillPlaying: 'rgba(12, 11, 9, 0.55)',
+  transportShadow: '0 10px 34px -8px rgba(0, 0, 0, 0.7)',
 };
 
 /** The API returns `date` in whatever shape the feed had: usually an ISO

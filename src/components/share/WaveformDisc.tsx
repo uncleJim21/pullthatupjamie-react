@@ -65,14 +65,23 @@ export default function WaveformDisc({
     reducedMotion,
   });
 
-  // Progress is read from a ref inside the draw loop so that timeupdate
-  // (~4/sec) never fights the animation frame for renders.
-  const progressRef = useRef(0);
-  progressRef.current = duration > 0 ? Math.min(1, Math.max(0, position / duration)) : 0;
+  // The media element fires timeupdate only about four times a second, so
+  // drawing `position` straight from React made the playhead visibly tick
+  // between jumps. Each update is stamped instead, and the draw loop advances
+  // the value by real elapsed time between stamps. The audio element stays the
+  // source of truth; this only fills the gaps.
+  const progressRef = useRef({ seconds: 0, stampedAt: 0 });
+  progressRef.current = {
+    seconds: position,
+    // performance.now() shares an origin with the rAF timestamp, so the two
+    // can be subtracted directly.
+    stampedAt: typeof performance !== 'undefined' ? performance.now() : 0,
+  };
   const readRef = useRef(source.read);
   readRef.current = source.read;
   const activeRef = useRef(isPlaying);
   activeRef.current = isPlaying;
+  const wakeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -112,7 +121,12 @@ export default function WaveformDisc({
       if (s <= 0) { frame = requestAnimationFrame(draw); return; }
 
       readRef.current(amps, time);
-      const progress = progressRef.current;
+      const { seconds, stampedAt } = progressRef.current;
+      // Only extrapolate while actually playing; a paused or scrubbing ring
+      // must sit exactly where the audio element says it is.
+      const elapsed = activeRef.current ? Math.max(0, (time - stampedAt) / 1000) : 0;
+      const smoothed = Math.min(duration, seconds + elapsed);
+      const progress = duration > 0 ? Math.min(1, Math.max(0, smoothed / duration)) : 0;
 
       ctx.clearRect(0, 0, w, h);
 
@@ -180,14 +194,27 @@ export default function WaveformDisc({
     };
 
     frame = requestAnimationFrame(draw);
+    wakeRef.current = () => {
+      if (!stopped && !frame) {
+        settleFrames = 0;
+        frame = requestAnimationFrame(draw);
+      }
+    };
     return () => {
       stopped = true;
+      wakeRef.current = null;
       if (frame) cancelAnimationFrame(frame);
       observer.disconnect();
     };
     // Restart the loop whenever a change could alter the drawing: playback
     // state, a new progress value while paused (scrubbing), or a tier change.
-  }, [isPlaying, source.tier, position, duration, reducedMotion]);
+    // `position` is deliberately absent: it changes ~4x/sec and tearing the
+    // loop down that often was itself a source of stutter. A paused seek wakes
+    // the parked loop through wakeRef below instead.
+  }, [isPlaying, source.tier, duration, reducedMotion]);
+
+  // Repaint a parked (settled, paused) ring when the listener scrubs.
+  useEffect(() => { wakeRef.current?.(); }, [position]);
 
   const seekFromPointer = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -244,6 +271,7 @@ export default function WaveformDisc({
   const fallbackAngle = (parseInt(seed.slice(-4).replace(/\W/g, '') || '0', 36) % 360);
   const PlayIcon = hasEnded ? RotateCcw : (isPlaying ? Pause : Play);
   const iconVisible = !isPlaying || hovered || isBuffering;
+  const atRest = !isPlaying && !isBuffering;
 
   return (
     <div
@@ -327,7 +355,6 @@ export default function WaveformDisc({
           border: 'none',
           padding: 0,
           background: iconVisible && !disabled ? DISC.transportScrim : 'transparent',
-          color: DISC.textHi,
           display: 'grid',
           placeItems: 'center',
           cursor: disabled ? 'default' : 'pointer',
@@ -336,25 +363,41 @@ export default function WaveformDisc({
         }}
       >
         <span
+          // The halo only runs before the first play, where the job is to pull
+          // the eye to the one thing worth clicking.
+          className={atRest && !disabled ? 'jamie-share-transport jamie-share-ping' : 'jamie-share-transport'}
           style={{
             display: 'grid',
             placeItems: 'center',
-            width: 'clamp(56px, 22%, 92px)',
+            width: 'clamp(68px, 27%, 108px)',
             aspectRatio: '1 / 1',
             borderRadius: '50%',
-            border: `1px solid ${DISC.transportEdge}`,
-            background: DISC.transportFill,
-            backdropFilter: 'blur(6px)',
+            border: `1px solid ${atRest ? 'transparent' : DISC.transportEdge}`,
+            background: atRest ? DISC.transportFill : DISC.transportFillPlaying,
+            color: atRest ? DISC.transportGlyph : DISC.textHi,
+            boxShadow: atRest ? DISC.transportShadow : 'none',
+            backdropFilter: atRest ? 'none' : 'blur(6px)',
             opacity: iconVisible && !disabled ? 1 : 0,
             transform: iconVisible ? 'scale(1)' : 'scale(0.94)',
-            transition: 'opacity 200ms cubic-bezier(0.25, 1, 0.5, 1), transform 200ms cubic-bezier(0.25, 1, 0.5, 1)',
+            transition: 'opacity 200ms cubic-bezier(0.25, 1, 0.5, 1), transform 200ms cubic-bezier(0.25, 1, 0.5, 1), background 220ms cubic-bezier(0.25, 1, 0.5, 1), color 220ms cubic-bezier(0.25, 1, 0.5, 1)',
           }}
         >
-          {isBuffering
-            ? <span style={{ width: '34%', aspectRatio: '1/1', borderRadius: '50%', border: `2px solid ${DISC.transportEdge}`, borderTopColor: DISC.textHi, animation: 'jamie-share-spin 900ms linear infinite' }} />
+          {isBuffering ? (
+            <span
+              style={{
+                width: '32%',
+                aspectRatio: '1 / 1',
+                borderRadius: '50%',
+                border: `2px solid ${atRest ? 'rgba(13, 12, 10, 0.25)' : DISC.transportEdge}`,
+                borderTopColor: atRest ? DISC.transportGlyph : DISC.textHi,
+                animation: 'jamie-share-spin 900ms linear infinite',
+              }}
+            />
+          ) : (
             // The play glyph is optically centered, not geometrically: a
             // triangle's visual mass sits left of its bounding box.
-            : <PlayIcon size={22} strokeWidth={1.75} style={{ marginLeft: isPlaying || hasEnded ? 0 : '3px' }} />}
+            <PlayIcon size={26} strokeWidth={2} style={{ marginLeft: isPlaying || hasEnded ? 0 : '3px' }} />
+          )}
         </span>
       </button>
     </div>
