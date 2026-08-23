@@ -118,6 +118,16 @@ export default function SharedClipView({ clipId, presentation }: Props) {
     >
       <style>{`
         @keyframes jamie-share-spin { to { transform: rotate(360deg); } }
+        /* A single expanding ring behind the transport, drawn with box-shadow
+           so it costs no layout and never intercepts a click. Runs only before
+           the first play. */
+        @keyframes jamie-share-ping {
+          0%   { box-shadow: 0 0 0 0 rgba(248, 246, 242, 0.34); }
+          70%  { box-shadow: 0 0 0 18px rgba(248, 246, 242, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(248, 246, 242, 0); }
+        }
+        .jamie-share-ping { animation: jamie-share-ping 2.4s cubic-bezier(0.25, 1, 0.5, 1) infinite; }
+        .jamie-share-transport { will-change: transform, opacity; }
         @keyframes jamie-share-rise {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: none; }
@@ -166,6 +176,7 @@ export default function SharedClipView({ clipId, presentation }: Props) {
         }
         @media (prefers-reduced-motion: reduce) {
           .jamie-share-rise { animation: none; }
+          .jamie-share-ping { animation: none; }
           .jamie-share-skeleton { animation: none; opacity: 0.8; }
         }
         /* Sized to keep all three actions on one row: the desktop text column
